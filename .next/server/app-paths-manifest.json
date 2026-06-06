@@ -1,0 +1,9 @@
+{
+  "/equipment/page": "app/equipment/page.js",
+  "/reports/page": "app/reports/page.js",
+  "/settings/page": "app/settings/page.js",
+  "/alerts/page": "app/alerts/page.js",
+  "/integrations/page": "app/integrations/page.js",
+  "/lease/page": "app/lease/page.js",
+  "/benchmarking/page": "app/benchmarking/page.js"
+}

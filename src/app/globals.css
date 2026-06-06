@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --navy: #0f1623;
+  --navy2: #161f30;
+  --navy3: #1e2a3a;
+  --navy4: #243347;
+  --blue: #3b82f6;
+  --green: #22c55e;
+  --red: #ef4444;
+  --amber: #f59e0b;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  background: #0d1520;
+  color: #e2e8f0;
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #243347; border-radius: 3px; }
+
+@layer components {
+  .card {
+    @apply bg-[#161f30] border border-white/[0.08] rounded-xl p-5;
+  }
+  .card2 {
+    @apply bg-[#1e2a3a] border border-white/[0.08] rounded-lg p-4;
+  }
+  .metric-label {
+    @apply text-[11px] text-slate-500 uppercase tracking-wider mb-1;
+  }
+  .metric-value {
+    @apply text-2xl font-bold text-slate-100 tracking-tight;
+  }
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold;
+  }
+  .badge-green { @apply bg-green-500/10 text-green-400; }
+  .badge-red { @apply bg-red-500/10 text-red-400; }
+  .badge-amber { @apply bg-amber-500/10 text-amber-400; }
+  .badge-blue { @apply bg-blue-500/10 text-blue-400; }
+  .positive { @apply text-green-400; }
+  .negative { @apply text-red-400; }
+  .muted { @apply text-slate-400; }
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors;
+  }
+  .btn-outline {
+    @apply bg-transparent hover:bg-white/5 text-slate-400 border border-white/10 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer;
+  }
+  .nav-item {
+    @apply flex items-center gap-2.5 px-5 py-2 text-[13px] text-slate-400 cursor-pointer border-l-2 border-transparent transition-all hover:bg-[#1e2a3a] hover:text-slate-200;
+  }
+  .nav-item-active {
+    @apply bg-blue-500/10 text-blue-300 border-l-blue-500;
+  }
+  .progress-bar {
+    @apply h-1.5 bg-[#243347] rounded-full overflow-hidden mt-2;
+  }
+  .section-title {
+    @apply text-[15px] font-semibold text-slate-100 mb-4 flex items-center gap-2;
+  }
+  .metric-row {
+    @apply flex items-center justify-between py-2.5 border-b border-white/[0.05] text-[13px];
+  }
+  .metric-row:last-child { @apply border-b-0; }
+}
