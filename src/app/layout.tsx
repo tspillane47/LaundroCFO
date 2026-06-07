@@ -51,9 +51,30 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [showStorePicker, setShowStorePicker] = useState(false);
+  const [isDark, setIsDark] = useState(false);
   const storePickerRef = useRef<HTMLDivElement>(null);
 
   const isAuthPage = authPages.includes(pathname);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    let dark: boolean;
+    if (saved === "dark") dark = true;
+    else if (saved === "light") dark = false;
+    else dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+    setIsDark(dark);
+    if (dark) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+  }, []);
+
+  function toggleTheme() {
+    const newDark = !isDark;
+    setIsDark(newDark);
+    localStorage.setItem("theme", newDark ? "dark" : "light");
+    if (newDark) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+  }
 
   useEffect(() => {
     if (isAuthPage) return;
@@ -100,19 +121,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   if (isAuthPage) {
     return (
-      <html lang="en">
+      <html lang="en" className={isDark ? "dark" : ""}>
         <body>{children}</body>
       </html>
     );
   }
 
   return (
-    <html lang="en">
+    <html lang="en" className={isDark ? "dark" : ""}>
       <body>
         <div className="flex h-screen overflow-hidden">
           {/* Sidebar */}
-          <aside className="w-[220px] bg-[#161f30] border-r border-white/[0.07] flex flex-col flex-shrink-0">
-            <div className="px-5 py-[18px] border-b border-white/[0.07]">
+          <aside
+            className="w-[220px] flex flex-col flex-shrink-0 border-r transition-colors duration-300"
+            style={{ background: "var(--bg-sidebar)", borderColor: "var(--border)" }}
+          >
+            <div className="px-5 py-[18px] border-b" style={{ borderColor: "var(--border)" }}>
               <div className="text-[15px] font-bold text-blue-300 tracking-tight">LaundroCFO</div>
               <div className="text-[10px] text-slate-500 mt-0.5 tracking-widest uppercase">Valuation & Underwriting</div>
             </div>
@@ -171,11 +195,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </nav>
 
             {/* Store switcher */}
-            <div className="p-4 border-t border-white/[0.07] relative" ref={storePickerRef}>
+            <div className="p-4 border-t relative" style={{ borderColor: "var(--border)" }} ref={storePickerRef}>
               <button
                 type="button"
                 onClick={() => setShowStorePicker((v) => !v)}
-                className="w-full bg-[#1e2a3a] border border-white/[0.08] rounded-lg p-3 flex items-center gap-2.5 cursor-pointer text-left hover:border-white/[0.15] transition-colors"
+                className="w-full rounded-lg p-3 flex items-center gap-2.5 cursor-pointer text-left transition-colors duration-300"
+                style={{ background: "var(--bg-card2)", border: "1px solid var(--border)" }}
               >
                 <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
                 <div className="min-w-0 flex-1">
@@ -192,7 +217,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </button>
 
               {showStorePicker && stores.length > 1 && (
-                <div className="absolute bottom-full left-4 right-4 mb-1 bg-[#1e2a3a] border border-white/[0.08] rounded-lg overflow-hidden shadow-lg z-50">
+                <div
+                  className="absolute bottom-full left-4 right-4 mb-1 rounded-lg overflow-hidden shadow-lg z-50"
+                  style={{ background: "var(--bg-card2)", border: "1px solid var(--border)" }}
+                >
                   {stores.map((store) => (
                     <button
                       key={store.id}
@@ -215,18 +243,32 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* Main content */}
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Topbar */}
-            <header className="bg-[#161f30] border-b border-white/[0.07] px-6 py-3 flex items-center justify-between flex-shrink-0">
+            <header
+              className="border-b px-6 py-3 flex items-center justify-between flex-shrink-0 transition-colors duration-300"
+              style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}
+            >
               <div className="flex items-center gap-3">
-                <span className="text-[14px] font-semibold text-slate-100">
+                <span className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
                   {pageTitles[pathname] ?? "LaundroCFO"}
                 </span>
                 {selectedStore && (
-                  <span className="bg-[#1e2a3a] border border-white/[0.08] rounded-md px-2.5 py-1 text-[11px] text-slate-400">
+                  <span
+                    className="rounded-md px-2.5 py-1 text-[11px]"
+                    style={{ background: "var(--bg-card2)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+                  >
                     {selectedStore.name}
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  className="btn-outline w-9 h-9 flex items-center justify-center p-0 text-base"
+                  onClick={toggleTheme}
+                  aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+                >
+                  {isDark ? "☀️" : "🌙"}
+                </button>
                 <button type="button" className="btn-outline" onClick={handleSignOut}>
                   Sign Out
                 </button>
@@ -237,7 +279,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </header>
 
             {/* Page content */}
-            <main className="flex-1 overflow-y-auto bg-[#0d1520] p-6">
+            <main
+              className="flex-1 overflow-y-auto p-6 transition-colors duration-300"
+              style={{ background: "var(--bg-primary)" }}
+            >
               {children}
             </main>
           </div>

@@ -12,15 +12,45 @@
   --green: #22c55e;
   --red: #ef4444;
   --amber: #f59e0b;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card2: #f1f5f9;
+  --bg-sidebar: #0f1e3d;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --border: rgba(0, 0, 0, 0.08);
+  --border2: rgba(0, 0, 0, 0.12);
+  --accent: #2563eb;
+}
+
+.dark {
+  --bg-primary: #0d1520;
+  --bg-secondary: #161f30;
+  --bg-card: #161f30;
+  --bg-card2: #1e2a3a;
+  --bg-sidebar: #161f30;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border: rgba(148, 163, 184, 0.1);
+  --border2: rgba(148, 163, 184, 0.2);
+  --accent: #3b82f6;
 }
 
 * { box-sizing: border-box; }
 
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
 html, body {
   height: 100%;
-  background: #0d1520;
-  color: #e2e8f0;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font-family: 'DM Sans', system-ui, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 /* Custom scrollbar */
@@ -30,16 +60,22 @@ html, body {
 
 @layer components {
   .card {
-    @apply bg-[#161f30] border border-white/[0.08] rounded-xl p-5;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    @apply rounded-xl p-5 transition-colors duration-300;
   }
   .card2 {
-    @apply bg-[#1e2a3a] border border-white/[0.08] rounded-lg p-4;
+    background: var(--bg-card2);
+    border: 1px solid var(--border);
+    @apply rounded-lg p-4 transition-colors duration-300;
   }
   .metric-label {
-    @apply text-[11px] text-slate-500 uppercase tracking-wider mb-1;
+    color: var(--text-muted);
+    @apply text-[11px] uppercase tracking-wider mb-1;
   }
   .metric-value {
-    @apply text-2xl font-bold text-slate-100 tracking-tight;
+    color: var(--text-primary);
+    @apply text-2xl font-bold tracking-tight;
   }
   .badge {
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold;
@@ -55,19 +91,28 @@ html, body {
     @apply bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors;
   }
   .btn-outline {
-    @apply bg-transparent hover:bg-white/5 text-slate-400 border border-white/10 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer;
+    color: var(--text-secondary);
+    border: 1px solid var(--border2);
+    @apply bg-transparent hover:opacity-80 text-xs px-3 py-2 rounded-lg transition-all duration-300 cursor-pointer;
   }
   .nav-item {
-    @apply flex items-center gap-2.5 px-5 py-2 text-[13px] text-slate-400 cursor-pointer border-l-2 border-transparent transition-all hover:bg-[#1e2a3a] hover:text-slate-200;
+    color: var(--text-muted);
+    @apply flex items-center gap-2.5 px-5 py-2 text-[13px] cursor-pointer border-l-2 border-transparent transition-all duration-300;
+  }
+  .nav-item:hover {
+    background: var(--bg-card2);
+    color: var(--text-primary);
   }
   .nav-item-active {
-    @apply bg-blue-500/10 text-blue-300 border-l-blue-500;
+    @apply bg-blue-500/10 text-blue-400 border-l-blue-500;
   }
   .progress-bar {
-    @apply h-1.5 bg-[#243347] rounded-full overflow-hidden mt-2;
+    background: var(--bg-card2);
+    @apply h-1.5 rounded-full overflow-hidden mt-2;
   }
   .section-title {
-    @apply text-[15px] font-semibold text-slate-100 mb-4 flex items-center gap-2;
+    color: var(--text-primary);
+    @apply text-[15px] font-semibold mb-4 flex items-center gap-2;
   }
   .metric-row {
     @apply flex items-center justify-between py-2.5 border-b border-white/[0.05] text-[13px];

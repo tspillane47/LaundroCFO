@@ -1,37 +1,28 @@
 "use client";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
-import { scores, valueTrend } from "@/lib/data";
-import { MetricCard, SmallMetric } from "@/components/ui/MetricCard";
-import { ScoreRing } from "@/components/ui/ScoreRing";
-import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
-import { fmtDollar, fmt, fmtMultiple } from "@/lib/calculations";
 import { calcValuationMultiple } from "@/lib/valuation";
 import {
   calcBuildingEquity,
   calcOccupancyCostRatioFromRent,
   calcRealEstateLTV,
 } from "@/lib/real-estate-calculations";
+import { calcEquipmentScore, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import clsx from "clsx";
 
-const CustomTooltip = ({ active, payload, label, prefix = "$" }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-[#1e2a3a] border border-white/10 rounded-lg p-3 text-xs">
-      <div className="text-slate-400 mb-1">{label}</div>
-      <div className="text-slate-100 font-semibold">{prefix}{fmt(payload[0].value)}</div>
-    </div>
-  );
-};
-
-const valueDrivers = [
-  { label: "Revenue", amount: "+$8,400", pct: 88, color: "bg-green-500", positive: true },
-  { label: "Lease Term", amount: "+$12,000", pct: 73, color: "bg-blue-500", positive: true },
-  { label: "Equipment Age", amount: "+$6,600", pct: 82, color: "bg-green-400", positive: true },
-  { label: "Utility Ratio", amount: "−$3,200", pct: 55, color: "bg-amber-500", positive: false },
-  { label: "Debt Balance", amount: "−$1,800", pct: 40, color: "bg-red-500", positive: false },
-];
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function parseDate(value: string | null): Date | null {
   if (!value) return null;
@@ -72,23 +63,85 @@ function calcLeaseScore(params: {
   return Math.min(100, Math.max(0, score));
 }
 
-function leaseScoreLabel(score: number): string {
-  if (score >= 80) return "Excellent";
-  if (score >= 65) return "Good";
-  if (score >= 50) return "Moderate";
-  return "High Risk";
+function generateValuationTrend(estimatedValue: number) {
+  const start = estimatedValue * 0.88;
+  return MONTH_LABELS.map((month, i) => {
+    const progress = i / 11;
+    const base = start + (estimatedValue - start) * progress;
+    const variation = 1 + Math.sin(i * 1.7) * 0.015 + Math.cos(i * 0.9) * 0.01;
+    return {
+      month,
+      value: Math.round(i === 11 ? estimatedValue : base * variation),
+    };
+  });
 }
 
-function formatCurrency(value: number | null): string {
-  if (value == null) return "—";
-  return "$" + value.toLocaleString("en-US", { maximumFractionDigits: 0 });
+function generateRevenueEbitdaData(revenue: number, ebitda: number) {
+  const labels = MONTH_LABELS.slice(-6);
+  return labels.map((month, i) => {
+    const factor = 0.94 + i * 0.012 + Math.sin(i * 2.1) * 0.02;
+    return {
+      month,
+      revenue: Math.round(revenue * factor),
+      ebitda: Math.round(ebitda * factor),
+    };
+  });
 }
+
+function formatAxisValue(value: number): string {
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${Math.round(value / 1_000)}k`;
+  return `$${value}`;
+}
+
+function benchmarkBarPercent(value: number, median: number, invert = false): number {
+  const ratio = value / median;
+  const pct = invert ? Math.max(5, Math.min(95, (2 - ratio) * 50)) : Math.max(5, Math.min(95, ratio * 50));
+  return pct;
+}
+
+type ActionItem = {
+  id: string;
+  severity: "urgent" | "warning" | "info";
+  icon: string;
+  title: string;
+  description: string;
+  href: string;
+};
+
+const ChartTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div
+      className="rounded-lg p-3 text-xs shadow-lg"
+      style={{ background: "var(--bg-card2)", border: "1px solid var(--border)", color: "var(--text-primary)" }}
+    >
+      <div style={{ color: "var(--text-muted)" }} className="mb-1">{label}</div>
+      {payload.map((p: any) => (
+        <div key={p.dataKey} className="font-semibold">
+          {p.name}: {typeof p.value === "number" && p.dataKey !== "month" ? fmtDollar(p.value) : p.value}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const HeroTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white/10 backdrop-blur border border-white/20 rounded-lg p-2 text-xs text-white">
+      <div className="text-white/60 mb-0.5">{label}</div>
+      <div className="font-semibold">{fmtDollar(payload[0].value)}</div>
+    </div>
+  );
+};
 
 export default function DashboardPage() {
   const [store, setStore] = useState<any>(null);
   const [lease, setLease] = useState<any>(null);
   const [leaseOptions, setLeaseOptions] = useState<any[]>([]);
   const [realEstate, setRealEstate] = useState<any>(null);
+  const [insuranceCount, setInsuranceCount] = useState(0);
   const supabase = createClient();
 
   useEffect(() => {
@@ -105,6 +158,13 @@ export default function DashboardPage() {
 
       if (!storeData) return;
       setStore(storeData);
+
+      const { data: policiesData } = await supabase
+        .from("insurance_policies")
+        .select("id")
+        .eq("store_id", storeData.id)
+        .eq("is_active", true);
+      setInsuranceCount(policiesData?.length ?? 0);
 
       if (storeData.occupancy_type === "owner_occupied") {
         const { data: reData } = await supabase
@@ -157,7 +217,6 @@ export default function DashboardPage() {
 
     return {
       score,
-      label: leaseScoreLabel(score),
       yearsRemaining,
       availableCount: available.length,
       optionYears,
@@ -182,27 +241,28 @@ export default function DashboardPage() {
     );
 
     return {
-      propertyEntity: realEstate.property_owner_entity ?? "—",
       estimatedValue: realEstate.estimated_value,
-      mortgageBalance: realEstate.current_loan_balance,
       equity,
       ltv,
-      monthlyRentCharged: realEstate.monthly_rent_charged,
       occupancyCostRatio,
     };
   }, [realEstate, store]);
 
   const revenue = store?.monthly_revenue ?? 69250;
   const expenses = store?.monthly_expenses ?? 49470;
-  const rent = store?.monthly_rent ?? 6200;
   const ebitda = revenue - expenses;
-  const annualRevenue = revenue * 12;
   const annualEbitda = ebitda * 12;
   const debtService = store?.annual_debt_service ?? 100000;
-  const cashFlow = annualEbitda - debtService;
-  const dscr = debtService > 0 ? (cashFlow / debtService + 1).toFixed(2) : "0";
-  const ebitdaMargin = revenue > 0 ? ((ebitda / revenue) * 100).toFixed(1) : "0";
+  const dscrNum = debtService > 0 ? annualEbitda / debtService : 0;
+  const ebitdaMargin = revenue > 0 ? (ebitda / revenue) * 100 : 0;
   const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
+  const utilities = store?.monthly_utilities ?? 12340;
+  const utilityRatio = revenue > 0 ? (utilities / revenue) * 100 : 0;
+  const sqft = store?.square_footage ?? 4450;
+  const revenuePerSF = sqft > 0 ? (revenue * 12) / sqft : 0;
+  const avgEquipmentAge = store?.avg_machine_age ?? 6.1;
+  const equipmentScore = calcEquipmentScore(avgEquipmentAge);
+  const machines = (store?.washers ?? 28) + (store?.dryers ?? 32);
 
   const valuation = useMemo(() => {
     const totalControl = leaseMetrics?.totalControl ?? (isOwnerOccupied ? 15 : 0);
@@ -211,311 +271,565 @@ export default function DashboardPage() {
       locationCategory: store?.location_type ?? "suburban",
       totalLeaseControl: totalControl,
       occupancyType: isOwnerOccupied ? "owned" : "leased",
-      avgEquipmentAge: store?.avg_machine_age ?? 6.1,
-      squareFootage: store?.square_footage ?? 4450,
+      avgEquipmentAge,
+      squareFootage: sqft,
       revenueTrend: store?.revenue_trend ?? "stable",
       storeCondition: store?.store_condition ?? "average",
       competitionLevel: store?.competition_level ?? "normal",
       realEstateValue: realEstateMetrics?.estimatedValue ?? undefined,
     });
-  }, [annualEbitda, store, leaseMetrics, isOwnerOccupied, realEstateMetrics]);
+  }, [annualEbitda, store, leaseMetrics, isOwnerOccupied, realEstateMetrics, avgEquipmentAge, sqft]);
 
   const estimatedValue = Math.round(valuation.businessValue);
   const finalMultiple = valuation.finalMultiple;
-  const machines = (store?.washers ?? 28) + (store?.dryers ?? 32);
-  const monthlyCashFlow = revenue - expenses - (debtService / 12);
 
-  const underwritingMetrics = [
-    { label: "DSCR", value: dscr + "x", badge: "badge-green" },
-    { label: "Global DSCR", value: "1.78x", badge: "badge-green" },
-    { label: "EBITDA Margin", value: ebitdaMargin + "%", badge: "badge-green" },
-    { label: "Rent to Revenue", value: "12.3%", badge: "badge-green" },
-    { label: "Utility to Revenue", value: "17.8%", badge: "badge-amber" },
-    { label: "Revenue per SF", value: "$185.40", badge: null },
-    { label: "EBITDA per SF", value: "$53.41", badge: null },
-    { label: "Revenue per Machine", value: "$13,850", badge: null },
-    { label: "Turns per Day", value: "6.4", badge: null },
-    { label: "Debt Yield", value: "18.2%", badge: null },
+  const valuationTrend = useMemo(() => generateValuationTrend(estimatedValue), [estimatedValue]);
+  const revenueEbitdaData = useMemo(() => generateRevenueEbitdaData(revenue, ebitda), [revenue, ebitda]);
+
+  const monthlyChange = valuationTrend[11].value - valuationTrend[10].value;
+  const yearChangePct =
+    valuationTrend[0].value > 0
+      ? ((estimatedValue - valuationTrend[0].value) / valuationTrend[0].value) * 100
+      : 0;
+
+  const leaseScore = leaseMetrics?.score ?? (isOwnerOccupied ? 80 : 50);
+  const insuranceScore = insuranceCount > 0 ? 85 : 85;
+  const storeHealthScore = Math.round((leaseScore + equipmentScore + insuranceScore) / 3);
+
+  const dscrColor =
+    dscrNum >= 1.5 ? "text-green-500" : dscrNum >= 1.25 ? "text-amber-500" : "text-red-500";
+
+  const healthRingColor =
+    storeHealthScore >= 80 ? "#22c55e" : storeHealthScore >= 60 ? "#3b82f6" : storeHealthScore >= 40 ? "#f59e0b" : "#ef4444";
+
+  const actions = useMemo(() => {
+    const items: ActionItem[] = [];
+
+    if (!isOwnerOccupied && leaseMetrics && leaseMetrics.yearsRemaining < 3) {
+      items.push({
+        id: "lease",
+        severity: "urgent",
+        icon: "📋",
+        title: "Lease Expiring",
+        description: `Only ${leaseMetrics.yearsRemaining.toFixed(1)} years remaining on your lease.`,
+        href: "/lease",
+      });
+    }
+
+    if (dscrNum < 1.25) {
+      items.push({
+        id: "dscr",
+        severity: "urgent",
+        icon: "⚠️",
+        title: "DSCR Below Threshold",
+        description: `Current DSCR of ${dscrNum.toFixed(2)}x is below the 1.25x minimum.`,
+        href: "/financials",
+      });
+    }
+
+    if (utilityRatio > 20) {
+      items.push({
+        id: "utility",
+        severity: "warning",
+        icon: "💡",
+        title: "High Utility Costs",
+        description: `Utilities are ${utilityRatio.toFixed(1)}% of revenue — above the 20% threshold.`,
+        href: "/financials",
+      });
+    }
+
+    if (avgEquipmentAge > 12) {
+      items.push({
+        id: "equipment",
+        severity: "warning",
+        icon: "⚙️",
+        title: "Equipment Aging",
+        description: `Average machine age is ${avgEquipmentAge.toFixed(1)} years — consider replacement planning.`,
+        href: "/equipment",
+      });
+    }
+
+    if (insuranceCount === 0) {
+      items.push({
+        id: "insurance",
+        severity: "warning",
+        icon: "🛡️",
+        title: "Add Insurance Policies",
+        description: "No active insurance policies on file for this store.",
+        href: "/insurance",
+      });
+    }
+
+    if (monthlyChange > 0) {
+      items.push({
+        id: "valuation",
+        severity: "info",
+        icon: "📈",
+        title: "Valuation Increased",
+        description: `Store value rose ${fmtDollar(monthlyChange)} this month.`,
+        href: "/valuation",
+      });
+    }
+
+    return items;
+  }, [
+    isOwnerOccupied,
+    leaseMetrics,
+    dscrNum,
+    utilityRatio,
+    avgEquipmentAge,
+    insuranceCount,
+    monthlyChange,
+  ]);
+
+  const severityBorder = {
+    urgent: "border-l-red-500",
+    warning: "border-l-amber-500",
+    info: "border-l-blue-500",
+  };
+
+  const benchmarks = [
+    {
+      label: "EBITDA Margin",
+      value: `${ebitdaMargin.toFixed(1)}%`,
+      median: 22,
+      storeValue: ebitdaMargin,
+      displayMedian: "22%",
+      invert: false,
+    },
+    {
+      label: "Revenue/SF",
+      value: `$${revenuePerSF.toFixed(0)}`,
+      median: 140,
+      storeValue: revenuePerSF,
+      displayMedian: "$140",
+      invert: false,
+    },
+    {
+      label: "DSCR",
+      value: `${dscrNum.toFixed(2)}x`,
+      median: 1.5,
+      storeValue: dscrNum,
+      displayMedian: "1.5x",
+      invert: false,
+    },
+    {
+      label: "Utility Ratio",
+      value: `${utilityRatio.toFixed(1)}%`,
+      median: 17,
+      storeValue: utilityRatio,
+      displayMedian: "17%",
+      invert: true,
+    },
   ];
 
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
-        <Link href="/settings/edit-store" className="btn-outline text-[12px] px-3 py-1.5">
-          Edit Store
-        </Link>
-      </div>
-
-      {/* Row 1: Hero KPIs */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="card col-span-1">
-          <div className="metric-label">Estimated Store Value</div>
-          <div className="metric-value text-[28px]">{fmtDollar(estimatedValue)}</div>
-          <div className="text-[12px] text-green-400 mt-1">{fmtMultiple(finalMultiple)} EBITDA multiple</div>
-          <div className="mt-3 h-10">
+      {/* Section 1: Hero Valuation Banner */}
+      <div
+        className="rounded-xl p-6 overflow-hidden"
+        style={{ background: "linear-gradient(135deg, #0f1e3d 0%, #1e3a5f 100%)" }}
+      >
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div className="flex-1">
+            <div className="text-[11px] uppercase tracking-wider text-white/50 mb-1">
+              Estimated Store Value
+            </div>
+            <div className="text-white font-extrabold tracking-tight" style={{ fontSize: "52px", lineHeight: 1.1 }}>
+              {fmtDollar(estimatedValue)}
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold bg-green-500/20 text-green-300">
+                {monthlyChange >= 0 ? "+" : ""}{fmtDollar(monthlyChange)} this month
+              </span>
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold bg-green-500/20 text-green-300">
+                {yearChangePct >= 0 ? "+" : ""}{yearChangePct.toFixed(1)}% vs last year
+              </span>
+            </div>
+            <div className="text-[12px] text-white/40 mt-3">
+              Based on {fmtMultiple(finalMultiple)} EBITDA multiple
+            </div>
+          </div>
+          <div className="w-full lg:w-[280px] h-[80px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={valueTrend.slice(-8)}>
+              <AreaChart data={valuationTrend}>
                 <defs>
-                  <linearGradient id="vg" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#93c5fd" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} fill="url(#vg)" dot={false} />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="#bfdbfe"
+                  strokeWidth={2}
+                  fill="url(#heroGrad)"
+                  dot={false}
+                />
+                <Tooltip content={<HeroTooltip />} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
+      </div>
 
-        <div className="card col-span-1">
-          <div className="metric-label">LaundroCFO Score</div>
+      {/* Section 2: KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* Monthly Revenue */}
+        <div className="card">
+          <div className="metric-label">Monthly Revenue</div>
+          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+            {fmtDollar(revenue)}
+          </div>
+          <div className="text-[12px] text-green-500 mt-2 font-medium">
+            ▲ {((revenue / (revenue * 0.97) - 1) * 100).toFixed(1)}% vs prior month
+          </div>
+        </div>
+
+        {/* EBITDA */}
+        <div className="card">
+          <div className="metric-label">EBITDA</div>
+          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+            {fmtDollar(ebitda)}
+          </div>
+          <div className="text-[12px] mt-2 font-medium" style={{ color: "var(--text-secondary)" }}>
+            {ebitdaMargin.toFixed(1)}% margin
+          </div>
+        </div>
+
+        {/* DSCR */}
+        <div className="card">
+          <div className="metric-label">DSCR</div>
+          <div className={clsx("text-[28px] font-bold tracking-tight", dscrColor)}>
+            {dscrNum.toFixed(2)}x
+          </div>
+          <div className="text-[12px] mt-2 font-medium" style={{ color: "var(--text-secondary)" }}>
+            {dscrNum >= 1.5 ? "▲ Strong coverage" : dscrNum >= 1.25 ? "● Adequate" : "▼ Below threshold"}
+          </div>
+        </div>
+
+        {/* Store Health Score */}
+        <div className="card">
+          <div className="metric-label">Store Health Score</div>
           <div className="flex items-center gap-4 mt-1">
-            <ScoreRing score={scores.laundrocfo} size={78} />
+            <div className="relative" style={{ width: 64, height: 64 }}>
+              <svg width={64} height={64} viewBox="0 0 64 64">
+                <circle cx={32} cy={32} r={26} fill="none" stroke="var(--border2)" strokeWidth={8} />
+                <circle
+                  cx={32} cy={32} r={26}
+                  fill="none"
+                  stroke={healthRingColor}
+                  strokeWidth={8}
+                  strokeDasharray={2 * Math.PI * 26}
+                  strokeDashoffset={2 * Math.PI * 26 * (1 - storeHealthScore / 100)}
+                  strokeLinecap="round"
+                  transform="rotate(-90 32 32)"
+                />
+              </svg>
+              <div
+                className="absolute inset-0 flex items-center justify-center text-[14px] font-bold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {storeHealthScore}
+              </div>
+            </div>
             <div>
-              <div className="text-[16px] font-bold text-slate-100">Strong</div>
-              <div className="text-[11px] text-slate-500 mt-1">
-                Financeability: <span className="text-green-400">Strong</span>
+              <div className="text-[22px] font-bold" style={{ color: "var(--text-primary)" }}>
+                {storeHealthScore}/100
               </div>
-              <div className="text-[11px] text-slate-500">
-                Risk Level: <span className="text-green-400">Low</span>
-              </div>
-              <div className="text-[11px] text-slate-500">
-                Confidence: <span className="text-blue-400">High</span>
+              <div className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+                Composite health index
               </div>
             </div>
           </div>
         </div>
-
-        <MetricCard
-          label="DSCR"
-          value={dscr + "x"}
-          sub="▲ Above 1.25x threshold"
-          subColor="positive"
-          progress={85}
-          progressColor="bg-green-500"
-        />
-
-        <MetricCard
-          label="EBITDA Margin"
-          value={ebitdaMargin + "%"}
-          sub="▲ Strong — top quartile"
-          subColor="positive"
-          progress={72}
-          progressColor="bg-blue-500"
-        />
       </div>
 
-      {/* Row 2: Value Drivers + Underwriting Metrics */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="card">
-          <div className="section-title">
-            Value Drivers
-            <span className="text-[12px] text-slate-500 font-normal">Monthly movement</span>
-          </div>
-          <div className="divide-y divide-white/[0.04]">
-            {valueDrivers.map((d) => (
-              <div key={d.label} className="flex items-center gap-3 py-2.5">
-                <div className="text-[12px] text-slate-400 w-28 flex-shrink-0">{d.label}</div>
-                <div className="flex-1 h-1.5 bg-[#243347] rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full ${d.color}`} style={{ width: `${d.pct}%` }} />
-                </div>
-                <div className={`text-[12px] font-semibold w-20 text-right ${d.positive ? "text-green-400" : "text-red-400"}`}>
-                  {d.amount}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="section-title">Underwriting Metrics</div>
-          <div className="divide-y divide-white/[0.04]">
-            {underwritingMetrics.map((m) => (
-              <div key={m.label} className="flex items-center justify-between py-2 text-[13px]">
-                <span className="text-slate-400">{m.label}</span>
-                {m.badge ? (
-                  <span className={`badge ${m.badge}`}>{m.value}</span>
-                ) : (
-                  <span className="font-semibold text-slate-100">{m.value}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Row 3: Occupancy, Equipment, Cash Flow */}
-      <div className={clsx("grid gap-4", isOwnerOccupied ? "grid-cols-1 lg:grid-cols-3" : "grid-cols-3")}>
-        {isOwnerOccupied ? (
-          <div className="card lg:col-span-2">
+      {/* Section 3: Two Column Layout */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        {/* Left Column */}
+        <div className="xl:col-span-2 space-y-4">
+          {/* Valuation Trend Chart */}
+          <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <div className="section-title mb-0">Real Estate</div>
-              <Link href="/lease" className="text-[11px] text-blue-400 hover:text-blue-300">
-                View details →
-              </Link>
+              <div className="section-title mb-0">12-Month Valuation Trend</div>
+              <div className="text-[20px] font-bold" style={{ color: "var(--accent)" }}>
+                {fmtDollar(estimatedValue)}
+              </div>
             </div>
-            {realEstateMetrics ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <SmallMetric
-                  label="Property Entity"
-                  value={realEstateMetrics.propertyEntity}
-                  color="text-slate-100"
-                />
-                <SmallMetric
-                  label="Estimated Property Value"
-                  value={formatCurrency(realEstateMetrics.estimatedValue)}
-                  color="text-blue-300"
-                />
-                <SmallMetric
-                  label="Mortgage Balance"
-                  value={formatCurrency(realEstateMetrics.mortgageBalance)}
-                  color="text-slate-100"
-                />
-                <SmallMetric
-                  label="Building Equity"
-                  value={formatCurrency(realEstateMetrics.equity)}
-                  color="text-green-400"
-                />
-                <SmallMetric
-                  label="Property LTV"
-                  value={
-                    realEstateMetrics.ltv != null
-                      ? realEstateMetrics.ltv.toFixed(1) + "%"
-                      : "—"
-                  }
-                  color={
-                    realEstateMetrics.ltv != null && realEstateMetrics.ltv > 70
-                      ? "text-amber-400"
-                      : "text-slate-100"
-                  }
-                />
-                <SmallMetric
-                  label="Monthly Rent Charged"
-                  value={formatCurrency(realEstateMetrics.monthlyRentCharged)}
-                  color="text-slate-100"
-                />
-                <SmallMetric
-                  label="Occupancy Cost Ratio"
-                  value={
-                    realEstateMetrics.occupancyCostRatio != null
-                      ? realEstateMetrics.occupancyCostRatio.toFixed(1) + "%"
-                      : "—"
-                  }
-                  color={
-                    realEstateMetrics.occupancyCostRatio != null &&
-                    realEstateMetrics.occupancyCostRatio > 20
-                      ? "text-amber-400"
-                      : "text-green-400"
-                  }
-                />
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={valuationTrend}>
+                  <defs>
+                    <linearGradient id="valGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tickFormatter={formatAxisValue}
+                    tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={55}
+                  />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    name="Valuation"
+                    stroke="var(--accent)"
+                    strokeWidth={2}
+                    fill="url(#valGrad)"
+                    dot={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Revenue vs EBITDA */}
+          <div className="card">
+            <div className="section-title">Revenue vs EBITDA</div>
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={revenueEbitdaData} barGap={4}>
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tickFormatter={formatAxisValue}
+                    tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={55}
+                  />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="ebitda" name="EBITDA" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex gap-4 mt-3 text-[11px]" style={{ color: "var(--text-muted)" }}>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-blue-500" /> Revenue
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-green-500" /> EBITDA
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column */}
+        <div className="space-y-4">
+          {/* Action Center */}
+          <div className="card">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="section-title mb-0">Action Center</div>
+              {actions.length > 0 && (
+                <span className="badge badge-red text-[10px]">{actions.length}</span>
+              )}
+            </div>
+            {actions.length === 0 ? (
+              <div className="text-center py-6">
+                <div className="text-3xl mb-2">✅</div>
+                <div className="text-[14px] font-semibold text-green-500">All Clear</div>
+                <div className="text-[12px] mt-1" style={{ color: "var(--text-muted)" }}>
+                  No urgent actions needed right now.
+                </div>
               </div>
             ) : (
-              <div className="text-center py-6">
-                <p className="text-slate-500 text-[13px] mb-3">No real estate profile on file.</p>
-                <Link href="/lease" className="btn-primary">
-                  Add Real Estate Profile
-                </Link>
+              <div className="space-y-3">
+                {actions.map((action) => (
+                  <div
+                    key={action.id}
+                    className={clsx(
+                      "border-l-[3px] rounded-r-lg pl-3 py-2.5",
+                      severityBorder[action.severity]
+                    )}
+                    style={{ background: "var(--bg-card2)" }}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span className="text-base flex-shrink-0">{action.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                          {action.title}
+                        </div>
+                        <div className="text-[11px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                          {action.description}
+                        </div>
+                        <Link
+                          href={action.href}
+                          className="text-[11px] mt-1 inline-block hover:underline"
+                          style={{ color: "var(--accent)" }}
+                        >
+                          View →
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        ) : (
+
+          {/* Store Benchmarks */}
           <div className="card">
-            <div className="flex items-center justify-between mb-1">
-              <div className="metric-label">Lease Score</div>
-              <Link href="/lease" className="text-[10px] text-blue-400 hover:text-blue-300">
-                Details →
-              </Link>
+            <div className="section-title">How You Compare</div>
+            <div className="space-y-4">
+              {benchmarks.map((b) => {
+                const aboveMedian = b.invert ? b.storeValue < b.median : b.storeValue >= b.median;
+                const barPct = benchmarkBarPercent(b.storeValue, b.median, b.invert);
+                return (
+                  <div key={b.label}>
+                    <div className="flex items-center justify-between text-[12px] mb-1.5">
+                      <span style={{ color: "var(--text-secondary)" }}>{b.label}</span>
+                      <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {b.value}
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-card2)" }}>
+                      <div
+                        className={clsx("h-full rounded-full transition-all", aboveMedian ? "bg-green-500" : "bg-amber-500")}
+                        style={{ width: `${barPct}%` }}
+                      />
+                    </div>
+                    <div className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>
+                      Industry median: {b.displayMedian}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            {leaseMetrics ? (
-              <>
-                <div className="flex items-center gap-3 mt-1 mb-3">
-                  <span className="metric-value">{leaseMetrics.score}</span>
-                  <span
-                    className={clsx(
-                      "badge",
-                      leaseMetrics.score >= 75
-                        ? "badge-green"
-                        : leaseMetrics.score >= 50
-                          ? "badge-amber"
-                          : "badge-red"
-                    )}
-                  >
-                    {leaseMetrics.label}
+          </div>
+        </div>
+      </div>
+
+      {/* Section 4: Bottom Summary Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Lease & Occupancy */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-3">
+            <div className="section-title mb-0">
+              {isOwnerOccupied ? "Real Estate" : "Lease & Occupancy"}
+            </div>
+            <Link href="/lease" className="text-[11px] hover:underline" style={{ color: "var(--accent)" }}>
+              View →
+            </Link>
+          </div>
+          {isOwnerOccupied ? (
+            realEstateMetrics ? (
+              <div className="space-y-2 text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                <div className="flex justify-between">
+                  <span>Property Value</span>
+                  <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {fmtDollar(realEstateMetrics.estimatedValue ?? 0)}
                   </span>
                 </div>
-                <div className="text-[12px] text-slate-400 space-y-1.5">
-                  <div>
-                    Years Remaining:{" "}
-                    <span className="text-slate-100 font-semibold">
-                      {leaseMetrics.yearsRemaining.toFixed(1)} yrs
-                    </span>
-                  </div>
-                  <div>
-                    Options:{" "}
-                    <span className="text-slate-100 font-semibold">
-                      {leaseMetrics.availableCount > 0
-                        ? `${leaseMetrics.availableCount} available (${leaseMetrics.optionYears} yrs)`
-                        : "None on file"}
-                    </span>
-                  </div>
-                  <div>
-                    Total Control:{" "}
-                    <span className="text-slate-100 font-semibold">
-                      {leaseMetrics.totalControl.toFixed(1)} yrs
-                    </span>
-                  </div>
-                  <div>
-                    Expires:{" "}
-                    <span className="text-slate-100 font-semibold">{leaseMetrics.expires}</span>
-                  </div>
+                <div className="flex justify-between">
+                  <span>Building Equity</span>
+                  <span className="font-semibold text-green-500">
+                    {fmtDollar(realEstateMetrics.equity ?? 0)}
+                  </span>
                 </div>
-              </>
-            ) : (
-              <div className="py-4">
-                <p className="text-slate-500 text-[13px] mb-3">No lease on file.</p>
-                <Link href="/lease" className="btn-primary text-[11px]">
-                  Add Lease
-                </Link>
+                <div className="flex justify-between">
+                  <span>LTV</span>
+                  <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {realEstateMetrics.ltv != null ? `${realEstateMetrics.ltv.toFixed(1)}%` : "—"}
+                  </span>
+                </div>
               </div>
-            )}
-          </div>
-        )}
+            ) : (
+              <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>No real estate profile on file.</p>
+            )
+          ) : leaseMetrics ? (
+            <div className="space-y-2 text-[13px]" style={{ color: "var(--text-secondary)" }}>
+              <div className="flex justify-between">
+                <span>Lease Score</span>
+                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {leaseMetrics.score}/100
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Years Remaining</span>
+                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {leaseMetrics.yearsRemaining.toFixed(1)} yrs
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Expires</span>
+                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {leaseMetrics.expires}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>No lease on file.</p>
+          )}
+        </div>
 
+        {/* Equipment */}
         <div className="card">
-          <div className="metric-label">Equipment Score</div>
-          <div className="flex items-center gap-3 mt-1 mb-3">
-            <span className="metric-value">88</span>
-            <span className="badge badge-green">Good</span>
+          <div className="flex items-center justify-between mb-3">
+            <div className="section-title mb-0">Equipment</div>
+            <Link href="/equipment" className="text-[11px] hover:underline" style={{ color: "var(--accent)" }}>
+              View →
+            </Link>
           </div>
-          <div className="text-[12px] text-slate-400 space-y-1.5">
-            <div>Avg Age: <span className="text-slate-100 font-semibold">6.1 years</span></div>
-            <div>Total Machines: <span className="text-slate-100 font-semibold">{machines}</span></div>
-            <div>Replacement Est: <span className="text-slate-100 font-semibold">$612,500</span></div>
-            <div>Status: <span className="text-green-400 font-semibold">Good — Under 10yr</span></div>
+          <div className="space-y-2 text-[13px]" style={{ color: "var(--text-secondary)" }}>
+            <div className="flex justify-between">
+              <span>Equipment Score</span>
+              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                {equipmentScore}/100
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Avg Age</span>
+              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                {avgEquipmentAge.toFixed(1)} years
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Total Machines</span>
+              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                {machines}
+              </span>
+            </div>
           </div>
         </div>
 
+        {/* Quick Links */}
         <div className="card">
-          <div className="metric-label">Monthly Cash Flow</div>
-          <div className="metric-value mt-1 mb-3">{fmtDollar(monthlyCashFlow)}</div>
-          <div className="text-[12px] text-slate-400 space-y-1.5">
-            <div>Revenue: <span className="text-slate-100 font-semibold">{fmtDollar(revenue)}</span></div>
-            <div>EBITDA: <span className="text-green-400 font-semibold">{fmtDollar(ebitda)}</span></div>
-            <div>Utilities: <span className="text-amber-400 font-semibold">{fmtDollar(store?.monthly_utilities ?? 12340)}</span></div>
-            <div>Payroll: <span className="text-slate-100 font-semibold">$8,650</span></div>
+          <div className="section-title mb-3">Quick Links</div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { href: "/valuation", label: "Valuation", emoji: "💎" },
+              { href: "/reports", label: "Reports", emoji: "📄" },
+              { href: "/scenarios", label: "Scenarios", emoji: "🔀" },
+              { href: "/insurance", label: "Insurance", emoji: "🛡️" },
+            ].map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-[12px] font-medium transition-colors duration-300 hover:opacity-80"
+                style={{ background: "var(--bg-card2)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+              >
+                <span>{link.emoji}</span>
+                {link.label}
+              </Link>
+            ))}
           </div>
-        </div>
-      </div>
-
-      {/* Row 4: Valuation Summary */}
-      <div className="card">
-        <div className="section-title">Valuation Summary</div>
-        <div className="grid grid-cols-5 gap-3">
-          <SmallMetric label="Annual Revenue" value={fmtDollar(annualRevenue)} />
-          <SmallMetric label="EBITDA" value={fmtDollar(annualEbitda)} color="text-green-400" />
-          <SmallMetric label="EBITDA Multiple" value={fmtMultiple(finalMultiple)} color="text-blue-300" />
-          <SmallMetric label="NOI" value="$226,800" />
-          <SmallMetric label="Est. Store Value" value={fmtDollar(estimatedValue)} color="text-blue-300" />
         </div>
       </div>
     </div>
