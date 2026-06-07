@@ -15,6 +15,7 @@ const navItems = [
   { href: "/scenarios", label: "Scenarios", emoji: "🔀" },
   { href: "/benchmarking", label: "Benchmarking", emoji: "📈" },
   { href: "/reports", label: "Reports", emoji: "📄" },
+  { href: "/insurance", label: "Insurance", emoji: "🛡️" },
   { href: "/alerts", label: "Alerts", emoji: "🔔", badge: 3 },
   { href: "/integrations", label: "Integrations", emoji: "🔌" },
   { href: "/settings", label: "Settings", emoji: "⚙️" },
@@ -29,6 +30,7 @@ const pageTitles: Record<string, string> = {
   "/scenarios": "Scenario Planner",
   "/benchmarking": "Benchmarking",
   "/reports": "Reports",
+  "/insurance": "Insurance",
   "/alerts": "Alerts",
   "/integrations": "Integrations",
   "/settings": "Settings",
@@ -140,8 +142,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </Link>
               ))}
 
+              <div className="text-[10px] text-slate-600 px-5 pt-4 pb-1 uppercase tracking-widest">Risk Management</div>
+              {navItems.slice(8, 9).map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={clsx("nav-item", pathname === item.href && "nav-item-active")}
+                >
+                  <span className="text-[13px] w-4 text-center">{item.emoji}</span>
+                  {item.label}
+                </Link>
+              ))}
+
               <div className="text-[10px] text-slate-600 px-5 pt-4 pb-1 uppercase tracking-widest">Settings</div>
-              {navItems.slice(8).map((item) => (
+              {navItems.slice(9).map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}

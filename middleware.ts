@@ -32,6 +32,7 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/scenarios') ||
     request.nextUrl.pathname.startsWith('/benchmarking') ||
     request.nextUrl.pathname.startsWith('/reports') ||
+    request.nextUrl.pathname.startsWith('/insurance') ||
     request.nextUrl.pathname.startsWith('/alerts') ||
     request.nextUrl.pathname.startsWith('/settings')
 
