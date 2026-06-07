@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 import { scores, valueTrend } from "@/lib/data";
 import { MetricCard, SmallMetric } from "@/components/ui/MetricCard";
@@ -70,6 +71,12 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
+      <div className="flex justify-end">
+        <Link href="/settings/edit-store" className="btn-outline text-[12px] px-3 py-1.5">
+          Edit Store
+        </Link>
+      </div>
+
       {/* Row 1: Hero KPIs */}
       <div className="grid grid-cols-4 gap-4">
         {/* Store Value */}
