@@ -1,5 +1,7 @@
 "use client";
-import { financials, scores, monthlyData, valueTrend, store } from "@/lib/data";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase";
+import { scores, valueTrend } from "@/lib/data";
 import { MetricCard, SmallMetric } from "@/components/ui/MetricCard";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import {
@@ -25,20 +27,47 @@ const valueDrivers = [
   { label: "Debt Balance", amount: "−$1,800", pct: 40, color: "bg-red-500", positive: false },
 ];
 
-const underwritingMetrics = [
-  { label: "DSCR", value: "2.14x", badge: "badge-green" },
-  { label: "Global DSCR", value: "1.78x", badge: "badge-green" },
-  { label: "EBITDA Margin", value: "28.6%", badge: "badge-green" },
-  { label: "Rent to Revenue", value: "12.3%", badge: "badge-green" },
-  { label: "Utility to Revenue", value: "17.8%", badge: "badge-amber" },
-  { label: "Revenue per SF", value: "$185.40", badge: null },
-  { label: "EBITDA per SF", value: "$53.41", badge: null },
-  { label: "Revenue per Machine", value: "$13,850", badge: null },
-  { label: "Turns per Day", value: "6.4", badge: null },
-  { label: "Debt Yield", value: "18.2%", badge: null },
-];
-
 export default function DashboardPage() {
+  const [store, setStore] = useState<any>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from("stores").select("*").eq("user_id", user.id).limit(1).single();
+      if (data) setStore(data);
+    }
+    load();
+  }, []);
+
+  const revenue = store?.monthly_revenue ?? 69250;
+  const expenses = store?.monthly_expenses ?? 49470;
+  const rent = store?.monthly_rent ?? 6200;
+  const ebitda = revenue - expenses;
+  const annualRevenue = revenue * 12;
+  const annualEbitda = ebitda * 12;
+  const debtService = store?.annual_debt_service ?? 100000;
+  const cashFlow = annualEbitda - debtService;
+  const dscr = debtService > 0 ? (cashFlow / debtService + 1).toFixed(2) : "0";
+  const ebitdaMargin = revenue > 0 ? ((ebitda / revenue) * 100).toFixed(1) : "0";
+  const estimatedValue = Math.round(annualEbitda * 3.47);
+  const machines = (store?.washers ?? 28) + (store?.dryers ?? 32);
+  const monthlyCashFlow = revenue - expenses - (debtService / 12);
+
+  const underwritingMetrics = [
+    { label: "DSCR", value: dscr + "x", badge: "badge-green" },
+    { label: "Global DSCR", value: "1.78x", badge: "badge-green" },
+    { label: "EBITDA Margin", value: ebitdaMargin + "%", badge: "badge-green" },
+    { label: "Rent to Revenue", value: "12.3%", badge: "badge-green" },
+    { label: "Utility to Revenue", value: "17.8%", badge: "badge-amber" },
+    { label: "Revenue per SF", value: "$185.40", badge: null },
+    { label: "EBITDA per SF", value: "$53.41", badge: null },
+    { label: "Revenue per Machine", value: "$13,850", badge: null },
+    { label: "Turns per Day", value: "6.4", badge: null },
+    { label: "Debt Yield", value: "18.2%", badge: null },
+  ];
+
   return (
     <div className="space-y-5">
       {/* Row 1: Hero KPIs */}
@@ -46,7 +75,7 @@ export default function DashboardPage() {
         {/* Store Value */}
         <div className="card col-span-1">
           <div className="metric-label">Estimated Store Value</div>
-          <div className="metric-value text-[28px]">{fmtDollar(financials.estimatedValue)}</div>
+          <div className="metric-value text-[28px]">{fmtDollar(estimatedValue)}</div>
           <div className="text-[12px] text-green-400 mt-1">▲ +$22,000 &nbsp;+2.7% vs last month</div>
           <div className="mt-3 h-10">
             <ResponsiveContainer width="100%" height="100%">
@@ -86,7 +115,7 @@ export default function DashboardPage() {
         {/* DSCR */}
         <MetricCard
           label="DSCR"
-          value="2.14x"
+          value={dscr + "x"}
           sub="▲ Above 1.25x threshold"
           subColor="positive"
           progress={85}
@@ -96,7 +125,7 @@ export default function DashboardPage() {
         {/* EBITDA Margin */}
         <MetricCard
           label="EBITDA Margin"
-          value="28.6%"
+          value={ebitdaMargin + "%"}
           sub="▲ Strong — top quartile"
           subColor="positive"
           progress={72}
@@ -169,7 +198,7 @@ export default function DashboardPage() {
           </div>
           <div className="text-[12px] text-slate-400 space-y-1.5">
             <div>Avg Age: <span className="text-slate-100 font-semibold">6.1 years</span></div>
-            <div>Total Machines: <span className="text-slate-100 font-semibold">60</span></div>
+            <div>Total Machines: <span className="text-slate-100 font-semibold">{machines}</span></div>
             <div>Replacement Est: <span className="text-slate-100 font-semibold">$612,500</span></div>
             <div>Status: <span className="text-green-400 font-semibold">Good — Under 10yr</span></div>
           </div>
@@ -177,11 +206,11 @@ export default function DashboardPage() {
 
         <div className="card">
           <div className="metric-label">Monthly Cash Flow</div>
-          <div className="metric-value mt-1 mb-3">{fmtDollar(monthlyData[monthlyData.length - 1].cashFlow)}</div>
+          <div className="metric-value mt-1 mb-3">{fmtDollar(monthlyCashFlow)}</div>
           <div className="text-[12px] text-slate-400 space-y-1.5">
-            <div>Revenue: <span className="text-slate-100 font-semibold">$69,250</span></div>
-            <div>EBITDA: <span className="text-green-400 font-semibold">$19,780</span></div>
-            <div>Utilities: <span className="text-amber-400 font-semibold">$12,340</span></div>
+            <div>Revenue: <span className="text-slate-100 font-semibold">{fmtDollar(revenue)}</span></div>
+            <div>EBITDA: <span className="text-green-400 font-semibold">{fmtDollar(ebitda)}</span></div>
+            <div>Utilities: <span className="text-amber-400 font-semibold">{fmtDollar(store?.monthly_utilities ?? 12340)}</span></div>
             <div>Payroll: <span className="text-slate-100 font-semibold">$8,650</span></div>
           </div>
         </div>
@@ -191,11 +220,11 @@ export default function DashboardPage() {
       <div className="card">
         <div className="section-title">Valuation Summary</div>
         <div className="grid grid-cols-5 gap-3">
-          <SmallMetric label="Annual Revenue" value="$831,000" />
-          <SmallMetric label="EBITDA" value="$237,666" color="text-green-400" />
+          <SmallMetric label="Annual Revenue" value={fmtDollar(annualRevenue)} />
+          <SmallMetric label="EBITDA" value={fmtDollar(annualEbitda)} color="text-green-400" />
           <SmallMetric label="EBITDA Multiple" value="3.47x" color="text-blue-300" />
           <SmallMetric label="NOI" value="$226,800" />
-          <SmallMetric label="Est. Store Value" value="$825,000" color="text-blue-300" />
+          <SmallMetric label="Est. Store Value" value={fmtDollar(estimatedValue)} color="text-blue-300" />
         </div>
       </div>
     </div>
