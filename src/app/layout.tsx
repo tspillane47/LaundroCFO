@@ -9,7 +9,7 @@ import clsx from "clsx";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", emoji: "⬛" },
   { href: "/financials", label: "Financials", emoji: "📊" },
-  { href: "/lease", label: "Lease", emoji: "📋" },
+  { href: "/lease", label: "Occupancy", emoji: "🏢" },
   { href: "/equipment", label: "Equipment", emoji: "⚙️" },
   { href: "/scenarios", label: "Scenarios", emoji: "🔀" },
   { href: "/benchmarking", label: "Benchmarking", emoji: "📈" },
@@ -22,7 +22,7 @@ const navItems = [
 const pageTitles: Record<string, string> = {
   "/dashboard": "Store Dashboard",
   "/financials": "Financials",
-  "/lease": "Lease Analysis",
+  "/lease": "Occupancy & Real Estate",
   "/equipment": "Equipment",
   "/scenarios": "Scenario Planner",
   "/benchmarking": "Benchmarking",

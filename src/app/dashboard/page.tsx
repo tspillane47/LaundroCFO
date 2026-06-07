@@ -1,14 +1,18 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 import { scores, valueTrend } from "@/lib/data";
 import { MetricCard, SmallMetric } from "@/components/ui/MetricCard";
 import { ScoreRing } from "@/components/ui/ScoreRing";
+import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
+import { fmtDollar, fmt } from "@/lib/calculations";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-} from "recharts";
-import { fmtDollar, fmtMultiple, fmtPct, fmt } from "@/lib/calculations";
+  calcBuildingEquity,
+  calcOccupancyCostRatioFromRent,
+  calcRealEstateLTV,
+} from "@/lib/real-estate-calculations";
+import clsx from "clsx";
 
 const CustomTooltip = ({ active, payload, label, prefix = "$" }: any) => {
   if (!active || !payload?.length) return null;
@@ -28,19 +32,164 @@ const valueDrivers = [
   { label: "Debt Balance", amount: "−$1,800", pct: 40, color: "bg-red-500", positive: false },
 ];
 
+function parseDate(value: string | null): Date | null {
+  if (!value) return null;
+  const d = new Date(value.split("T")[0] + "T12:00:00");
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function calcYearsRemaining(endDate: string | null): number {
+  const end = parseDate(endDate);
+  if (!end) return 0;
+  const now = new Date();
+  const ms = end.getTime() - now.getTime();
+  return Math.max(0, ms / (365.25 * 24 * 60 * 60 * 1000));
+}
+
+function calcLeaseScore(params: {
+  yearsRemaining: number;
+  availableOptions: number;
+  exclusivityClause: boolean;
+  personalGuaranty: boolean;
+  assignmentRights: string | null;
+  monthlyRent: number | null;
+  monthlyRevenue: number | null;
+}): number {
+  let score = 50;
+  if (params.yearsRemaining >= 10) score += 25;
+  else if (params.yearsRemaining >= 7) score += 15;
+  else if (params.yearsRemaining >= 5) score += 8;
+  if (params.availableOptions >= 2) score += 10;
+  else if (params.availableOptions === 1) score += 5;
+  if (params.exclusivityClause) score += 5;
+  if (params.personalGuaranty) score -= 10;
+  if (params.assignmentRights === "Not Allowed") score -= 5;
+  if (params.monthlyRent != null && params.monthlyRevenue != null && params.monthlyRevenue > 0) {
+    const rentToRevenue = (params.monthlyRent / params.monthlyRevenue) * 100;
+    if (rentToRevenue > 20) score -= 15;
+  }
+  return Math.min(100, Math.max(0, score));
+}
+
+function leaseScoreLabel(score: number): string {
+  if (score >= 80) return "Excellent";
+  if (score >= 65) return "Good";
+  if (score >= 50) return "Moderate";
+  return "High Risk";
+}
+
+function formatCurrency(value: number | null): string {
+  if (value == null) return "—";
+  return "$" + value.toLocaleString("en-US", { maximumFractionDigits: 0 });
+}
+
 export default function DashboardPage() {
   const [store, setStore] = useState<any>(null);
+  const [lease, setLease] = useState<any>(null);
+  const [leaseOptions, setLeaseOptions] = useState<any[]>([]);
+  const [realEstate, setRealEstate] = useState<any>(null);
   const supabase = createClient();
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase.from("stores").select("*").eq("user_id", user.id).limit(1).single();
-      if (data) setStore(data);
+
+      const { data: storeData } = await supabase
+        .from("stores")
+        .select("*")
+        .eq("user_id", user.id)
+        .limit(1)
+        .single();
+
+      if (!storeData) return;
+      setStore(storeData);
+
+      if (storeData.occupancy_type === "owner_occupied") {
+        const { data: reData } = await supabase
+          .from("real_estate")
+          .select("*")
+          .eq("store_id", storeData.id)
+          .limit(1)
+          .maybeSingle();
+        setRealEstate(reData);
+      } else {
+        const { data: leaseData } = await supabase
+          .from("leases")
+          .select("*")
+          .eq("store_id", storeData.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (leaseData) {
+          setLease(leaseData);
+          const { data: optionsData } = await supabase
+            .from("lease_options")
+            .select("*")
+            .eq("lease_id", leaseData.id)
+            .order("option_number", { ascending: true });
+          setLeaseOptions(optionsData ?? []);
+        }
+      }
     }
     load();
   }, []);
+
+  const leaseMetrics = useMemo(() => {
+    if (!lease) return null;
+    const yearsRemaining = calcYearsRemaining(lease.lease_end_date);
+    const available = leaseOptions.filter((o) => o.status === "Available");
+    const optionYears = available.reduce((s: number, o: any) => s + (o.option_years ?? 0), 0);
+    const score = calcLeaseScore({
+      yearsRemaining,
+      availableOptions: available.length,
+      exclusivityClause: lease.exclusivity_clause ?? false,
+      personalGuaranty: lease.personal_guaranty ?? false,
+      assignmentRights: lease.assignment_rights ?? null,
+      monthlyRent: lease.monthly_rent ?? null,
+      monthlyRevenue: store?.monthly_revenue ?? null,
+    });
+    const end = parseDate(lease.lease_end_date);
+    const expires = end
+      ? end.toLocaleDateString("en-US", { month: "short", year: "numeric" })
+      : "—";
+
+    return {
+      score,
+      label: leaseScoreLabel(score),
+      yearsRemaining,
+      availableCount: available.length,
+      optionYears,
+      totalControl: yearsRemaining + optionYears,
+      expires,
+    };
+  }, [lease, leaseOptions, store]);
+
+  const realEstateMetrics = useMemo(() => {
+    if (!realEstate) return null;
+    const equity = calcBuildingEquity(
+      realEstate.estimated_value,
+      realEstate.current_loan_balance
+    );
+    const ltv = calcRealEstateLTV(
+      realEstate.current_loan_balance,
+      realEstate.estimated_value
+    );
+    const occupancyCostRatio = calcOccupancyCostRatioFromRent(
+      realEstate.monthly_rent_charged,
+      store?.monthly_revenue ?? null
+    );
+
+    return {
+      propertyEntity: realEstate.property_owner_entity ?? "—",
+      estimatedValue: realEstate.estimated_value,
+      mortgageBalance: realEstate.current_loan_balance,
+      equity,
+      ltv,
+      monthlyRentCharged: realEstate.monthly_rent_charged,
+      occupancyCostRatio,
+    };
+  }, [realEstate, store]);
 
   const revenue = store?.monthly_revenue ?? 69250;
   const expenses = store?.monthly_expenses ?? 49470;
@@ -55,6 +204,7 @@ export default function DashboardPage() {
   const estimatedValue = Math.round(annualEbitda * 3.47);
   const machines = (store?.washers ?? 28) + (store?.dryers ?? 32);
   const monthlyCashFlow = revenue - expenses - (debtService / 12);
+  const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
 
   const underwritingMetrics = [
     { label: "DSCR", value: dscr + "x", badge: "badge-green" },
@@ -79,7 +229,6 @@ export default function DashboardPage() {
 
       {/* Row 1: Hero KPIs */}
       <div className="grid grid-cols-4 gap-4">
-        {/* Store Value */}
         <div className="card col-span-1">
           <div className="metric-label">Estimated Store Value</div>
           <div className="metric-value text-[28px]">{fmtDollar(estimatedValue)}</div>
@@ -99,7 +248,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* LaundroCFO Score */}
         <div className="card col-span-1">
           <div className="metric-label">LaundroCFO Score</div>
           <div className="flex items-center gap-4 mt-1">
@@ -119,7 +267,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* DSCR */}
         <MetricCard
           label="DSCR"
           value={dscr + "x"}
@@ -129,7 +276,6 @@ export default function DashboardPage() {
           progressColor="bg-green-500"
         />
 
-        {/* EBITDA Margin */}
         <MetricCard
           label="EBITDA Margin"
           value={ebitdaMargin + "%"}
@@ -142,7 +288,6 @@ export default function DashboardPage() {
 
       {/* Row 2: Value Drivers + Underwriting Metrics */}
       <div className="grid grid-cols-2 gap-4">
-        {/* Value Drivers */}
         <div className="card">
           <div className="section-title">
             Value Drivers
@@ -163,7 +308,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Underwriting Metrics */}
         <div className="card">
           <div className="section-title">Underwriting Metrics</div>
           <div className="divide-y divide-white/[0.04]">
@@ -181,21 +325,142 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Row 3: Lease, Equipment, Cash Flow */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="card">
-          <div className="metric-label">Lease Score</div>
-          <div className="flex items-center gap-3 mt-1 mb-3">
-            <span className="metric-value">94</span>
-            <span className="badge badge-green">Excellent</span>
+      {/* Row 3: Occupancy, Equipment, Cash Flow */}
+      <div className={clsx("grid gap-4", isOwnerOccupied ? "grid-cols-1 lg:grid-cols-3" : "grid-cols-3")}>
+        {isOwnerOccupied ? (
+          <div className="card lg:col-span-2">
+            <div className="flex items-center justify-between mb-4">
+              <div className="section-title mb-0">Real Estate</div>
+              <Link href="/lease" className="text-[11px] text-blue-400 hover:text-blue-300">
+                View details →
+              </Link>
+            </div>
+            {realEstateMetrics ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <SmallMetric
+                  label="Property Entity"
+                  value={realEstateMetrics.propertyEntity}
+                  color="text-slate-100"
+                />
+                <SmallMetric
+                  label="Estimated Property Value"
+                  value={formatCurrency(realEstateMetrics.estimatedValue)}
+                  color="text-blue-300"
+                />
+                <SmallMetric
+                  label="Mortgage Balance"
+                  value={formatCurrency(realEstateMetrics.mortgageBalance)}
+                  color="text-slate-100"
+                />
+                <SmallMetric
+                  label="Building Equity"
+                  value={formatCurrency(realEstateMetrics.equity)}
+                  color="text-green-400"
+                />
+                <SmallMetric
+                  label="Property LTV"
+                  value={
+                    realEstateMetrics.ltv != null
+                      ? realEstateMetrics.ltv.toFixed(1) + "%"
+                      : "—"
+                  }
+                  color={
+                    realEstateMetrics.ltv != null && realEstateMetrics.ltv > 70
+                      ? "text-amber-400"
+                      : "text-slate-100"
+                  }
+                />
+                <SmallMetric
+                  label="Monthly Rent Charged"
+                  value={formatCurrency(realEstateMetrics.monthlyRentCharged)}
+                  color="text-slate-100"
+                />
+                <SmallMetric
+                  label="Occupancy Cost Ratio"
+                  value={
+                    realEstateMetrics.occupancyCostRatio != null
+                      ? realEstateMetrics.occupancyCostRatio.toFixed(1) + "%"
+                      : "—"
+                  }
+                  color={
+                    realEstateMetrics.occupancyCostRatio != null &&
+                    realEstateMetrics.occupancyCostRatio > 20
+                      ? "text-amber-400"
+                      : "text-green-400"
+                  }
+                />
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-slate-500 text-[13px] mb-3">No real estate profile on file.</p>
+                <Link href="/lease" className="btn-primary">
+                  Add Real Estate Profile
+                </Link>
+              </div>
+            )}
           </div>
-          <div className="text-[12px] text-slate-400 space-y-1.5">
-            <div>Years Remaining: <span className="text-slate-100 font-semibold">7.3 yrs</span></div>
-            <div>Options: <span className="text-slate-100 font-semibold">2 × 5 years</span></div>
-            <div>Total Control: <span className="text-slate-100 font-semibold">17.3 yrs</span></div>
-            <div>Expires: <span className="text-slate-100 font-semibold">Nov 2031</span></div>
+        ) : (
+          <div className="card">
+            <div className="flex items-center justify-between mb-1">
+              <div className="metric-label">Lease Score</div>
+              <Link href="/lease" className="text-[10px] text-blue-400 hover:text-blue-300">
+                Details →
+              </Link>
+            </div>
+            {leaseMetrics ? (
+              <>
+                <div className="flex items-center gap-3 mt-1 mb-3">
+                  <span className="metric-value">{leaseMetrics.score}</span>
+                  <span
+                    className={clsx(
+                      "badge",
+                      leaseMetrics.score >= 75
+                        ? "badge-green"
+                        : leaseMetrics.score >= 50
+                          ? "badge-amber"
+                          : "badge-red"
+                    )}
+                  >
+                    {leaseMetrics.label}
+                  </span>
+                </div>
+                <div className="text-[12px] text-slate-400 space-y-1.5">
+                  <div>
+                    Years Remaining:{" "}
+                    <span className="text-slate-100 font-semibold">
+                      {leaseMetrics.yearsRemaining.toFixed(1)} yrs
+                    </span>
+                  </div>
+                  <div>
+                    Options:{" "}
+                    <span className="text-slate-100 font-semibold">
+                      {leaseMetrics.availableCount > 0
+                        ? `${leaseMetrics.availableCount} available (${leaseMetrics.optionYears} yrs)`
+                        : "None on file"}
+                    </span>
+                  </div>
+                  <div>
+                    Total Control:{" "}
+                    <span className="text-slate-100 font-semibold">
+                      {leaseMetrics.totalControl.toFixed(1)} yrs
+                    </span>
+                  </div>
+                  <div>
+                    Expires:{" "}
+                    <span className="text-slate-100 font-semibold">{leaseMetrics.expires}</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="py-4">
+                <p className="text-slate-500 text-[13px] mb-3">No lease on file.</p>
+                <Link href="/lease" className="btn-primary text-[11px]">
+                  Add Lease
+                </Link>
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
         <div className="card">
           <div className="metric-label">Equipment Score</div>
