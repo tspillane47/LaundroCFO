@@ -6,7 +6,8 @@ import { scores, valueTrend } from "@/lib/data";
 import { MetricCard, SmallMetric } from "@/components/ui/MetricCard";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
-import { fmtDollar, fmt } from "@/lib/calculations";
+import { fmtDollar, fmt, fmtMultiple } from "@/lib/calculations";
+import { calcValuationMultiple } from "@/lib/valuation";
 import {
   calcBuildingEquity,
   calcOccupancyCostRatioFromRent,
@@ -201,10 +202,28 @@ export default function DashboardPage() {
   const cashFlow = annualEbitda - debtService;
   const dscr = debtService > 0 ? (cashFlow / debtService + 1).toFixed(2) : "0";
   const ebitdaMargin = revenue > 0 ? ((ebitda / revenue) * 100).toFixed(1) : "0";
-  const estimatedValue = Math.round(annualEbitda * 3.47);
+  const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
+
+  const valuation = useMemo(() => {
+    const totalControl = leaseMetrics?.totalControl ?? (isOwnerOccupied ? 15 : 0);
+    return calcValuationMultiple({
+      ebitda: annualEbitda,
+      locationCategory: store?.location_type ?? "suburban",
+      totalLeaseControl: totalControl,
+      occupancyType: isOwnerOccupied ? "owned" : "leased",
+      avgEquipmentAge: store?.avg_machine_age ?? 6.1,
+      squareFootage: store?.square_footage ?? 4450,
+      revenueTrend: store?.revenue_trend ?? "stable",
+      storeCondition: store?.store_condition ?? "average",
+      competitionLevel: store?.competition_level ?? "normal",
+      realEstateValue: realEstateMetrics?.estimatedValue ?? undefined,
+    });
+  }, [annualEbitda, store, leaseMetrics, isOwnerOccupied, realEstateMetrics]);
+
+  const estimatedValue = Math.round(valuation.businessValue);
+  const finalMultiple = valuation.finalMultiple;
   const machines = (store?.washers ?? 28) + (store?.dryers ?? 32);
   const monthlyCashFlow = revenue - expenses - (debtService / 12);
-  const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
 
   const underwritingMetrics = [
     { label: "DSCR", value: dscr + "x", badge: "badge-green" },
@@ -232,7 +251,7 @@ export default function DashboardPage() {
         <div className="card col-span-1">
           <div className="metric-label">Estimated Store Value</div>
           <div className="metric-value text-[28px]">{fmtDollar(estimatedValue)}</div>
-          <div className="text-[12px] text-green-400 mt-1">▲ +$22,000 &nbsp;+2.7% vs last month</div>
+          <div className="text-[12px] text-green-400 mt-1">{fmtMultiple(finalMultiple)} EBITDA multiple</div>
           <div className="mt-3 h-10">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={valueTrend.slice(-8)}>
@@ -494,7 +513,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-5 gap-3">
           <SmallMetric label="Annual Revenue" value={fmtDollar(annualRevenue)} />
           <SmallMetric label="EBITDA" value={fmtDollar(annualEbitda)} color="text-green-400" />
-          <SmallMetric label="EBITDA Multiple" value="3.47x" color="text-blue-300" />
+          <SmallMetric label="EBITDA Multiple" value={fmtMultiple(finalMultiple)} color="text-blue-300" />
           <SmallMetric label="NOI" value="$226,800" />
           <SmallMetric label="Est. Store Value" value={fmtDollar(estimatedValue)} color="text-blue-300" />
         </div>

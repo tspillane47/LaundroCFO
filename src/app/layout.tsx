@@ -11,6 +11,7 @@ const navItems = [
   { href: "/financials", label: "Financials", emoji: "📊" },
   { href: "/lease", label: "Occupancy", emoji: "🏢" },
   { href: "/equipment", label: "Equipment", emoji: "⚙️" },
+  { href: "/valuation", label: "Valuation", emoji: "💎" },
   { href: "/scenarios", label: "Scenarios", emoji: "🔀" },
   { href: "/benchmarking", label: "Benchmarking", emoji: "📈" },
   { href: "/reports", label: "Reports", emoji: "📄" },
@@ -24,6 +25,7 @@ const pageTitles: Record<string, string> = {
   "/financials": "Financials",
   "/lease": "Occupancy & Real Estate",
   "/equipment": "Equipment",
+  "/valuation": "Valuation Engine",
   "/scenarios": "Scenario Planner",
   "/benchmarking": "Benchmarking",
   "/reports": "Reports",
@@ -115,7 +117,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
             <nav className="flex-1 py-3 overflow-y-auto">
               <div className="text-[10px] text-slate-600 px-5 pt-2 pb-1 uppercase tracking-widest">Analytics</div>
-              {navItems.slice(0, 4).map((item) => (
+              {navItems.slice(0, 5).map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -127,7 +129,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               ))}
 
               <div className="text-[10px] text-slate-600 px-5 pt-4 pb-1 uppercase tracking-widest">Tools</div>
-              {navItems.slice(4, 7).map((item) => (
+              {navItems.slice(5, 8).map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -139,7 +141,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               ))}
 
               <div className="text-[10px] text-slate-600 px-5 pt-4 pb-1 uppercase tracking-widest">Settings</div>
-              {navItems.slice(7).map((item) => (
+              {navItems.slice(8).map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
