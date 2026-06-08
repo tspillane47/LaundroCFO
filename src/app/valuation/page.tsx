@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
-import { calcValuationMultiple } from "@/lib/valuation";
+import { calcValuationMultiple, getEquipmentAdjustment } from "@/lib/valuation";
+import { computePct200GWashers, computeWeightedAvgAge } from "@/lib/equipment";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
 
 type LocationType = "urban" | "suburban" | "average" | "rural";
@@ -105,7 +106,8 @@ export default function ValuationPage() {
   const [annualEbitda, setAnnualEbitda] = useState(0);
   const [totalLeaseControl, setTotalLeaseControl] = useState(0);
   const [occupancyType, setOccupancyType] = useState<string>("leased");
-  const [avgEquipmentAge, setAvgEquipmentAge] = useState(6);
+  const [avgEquipmentAge, setAvgEquipmentAge] = useState(0);
+  const [pct200GWashers, setPct200GWashers] = useState(0);
   const [squareFootage, setSquareFootage] = useState(3500);
   const [realEstateValue, setRealEstateValue] = useState(0);
   const [isOwnerOccupied, setIsOwnerOccupied] = useState(false);
@@ -136,8 +138,22 @@ export default function ValuationPage() {
       setRevenueTrend((storeData.revenue_trend as RevenueTrend) ?? "stable");
       setStoreCondition((storeData.store_condition as StoreCondition) ?? "average");
       setCompetitionLevel((storeData.competition_level as CompetitionLevel) ?? "normal");
-      setAvgEquipmentAge(storeData.avg_machine_age ?? 6);
       setSquareFootage(storeData.square_footage ?? 3500);
+
+      const { data: equipmentData } = await supabase
+        .from("equipment_inventory")
+        .select("machine_type, quantity, installation_year, high_speed_extract")
+        .eq("user_id", user.id)
+        .eq("store_id", storeData.id);
+
+      const equipment = equipmentData ?? [];
+      if (equipment.length > 0) {
+        setAvgEquipmentAge(computeWeightedAvgAge(equipment));
+        setPct200GWashers(computePct200GWashers(equipment));
+      } else {
+        setAvgEquipmentAge(storeData.avg_machine_age ?? 6);
+        setPct200GWashers(0);
+      }
 
       const revenue = storeData.monthly_revenue ?? 69250;
       const expenses = storeData.monthly_expenses ?? 49470;
@@ -193,6 +209,7 @@ export default function ValuationPage() {
         totalLeaseControl,
         occupancyType,
         avgEquipmentAge,
+        pct200GWashers,
         squareFootage,
         revenueTrend,
         storeCondition,
@@ -205,6 +222,7 @@ export default function ValuationPage() {
       totalLeaseControl,
       occupancyType,
       avgEquipmentAge,
+      pct200GWashers,
       squareFootage,
       revenueTrend,
       storeCondition,
@@ -229,11 +247,7 @@ export default function ValuationPage() {
 
     const reAdj = occupancyType === "owned" ? 0.25 : 0;
 
-    const equipAdj =
-      avgEquipmentAge <= 5 ? 0.5 :
-      avgEquipmentAge <= 10 ? 0.25 :
-      avgEquipmentAge <= 15 ? 0 :
-      avgEquipmentAge <= 20 ? -0.5 : -1.0;
+    const equipAdj = getEquipmentAdjustment(avgEquipmentAge, pct200GWashers);
 
     const sfAdj =
       squareFootage > 5000 ? 0.25 :
@@ -271,7 +285,7 @@ export default function ValuationPage() {
       },
       {
         label: "Equipment Age",
-        detail: `${avgEquipmentAge.toFixed(1)} years avg`,
+        detail: `${avgEquipmentAge.toFixed(1)} years avg${pct200GWashers > 50 ? ` · ${pct200GWashers.toFixed(0)}% 200G` : ""}`,
         value: equipAdj,
       },
       {
@@ -300,6 +314,7 @@ export default function ValuationPage() {
     totalLeaseControl,
     occupancyType,
     avgEquipmentAge,
+    pct200GWashers,
     squareFootage,
     revenueTrend,
     storeCondition,
