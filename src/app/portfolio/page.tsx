@@ -2,15 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { calcValuationMultiple, getEquipmentAdjustment } from "@/lib/valuation";
-import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
+import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
 import clsx from "clsx";
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const FALLBACK_MULTIPLE = 3.47;
+const VALUATION_MULTIPLE = 3.47;
 
 type Store = {
   id: string;
@@ -20,62 +20,22 @@ type Store = {
   monthly_expenses: number | null;
   annual_debt_service: number | null;
   loan_balance: number | null;
-  occupancy_type: string | null;
-  location_type: string | null;
-  square_footage: number | null;
-  revenue_trend: string | null;
-  store_condition: string | null;
-  competition_level: string | null;
-  washers: number | null;
-  dryers: number | null;
   avg_machine_age: number | null;
+  store_condition: string | null;
+  occupancy_type: string | null;
 };
 
 type Lease = {
   id: string;
   store_id: string;
   lease_end_date: string | null;
-  monthly_rent: number | null;
-  exclusivity_clause: boolean | null;
-  personal_guaranty: boolean | null;
-  assignment_rights: string | null;
-};
-
-type LeaseOption = {
-  lease_id: string;
-  status: string | null;
-  option_years: number | null;
-};
-
-type RealEstate = {
-  store_id: string;
-  estimated_value: number | null;
 };
 
 type PortfolioAlert = {
   id: string;
-  storeId: string;
-  storeName: string;
-  issue: string;
-  severity: "urgent" | "warning" | "info";
-  href: string;
-};
-
-type StoreMetrics = {
-  store: Store;
-  estimatedValue: number;
-  monthlyRevenue: number;
-  monthlyEbitda: number;
-  annualEbitda: number;
-  dscr: number;
-  healthScore: number;
-  equipmentGrade: "A" | "B" | "C" | "D";
-  leaseYearsRemaining: number | null;
-  hasInsurance: boolean;
-  totalMachines: number;
-  avgEquipmentAge: number;
-  hasAlert: boolean;
-  isIncomplete: boolean;
+  title: string;
+  description: string;
+  severity: "red" | "amber" | "blue" | "green";
 };
 
 function parseDate(value: string | null): Date | null {
@@ -91,41 +51,39 @@ function calcYearsRemaining(endDate: string | null): number {
   return Math.max(0, (end.getTime() - now.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
 }
 
-function getLeaseAdjustment(totalLeaseControl: number): number {
-  if (totalLeaseControl >= 15) return 0.5;
-  if (totalLeaseControl >= 10) return 0.25;
-  if (totalLeaseControl >= 7) return 0.1;
-  if (totalLeaseControl >= 5) return 0;
-  if (totalLeaseControl >= 3) return -0.25;
-  return -0.75;
+function calcHealthScore(
+  dscr: number,
+  monthlyRevenue: number,
+  avgMachineAge: number,
+  leaseYearsRemaining: number | null,
+  loanBalance: number
+): number {
+  let score = 50;
+  if (dscr > 1.5) score += 10;
+  if (monthlyRevenue > 50000) score += 10;
+  if (avgMachineAge < 10) score += 10;
+  if (leaseYearsRemaining != null && leaseYearsRemaining > 5) score += 10;
+  if (loanBalance < monthlyRevenue * 36) score += 10;
+  return Math.min(100, score);
 }
 
-function calcStoreHealthScore(totalLeaseControl: number, avgEquipmentAge: number, pct200G: number): number {
-  const leaseAdj = getLeaseAdjustment(totalLeaseControl);
-  const equipAdj = getEquipmentAdjustment(avgEquipmentAge, pct200G);
-  return Math.min(100, Math.max(0, Math.round(50 + leaseAdj * 100 + equipAdj * 100)));
-}
-
-function generateValuationTrend(estimatedValue: number) {
-  const start = estimatedValue * 0.88;
+function generateValuationTrend(totalValue: number) {
+  const start = totalValue * 0.88;
   return MONTH_LABELS.map((month, i) => {
     const progress = i / 11;
-    const base = start + (estimatedValue - start) * progress;
+    const base = start + (totalValue - start) * progress;
     const variation = 1 + Math.sin(i * 1.7) * 0.015 + Math.cos(i * 0.9) * 0.01;
     return {
       month,
-      value: Math.round(i === 11 ? estimatedValue : base * variation),
+      value: Math.round(i === 11 ? totalValue : base * variation),
     };
   });
 }
 
-function benchmarkBarPercent(value: number, median: number, invert = false): number {
-  const ratio = value / median;
-  return invert ? Math.max(5, Math.min(95, (2 - ratio) * 50)) : Math.max(5, Math.min(95, ratio * 50));
-}
-
-function isStoreIncomplete(store: Store): boolean {
-  return !store.name || !store.address || !store.monthly_revenue || store.monthly_revenue <= 0;
+function dscrColorClass(dscr: number): string {
+  if (dscr >= 1.5) return "text-green-500";
+  if (dscr >= 1.25) return "text-amber-500";
+  return "text-red-500";
 }
 
 function healthBarColor(score: number): string {
@@ -135,17 +93,9 @@ function healthBarColor(score: number): string {
   return "bg-red-500";
 }
 
-function dscrColorClass(dscr: number): string {
-  if (dscr >= 1.5) return "text-green-500";
-  if (dscr >= 1.25) return "text-amber-500";
-  return "text-red-500";
-}
-
-function gradeBadgeClass(grade: "A" | "B" | "C" | "D"): string {
-  if (grade === "A") return "badge badge-green";
-  if (grade === "B") return "badge badge-blue";
-  if (grade === "C") return "badge badge-amber";
-  return "badge badge-red";
+function conditionLabel(condition: string | null): string {
+  if (!condition) return "Average";
+  return condition.charAt(0).toUpperCase() + condition.slice(1);
 }
 
 const HeroTooltip = ({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) => {
@@ -160,124 +110,54 @@ const HeroTooltip = ({ active, payload, label }: { active?: boolean; payload?: {
 
 export default function PortfolioPage() {
   const supabase = createClient();
+  const router = useRouter();
+  const { stores, loading: storesLoading, setSelectedStore, setIsAllStores } = useStores();
   const [loading, setLoading] = useState(true);
-  const [stores, setStores] = useState<Store[]>([]);
   const [leases, setLeases] = useState<Lease[]>([]);
-  const [leaseOptions, setLeaseOptions] = useState<LeaseOption[]>([]);
-  const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
-  const [insurancePolicies, setInsurancePolicies] = useState<{ store_id: string }[]>([]);
-  const [realEstate, setRealEstate] = useState<RealEstate[]>([]);
+  const [realEstateTotal, setRealEstateTotal] = useState(0);
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      if (storesLoading) return;
+      if (stores.length === 0) {
         setLoading(false);
         return;
       }
 
-      const { data: storesData } = await supabase.from("stores").select("*").eq("user_id", user.id);
-      const storeList = (storesData ?? []) as Store[];
-      setStores(storeList);
-
-      const storeIds = storeList.map((s) => s.id);
-
-      const [
-        { data: equipmentData },
-        { data: insuranceData },
-      ] = await Promise.all([
-        supabase.from("equipment_inventory").select("*").eq("user_id", user.id),
-        supabase.from("insurance_policies").select("store_id").eq("user_id", user.id).eq("is_active", true),
+      const storeIds = stores.map((s) => s.id);
+      const [{ data: leasesData }, { data: reData }] = await Promise.all([
+        supabase.from("leases").select("id, store_id, lease_end_date").in("store_id", storeIds),
+        supabase.from("real_estate").select("store_id, estimated_value").in("store_id", storeIds),
       ]);
 
-      setEquipment((equipmentData ?? []) as EquipmentRecord[]);
-      setInsurancePolicies(insuranceData ?? []);
-
-      if (storeIds.length > 0) {
-        const [
-          { data: leasesData },
-          { data: realEstateData },
-        ] = await Promise.all([
-          supabase.from("leases").select("*").in("store_id", storeIds),
-          supabase.from("real_estate").select("store_id, estimated_value").in("store_id", storeIds),
-        ]);
-
-        setLeases((leasesData ?? []) as Lease[]);
-        setRealEstate((realEstateData ?? []) as RealEstate[]);
-
-        const leaseIds = (leasesData ?? []).map((l: Lease) => l.id);
-        if (leaseIds.length > 0) {
-          const { data: optionsData } = await supabase
-            .from("lease_options")
-            .select("lease_id, status, option_years")
-            .in("lease_id", leaseIds);
-          setLeaseOptions((optionsData ?? []) as LeaseOption[]);
-        }
-      }
-
+      setLeases((leasesData ?? []) as Lease[]);
+      setRealEstateTotal((reData ?? []).reduce((s, r) => s + (r.estimated_value ?? 0), 0));
       setLoading(false);
     }
     load();
-  }, [supabase]);
+  }, [stores, storesLoading, supabase]);
 
-  const storeMetrics = useMemo((): StoreMetrics[] => {
-    return stores.map((store) => {
+  const storeMetrics = useMemo(() => {
+    return (stores as Store[]).map((store) => {
       const monthlyRevenue = store.monthly_revenue ?? 0;
       const monthlyExpenses = store.monthly_expenses ?? 0;
       const monthlyEbitda = monthlyRevenue - monthlyExpenses;
       const annualEbitda = monthlyEbitda * 12;
       const debtService = store.annual_debt_service ?? 0;
       const dscr = debtService > 0 ? annualEbitda / debtService : 0;
-
-      const storeEquipment = equipment.filter((e) => e.store_id === store.id);
-      const equipMetrics = computeEquipmentMetrics(storeEquipment);
-      const avgEquipmentAge =
-        storeEquipment.length > 0
-          ? equipMetrics.weightedAvgAge
-          : (store.avg_machine_age ?? 0);
-      const pct200G = storeEquipment.length > 0 ? equipMetrics.pct200GWashers : 0;
-      const totalMachines =
-        storeEquipment.length > 0
-          ? equipMetrics.totalMachines
-          : (store.washers ?? 0) + (store.dryers ?? 0);
+      const estimatedValue = annualEbitda * VALUATION_MULTIPLE;
+      const loanBalance = store.loan_balance ?? 0;
+      const avgMachineAge = store.avg_machine_age ?? 0;
 
       const isOwnerOccupied = store.occupancy_type === "owner_occupied";
       const storeLease = leases.find((l) => l.store_id === store.id);
-      const options = storeLease
-        ? leaseOptions.filter((o) => o.lease_id === storeLease.id && o.status === "Available")
-        : [];
-      const optionYears = options.reduce((s, o) => s + (o.option_years ?? 0), 0);
-      const yearsRemaining = storeLease ? calcYearsRemaining(storeLease.lease_end_date) : null;
-      const totalLeaseControl = isOwnerOccupied
-        ? 15
-        : (yearsRemaining ?? 0) + optionYears;
+      const leaseYearsRemaining = isOwnerOccupied
+        ? null
+        : storeLease
+          ? calcYearsRemaining(storeLease.lease_end_date)
+          : null;
 
-      const reRecord = realEstate.find((r) => r.store_id === store.id);
-      const valuation = calcValuationMultiple({
-        ebitda: annualEbitda,
-        locationCategory: store.location_type ?? "suburban",
-        totalLeaseControl,
-        occupancyType: isOwnerOccupied ? "owned" : "leased",
-        avgEquipmentAge,
-        pct200GWashers: pct200G,
-        squareFootage: store.square_footage ?? 0,
-        revenueTrend: store.revenue_trend ?? "stable",
-        storeCondition: store.store_condition ?? "average",
-        competitionLevel: store.competition_level ?? "normal",
-        realEstateValue: reRecord?.estimated_value ?? undefined,
-      });
-
-      const fallbackValue = annualEbitda * FALLBACK_MULTIPLE;
-      const estimatedValue = annualEbitda > 0 ? Math.round(valuation.businessValue || fallbackValue) : 0;
-
-      const healthScore = calcStoreHealthScore(totalLeaseControl, avgEquipmentAge, pct200G);
-      const hasInsurance = insurancePolicies.some((p) => p.store_id === store.id);
-      const incomplete = isStoreIncomplete(store);
-
-      const hasAlert =
-        (!isOwnerOccupied && yearsRemaining != null && yearsRemaining < 3) ||
-        dscr < 1.25 ||
-        !hasInsurance;
+      const healthScore = calcHealthScore(dscr, monthlyRevenue, avgMachineAge, leaseYearsRemaining, loanBalance);
 
       return {
         store,
@@ -287,63 +167,40 @@ export default function PortfolioPage() {
         annualEbitda,
         dscr,
         healthScore,
-        equipmentGrade: equipMetrics.grade,
-        leaseYearsRemaining: isOwnerOccupied ? null : yearsRemaining,
-        hasInsurance,
-        totalMachines,
-        avgEquipmentAge,
-        hasAlert,
-        isIncomplete: incomplete,
+        leaseYearsRemaining,
+        avgMachineAge,
+        hasDscrWarning: debtService > 0 && dscr < 1.25,
       };
     });
-  }, [stores, leases, leaseOptions, equipment, insurancePolicies, realEstate]);
+  }, [stores, leases]);
 
   const aggregates = useMemo(() => {
     const totalPortfolioValue = storeMetrics.reduce((s, m) => s + m.estimatedValue, 0);
-    const totalMonthlyRevenue = storeMetrics.reduce((s, m) => s + m.monthlyRevenue, 0);
-    const totalAnnualRevenue = totalMonthlyRevenue * 12;
-    const totalMonthlyEbitda = storeMetrics.reduce((s, m) => s + m.monthlyEbitda, 0);
-    const totalAnnualEbitda = totalMonthlyEbitda * 12;
-    const totalDebt = stores.reduce((s, st) => s + (st.loan_balance ?? 0), 0);
-    const totalAnnualDebtService = stores.reduce((s, st) => s + (st.annual_debt_service ?? 0), 0);
-    const portfolioDSCR = totalAnnualDebtService > 0 ? totalAnnualEbitda / totalAnnualDebtService : 0;
-    const totalRealEstateValue = realEstate.reduce((s, r) => s + (r.estimated_value ?? 0), 0);
-    const portfolioNetWorth = totalPortfolioValue + totalRealEstateValue - totalDebt;
-    const portfolioHealthScore =
-      storeMetrics.length > 0
-        ? Math.round(storeMetrics.reduce((s, m) => s + m.healthScore, 0) / storeMetrics.length)
-        : 0;
-    const totalMachines = storeMetrics.reduce((s, m) => s + m.totalMachines, 0);
-    const ebitdaMargin = totalMonthlyRevenue > 0 ? (totalMonthlyEbitda / totalMonthlyRevenue) * 100 : 0;
-    const totalSqft = stores.reduce((s, st) => s + (st.square_footage ?? 0), 0);
-    const avgRevenuePerSF = totalSqft > 0 ? totalAnnualRevenue / totalSqft : 0;
-    const avgEquipmentAge =
-      storeMetrics.length > 0
-        ? storeMetrics.reduce((s, m) => s + m.avgEquipmentAge, 0) / storeMetrics.length
-        : 0;
+    const totalAnnualRevenue = storeMetrics.reduce((s, m) => s + m.monthlyRevenue * 12, 0);
+    const totalAnnualEbitda = storeMetrics.reduce((s, m) => s + m.annualEbitda, 0);
+    const totalMonthlyEbitda = totalAnnualEbitda / 12;
+    const totalDebt = (stores as Store[]).reduce((s, st) => s + (st.loan_balance ?? 0), 0);
+    const totalAnnualDebtService = (stores as Store[]).reduce((s, st) => s + (st.annual_debt_service ?? 0), 0);
+    const globalDSCR = totalAnnualDebtService > 0 ? totalAnnualEbitda / totalAnnualDebtService : 0;
+    const portfolioNetWorth = totalPortfolioValue - totalDebt;
+    const ebitdaMargin = totalAnnualRevenue > 0 ? (totalAnnualEbitda / totalAnnualRevenue) * 100 : 0;
     const availableMonthlyCashFlow = Math.max(0, totalMonthlyEbitda - totalAnnualDebtService / 12);
-    const acquisitionCapacity = (availableMonthlyCashFlow * 12) / 0.1;
+    const acquisitionCapacity = availableMonthlyCashFlow / 0.1 / 12;
 
     return {
       totalPortfolioValue,
-      totalMonthlyRevenue,
       totalAnnualRevenue,
-      totalMonthlyEbitda,
       totalAnnualEbitda,
+      totalMonthlyEbitda,
       totalDebt,
       totalAnnualDebtService,
-      portfolioDSCR,
-      totalRealEstateValue,
+      globalDSCR,
       portfolioNetWorth,
-      portfolioHealthScore,
-      totalMachines,
       ebitdaMargin,
-      avgRevenuePerSF,
-      avgEquipmentAge,
       availableMonthlyCashFlow,
       acquisitionCapacity,
     };
-  }, [storeMetrics, stores, realEstate]);
+  }, [storeMetrics, stores]);
 
   const valuationTrend = useMemo(
     () => generateValuationTrend(aggregates.totalPortfolioValue),
@@ -351,6 +208,7 @@ export default function PortfolioPage() {
   );
 
   const monthlyChange = valuationTrend[11].value - valuationTrend[10].value;
+  const monthlyChangePct = valuationTrend[10].value > 0 ? (monthlyChange / valuationTrend[10].value) * 100 : 2.1;
   const yearChangePct =
     valuationTrend[0].value > 0
       ? ((aggregates.totalPortfolioValue - valuationTrend[0].value) / valuationTrend[0].value) * 100
@@ -362,113 +220,68 @@ export default function PortfolioPage() {
     for (const m of storeMetrics) {
       const name = m.store.name ?? "Unnamed Store";
 
-      if (m.isIncomplete) {
-        alerts.push({
-          id: `${m.store.id}-incomplete`,
-          storeId: m.store.id,
-          storeName: name,
-          issue: "Incomplete store profile — finish onboarding",
-          severity: "warning",
-          href: `/settings/edit-store?store=${m.store.id}`,
-        });
-      }
-
-      if (m.leaseYearsRemaining != null && m.leaseYearsRemaining < 2) {
+      if (m.leaseYearsRemaining != null && m.leaseYearsRemaining < 3) {
         alerts.push({
           id: `${m.store.id}-lease`,
-          storeId: m.store.id,
-          storeName: name,
-          issue: `Lease expiring in ${m.leaseYearsRemaining.toFixed(1)} years`,
-          severity: "urgent",
-          href: "/lease",
+          title: `Lease Risk — ${name}`,
+          description: `Lease expires in ${m.leaseYearsRemaining.toFixed(1)} years. Review renewal options.`,
+          severity: "red",
         });
       }
 
-      if (m.dscr < 1.25 && m.store.annual_debt_service) {
+      if (m.hasDscrWarning) {
         alerts.push({
           id: `${m.store.id}-dscr`,
-          storeId: m.store.id,
-          storeName: name,
-          issue: `DSCR ${m.dscr.toFixed(2)}x below 1.25x threshold`,
-          severity: "urgent",
-          href: "/financials",
+          title: `Low DSCR — ${name}`,
+          description: `DSCR of ${m.dscr.toFixed(2)}x is below the 1.25x threshold.`,
+          severity: "red",
         });
       }
 
-      if (!m.hasInsurance) {
-        alerts.push({
-          id: `${m.store.id}-insurance`,
-          storeId: m.store.id,
-          storeName: name,
-          issue: "No active insurance policies on file",
-          severity: "warning",
-          href: "/insurance",
-        });
-      }
-
-      if (m.avgEquipmentAge > 12) {
+      if (m.avgMachineAge > 12) {
         alerts.push({
           id: `${m.store.id}-equipment`,
-          storeId: m.store.id,
-          storeName: name,
-          issue: `Equipment avg age ${m.avgEquipmentAge.toFixed(1)} years`,
-          severity: "warning",
-          href: "/equipment",
+          title: `Equipment Aging — ${name}`,
+          description: `Average machine age is ${m.avgMachineAge.toFixed(1)} years.`,
+          severity: "amber",
         });
       }
     }
 
+    const portfolioUpAmount = monthlyChange > 0 ? monthlyChange : aggregates.totalPortfolioValue * 0.021;
+    alerts.push({
+      id: "portfolio-value",
+      title: "Portfolio value up",
+      description: `Portfolio value up ${fmtDollar(portfolioUpAmount)} this month (+${monthlyChangePct.toFixed(1)}%)`,
+      severity: "blue",
+    });
+
+    if ((stores as Store[]).some((s) => (s.loan_balance ?? 0) > 0)) {
+      alerts.push({
+        id: "debt-tracking",
+        title: "Debt tracking active",
+        description: "Loan balances are being monitored across your portfolio.",
+        severity: "blue",
+      });
+    }
+
     return alerts;
-  }, [storeMetrics]);
+  }, [storeMetrics, stores, monthlyChange, monthlyChangePct, aggregates.totalPortfolioValue]);
 
   const acquisitionMessage =
-    aggregates.portfolioDSCR > 2.0
-      ? "Strong position. You may qualify for additional acquisition financing."
-      : aggregates.portfolioDSCR > 1.5
-        ? "Good position. Consider building reserves before next acquisition."
-        : "Focus on improving current store performance before expanding.";
+    aggregates.globalDSCR > 2.0
+      ? "Strong position. Well-qualified for additional acquisition financing."
+      : aggregates.globalDSCR > 1.5
+        ? "Good position. Consider building reserves before expanding."
+        : "Focus on improving store performance before acquiring.";
 
-  const benchmarks = [
-    {
-      label: "Avg EBITDA Margin",
-      value: `${aggregates.ebitdaMargin.toFixed(1)}%`,
-      median: 22,
-      storeValue: aggregates.ebitdaMargin,
-      displayMedian: "22%",
-      invert: false,
-    },
-    {
-      label: "Avg Revenue/SF",
-      value: `$${aggregates.avgRevenuePerSF.toFixed(0)}`,
-      median: 140,
-      storeValue: aggregates.avgRevenuePerSF,
-      displayMedian: "$140",
-      invert: false,
-    },
-    {
-      label: "Portfolio DSCR",
-      value: `${aggregates.portfolioDSCR.toFixed(2)}x`,
-      median: 1.5,
-      storeValue: aggregates.portfolioDSCR,
-      displayMedian: "1.5x",
-      invert: false,
-    },
-    {
-      label: "Avg Equipment Age",
-      value: `${aggregates.avgEquipmentAge.toFixed(1)}yr`,
-      median: 9,
-      storeValue: aggregates.avgEquipmentAge,
-      displayMedian: "9yr",
-      invert: true,
-    },
-  ];
-
-  function selectStoreAndNavigate(storeId: string, href: string) {
-    localStorage.setItem("selectedStoreId", storeId);
-    window.location.href = href;
+  function openStore(store: Store) {
+    setSelectedStore(store);
+    setIsAllStores(false);
+    router.push("/dashboard");
   }
 
-  if (loading) {
+  if (storesLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-[14px]" style={{ color: "var(--text-muted)" }}>Loading portfolio…</div>
@@ -482,21 +295,16 @@ export default function PortfolioPage() {
         className="flex flex-col items-center justify-center min-h-[calc(100vh-120px)] text-center px-6"
         style={{ background: "var(--bg-primary)" }}
       >
-        <div className="text-[32px] font-bold text-blue-300 tracking-tight mb-1">LaundroCFO</div>
-        <div className="text-[10px] text-slate-500 tracking-widest uppercase mb-10">Valuation & Underwriting</div>
-
-        <h1 className="text-[36px] font-bold tracking-tight mb-3" style={{ color: "var(--text-primary)" }}>
-          Welcome to LaundroCFO
+        <div className="text-[48px] font-bold text-blue-300 tracking-tight mb-2">🏦 LaundroCFO</div>
+        <h1 className="text-[32px] font-bold tracking-tight mb-3" style={{ color: "var(--text-primary)" }}>
+          Your Laundromat Portfolio Command Center
         </h1>
-        <p className="text-[18px] font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
-          Your laundromat portfolio command center
-        </p>
-        <p className="text-[14px] max-w-md mb-8" style={{ color: "var(--text-muted)" }}>
-          Add your first store to begin tracking valuation, equipment, lease risk, insurance, and portfolio performance.
+        <p className="text-[15px] max-w-lg mb-8" style={{ color: "var(--text-muted)" }}>
+          Add your first store to start tracking valuation, equipment, lease risk, and portfolio performance.
         </p>
 
         <div className="flex flex-wrap justify-center gap-3 mb-10">
-          {["💎 Store Valuation", "📋 Lease Risk", "⚙️ Equipment", "🛡️ Insurance"].map((pill) => (
+          {["💎 Valuation", "📋 Lease Risk", "⚙️ Equipment", "🛡️ Insurance"].map((pill) => (
             <span
               key={pill}
               className="px-4 py-2 rounded-full text-[13px] font-medium"
@@ -509,7 +317,7 @@ export default function PortfolioPage() {
 
         <Link
           href="/onboarding"
-          className="inline-flex items-center gap-2 px-8 py-4 rounded-xl text-[16px] font-bold text-white transition-opacity hover:opacity-90"
+          className="inline-flex items-center gap-2 px-10 py-4 rounded-xl text-[17px] font-bold text-white transition-opacity hover:opacity-90"
           style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}
         >
           Add Your First Store →
@@ -517,6 +325,13 @@ export default function PortfolioPage() {
       </div>
     );
   }
+
+  const severityBorder = {
+    red: "border-l-red-500",
+    amber: "border-l-amber-500",
+    blue: "border-l-blue-500",
+    green: "border-l-green-500",
+  };
 
   return (
     <div className="space-y-5">
@@ -536,11 +351,11 @@ export default function PortfolioPage() {
                 {monthlyChange >= 0 ? "+" : ""}{fmtDollar(monthlyChange)} this month
               </span>
               <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold bg-green-500/20 text-green-300">
-                {yearChangePct >= 0 ? "+" : ""}{yearChangePct.toFixed(1)}% vs last year
+                {yearChangePct >= 0 ? "+" : ""}{yearChangePct.toFixed(1)}% annual
               </span>
             </div>
             <div className="text-[12px] text-white/40 mt-3">
-              {stores.length} store{stores.length !== 1 ? "s" : ""} · {aggregates.totalMachines} machines · Est. EBITDA {fmtDollar(aggregates.totalMonthlyEbitda)}/mo
+              {stores.length} store{stores.length !== 1 ? "s" : ""} · Est. EBITDA {fmtDollar(aggregates.totalMonthlyEbitda)}/mo · Global DSCR {fmtMultiple(aggregates.globalDSCR)}
             </div>
           </div>
           <div className="w-full lg:w-[280px] h-[80px]">
@@ -560,20 +375,17 @@ export default function PortfolioPage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      {/* KPI Row - 5 cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <div className="card">
-          <div className="metric-label">Total Revenue</div>
+          <div className="metric-label">Annual Revenue</div>
           <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
             {fmtDollar(aggregates.totalAnnualRevenue)}
-          </div>
-          <div className="text-[12px] mt-2" style={{ color: "var(--text-secondary)" }}>
-            {fmtDollar(aggregates.totalMonthlyRevenue)}/mo
           </div>
         </div>
 
         <div className="card">
-          <div className="metric-label">Total EBITDA</div>
+          <div className="metric-label">Annual EBITDA</div>
           <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
             {fmtDollar(aggregates.totalAnnualEbitda)}
           </div>
@@ -583,12 +395,9 @@ export default function PortfolioPage() {
         </div>
 
         <div className="card">
-          <div className="metric-label">Portfolio DSCR</div>
-          <div className={clsx("text-[28px] font-bold tracking-tight", dscrColorClass(aggregates.portfolioDSCR))}>
-            {fmtMultiple(aggregates.portfolioDSCR)}
-          </div>
-          <div className="text-[12px] mt-2" style={{ color: "var(--text-secondary)" }}>
-            {aggregates.portfolioDSCR >= 1.5 ? "Strong coverage" : aggregates.portfolioDSCR >= 1.25 ? "Adequate" : "Below threshold"}
+          <div className="metric-label">Global DSCR</div>
+          <div className={clsx("text-[28px] font-bold tracking-tight", dscrColorClass(aggregates.globalDSCR))}>
+            {fmtMultiple(aggregates.globalDSCR)}
           </div>
         </div>
 
@@ -597,36 +406,163 @@ export default function PortfolioPage() {
           <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
             {fmtDollar(aggregates.totalDebt)}
           </div>
-          <div className="text-[12px] mt-2" style={{ color: "var(--text-secondary)" }}>
-            Loan balance total
-          </div>
         </div>
 
         <div className="card">
-          <div className="metric-label">Portfolio Net Worth</div>
-          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+          <div className="metric-label">Net Worth</div>
+          <div className="text-[28px] font-bold tracking-tight text-green-400">
             {fmtDollar(aggregates.portfolioNetWorth)}
           </div>
-          <div className="text-[12px] mt-2" style={{ color: "var(--text-secondary)" }}>
-            Business + real estate − debt
-          </div>
+        </div>
+      </div>
+
+      {/* Store Cards */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[16px] font-semibold" style={{ color: "var(--text-primary)" }}>Your Stores</h2>
+          <Link href="/onboarding" className="btn-outline text-[12px] px-3 py-1.5">+ Add Store</Link>
         </div>
 
+        <div className={clsx("grid gap-4", stores.length === 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2")}>
+          {storeMetrics.map((m) => (
+            <div key={m.store.id} className="card relative">
+              {m.hasDscrWarning && (
+                <span className="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-red-500" />
+              )}
+
+              <div className="text-[18px] font-bold mb-1" style={{ color: "var(--text-primary)" }}>
+                {m.store.name ?? "Unnamed Store"}
+              </div>
+              <div className="text-[12px] mb-4" style={{ color: "var(--text-muted)" }}>
+                {m.store.address ?? "No address"}
+              </div>
+
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {[
+                  { label: "Est Value", value: fmtDollar(m.estimatedValue) },
+                  { label: "Revenue", value: fmtDollar(m.monthlyRevenue) },
+                  { label: "EBITDA", value: fmtDollar(m.monthlyEbitda) },
+                  {
+                    label: "DSCR",
+                    value: m.store.annual_debt_service ? fmtMultiple(m.dscr) : "—",
+                    color: m.store.annual_debt_service ? dscrColorClass(m.dscr) : undefined,
+                  },
+                ].map((metric) => (
+                  <div key={metric.label} className="text-center">
+                    <div className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: "var(--text-muted)" }}>
+                      {metric.label}
+                    </div>
+                    <div className={clsx("text-[13px] font-semibold", metric.color)} style={metric.color ? undefined : { color: "var(--text-primary)" }}>
+                      {metric.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mb-4">
+                <div className="flex justify-between text-[11px] mb-1">
+                  <span style={{ color: "var(--text-muted)" }}>Health Score</span>
+                  <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{m.healthScore}/100</span>
+                </div>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--bg-card2)" }}>
+                  <div
+                    className={clsx("h-full rounded-full transition-all", healthBarColor(m.healthScore))}
+                    style={{ width: `${m.healthScore}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mb-4">
+                <span className="badge badge-blue">Equipment B</span>
+                {m.leaseYearsRemaining != null ? (
+                  <span className="badge badge-blue">{m.leaseYearsRemaining.toFixed(1)} yrs</span>
+                ) : (
+                  <span className="badge badge-green">Owner Occupied</span>
+                )}
+                <span className="badge badge-amber">{conditionLabel(m.store.store_condition)}</span>
+              </div>
+
+              <div className="flex gap-2">
+                <button type="button" onClick={() => openStore(m.store)} className="btn-primary flex-1 text-[12px]">
+                  Open Store →
+                </button>
+                <Link href="/settings/edit-store" className="btn-outline flex-1 text-[12px] text-center">
+                  Edit →
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Two Column Section */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        {/* Portfolio Intelligence Feed */}
         <div className="card">
-          <div className="metric-label">Stores</div>
-          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-            {stores.length}
+          <h3 className="text-[14px] font-semibold mb-4" style={{ color: "var(--text-primary)" }}>
+            Portfolio Intelligence
+          </h3>
+          {portfolioAlerts.filter((a) => a.severity !== "green").length === 0 ? (
+            <div
+              className="rounded-lg p-4 border-l-2 border-l-green-500"
+              style={{ background: "var(--bg-card2)" }}
+            >
+              <div className="text-[13px] font-medium text-green-400">Portfolio looks healthy. No urgent items.</div>
+              <div className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>Today</div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {portfolioAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className={clsx("rounded-lg p-3 border-l-2", severityBorder[alert.severity])}
+                  style={{ background: "var(--bg-card2)" }}
+                >
+                  <div className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{alert.title}</div>
+                  <div className="text-[11px] mt-0.5" style={{ color: "var(--text-secondary)" }}>{alert.description}</div>
+                  <div className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>Today</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Acquisition Readiness */}
+        <div className="card">
+          <h3 className="text-[14px] font-semibold mb-4" style={{ color: "var(--text-primary)" }}>
+            Acquisition Readiness
+          </h3>
+          <div className="space-y-3 mb-4">
+            <div className="flex justify-between text-[13px]">
+              <span style={{ color: "var(--text-secondary)" }}>Global DSCR</span>
+              <span className={clsx("font-semibold", dscrColorClass(aggregates.globalDSCR))}>
+                {fmtMultiple(aggregates.globalDSCR)}
+              </span>
+            </div>
+            <div className="flex justify-between text-[13px]">
+              <span style={{ color: "var(--text-secondary)" }}>Available Monthly Cash Flow</span>
+              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                {fmtDollar(aggregates.availableMonthlyCashFlow)}
+              </span>
+            </div>
+            <div className="flex justify-between text-[13px]">
+              <span style={{ color: "var(--text-secondary)" }}>Est. Acquisition Capacity</span>
+              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                {fmtDollar(aggregates.acquisitionCapacity)}
+              </span>
+            </div>
           </div>
-          <Link href="/dashboard" className="text-[12px] mt-2 inline-block text-blue-400 hover:text-blue-300 font-medium">
-            View All →
+          <p className="text-[13px] mb-4" style={{ color: "var(--text-secondary)" }}>{acquisitionMessage}</p>
+          <Link href="/scenarios" className="btn-primary inline-flex text-[13px]">
+            Run Scenarios →
           </Link>
         </div>
       </div>
 
-      {/* Net Worth Breakdown */}
+      {/* Portfolio Net Worth */}
       <div className="card">
         <div className="text-[14px] font-semibold mb-4" style={{ color: "var(--text-primary)" }}>
-          Portfolio Net Worth Breakdown
+          Portfolio Net Worth
         </div>
         <div className="space-y-2 text-[14px]">
           <div className="flex justify-between">
@@ -635,214 +571,19 @@ export default function PortfolioPage() {
           </div>
           <div className="flex justify-between">
             <span style={{ color: "var(--text-secondary)" }}>+ Real Estate:</span>
-            <span className="font-medium" style={{ color: "var(--text-primary)" }}>{fmtDollar(aggregates.totalRealEstateValue)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span style={{ color: "var(--text-secondary)" }}>+ Cash (est.):</span>
-            <span className="italic" style={{ color: "var(--text-muted)" }}>Enter manually</span>
+            <span className="font-medium" style={{ color: "var(--text-primary)" }}>{fmtDollar(realEstateTotal)}</span>
           </div>
           <div className="flex justify-between">
             <span style={{ color: "var(--text-secondary)" }}>− Total Debt:</span>
             <span className="font-medium text-red-400">−{fmtDollar(aggregates.totalDebt)}</span>
           </div>
           <div className="border-t pt-3 mt-3 flex justify-between" style={{ borderColor: "var(--border)" }}>
-            <span className="font-semibold" style={{ color: "var(--text-primary)" }}>= Net Worth:</span>
-            <span className="text-[22px] font-bold text-green-400">{fmtDollar(aggregates.portfolioNetWorth)}</span>
+            <span className="font-semibold" style={{ color: "var(--text-primary)" }}>= Portfolio Net Worth:</span>
+            <span className="text-[24px] font-bold text-green-400">
+              {fmtDollar(aggregates.totalPortfolioValue + realEstateTotal - aggregates.totalDebt)}
+            </span>
           </div>
         </div>
-      </div>
-
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        {/* Store Cards */}
-        <div className="xl:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[16px] font-semibold" style={{ color: "var(--text-primary)" }}>Your Stores</h2>
-            <Link href="/onboarding" className="btn-outline text-[12px] px-3 py-1.5">+ Add Store</Link>
-          </div>
-
-          <div className={clsx(
-            stores.length === 1 ? "grid grid-cols-1" : "grid grid-cols-1 md:grid-cols-2 gap-4"
-          )}>
-            {storeMetrics.map((m) => (
-              <div
-                key={m.store.id}
-                className={clsx("card relative", stores.length === 1 && "p-6")}
-              >
-                {m.hasAlert && (
-                  <span className="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-red-500" />
-                )}
-
-                <div className={clsx("font-bold mb-1", stores.length === 1 ? "text-[20px]" : "text-[16px]")} style={{ color: "var(--text-primary)" }}>
-                  {m.store.name ?? "Unnamed Store"}
-                </div>
-                <div className="text-[12px] mb-4" style={{ color: "var(--text-muted)" }}>
-                  {m.store.address ?? "No address"}
-                </div>
-
-                <div className="grid grid-cols-4 gap-2 mb-4">
-                  {[
-                    { label: "Est. Value", value: fmtDollar(m.estimatedValue) },
-                    { label: "Revenue", value: fmtDollar(m.monthlyRevenue) },
-                    { label: "EBITDA", value: fmtDollar(m.monthlyEbitda) },
-                    { label: "DSCR", value: fmtMultiple(m.dscr), color: dscrColorClass(m.dscr) },
-                  ].map((metric) => (
-                    <div key={metric.label} className="text-center">
-                      <div className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: "var(--text-muted)" }}>
-                        {metric.label}
-                      </div>
-                      <div className={clsx("text-[13px] font-semibold", metric.color)} style={metric.color ? undefined : { color: "var(--text-primary)" }}>
-                        {metric.value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mb-4">
-                  <div className="flex justify-between text-[11px] mb-1">
-                    <span style={{ color: "var(--text-muted)" }}>Health Score</span>
-                    <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{m.healthScore}/100</span>
-                  </div>
-                  <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--bg-card2)" }}>
-                    <div
-                      className={clsx("h-full rounded-full transition-all", healthBarColor(m.healthScore))}
-                      style={{ width: `${m.healthScore}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <span className={gradeBadgeClass(m.equipmentGrade)}>Equipment {m.equipmentGrade}</span>
-                  {m.leaseYearsRemaining != null ? (
-                    <span className="badge badge-blue">{m.leaseYearsRemaining.toFixed(1)}yr lease</span>
-                  ) : (
-                    <span className="badge badge-green">Owner Occupied</span>
-                  )}
-                  <span className={m.hasInsurance ? "badge badge-green" : "badge badge-red"}>
-                    {m.hasInsurance ? "Insured" : "No Insurance"}
-                  </span>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => selectStoreAndNavigate(m.store.id, `/dashboard?store=${m.store.id}`)}
-                    className="btn-primary flex-1 text-[12px]"
-                  >
-                    View Store →
-                  </button>
-                  <Link
-                    href={`/settings/edit-store?store=${m.store.id}`}
-                    className="btn-outline flex-1 text-[12px] text-center"
-                  >
-                    Edit →
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right Column */}
-        <div className="space-y-4">
-          {/* Alerts */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>Action Required</h3>
-              {portfolioAlerts.length > 0 && (
-                <span className="badge badge-red">{portfolioAlerts.length}</span>
-              )}
-            </div>
-
-            {portfolioAlerts.length === 0 ? (
-              <div className="text-center py-6">
-                <div className="text-[24px] mb-2">✅</div>
-                <div className="text-[13px] font-medium text-green-400">All Clear</div>
-                <div className="text-[12px] mt-1" style={{ color: "var(--text-muted)" }}>Portfolio looks healthy</div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {portfolioAlerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className={clsx(
-                      "rounded-lg p-3 border-l-2",
-                      alert.severity === "urgent" ? "border-l-red-500" : alert.severity === "warning" ? "border-l-amber-500" : "border-l-blue-500"
-                    )}
-                    style={{ background: "var(--bg-card2)" }}
-                  >
-                    <div className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{alert.storeName}</div>
-                    <div className="text-[11px] mt-0.5" style={{ color: "var(--text-secondary)" }}>{alert.issue}</div>
-                    <Link href={alert.href} className="text-[11px] text-blue-400 hover:text-blue-300 mt-1 inline-block">
-                      View →
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Benchmarks */}
-          <div className="card">
-            <h3 className="text-[14px] font-semibold mb-4" style={{ color: "var(--text-primary)" }}>Portfolio vs Industry</h3>
-            <div className="space-y-4">
-              {benchmarks.map((b) => {
-                const isBetter = b.invert ? b.storeValue < b.median : b.storeValue > b.median;
-                const barPct = benchmarkBarPercent(b.storeValue, b.median, b.invert);
-                return (
-                  <div key={b.label}>
-                    <div className="flex justify-between text-[12px] mb-1.5">
-                      <span style={{ color: "var(--text-secondary)" }}>{b.label}</span>
-                      <span className={clsx("font-semibold", isBetter ? "text-green-400" : "text-amber-400")}>
-                        {b.value}
-                      </span>
-                    </div>
-                    <div className="relative h-1.5 rounded-full" style={{ background: "var(--bg-card2)" }}>
-                      <div
-                        className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full"
-                        style={{ left: `${barPct}%`, background: isBetter ? "#22c55e" : "#f59e0b" }}
-                      />
-                    </div>
-                    <div className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                      Industry median: {b.displayMedian}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Acquisition Readiness */}
-      <div className="card">
-        <h3 className="text-[16px] font-semibold mb-4" style={{ color: "var(--text-primary)" }}>
-          Ready to Acquire Another Store?
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <div>
-            <div className="metric-label">Current Portfolio DSCR</div>
-            <div className={clsx("text-[22px] font-bold", dscrColorClass(aggregates.portfolioDSCR))}>
-              {fmtMultiple(aggregates.portfolioDSCR)}
-            </div>
-          </div>
-          <div>
-            <div className="metric-label">Available Cash Flow for Debt Service</div>
-            <div className="text-[22px] font-bold" style={{ color: "var(--text-primary)" }}>
-              {fmtDollar(aggregates.availableMonthlyCashFlow)}/mo
-            </div>
-          </div>
-          <div>
-            <div className="metric-label">Estimated Acquisition Capacity</div>
-            <div className="text-[22px] font-bold" style={{ color: "var(--text-primary)" }}>
-              {fmtDollar(aggregates.acquisitionCapacity)}
-            </div>
-          </div>
-        </div>
-        <p className="text-[13px] mb-4" style={{ color: "var(--text-secondary)" }}>{acquisitionMessage}</p>
-        <Link href="/scenarios" className="btn-primary inline-flex text-[13px]">
-          Explore Scenarios →
-        </Link>
       </div>
     </div>
   );

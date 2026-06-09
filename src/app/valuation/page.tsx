@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
+import { useStores } from "@/lib/store-context";
 import { calcValuation, type ValuationResult } from "@/lib/valuation";
 import {
   computeEquipmentMetrics,
@@ -167,6 +168,7 @@ function PillSelector<T extends string>({
 
 export default function ValuationPage() {
   const supabase = createClient();
+  const { selectedStore, isAllStores, stores } = useStores();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -200,20 +202,17 @@ export default function ValuationPage() {
 
   useEffect(() => {
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const savedId = localStorage.getItem("selectedStoreId");
-      let storeQuery = supabase.from("stores").select("*").eq("user_id", user.id);
-      if (savedId) {
-        storeQuery = storeQuery.eq("id", savedId);
-      } else {
-        storeQuery = storeQuery.limit(1);
+      if (!selectedStore?.id) {
+        setLoading(false);
+        return;
       }
 
-      const { data: storeData } = await storeQuery.single();
+      const { data: storeData } = await supabase
+        .from("stores")
+        .select("*")
+        .eq("id", selectedStore.id)
+        .single();
+
       if (!storeData) {
         setLoading(false);
         return;
@@ -251,7 +250,6 @@ export default function ValuationPage() {
       const { data: equipmentData } = await supabase
         .from("equipment_inventory")
         .select("id, user_id, store_id, machine_type, manufacturer, machine_size, quantity, installation_year, high_speed_extract, condition, notes")
-        .eq("user_id", user.id)
         .eq("store_id", store.id);
 
       setEquipment((equipmentData ?? []) as EquipmentRecord[]);
@@ -298,7 +296,7 @@ export default function ValuationPage() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [selectedStore?.id, supabase]);
 
   const equipMetrics = useMemo(
     () => computeEquipmentMetrics(equipment),
@@ -392,6 +390,16 @@ export default function ValuationPage() {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="text-slate-500 text-[13px]">Loading valuation data...</div>
+      </div>
+    );
+  }
+
+  if (stores.length === 0 || isAllStores || !selectedStore) {
+    return (
+      <div className="card text-center py-10">
+        <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
+          Select a store from the dropdown above to view valuation details.
+        </p>
       </div>
     );
   }

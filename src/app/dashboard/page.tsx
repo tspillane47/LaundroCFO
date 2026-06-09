@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { useStores } from "@/lib/store-context";
 import { calcValuationMultiple } from "@/lib/valuation";
 import {
   calcBuildingEquity,
@@ -136,35 +138,50 @@ const HeroTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+type IntelligenceItem = {
+  id: string;
+  severity: "urgent" | "warning" | "info";
+  title: string;
+  description: string;
+};
+
 export default function DashboardPage() {
+  const router = useRouter();
+  const { stores, selectedStore, isAllStores, setSelectedStore, setIsAllStores, loading: storesLoading } = useStores();
   const [store, setStore] = useState<any>(null);
   const [lease, setLease] = useState<any>(null);
   const [leaseOptions, setLeaseOptions] = useState<any[]>([]);
   const [realEstate, setRealEstate] = useState<any>(null);
   const [insuranceCount, setInsuranceCount] = useState(0);
+  const [insuranceExpiringSoon, setInsuranceExpiringSoon] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!selectedStore) {
+        setStore(null);
+        return;
+      }
 
-      const { data: storeData } = await supabase
-        .from("stores")
-        .select("*")
-        .eq("user_id", user.id)
-        .limit(1)
-        .single();
-
-      if (!storeData) return;
+      const storeData = selectedStore;
       setStore(storeData);
 
       const { data: policiesData } = await supabase
         .from("insurance_policies")
-        .select("id")
+        .select("id, expiration_date")
         .eq("store_id", storeData.id)
         .eq("is_active", true);
       setInsuranceCount(policiesData?.length ?? 0);
+
+      const now = new Date();
+      const sixtyDays = 60 * 24 * 60 * 60 * 1000;
+      setInsuranceExpiringSoon(
+        (policiesData ?? []).some((p) => {
+          if (!p.expiration_date) return false;
+          const exp = new Date(p.expiration_date.split("T")[0] + "T12:00:00");
+          return exp.getTime() - now.getTime() <= sixtyDays && exp.getTime() >= now.getTime();
+        })
+      );
 
       if (storeData.occupancy_type === "owner_occupied") {
         const { data: reData } = await supabase
@@ -174,7 +191,10 @@ export default function DashboardPage() {
           .limit(1)
           .maybeSingle();
         setRealEstate(reData);
+        setLease(null);
+        setLeaseOptions([]);
       } else {
+        setRealEstate(null);
         const { data: leaseData } = await supabase
           .from("leases")
           .select("*")
@@ -190,11 +210,20 @@ export default function DashboardPage() {
             .eq("lease_id", leaseData.id)
             .order("option_number", { ascending: true });
           setLeaseOptions(optionsData ?? []);
+        } else {
+          setLease(null);
+          setLeaseOptions([]);
         }
       }
     }
     load();
-  }, []);
+  }, [selectedStore, supabase]);
+
+  function openStore(s: (typeof stores)[0]) {
+    setSelectedStore(s);
+    setIsAllStores(false);
+    router.push("/dashboard");
+  }
 
   const leaseMetrics = useMemo(() => {
     if (!lease) return null;
@@ -387,6 +416,116 @@ export default function DashboardPage() {
     warning: "border-l-amber-500",
     info: "border-l-blue-500",
   };
+
+  const storeIntelligence = useMemo((): IntelligenceItem[] => {
+    const items: IntelligenceItem[] = [];
+
+    if (insuranceExpiringSoon) {
+      items.push({
+        id: "insurance-expiring",
+        severity: "urgent",
+        title: "Insurance Expiring Soon",
+        description: "One or more policies expire within 60 days. Review renewal dates.",
+      });
+    }
+
+    if (!isOwnerOccupied && leaseMetrics && leaseMetrics.yearsRemaining < 2) {
+      items.push({
+        id: "lease-renewal",
+        severity: "warning",
+        title: "Lease Renewal Approaching",
+        description: `Lease expires in ${leaseMetrics.yearsRemaining.toFixed(1)} years — start renewal planning.`,
+      });
+    }
+
+    if (avgEquipmentAge > 10) {
+      items.push({
+        id: "equipment-age",
+        severity: "warning",
+        title: "Equipment Age Concern",
+        description: `Average machine age is ${avgEquipmentAge.toFixed(1)} years — consider replacement planning.`,
+      });
+    }
+
+    if (debtService > 0) {
+      items.push({
+        id: "dscr-status",
+        severity: dscrNum >= 1.5 ? "info" : dscrNum >= 1.25 ? "warning" : "urgent",
+        title: "DSCR Status",
+        description:
+          dscrNum >= 1.5
+            ? `Strong coverage at ${dscrNum.toFixed(2)}x — well above lender thresholds.`
+            : dscrNum >= 1.25
+              ? `Adequate coverage at ${dscrNum.toFixed(2)}x — monitor closely.`
+              : `Low coverage at ${dscrNum.toFixed(2)}x — below 1.25x minimum.`,
+      });
+    }
+
+    if (monthlyChange > 0) {
+      items.push({
+        id: "valuation-change",
+        severity: "info",
+        title: "Valuation Change",
+        description: `Store value increased ${fmtDollar(monthlyChange)} this month (mock trend).`,
+      });
+    }
+
+    return items;
+  }, [insuranceExpiringSoon, isOwnerOccupied, leaseMetrics, avgEquipmentAge, debtService, dscrNum, monthlyChange]);
+
+  if (storesLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-[14px]" style={{ color: "var(--text-muted)" }}>Loading dashboard…</div>
+      </div>
+    );
+  }
+
+  if (isAllStores && stores.length > 1) {
+    return (
+      <div className="space-y-5">
+        <div className="card text-center py-10">
+          <div className="text-[16px] font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
+            Select a store from the dropdown above to view store details
+          </div>
+          <p className="text-[13px] mb-6" style={{ color: "var(--text-muted)" }}>
+            Or choose a store below to open its dashboard.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {stores.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => openStore(s)}
+              className="card text-left hover:opacity-90 transition-opacity"
+            >
+              <div className="text-[16px] font-bold mb-1" style={{ color: "var(--text-primary)" }}>{s.name}</div>
+              <div className="text-[12px] mb-3" style={{ color: "var(--text-muted)" }}>{s.address ?? "No address"}</div>
+              <div className="text-[12px] font-medium text-blue-400">Open Store →</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!selectedStore && stores.length === 0) {
+    return (
+      <div className="card text-center py-10">
+        <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>No stores yet. Add your first store to get started.</p>
+        <Link href="/onboarding" className="btn-primary inline-flex mt-4 text-[13px]">Add Store →</Link>
+      </div>
+    );
+  }
+
+  if (!store) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-[14px]" style={{ color: "var(--text-muted)" }}>Loading store data…</div>
+      </div>
+    );
+  }
 
   const benchmarks = [
     {
@@ -831,6 +970,39 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Store Intelligence Feed */}
+      <div className="card">
+        <div className="section-title mb-4">Store Intelligence</div>
+        {storeIntelligence.length === 0 ? (
+          <div
+            className="rounded-lg p-4 border-l-[3px] border-l-green-500"
+            style={{ background: "var(--bg-card2)" }}
+          >
+            <div className="text-[13px] font-medium text-green-400">Store looks healthy. No urgent items.</div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {storeIntelligence.map((item) => (
+              <div
+                key={item.id}
+                className={clsx(
+                  "border-l-[3px] rounded-r-lg pl-3 py-2.5",
+                  severityBorder[item.severity]
+                )}
+                style={{ background: "var(--bg-card2)" }}
+              >
+                <div className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {item.title}
+                </div>
+                <div className="text-[11px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                  {item.description}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

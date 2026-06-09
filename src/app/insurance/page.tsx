@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
+import { useStores } from "@/lib/store-context";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import {
@@ -441,6 +442,7 @@ function AlertCard({
 export default function InsurancePage() {
   const router = useRouter();
   const supabase = createClient();
+  const { selectedStore } = useStores();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -478,14 +480,20 @@ export default function InsurancePage() {
     }
     setUserId(user.id);
 
-    const savedId = localStorage.getItem("selectedStoreId");
-    let storeQuery = supabase.from("stores").select("id, name, address").eq("user_id", user.id);
-    if (savedId) {
-      storeQuery = storeQuery.eq("id", savedId);
-    } else {
-      storeQuery = storeQuery.limit(1);
+    if (!selectedStore?.id) {
+      setError("Select a store from the dropdown above.");
+      setStore(null);
+      setPolicies([]);
+      setClaims([]);
+      setLoading(false);
+      return;
     }
-    const { data: storeData, error: storeError } = await storeQuery.single();
+
+    const { data: storeData, error: storeError } = await supabase
+      .from("stores")
+      .select("id, name, address")
+      .eq("id", selectedStore.id)
+      .single();
 
     if (storeError || !storeData) {
       setError(storeError?.message ?? "No store found. Complete onboarding first.");
@@ -498,6 +506,7 @@ export default function InsurancePage() {
       .from("insurance_policies")
       .select("*")
       .eq("user_id", user.id)
+      .eq("store_id", storeData.id)
       .eq("is_active", true)
       .order("expiration_date", { ascending: true });
 
@@ -532,7 +541,7 @@ export default function InsurancePage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [selectedStore?.id]);
 
   const metrics = useMemo(() => {
     const totalPremium = policies.reduce((s, p) => s + (p.annual_premium ?? 0), 0);

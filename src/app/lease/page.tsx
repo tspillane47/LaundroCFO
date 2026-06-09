@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { useStores } from "@/lib/store-context";
 import { OccupancySelector, type OccupancyType } from "@/components/occupancy/OccupancySelector";
 import { LeaseModule } from "@/components/occupancy/LeaseModule";
 import { RealEstateModule } from "@/components/occupancy/RealEstateModule";
@@ -23,6 +24,7 @@ const OCCUPANCY_LABELS: Record<OccupancyType, string> = {
 export default function OccupancyPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { selectedStore } = useStores();
 
   const [loading, setLoading] = useState(true);
   const [savingType, setSavingType] = useState(false);
@@ -42,11 +44,17 @@ export default function OccupancyPage() {
       return;
     }
 
+    if (!selectedStore?.id) {
+      setError("Select a store from the dropdown above.");
+      setStore(null);
+      setLoading(false);
+      return;
+    }
+
     const { data: storeData, error: storeError } = await supabase
       .from("stores")
       .select("id, address, monthly_revenue, monthly_expenses, occupancy_type")
-      .eq("user_id", user.id)
-      .limit(1)
+      .eq("id", selectedStore.id)
       .single();
 
     if (storeError || !storeData) {
@@ -62,7 +70,7 @@ export default function OccupancyPage() {
 
   useEffect(() => {
     loadStore();
-  }, []);
+  }, [selectedStore?.id]);
 
   async function handleSelectOccupancy(type: OccupancyType) {
     if (!store) return;

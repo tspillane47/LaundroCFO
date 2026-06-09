@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
+import { useStores } from "@/lib/store-context";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 import {
@@ -80,6 +81,7 @@ function SelectField({
 export default function EquipmentPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { selectedStore } = useStores();
   const currentYear = new Date().getFullYear();
 
   const [loading, setLoading] = useState(true);
@@ -105,18 +107,19 @@ export default function EquipmentPage() {
     }
     setUserId(user.id);
 
-    const savedId = localStorage.getItem("selectedStoreId");
-    let storeQuery = supabase
-      .from("stores")
-      .select("id, name, monthly_revenue, monthly_expenses")
-      .eq("user_id", user.id);
-    if (savedId) {
-      storeQuery = storeQuery.eq("id", savedId);
-    } else {
-      storeQuery = storeQuery.limit(1);
+    if (!selectedStore?.id) {
+      setError("Select a store from the dropdown above.");
+      setStore(null);
+      setEquipment([]);
+      setLoading(false);
+      return;
     }
 
-    const { data: storeData, error: storeError } = await storeQuery.single();
+    const { data: storeData, error: storeError } = await supabase
+      .from("stores")
+      .select("id, name, monthly_revenue, monthly_expenses")
+      .eq("id", selectedStore.id)
+      .single();
     if (storeError || !storeData) {
       setError(storeError?.message ?? "No store found. Complete onboarding first.");
       setLoading(false);
@@ -140,7 +143,7 @@ export default function EquipmentPage() {
 
     setEquipment((equipmentData ?? []) as EquipmentRecord[]);
     setLoading(false);
-  }, [router, supabase]);
+  }, [router, supabase, selectedStore?.id]);
 
   useEffect(() => {
     loadData();
