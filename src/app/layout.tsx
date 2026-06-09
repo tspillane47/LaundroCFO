@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase";
 import clsx from "clsx";
 
 const navItems = [
+  { href: "/portfolio", label: "Portfolio", emoji: "🏦" },
   { href: "/dashboard", label: "Dashboard", emoji: "⬛" },
   { href: "/financials", label: "Financials", emoji: "📊" },
   { href: "/lease", label: "Occupancy", emoji: "🏢" },
@@ -22,6 +23,7 @@ const navItems = [
 ];
 
 const pageTitles: Record<string, string> = {
+  "/portfolio": "Portfolio",
   "/dashboard": "Store Dashboard",
   "/financials": "Financials",
   "/lease": "Occupancy & Real Estate",
@@ -143,7 +145,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
             <nav className="flex-1 py-3 overflow-y-auto">
               <div className="text-[10px] text-slate-600 px-5 pt-2 pb-1 uppercase tracking-widest">Analytics</div>
-              {navItems.slice(0, 5).map((item) => (
+              {navItems.slice(0, 6).map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
