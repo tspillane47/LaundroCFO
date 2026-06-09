@@ -6,20 +6,45 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import clsx from "clsx";
 
-const navItems = [
-  { href: "/portfolio", label: "Portfolio", emoji: "🏦" },
-  { href: "/dashboard", label: "Dashboard", emoji: "⬛" },
-  { href: "/financials", label: "Financials", emoji: "📊" },
-  { href: "/lease", label: "Occupancy", emoji: "🏢" },
-  { href: "/equipment", label: "Equipment", emoji: "⚙️" },
-  { href: "/valuation", label: "Valuation", emoji: "💎" },
-  { href: "/scenarios", label: "Scenarios", emoji: "🔀" },
-  { href: "/benchmarking", label: "Benchmarking", emoji: "📈" },
-  { href: "/reports", label: "Reports", emoji: "📄" },
-  { href: "/insurance", label: "Insurance", emoji: "🛡️" },
-  { href: "/alerts", label: "Alerts", emoji: "🔔", badge: 3 },
-  { href: "/integrations", label: "Integrations", emoji: "🔌" },
-  { href: "/settings", label: "Settings", emoji: "⚙️" },
+const navSections = [
+  {
+    label: "Analytics",
+    items: [
+      { href: "/portfolio", label: "Portfolio", emoji: "🏦" },
+      { href: "/dashboard", label: "Dashboard", emoji: "⬛" },
+      { href: "/financials", label: "Financials", emoji: "📊" },
+    ],
+  },
+  {
+    label: "Store Modules",
+    items: [
+      { href: "/valuation", label: "Valuation", emoji: "💎" },
+      { href: "/lease", label: "Occupancy", emoji: "📋" },
+      { href: "/equipment", label: "Equipment", emoji: "⚙️" },
+    ],
+  },
+  {
+    label: "Tools",
+    items: [
+      { href: "/scenarios", label: "Scenarios", emoji: "🔀" },
+      { href: "/benchmarking", label: "Benchmarking", emoji: "📈" },
+      { href: "/reports", label: "Reports", emoji: "📄" },
+    ],
+  },
+  {
+    label: "Risk Management",
+    items: [
+      { href: "/insurance", label: "Insurance", emoji: "🛡️" },
+      { href: "/alerts", label: "Alerts", emoji: "🔔", badge: 3 },
+    ],
+  },
+  {
+    label: "Settings",
+    items: [
+      { href: "/integrations", label: "Integrations", emoji: "🔌" },
+      { href: "/settings", label: "Settings", emoji: "⚙️" },
+    ],
+  },
 ];
 
 const pageTitles: Record<string, string> = {
@@ -144,55 +169,30 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
 
             <nav className="flex-1 py-3 overflow-y-auto">
-              <div className="text-[10px] text-slate-600 px-5 pt-2 pb-1 uppercase tracking-widest">Analytics</div>
-              {navItems.slice(0, 6).map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={clsx("nav-item", pathname === item.href && "nav-item-active")}
-                >
-                  <span className="text-[13px] w-4 text-center">{item.emoji}</span>
-                  {item.label}
-                </Link>
-              ))}
-
-              <div className="text-[10px] text-slate-600 px-5 pt-4 pb-1 uppercase tracking-widest">Tools</div>
-              {navItems.slice(5, 8).map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={clsx("nav-item", pathname === item.href && "nav-item-active")}
-                >
-                  <span className="text-[13px] w-4 text-center">{item.emoji}</span>
-                  {item.label}
-                </Link>
-              ))}
-
-              <div className="text-[10px] text-slate-600 px-5 pt-4 pb-1 uppercase tracking-widest">Risk Management</div>
-              {navItems.slice(8, 9).map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={clsx("nav-item", pathname === item.href && "nav-item-active")}
-                >
-                  <span className="text-[13px] w-4 text-center">{item.emoji}</span>
-                  {item.label}
-                </Link>
-              ))}
-
-              <div className="text-[10px] text-slate-600 px-5 pt-4 pb-1 uppercase tracking-widest">Settings</div>
-              {navItems.slice(9).map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={clsx("nav-item", pathname === item.href && "nav-item-active")}
-                >
-                  <span className="text-[13px] w-4 text-center">{item.emoji}</span>
-                  {item.label}
-                  {item.badge && (
-                    <span className="ml-auto badge badge-red text-[10px] px-1.5 py-0">{item.badge}</span>
-                  )}
-                </Link>
+              {navSections.map((section, sectionIndex) => (
+                <div key={section.label}>
+                  <div
+                    className={clsx(
+                      "text-[10px] text-slate-600 px-5 pb-1 uppercase tracking-widest",
+                      sectionIndex === 0 ? "pt-2" : "pt-4"
+                    )}
+                  >
+                    {section.label}
+                  </div>
+                  {section.items.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={clsx("nav-item", pathname === item.href && "nav-item-active")}
+                    >
+                      <span className="text-[13px] w-4 text-center">{item.emoji}</span>
+                      {item.label}
+                      {"badge" in item && item.badge && (
+                        <span className="ml-auto badge badge-red text-[10px] px-1.5 py-0">{item.badge}</span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
               ))}
             </nav>
 
