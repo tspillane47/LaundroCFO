@@ -122,7 +122,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const dropdownLabel = isAllStores ? "All Stores" : (selectedStore?.name ?? "All Stores");
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg-page)" }}>
       {/* Sidebar */}
       <aside
         className="w-[220px] flex flex-col flex-shrink-0 border-r transition-colors duration-300"
@@ -138,9 +138,10 @@ function AppShell({ children }: { children: React.ReactNode }) {
             <div key={section.label}>
               <div
                 className={clsx(
-                  "text-[10px] text-slate-600 px-5 pb-1 uppercase tracking-widest",
+                  "text-[10px] px-5 pb-1 uppercase tracking-widest",
                   sectionIndex === 0 ? "pt-2" : "pt-4"
                 )}
+                style={{ color: "var(--text-muted)" }}
               >
                 {section.label}
               </div>
@@ -162,14 +163,14 @@ function AppShell({ children }: { children: React.ReactNode }) {
         <div className="p-4 border-t" style={{ borderColor: "var(--border)" }}>
           <div
             className="w-full rounded-lg p-3 flex items-center gap-2.5"
-            style={{ background: "var(--bg-card2)", border: "1px solid var(--border)" }}
+            style={{ background: "var(--bg-card2)", border: "1px solid var(--border2)" }}
           >
             <div className={clsx("w-2 h-2 rounded-full flex-shrink-0", isAllStores ? "bg-blue-400" : "bg-green-400")} />
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-semibold text-slate-200 leading-tight truncate">
+              <div className="text-[11px] font-semibold leading-tight truncate" style={{ color: "var(--text-primary)" }}>
                 {isAllStores ? "All Stores" : (selectedStore?.name ?? "No store selected")}
               </div>
-              <div className="text-[10px] text-slate-500 leading-tight truncate">
+              <div className="text-[10px] leading-tight truncate" style={{ color: "var(--text-muted)" }}>
                 {isAllStores
                   ? `${stores.length} store${stores.length !== 1 ? "s" : ""} in portfolio`
                   : (selectedStore?.address ?? "Select a store")}
@@ -183,8 +184,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Topbar */}
         <header
-          className="border-b px-6 py-3 flex items-center justify-between flex-shrink-0 transition-colors duration-300"
-          style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}
+          className="px-6 py-3 flex items-center justify-between flex-shrink-0 transition-colors duration-300"
+          style={{ background: "var(--bg-card)", borderBottom: "1px solid var(--border)" }}
         >
           <div className="flex items-center gap-3">
             <span className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
@@ -278,7 +279,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         {/* Page content */}
         <main
           className="flex-1 overflow-y-auto p-6 transition-colors duration-300"
-          style={{ background: "var(--bg-primary)" }}
+          style={{ background: "var(--bg-page)" }}
         >
           {children}
         </main>

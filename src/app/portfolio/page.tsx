@@ -263,7 +263,7 @@ export default function PortfolioPage() {
     return (
       <div
         className="flex flex-col items-center justify-center min-h-[calc(100vh-120px)] text-center px-6"
-        style={{ background: "var(--bg-primary)" }}
+        style={{ background: "var(--bg-page)" }}
       >
         <div className="text-[48px] font-bold text-blue-300 tracking-tight mb-2">🏦 LaundroCFO</div>
         <h1 className="text-[32px] font-bold tracking-tight mb-3" style={{ color: "var(--text-primary)" }}>
