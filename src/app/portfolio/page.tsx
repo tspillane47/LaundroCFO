@@ -8,6 +8,8 @@ import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
 import clsx from "clsx";
+import { generateStoreFeed } from "@/lib/intelligence";
+import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const VALUATION_MULTIPLE = 3.47;
@@ -29,13 +31,7 @@ type Lease = {
   id: string;
   store_id: string;
   lease_end_date: string | null;
-};
-
-type PortfolioAlert = {
-  id: string;
-  title: string;
-  description: string;
-  severity: "red" | "amber" | "blue" | "green";
+  monthly_rent: number | null;
 };
 
 function parseDate(value: string | null): Date | null {
@@ -115,6 +111,8 @@ export default function PortfolioPage() {
   const [loading, setLoading] = useState(true);
   const [leases, setLeases] = useState<Lease[]>([]);
   const [realEstateTotal, setRealEstateTotal] = useState(0);
+  const [equipmentByStore, setEquipmentByStore] = useState<Record<string, any[]>>({});
+  const [insuranceByStore, setInsuranceByStore] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
     async function load() {
@@ -125,13 +123,29 @@ export default function PortfolioPage() {
       }
 
       const storeIds = stores.map((s) => s.id);
-      const [{ data: leasesData }, { data: reData }] = await Promise.all([
-        supabase.from("leases").select("id, store_id, lease_end_date").in("store_id", storeIds),
+      const [{ data: leasesData }, { data: reData }, { data: equipmentData }, { data: insuranceData }] = await Promise.all([
+        supabase.from("leases").select("id, store_id, lease_end_date, monthly_rent").in("store_id", storeIds),
         supabase.from("real_estate").select("store_id, estimated_value").in("store_id", storeIds),
+        supabase.from("equipment_inventory").select("*").in("store_id", storeIds),
+        supabase.from("insurance_policies").select("*").in("store_id", storeIds).eq("is_active", true),
       ]);
 
       setLeases((leasesData ?? []) as Lease[]);
       setRealEstateTotal((reData ?? []).reduce((s, r) => s + (r.estimated_value ?? 0), 0));
+
+      const equipMap: Record<string, any[]> = {};
+      for (const e of equipmentData ?? []) {
+        if (!equipMap[e.store_id]) equipMap[e.store_id] = [];
+        equipMap[e.store_id].push(e);
+      }
+      setEquipmentByStore(equipMap);
+
+      const insMap: Record<string, any[]> = {};
+      for (const p of insuranceData ?? []) {
+        if (!insMap[p.store_id]) insMap[p.store_id] = [];
+        insMap[p.store_id].push(p);
+      }
+      setInsuranceByStore(insMap);
       setLoading(false);
     }
     load();
@@ -208,65 +222,21 @@ export default function PortfolioPage() {
   );
 
   const monthlyChange = valuationTrend[11].value - valuationTrend[10].value;
-  const monthlyChangePct = valuationTrend[10].value > 0 ? (monthlyChange / valuationTrend[10].value) * 100 : 2.1;
   const yearChangePct =
     valuationTrend[0].value > 0
       ? ((aggregates.totalPortfolioValue - valuationTrend[0].value) / valuationTrend[0].value) * 100
       : 0;
 
-  const portfolioAlerts = useMemo((): PortfolioAlert[] => {
-    const alerts: PortfolioAlert[] = [];
-
-    for (const m of storeMetrics) {
-      const name = m.store.name ?? "Unnamed Store";
-
-      if (m.leaseYearsRemaining != null && m.leaseYearsRemaining < 3) {
-        alerts.push({
-          id: `${m.store.id}-lease`,
-          title: `Lease Risk — ${name}`,
-          description: `Lease expires in ${m.leaseYearsRemaining.toFixed(1)} years. Review renewal options.`,
-          severity: "red",
-        });
-      }
-
-      if (m.hasDscrWarning) {
-        alerts.push({
-          id: `${m.store.id}-dscr`,
-          title: `Low DSCR — ${name}`,
-          description: `DSCR of ${m.dscr.toFixed(2)}x is below the 1.25x threshold.`,
-          severity: "red",
-        });
-      }
-
-      if (m.avgMachineAge > 12) {
-        alerts.push({
-          id: `${m.store.id}-equipment`,
-          title: `Equipment Aging — ${name}`,
-          description: `Average machine age is ${m.avgMachineAge.toFixed(1)} years.`,
-          severity: "amber",
-        });
-      }
-    }
-
-    const portfolioUpAmount = monthlyChange > 0 ? monthlyChange : aggregates.totalPortfolioValue * 0.021;
-    alerts.push({
-      id: "portfolio-value",
-      title: "Portfolio value up",
-      description: `Portfolio value up ${fmtDollar(portfolioUpAmount)} this month (+${monthlyChangePct.toFixed(1)}%)`,
-      severity: "blue",
+  const allFeedItems = useMemo(() => {
+    const items = (stores as Store[]).flatMap((store) => {
+      const storeLease = leases.find((l) => l.store_id === store.id);
+      const equipment = equipmentByStore[store.id] ?? [];
+      const insurance = insuranceByStore[store.id] ?? [];
+      return generateStoreFeed(store, storeLease, equipment, insurance);
     });
-
-    if ((stores as Store[]).some((s) => (s.loan_balance ?? 0) > 0)) {
-      alerts.push({
-        id: "debt-tracking",
-        title: "Debt tracking active",
-        description: "Loan balances are being monitored across your portfolio.",
-        severity: "blue",
-      });
-    }
-
-    return alerts;
-  }, [storeMetrics, stores, monthlyChange, monthlyChangePct, aggregates.totalPortfolioValue]);
+    const order = { danger: 0, warning: 1, success: 2, info: 3 };
+    return items.sort((a, b) => order[a.severity] - order[b.severity]);
+  }, [stores, leases, equipmentByStore, insuranceByStore]);
 
   const acquisitionMessage =
     aggregates.globalDSCR > 2.0
@@ -325,13 +295,6 @@ export default function PortfolioPage() {
       </div>
     );
   }
-
-  const severityBorder = {
-    red: "border-l-red-500",
-    amber: "border-l-amber-500",
-    blue: "border-l-blue-500",
-    green: "border-l-green-500",
-  };
 
   return (
     <div className="space-y-5">
@@ -495,68 +458,48 @@ export default function PortfolioPage() {
         </div>
       </div>
 
-      {/* Two Column Section */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        {/* Portfolio Intelligence Feed */}
-        <div className="card">
-          <h3 className="text-[14px] font-semibold mb-4" style={{ color: "var(--text-primary)" }}>
-            Portfolio Intelligence
+      {/* Portfolio Intelligence Feed */}
+      <div className="card">
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="text-[14px] font-semibold mb-0" style={{ color: "var(--text-primary)" }}>
+            Portfolio Intelligence Feed
           </h3>
-          {portfolioAlerts.filter((a) => a.severity !== "green").length === 0 ? (
-            <div
-              className="rounded-lg p-4 border-l-2 border-l-green-500"
-              style={{ background: "var(--bg-card2)" }}
-            >
-              <div className="text-[13px] font-medium text-green-400">Portfolio looks healthy. No urgent items.</div>
-              <div className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>Today</div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {portfolioAlerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className={clsx("rounded-lg p-3 border-l-2", severityBorder[alert.severity])}
-                  style={{ background: "var(--bg-card2)" }}
-                >
-                  <div className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{alert.title}</div>
-                  <div className="text-[11px] mt-0.5" style={{ color: "var(--text-secondary)" }}>{alert.description}</div>
-                  <div className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>Today</div>
-                </div>
-              ))}
-            </div>
+          {allFeedItems.length > 0 && (
+            <span className="badge badge-blue text-[10px]">{allFeedItems.length}</span>
           )}
         </div>
+        <IntelligenceFeed items={allFeedItems} showStoreName={true} maxItems={30} />
+      </div>
 
-        {/* Acquisition Readiness */}
-        <div className="card">
-          <h3 className="text-[14px] font-semibold mb-4" style={{ color: "var(--text-primary)" }}>
-            Acquisition Readiness
-          </h3>
-          <div className="space-y-3 mb-4">
-            <div className="flex justify-between text-[13px]">
-              <span style={{ color: "var(--text-secondary)" }}>Global DSCR</span>
-              <span className={clsx("font-semibold", dscrColorClass(aggregates.globalDSCR))}>
-                {fmtMultiple(aggregates.globalDSCR)}
-              </span>
-            </div>
-            <div className="flex justify-between text-[13px]">
-              <span style={{ color: "var(--text-secondary)" }}>Available Monthly Cash Flow</span>
-              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                {fmtDollar(aggregates.availableMonthlyCashFlow)}
-              </span>
-            </div>
-            <div className="flex justify-between text-[13px]">
-              <span style={{ color: "var(--text-secondary)" }}>Est. Acquisition Capacity</span>
-              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                {fmtDollar(aggregates.acquisitionCapacity)}
-              </span>
-            </div>
+      {/* Acquisition Readiness */}
+      <div className="card">
+        <h3 className="text-[14px] font-semibold mb-4" style={{ color: "var(--text-primary)" }}>
+          Acquisition Readiness
+        </h3>
+        <div className="space-y-3 mb-4">
+          <div className="flex justify-between text-[13px]">
+            <span style={{ color: "var(--text-secondary)" }}>Global DSCR</span>
+            <span className={clsx("font-semibold", dscrColorClass(aggregates.globalDSCR))}>
+              {fmtMultiple(aggregates.globalDSCR)}
+            </span>
           </div>
-          <p className="text-[13px] mb-4" style={{ color: "var(--text-secondary)" }}>{acquisitionMessage}</p>
-          <Link href="/scenarios" className="btn-primary inline-flex text-[13px]">
-            Run Scenarios →
-          </Link>
+          <div className="flex justify-between text-[13px]">
+            <span style={{ color: "var(--text-secondary)" }}>Available Monthly Cash Flow</span>
+            <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+              {fmtDollar(aggregates.availableMonthlyCashFlow)}
+            </span>
+          </div>
+          <div className="flex justify-between text-[13px]">
+            <span style={{ color: "var(--text-secondary)" }}>Est. Acquisition Capacity</span>
+            <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+              {fmtDollar(aggregates.acquisitionCapacity)}
+            </span>
+          </div>
         </div>
+        <p className="text-[13px] mb-4" style={{ color: "var(--text-secondary)" }}>{acquisitionMessage}</p>
+        <Link href="/scenarios" className="btn-primary inline-flex text-[13px]">
+          Run Scenarios →
+        </Link>
       </div>
 
       {/* Portfolio Net Worth */}
