@@ -303,7 +303,7 @@ export default function PortfolioPage() {
         className="rounded-xl p-6 overflow-hidden"
         style={{ background: "linear-gradient(135deg, #0f1e3d 0%, #1e3a5f 100%)" }}
       >
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 hero-banner">
           <div className="flex-1">
             <div className="text-[11px] uppercase tracking-wider text-white/50 mb-1">Total Portfolio Value</div>
             <div className="text-white font-extrabold tracking-tight" style={{ fontSize: "52px", lineHeight: 1.1 }}>
@@ -321,7 +321,7 @@ export default function PortfolioPage() {
               {stores.length} store{stores.length !== 1 ? "s" : ""} · Est. EBITDA {fmtDollar(aggregates.totalMonthlyEbitda)}/mo · Global DSCR {fmtMultiple(aggregates.globalDSCR)}
             </div>
           </div>
-          <div className="w-full lg:w-[280px] h-[80px]">
+          <div className="hero-chart w-full lg:w-[280px] h-[80px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={valuationTrend}>
                 <defs>
@@ -339,7 +339,10 @@ export default function PortfolioPage() {
       </div>
 
       {/* KPI Row - 5 cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+      <div
+        className="grid-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4"
+        style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "16px" }}
+      >
         <div className="card">
           <div className="metric-label">Annual Revenue</div>
           <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
@@ -386,7 +389,9 @@ export default function PortfolioPage() {
           <Link href="/onboarding" className="btn-outline text-[12px] px-3 py-1.5">+ Add Store</Link>
         </div>
 
-        <div className={clsx("grid gap-4", stores.length === 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2")}>
+        <div
+          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}
+        >
           {storeMetrics.map((m) => (
             <div key={m.store.id} className="card relative">
               {m.hasDscrWarning && (

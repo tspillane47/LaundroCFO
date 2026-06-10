@@ -266,3 +266,102 @@ html, body {
   animation-delay: 4s;
   animation-duration: 15s;
 }
+
+/* ============ RESPONSIVE ============ */
+
+/* Mobile hamburger menu */
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  color: var(--text-secondary);
+  font-size: 20px;
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 40;
+}
+
+@media (max-width: 1023px) {
+  .mobile-menu-btn { display: flex; align-items: center; }
+  
+  .sidebar-overlay.open { display: block; }
+  
+  .app-sidebar {
+    position: fixed !important;
+    left: -220px !important;
+    top: 0 !important;
+    height: 100vh !important;
+    z-index: 50 !important;
+    transition: left 0.25s ease !important;
+  }
+  
+  .app-sidebar.open {
+    left: 0 !important;
+  }
+  
+  .app-main {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
+  .hide-tablet { display: none !important; }
+}
+
+@media (max-width: 767px) {
+  .grid-4 { grid-template-columns: 1fr !important; }
+  .grid-3 { grid-template-columns: 1fr !important; }
+  .grid-2 { grid-template-columns: 1fr !important; }
+  .grid-2-1 { grid-template-columns: 1fr !important; }
+  
+  .content { padding: 16px !important; }
+  
+  .hide-mobile { display: none !important; }
+  
+  .card { padding: 16px !important; }
+  
+  /* Mobile table scroll */
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Stack flex rows on mobile */
+  .mobile-stack {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  
+  /* Full width buttons on mobile */
+  .mobile-full { width: 100% !important; }
+  
+  /* Reduce large text on mobile */
+  .metric-value { font-size: 22px !important; }
+  
+  /* Hero section on mobile */
+  .hero-banner {
+    flex-direction: column !important;
+    gap: 20px !important;
+  }
+  
+  .hero-banner .hero-chart {
+    display: none !important;
+  }
+  
+  /* Topbar on mobile */
+  .topbar-store-badge { display: none !important; }
+  .topbar-synced { display: none !important; }
+  
+  /* Hide secondary topbar items */
+  .topbar-add-store { display: none !important; }
+}

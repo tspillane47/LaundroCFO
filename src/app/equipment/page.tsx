@@ -289,7 +289,7 @@ export default function EquipmentPage() {
       )}
 
       {/* Section 1 — Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 grid-4">
         <MetricCard label="Total Washers" value={String(metrics.totalWashers)} sub="Front-load fleet" />
         <MetricCard label="Total Dryers" value={String(metrics.totalDryers)} sub="Dryer fleet" />
         <div className="card">
@@ -389,7 +389,7 @@ export default function EquipmentPage() {
                 </button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="table-scroll overflow-x-auto">
                 <table className="w-full text-[12px]">
                   <thead>
                     <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.06]">

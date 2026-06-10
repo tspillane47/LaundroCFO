@@ -91,7 +91,7 @@ export default function PricingPage() {
           <p className="text-[18px] text-slate-500">Free during beta. Paid plans launching soon.</p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8 mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
           {tiers.map((tier) => (
             <div
               key={tier.name}

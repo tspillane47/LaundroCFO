@@ -449,7 +449,10 @@ export default function ValuationPage() {
 
       {/* Section 2 — Valuation Breakdown */}
       <div className="card !p-3.5">
-        <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-3 lg:gap-4">
+        <div
+          className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-3 lg:gap-4"
+          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}
+        >
           {/* Left — adjustment waterfall */}
           <div className="min-w-0">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
@@ -580,7 +583,10 @@ export default function ValuationPage() {
       </div>
 
       {/* Section 3 — Qualitative inputs */}
-      <div className="grid grid-cols-2 gap-4">
+      <div
+        className="grid grid-cols-2 gap-4"
+        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}
+      >
         <PillSelector
           label="Market Density"
           options={MARKET_OPTIONS}

@@ -664,31 +664,33 @@ export default function FinancialsPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1 border-b border-white/[0.06]">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={clsx(
-              "px-4 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors",
-              activeTab === tab.id
-                ? "border-blue-500 text-blue-400"
-                : "border-transparent text-slate-500 hover:text-slate-300"
-            )}
-          >
-            {tab.label}
-            {tab.id === "bank" && reviewCount > 0 && (
-              <span className="ml-2 badge badge-amber text-[10px]">{reviewCount}</span>
-            )}
-          </button>
-        ))}
+      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", display: "flex", gap: "8px", paddingBottom: "4px" }}>
+        <div className="flex flex-wrap gap-1 border-b border-white/[0.06]">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={clsx(
+                "px-4 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
+                activeTab === tab.id
+                  ? "border-blue-500 text-blue-400"
+                  : "border-transparent text-slate-500 hover:text-slate-300"
+              )}
+            >
+              {tab.label}
+              {tab.id === "bank" && reviewCount > 0 && (
+                <span className="ml-2 badge badge-amber text-[10px]">{reviewCount}</span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ─── TAB 1: P&L ─── */}
       {activeTab === "pl" && (
         <div className="space-y-5">
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 grid-4">
             <MetricCard
               label="TTM Revenue"
               value={fmtDollar(ttm.ttmRevenue)}
@@ -774,7 +776,10 @@ export default function FinancialsPage() {
               <div className="section-title">
                 {selectedRecord ? "Edit" : "Add"} — {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div
+                className="grid gap-4"
+                style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px" }}
+              >
                 {FORM_FIELDS.map(({ key, label }) => (
                   <div key={key}>
                     <div className="metric-label mb-1.5">{label}</div>
@@ -817,8 +822,9 @@ export default function FinancialsPage() {
             </div>
           )}
 
-          <div className="card overflow-x-auto">
+          <div className="card">
             <div className="section-title">P&L — {selectedYear}</div>
+            <div className="table-scroll">
             <table className="w-full text-[12px]">
               <thead>
                 <tr className="text-left text-slate-500 border-b border-white/[0.06]">
@@ -883,6 +889,7 @@ export default function FinancialsPage() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
 
           <div className="card">
@@ -1145,7 +1152,7 @@ export default function FinancialsPage() {
             </div>
           </div>
 
-          <div className="card overflow-x-auto">
+          <div className="card">
             <div className="section-title">
               Transaction Review
               <span className="text-[11px] text-slate-600 font-normal ml-auto">
@@ -1157,6 +1164,7 @@ export default function FinancialsPage() {
                 No transactions to review. Upload a CSV to get started.
               </p>
             ) : (
+              <div className="table-scroll">
               <table className="w-full text-[12px]">
                 <thead>
                   <tr className="text-left text-slate-500 border-b border-white/[0.06]">
@@ -1264,6 +1272,7 @@ export default function FinancialsPage() {
                   })}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </div>

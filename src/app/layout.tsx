@@ -67,6 +67,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const { stores, selectedStore, setSelectedStore, isAllStores, setIsAllStores, loading: storesLoading } = useStores();
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -124,9 +125,17 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg-page)" }}>
+      <div
+        className={`sidebar-overlay ${sidebarOpen ? "open" : ""}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
       {/* Sidebar */}
       <aside
-        className="w-[220px] flex flex-col flex-shrink-0 border-r transition-colors duration-300"
+        className={clsx(
+          "app-sidebar w-[220px] flex flex-col flex-shrink-0 border-r transition-colors duration-300",
+          sidebarOpen && "open"
+        )}
         style={{ background: "var(--bg-sidebar)", borderColor: "var(--border)" }}
       >
         <div className="px-5 py-[18px] border-b" style={{ borderColor: "var(--border)" }}>
@@ -150,6 +159,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => setSidebarOpen(false)}
                   className={clsx("nav-item", pathname === item.href && "nav-item-active")}
                 >
                   <span className="text-[13px] w-4 text-center">{item.emoji}</span>
@@ -182,13 +192,21 @@ function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="app-main flex-1 flex flex-col overflow-hidden">
         {/* Topbar */}
         <header
           className="px-6 py-3 flex items-center justify-between flex-shrink-0 transition-colors duration-300"
           style={{ background: "var(--bg-card)", borderBottom: "1px solid var(--border)" }}
         >
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="mobile-menu-btn"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label="Toggle menu"
+            >
+              {sidebarOpen ? "✕" : "☰"}
+            </button>
             <span className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
               {pageTitles[pathname] ?? "LaundroCFO"}
             </span>
@@ -199,7 +217,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={() => setShowStoreDropdown((v) => !v)}
-                  className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors hover:opacity-90"
+                  className="topbar-store-badge flex items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors hover:opacity-90"
                   style={{
                     background: "var(--bg-card2)",
                     border: "1px solid var(--border)",
@@ -251,7 +269,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
             )}
 
             <span
-              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px]"
+              className="topbar-synced flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px]"
               style={{ background: "var(--bg-card2)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
@@ -271,7 +289,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
             <button type="button" className="btn-outline" onClick={handleSignOut}>
               Sign Out
             </button>
-            <button type="button" className="btn-primary" onClick={() => router.push("/onboarding")}>
+            <button type="button" className="topbar-add-store btn-primary" onClick={() => router.push("/onboarding")}>
               + Add Store
             </button>
           </div>

@@ -788,7 +788,7 @@ export default function InsurancePage() {
       )}
 
       {/* Dashboard Summary */}
-      <div className="grid grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-3 lg:grid-cols-6 gap-4 grid-4">
         <MetricCard
           label="Total Annual Premium"
           value={formatCurrency(metrics.totalPremium)}
@@ -825,7 +825,7 @@ export default function InsurancePage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid-2 grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Coverage Alerts */}
         <div className="card lg:col-span-2">
           <div className="section-title">Coverage Alerts</div>
@@ -1194,7 +1194,9 @@ export default function InsurancePage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div
+            style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}
+          >
             {policies.map((policy) => {
               const days = calcDaysRemaining(policy.expiration_date);
               const typeColor =

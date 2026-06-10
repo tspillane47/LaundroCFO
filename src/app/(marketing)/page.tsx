@@ -111,7 +111,7 @@ export default function MarketingHomePage() {
         <div className="marketing-hero-particles absolute inset-0 pointer-events-none" />
 
         <div className="relative max-w-7xl mx-auto px-6 py-20 w-full">
-          <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-8">
+          <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-8 hero-banner">
             <div className="w-full lg:w-[60%]">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[13px] font-medium bg-blue-500/15 text-blue-300 border border-blue-500/30 mb-8">
                 🚀 Now in Beta — Free Access
@@ -160,7 +160,7 @@ export default function MarketingHomePage() {
               </div>
             </div>
 
-            <div className="w-full lg:w-[40%]">
+            <div className="w-full lg:w-[40%] hide-mobile">
               <HeroIllustration />
             </div>
           </div>
@@ -219,7 +219,10 @@ export default function MarketingHomePage() {
               Built specifically for laundromats. Not generic accounting software.
             </p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div
+            className="gap-6"
+            style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "24px" }}
+          >
             {features.map((item) => (
               <div
                 key={item.title}
@@ -240,7 +243,10 @@ export default function MarketingHomePage() {
           <h2 className="text-[32px] lg:text-[40px] font-bold text-slate-900 text-center mb-16">
             Built for everyone in the laundromat industry
           </h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div
+            className="gap-6"
+            style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "24px" }}
+          >
             {audiences.map((item) => (
               <div
                 key={item.title}

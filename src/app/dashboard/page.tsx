@@ -512,7 +512,7 @@ export default function DashboardPage() {
         className="rounded-xl p-6 overflow-hidden"
         style={{ background: "linear-gradient(135deg, #0f1e3d 0%, #1e3a5f 100%)" }}
       >
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 hero-banner">
           <div className="flex-1">
             <div className="text-[11px] uppercase tracking-wider text-white/50 mb-1">
               Estimated Store Value
@@ -532,7 +532,7 @@ export default function DashboardPage() {
               Based on {fmtMultiple(finalMultiple)} EBITDA multiple
             </div>
           </div>
-          <div className="w-full lg:w-[280px] h-[80px]">
+          <div className="hero-chart w-full lg:w-[280px] h-[80px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={valuationTrend}>
                 <defs>
@@ -557,7 +557,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Section 2: KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div
+        className="grid-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
+        style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}
+      >
         {/* Monthly Revenue */}
         <div className="card">
           <div className="metric-label">Monthly Revenue</div>
@@ -629,7 +632,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Section 3: Two Column Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="grid-3 grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Left Column */}
         <div className="xl:col-span-2 space-y-4">
           {/* Valuation Trend Chart */}
@@ -799,7 +802,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Section 4: Bottom Summary Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid-3 grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Lease & Occupancy */}
         <div className="card">
           <div className="flex items-center justify-between mb-3">
@@ -894,7 +897,7 @@ export default function DashboardPage() {
         {/* Quick Links */}
         <div className="card">
           <div className="section-title mb-3">Quick Links</div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid-2 grid grid-cols-2 gap-2">
             {[
               { href: "/valuation", label: "Valuation", emoji: "💎" },
               { href: "/reports", label: "Reports", emoji: "📄" },

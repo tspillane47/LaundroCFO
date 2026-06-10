@@ -669,7 +669,7 @@ export function LeaseModule({ store }: Props) {
           <div className="card space-y-4">
             <div className="section-title mb-0">Base Lease Information</div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
               <div>
                 <div className="metric-label mb-1.5">Landlord</div>
                 <input
@@ -703,7 +703,7 @@ export function LeaseModule({ store }: Props) {
               <p className="text-[11px] text-slate-600 mt-1">Edit address in Store Settings</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
               <div>
                 <div className="metric-label mb-1.5">Lease Start Date</div>
                 <input
@@ -758,7 +758,7 @@ export function LeaseModule({ store }: Props) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
               <div>
                 <div className="metric-label mb-1.5">Square Footage</div>
                 <input
@@ -781,7 +781,7 @@ export function LeaseModule({ store }: Props) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
               <div>
                 <div className="metric-label mb-1.5">Assignment Rights</div>
                 <select
