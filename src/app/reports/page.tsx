@@ -1,61 +1,556 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useState } from "react";
+import clsx from "clsx";
+import { pdf } from "@react-pdf/renderer";
+import { createClient } from "@/lib/supabase";
+import { useStores } from "@/lib/store-context";
+import { calcValuation, type ValuationResult } from "@/lib/valuation";
+import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
+import {
+  calcDSCR,
+  calcGlobalDSCR,
+  calcDebtYield,
+  calcEbitdaMargin,
+  calcOccupancyCostRatio,
+  calcRentToRevenue,
+  calcRevenuePerSF,
+  calcEbitdaPerSF,
+  calcUtilityRatio,
+  calcLeaseScore,
+  fmtDollar,
+  fmtMultiple,
+  fmtPct,
+} from "@/lib/calculations";
+import { ReportDocument, type ReportProps } from "@/components/reports/ReportDocument";
+import { generateExecutiveSummary } from "@/components/reports/generateExecutiveSummary";
+
+function parseDate(value: string | null): Date | null {
+  if (!value) return null;
+  const d = new Date(value.split("T")[0] + "T12:00:00");
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function calcYearsRemaining(endDate: string | null): number {
+  const end = parseDate(endDate);
+  if (!end) return 0;
+  return Math.max(0, (end.getTime() - Date.now()) / (365.25 * 24 * 60 * 60 * 1000));
+}
+
+function normalizeMarketDensity(raw: string | null): string {
+  const v = (raw ?? "average").toLowerCase();
+  if (v === "urban" || v === "dense_urban") return "urban";
+  if (v === "suburban") return "suburban";
+  if (v === "rural") return "rural";
+  return "average";
+}
+
+function normalizeStoreCondition(raw: string | null): string {
+  const v = (raw ?? "fair").toLowerCase();
+  if (v === "excellent" || v === "remodeled") return "excellent";
+  if (v === "good") return "good";
+  if (v === "poor" || v === "needs_renovation") return "poor";
+  return "fair";
+}
+
+function financeabilityRating(dscr: number, globalDscr: number): string {
+  if (dscr >= 1.5 && globalDscr >= 1.5) return "Strong";
+  if (dscr >= 1.25 && globalDscr >= 1.25) return "Acceptable";
+  if (dscr >= 1.0) return "Marginal";
+  return "Weak";
+}
+
+function ratioColorClass(value: number, good: number, warn: number, invert = false): string {
+  if (invert) {
+    if (value <= good) return "text-green-400";
+    if (value <= warn) return "text-amber-400";
+    return "text-red-400";
+  }
+  if (value >= good) return "text-green-400";
+  if (value >= warn) return "text-amber-400";
+  return "text-red-400";
+}
+
+function scoreLabel(score: number): string {
+  if (score >= 90) return "Excellent";
+  if (score >= 75) return "Good";
+  if (score >= 60) return "Fair";
+  return "Poor";
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 pb-2.5 border-b border-white/[0.06]">
+      {children}
+    </div>
+  );
+}
+
+function PreviewRow({ label, value, className }: { label: string; value: string; className?: string }) {
+  return (
+    <div className="flex justify-between py-2">
+      <span className="text-slate-400">{label}</span>
+      <span className={clsx("font-semibold", className ?? "text-slate-100")}>{value}</span>
+    </div>
+  );
+}
+
 export default function ReportsPage() {
+  const supabase = createClient();
+  const { stores, selectedStore, isAllStores, loading: storesLoading } = useStores();
+
+  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [store, setStore] = useState<any>(null);
+  const [lease, setLease] = useState<any>(null);
+  const [leaseOptions, setLeaseOptions] = useState<any[]>([]);
+  const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
+  const [insurance, setInsurance] = useState<any[]>([]);
+  const [realEstate, setRealEstate] = useState<any>(null);
+  const [totalLeaseControl, setTotalLeaseControl] = useState(0);
+
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [error, setError] = useState("");
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareExpires, setShareExpires] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      if (!selectedStore?.id) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setUserId(user.id);
+
+      const { data: storeData } = await supabase
+        .from("stores")
+        .select("*")
+        .eq("id", selectedStore.id)
+        .single();
+
+      if (!storeData) {
+        setLoading(false);
+        return;
+      }
+
+      setStore(storeData);
+
+      const [{ data: equipmentData }, { data: policiesData }] = await Promise.all([
+        supabase.from("equipment_inventory").select("*").eq("store_id", storeData.id),
+        supabase
+          .from("insurance_policies")
+          .select("*")
+          .eq("store_id", storeData.id)
+          .eq("is_active", true),
+      ]);
+
+      setEquipment((equipmentData ?? []) as EquipmentRecord[]);
+      setInsurance(policiesData ?? []);
+
+      const ownerOccupied = storeData.occupancy_type === "owner_occupied";
+
+      if (ownerOccupied) {
+        const { data: reData } = await supabase
+          .from("real_estate")
+          .select("*")
+          .eq("store_id", storeData.id)
+          .limit(1)
+          .maybeSingle();
+        setRealEstate(reData);
+        setLease(null);
+        setLeaseOptions([]);
+        setTotalLeaseControl(15);
+      } else {
+        setRealEstate(null);
+        const { data: leaseData } = await supabase
+          .from("leases")
+          .select("*")
+          .eq("store_id", storeData.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (leaseData) {
+          setLease(leaseData);
+          const remaining = calcYearsRemaining(leaseData.lease_end_date);
+          const { data: optionsData } = await supabase
+            .from("lease_options")
+            .select("*")
+            .eq("lease_id", leaseData.id)
+            .order("option_number", { ascending: true });
+          setLeaseOptions(optionsData ?? []);
+          const optionYears = (optionsData ?? [])
+            .filter((o) => o.status === "Available")
+            .reduce((s, o) => s + (o.option_years ?? 0), 0);
+          setTotalLeaseControl(remaining + optionYears);
+        } else {
+          setLease(null);
+          setLeaseOptions([]);
+          setTotalLeaseControl(0);
+        }
+      }
+
+      setLoading(false);
+    }
+
+    load();
+  }, [selectedStore?.id, supabase]);
+
+  const equipMetrics = useMemo(() => computeEquipmentMetrics(equipment), [equipment]);
+
+  const valuation: ValuationResult | null = useMemo(() => {
+    if (!store) return null;
+    const monthlyRevenue = store.monthly_revenue ?? 0;
+    const monthlyExpenses = store.monthly_expenses ?? 0;
+    const annualEbitda = (monthlyRevenue - monthlyExpenses) * 12;
+    const isOwnerOccupied = store.occupancy_type === "owner_occupied";
+
+    return calcValuation({
+      ebitda: annualEbitda,
+      monthlyRevenue,
+      squareFootage: store.square_footage ?? 3500,
+      avgEquipmentAge: equipMetrics.totalMachines > 0 ? equipMetrics.weightedAvgAge : 6,
+      pct200G: equipMetrics.pct200GWashers,
+      equipmentScore: equipMetrics.qualityScore,
+      totalLeaseControl,
+      occupancyType: isOwnerOccupied ? "owned" : "leased",
+      marketDensity: normalizeMarketDensity(store.market_density ?? store.location_type),
+      storeCondition: normalizeStoreCondition(store.store_condition),
+      lastRetoolYear: store.last_retool_year ?? undefined,
+      retoolInvestment: store.retool_investment ?? undefined,
+      retoolType: store.retool_type ?? undefined,
+      revenueTrend: store.revenue_trend ?? "stable",
+      competitionLevel: store.competition_level ?? "normal",
+      selfServicePct: store.self_service_pct ?? 70,
+      wdfPct: store.wdf_pct ?? 18,
+      commercialPct: store.commercial_pct ?? 12,
+      pickupDeliveryPct: store.pickup_delivery_pct ?? 0,
+      realEstateValue: isOwnerOccupied ? (realEstate?.estimated_value ?? 0) : undefined,
+    });
+  }, [store, equipMetrics, totalLeaseControl, realEstate]);
+
+  const generatedDate = useMemo(
+    () =>
+      new Date().toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }),
+    []
+  );
+
+  const executiveSummary = useMemo(() => {
+    if (!store || !valuation) return "";
+    return generateExecutiveSummary({ store, lease, leaseOptions, equipment, valuation });
+  }, [store, lease, leaseOptions, equipment, valuation]);
+
+  const metrics = useMemo(() => {
+    if (!store || !valuation) return null;
+
+    const monthlyRevenue = store.monthly_revenue ?? 0;
+    const monthlyExpenses = store.monthly_expenses ?? 0;
+    const monthlyEbitda = monthlyRevenue - monthlyExpenses;
+    const annualRevenue = monthlyRevenue * 12;
+    const annualEbitda = monthlyEbitda * 12;
+    const annualDebtService = store.annual_debt_service ?? 0;
+    const monthlyUtilities = store.monthly_utilities ?? 0;
+    const loanBalance = store.loan_balance ?? 0;
+    const sqft = store.square_footage ?? 3500;
+    const isOwnerOccupied = store.occupancy_type === "owner_occupied";
+
+    const dscr = annualDebtService > 0 ? calcDSCR(annualEbitda, annualDebtService) : 0;
+    const portfolioEbitda = stores.reduce(
+      (s, st) => s + ((st.monthly_revenue ?? 0) - (st.monthly_expenses ?? 0)) * 12,
+      0
+    );
+    const portfolioDebtService = stores.reduce((s, st) => s + (st.annual_debt_service ?? 0), 0);
+    const globalDscr =
+      portfolioDebtService > 0 ? calcGlobalDSCR(portfolioEbitda, portfolioDebtService) : dscr;
+
+    const ebitdaMargin = calcEbitdaMargin(annualEbitda, annualRevenue);
+    const utilityRatio = calcUtilityRatio(monthlyUtilities * 12, annualRevenue);
+    const rentToRevenue = calcRentToRevenue((lease?.monthly_rent ?? 0) * 12, annualRevenue);
+    const revenuePerSF = calcRevenuePerSF(annualRevenue, sqft);
+    const ebitdaPerSF = calcEbitdaPerSF(annualEbitda, sqft);
+    const debtYield = loanBalance > 0 ? calcDebtYield(annualEbitda, loanBalance) : 0;
+
+    const yearsRemaining = lease ? calcYearsRemaining(lease.lease_end_date) : 0;
+    const availableOptions = leaseOptions.filter((o) => o.status === "Available");
+    const leaseScore = lease
+      ? calcLeaseScore({
+          yearsRemaining,
+          renewalOptions: availableOptions.length,
+          relocationClause: false,
+          assignmentWithConsent: lease.assignment_rights === "With Consent",
+          exclusiveUse: lease.exclusivity_clause ?? false,
+        })
+      : isOwnerOccupied
+        ? 95
+        : 0;
+
+    const camCharges = lease?.cam_charges ?? 0;
+    const monthlyRent = lease?.monthly_rent ?? 0;
+    const occupancyCostRatio = calcOccupancyCostRatio((monthlyRent + camCharges) * 12, annualRevenue);
+
+    const leaseExpires = parseDate(lease?.lease_end_date);
+    const leaseExpiresStr = leaseExpires
+      ? leaseExpires.toLocaleDateString("en-US", { month: "short", year: "numeric" })
+      : "—";
+
+    return {
+      annualEbitda,
+      annualRevenue,
+      dscr,
+      globalDscr,
+      ebitdaMargin,
+      utilityRatio,
+      rentToRevenue,
+      revenuePerSF,
+      ebitdaPerSF,
+      debtYield,
+      leaseScore,
+      totalLeaseControl,
+      yearsRemaining,
+      leaseExpiresStr,
+      availableOptions,
+      monthlyRent,
+      camCharges,
+      occupancyCostRatio,
+      financeRating: financeabilityRating(dscr, globalDscr),
+      isOwnerOccupied,
+    };
+  }, [store, valuation, stores, lease, leaseOptions, totalLeaseControl]);
+
+  const reportProps: ReportProps | null = useMemo(() => {
+    if (!store || !valuation) return null;
+    return {
+      store,
+      lease,
+      leaseOptions,
+      equipment,
+      insurance,
+      realEstate,
+      valuation,
+      portfolioStores: stores,
+      generatedDate,
+      executiveSummary,
+    };
+  }, [
+    store,
+    lease,
+    leaseOptions,
+    equipment,
+    insurance,
+    realEstate,
+    valuation,
+    stores,
+    generatedDate,
+    executiveSummary,
+  ]);
+
+  const buildPdfBlob = useCallback(async () => {
+    if (!reportProps) throw new Error("Report data not ready");
+    return pdf(<ReportDocument {...reportProps} />).toBlob();
+  }, [reportProps]);
+
+  async function handleGeneratePdf() {
+    if (!reportProps || !store) return;
+    setGeneratingPdf(true);
+    setError("");
+    try {
+      const blob = await buildPdfBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(store.name ?? "store").replace(/\s+/g, "-").toLowerCase()}-underwriting-report.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate PDF");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  }
+
+  async function handleShareWithLender() {
+    if (!reportProps || !store || !userId) {
+      setError("You must be signed in to share reports.");
+      return;
+    }
+
+    setSharing(true);
+    setError("");
+
+    try {
+      const blob = await buildPdfBlob();
+      const timestamp = Date.now();
+      const filePath = `${userId}/${store.id}/report-${timestamp}.pdf`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("reports")
+        .upload(filePath, blob, { contentType: "application/pdf", upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      const sevenDays = 60 * 60 * 24 * 7;
+      const { data: signedData, error: signError } = await supabase.storage
+        .from("reports")
+        .createSignedUrl(filePath, sevenDays);
+
+      if (signError || !signedData?.signedUrl) {
+        throw signError ?? new Error("Failed to create signed URL");
+      }
+
+      const expiresAt = new Date(Date.now() + sevenDays * 1000).toISOString();
+
+      const { error: insertError } = await supabase.from("shared_reports").insert({
+        user_id: userId,
+        store_id: store.id,
+        file_path: filePath,
+        signed_url: signedData.signedUrl,
+        expires_at: expiresAt,
+      });
+
+      if (insertError) throw insertError;
+
+      setShareUrl(signedData.signedUrl);
+      setShareExpires(
+        new Date(expiresAt).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        })
+      );
+      setShareModalOpen(true);
+      setCopied(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to share report");
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  async function handleCopyLink() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("Could not copy link to clipboard");
+    }
+  }
+
+  if (storesLoading || loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-slate-500 text-[13px]">Loading report data...</div>
+      </div>
+    );
+  }
+
+  if (stores.length === 0 || isAllStores || !selectedStore || !store || !valuation || !metrics) {
+    return (
+      <div className="card text-center py-10 max-w-4xl">
+        <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
+          Select a store from the dropdown above to generate an underwriting report.
+        </p>
+      </div>
+    );
+  }
+
+  const storeName = store.name ?? "Your Store";
+
   return (
     <div className="space-y-4 max-w-4xl">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-[15px] font-semibold text-slate-100">Underwriting Report Preview</h1>
+        <div>
+          <h1 className="text-[15px] font-semibold text-slate-100">Underwriting Report</h1>
+          <p className="text-slate-500 text-[12px] mt-0.5">{storeName} — {generatedDate}</p>
+        </div>
         <div className="flex gap-2.5">
-          <button className="btn-outline">Download PDF</button>
-          <button className="btn-primary">Share with Lender</button>
+          <button
+            type="button"
+            className="btn-outline"
+            onClick={handleGeneratePdf}
+            disabled={generatingPdf || sharing}
+          >
+            {generatingPdf ? "Generating..." : "Generate PDF"}
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={handleShareWithLender}
+            disabled={generatingPdf || sharing || !userId}
+          >
+            {sharing ? "Sharing..." : "Share with Lender"}
+          </button>
         </div>
       </div>
 
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[12px] text-red-400">
+          {error}
+        </div>
+      )}
+
       {/* Executive Summary */}
       <div className="card">
-        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 pb-2.5 border-b border-white/[0.06]">
-          Executive Summary
-        </div>
-        <p className="text-[13px] text-slate-300 leading-relaxed">
-          Sunnyvale Super Wash is a strong-performing laundromat located in Sunnyvale, CA with 4,450 SF and 60 machines.
-          The store generates <strong className="text-slate-100">$831,000</strong> in annual revenue with a{" "}
-          <strong className="text-slate-100">28.6% EBITDA margin</strong>, significantly above the industry median of ~22%.
-          The LaundroCFO Score of <strong className="text-green-400">89/100</strong> reflects strong financeability, low
-          operational risk, and a well-structured lease with 17.3 years of total site control.
-        </p>
+        <SectionHeading>Executive Summary</SectionHeading>
+        <p className="text-[13px] text-slate-300 leading-relaxed">{executiveSummary}</p>
       </div>
 
       {/* Three-column summary */}
       <div className="grid grid-cols-3 gap-4">
         <div className="card">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 pb-2.5 border-b border-white/[0.06]">
-            Valuation
-          </div>
+          <SectionHeading>Valuation</SectionHeading>
           <div className="divide-y divide-white/[0.04] text-[13px]">
-            <div className="flex justify-between py-2"><span className="text-slate-400">EBITDA</span><span className="text-slate-100 font-semibold">$237,666</span></div>
-            <div className="flex justify-between py-2"><span className="text-slate-400">Multiple Applied</span><span className="text-blue-300 font-semibold">3.47x</span></div>
-            <div className="flex justify-between py-2"><span className="text-slate-400">Est. Store Value</span><span className="text-green-400 text-[15px] font-bold">$825,000</span></div>
+            <PreviewRow label="EBITDA" value={fmtDollar(metrics.annualEbitda)} />
+            <PreviewRow label="Multiple Applied" value={fmtMultiple(valuation.finalMultiple)} className="text-blue-300" />
+            <PreviewRow label="Est. Store Value" value={fmtDollar(valuation.businessValue)} className="text-green-400 text-[15px] font-bold" />
           </div>
         </div>
         <div className="card">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 pb-2.5 border-b border-white/[0.06]">
-            Financeability
-          </div>
+          <SectionHeading>Financeability</SectionHeading>
           <div className="divide-y divide-white/[0.04] text-[13px]">
-            <div className="flex justify-between py-2"><span className="text-slate-400">DSCR</span><span className="text-green-400 font-semibold">2.14x ✓</span></div>
-            <div className="flex justify-between py-2"><span className="text-slate-400">Global DSCR</span><span className="text-green-400 font-semibold">1.78x ✓</span></div>
-            <div className="flex justify-between py-2"><span className="text-slate-400">Rating</span><span className="text-green-400 font-semibold">Strong</span></div>
+            <PreviewRow
+              label="DSCR"
+              value={store.annual_debt_service ? `${fmtMultiple(metrics.dscr)} ✓` : "N/A"}
+              className={ratioColorClass(metrics.dscr, 1.25, 1.0)}
+            />
+            <PreviewRow
+              label="Global DSCR"
+              value={stores.some((s) => s.annual_debt_service) ? `${fmtMultiple(metrics.globalDscr)} ✓` : "N/A"}
+              className={ratioColorClass(metrics.globalDscr, 1.25, 1.0)}
+            />
+            <PreviewRow label="Rating" value={metrics.financeRating} className="text-green-400" />
           </div>
         </div>
         <div className="card">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 pb-2.5 border-b border-white/[0.06]">
-            Key Risks
-          </div>
+          <SectionHeading>Key Risks</SectionHeading>
           <div className="divide-y divide-white/[0.04] text-[13px]">
-            <div className="py-2 text-amber-400">⚠ Utility ratio 17.8%</div>
-            <div className="py-2 text-slate-300">✅ Lease — 17.3yr control</div>
-            <div className="py-2 text-slate-300">✅ Equipment — 6.1yr avg</div>
+            {metrics.utilityRatio > 17 ? (
+              <div className="py-2 text-amber-400">⚠ Utility ratio {fmtPct(metrics.utilityRatio)}</div>
+            ) : (
+              <div className="py-2 text-slate-300">✅ Utility ratio {fmtPct(metrics.utilityRatio)}</div>
+            )}
+            <div className="py-2 text-slate-300">
+              {metrics.isOwnerOccupied
+                ? "✅ Owner-occupied — fee simple"
+                : `✅ Lease — ${metrics.totalLeaseControl.toFixed(1)}yr control`}
+            </div>
+            <div className="py-2 text-slate-300">
+              {equipMetrics.weightedAvgAge < 10 ? "✅" : "⚠"} Equipment — {equipMetrics.weightedAvgAge.toFixed(1)}yr avg
+            </div>
           </div>
         </div>
       </div>
@@ -63,73 +558,204 @@ export default function ReportsPage() {
       {/* Lease + Equipment */}
       <div className="grid grid-cols-2 gap-4">
         <div className="card">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 pb-2.5 border-b border-white/[0.06]">
-            Lease Summary
-          </div>
+          <SectionHeading>{metrics.isOwnerOccupied ? "Real Estate" : "Lease Summary"}</SectionHeading>
           <div className="text-[13px] text-slate-400 space-y-2">
-            <div>Expires: <span className="text-slate-100">Nov 2031 — 7.3 years remaining</span></div>
-            <div>Renewals: <span className="text-slate-100">2 × 5-year options (total 17.3yr)</span></div>
-            <div>Monthly Rent: <span className="text-slate-100">$6,200 + CAM/taxes/ins</span></div>
-            <div>Occupancy Cost: <span className="text-slate-100">$91,450/yr (11.0%)</span></div>
-            <div>Lease Score: <span className="text-green-400 font-semibold">94/100 — Excellent</span></div>
+            {metrics.isOwnerOccupied ? (
+              <>
+                <div>
+                  Value:{" "}
+                  <span className="text-slate-100">
+                    {realEstate?.estimated_value ? fmtDollar(realEstate.estimated_value) : "—"}
+                  </span>
+                </div>
+                <div>
+                  Equity:{" "}
+                  <span className="text-green-400 font-semibold">
+                    {realEstate?.estimated_value != null && realEstate?.current_loan_balance != null
+                      ? fmtDollar(realEstate.estimated_value - realEstate.current_loan_balance)
+                      : "—"}
+                  </span>
+                </div>
+              </>
+            ) : lease ? (
+              <>
+                <div>
+                  Expires:{" "}
+                  <span className="text-slate-100">
+                    {metrics.leaseExpiresStr} — {metrics.yearsRemaining.toFixed(1)} years remaining
+                  </span>
+                </div>
+                <div>
+                  Renewals:{" "}
+                  <span className="text-slate-100">
+                    {metrics.availableOptions.length} option{metrics.availableOptions.length !== 1 ? "s" : ""} (total{" "}
+                    {metrics.totalLeaseControl.toFixed(1)}yr)
+                  </span>
+                </div>
+                <div>
+                  Monthly Rent:{" "}
+                  <span className="text-slate-100">
+                    {metrics.monthlyRent ? fmtDollar(metrics.monthlyRent) : "—"}
+                    {metrics.camCharges > 0 ? " + CAM" : ""}
+                  </span>
+                </div>
+                <div>
+                  Occupancy Cost:{" "}
+                  <span className="text-slate-100">
+                    {fmtPct(metrics.occupancyCostRatio)} of revenue
+                  </span>
+                </div>
+                <div>
+                  Lease Score:{" "}
+                  <span className="text-green-400 font-semibold">
+                    {metrics.leaseScore}/100 — {scoreLabel(metrics.leaseScore)}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="text-amber-400">No lease data on file</div>
+            )}
           </div>
         </div>
         <div className="card">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 pb-2.5 border-b border-white/[0.06]">
-            Equipment Summary
-          </div>
+          <SectionHeading>Equipment Summary</SectionHeading>
           <div className="text-[13px] text-slate-400 space-y-2">
-            <div>Total Machines: <span className="text-slate-100">60 (28 washers, 32 dryers)</span></div>
-            <div>Average Age: <span className="text-slate-100">6.1 years — Good</span></div>
-            <div>Fleet Under 10yr: <span className="text-slate-100">87% of machines</span></div>
-            <div>Replacement Estimate: <span className="text-slate-100">$612,500</span></div>
-            <div>Equipment Score: <span className="text-green-400 font-semibold">88/100 — Good</span></div>
+            <div>
+              Total Machines:{" "}
+              <span className="text-slate-100">
+                {equipMetrics.totalMachines} ({equipMetrics.totalWashers} washers, {equipMetrics.totalDryers} dryers)
+              </span>
+            </div>
+            <div>
+              Average Age:{" "}
+              <span className="text-slate-100">
+                {equipMetrics.weightedAvgAge.toFixed(1)} years — {scoreLabel(equipMetrics.qualityScore)}
+              </span>
+            </div>
+            <div>
+              Fleet Under 10yr:{" "}
+              <span className="text-slate-100">{equipMetrics.pctUnder10Years.toFixed(0)}% of machines</span>
+            </div>
+            <div>
+              Replacement Estimate:{" "}
+              <span className="text-slate-100">{fmtDollar(equipMetrics.estimatedReplacementValue)}</span>
+            </div>
+            <div>
+              Equipment Score:{" "}
+              <span className="text-green-400 font-semibold">
+                {equipMetrics.qualityScore}/100 — {scoreLabel(equipMetrics.qualityScore)}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Financial Ratios */}
       <div className="card">
-        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 pb-2.5 border-b border-white/[0.06]">
-          Financial Ratios
-        </div>
+        <SectionHeading>Financial Ratios</SectionHeading>
         <div className="grid grid-cols-4 gap-3">
           {[
-            ["DSCR", "2.14x", "text-green-400"],
-            ["Global DSCR", "1.78x", "text-green-400"],
-            ["EBITDA Margin", "28.6%", "text-green-400"],
-            ["Rent / Revenue", "12.3%", "text-green-400"],
-            ["Utility / Revenue", "17.8%", "text-amber-400"],
-            ["Revenue / SF", "$185.40", "text-slate-100"],
-            ["EBITDA / SF", "$53.41", "text-slate-100"],
-            ["Debt Yield", "18.2%", "text-green-400"],
+            ["DSCR", store.annual_debt_service ? fmtMultiple(metrics.dscr) : "N/A", ratioColorClass(metrics.dscr, 1.25, 1.0)],
+            ["Global DSCR", stores.some((s) => s.annual_debt_service) ? fmtMultiple(metrics.globalDscr) : "N/A", ratioColorClass(metrics.globalDscr, 1.25, 1.0)],
+            ["EBITDA Margin", fmtPct(metrics.ebitdaMargin), ratioColorClass(metrics.ebitdaMargin, 25, 20)],
+            ["Rent / Revenue", fmtPct(metrics.rentToRevenue), ratioColorClass(metrics.rentToRevenue, 0, 15, true)],
+            ["Utility / Revenue", fmtPct(metrics.utilityRatio), ratioColorClass(metrics.utilityRatio, 0, 17, true)],
+            ["Revenue / SF", `$${metrics.revenuePerSF.toFixed(2)}`, "text-slate-100"],
+            ["EBITDA / SF", `$${metrics.ebitdaPerSF.toFixed(2)}`, "text-slate-100"],
+            ["Debt Yield", store.loan_balance ? fmtPct(metrics.debtYield) : "N/A", ratioColorClass(metrics.debtYield, 12, 8)],
           ].map(([label, val, color]) => (
-            <div key={label} className="card2">
+            <div key={label as string} className="card2">
               <div className="metric-label">{label}</div>
-              <div className={`text-[16px] font-bold ${color}`}>{val}</div>
+              <div className={clsx("text-[16px] font-bold", color)}>{val}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Underwriter Notes */}
-      <div className="card">
-        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 pb-2.5 border-b border-white/[0.06]">
-          Underwriter Notes
+      {/* Value Drivers & Risks */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="card">
+          <SectionHeading>Value Drivers</SectionHeading>
+          {valuation.valueDrivers.length === 0 ? (
+            <p className="text-[12px] text-slate-500">No major drivers identified.</p>
+          ) : (
+            <ul className="space-y-2">
+              {valuation.valueDrivers.slice(0, 5).map((d) => (
+                <li key={d} className="text-[12px] text-slate-300 flex gap-2">
+                  <span className="text-green-400">✓</span>
+                  <span>{d}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-        <p className="text-[13px] text-slate-300 leading-relaxed">
-          Store demonstrates consistent revenue performance with above-median margins. Utility costs are elevated and should
-          be monitored — any reduction in the utility ratio to 15% would add approximately{" "}
-          <span className="text-green-400 font-semibold">$57,000</span> in estimated store value. Recommend a standard SBA
-          7(a) or conventional commercial loan structure. Lease structure is lender-friendly with long-term site control.
-          Equipment is in good shape with minimal near-term replacement risk. Global DSCR of 1.78x comfortably exceeds
-          minimum 1.25x threshold. This store is a strong candidate for financing or acquisition.
-        </p>
+        <div className="card">
+          <SectionHeading>Value Risks</SectionHeading>
+          {valuation.valueRisks.length === 0 ? (
+            <p className="text-[12px] text-slate-500">No significant risks flagged.</p>
+          ) : (
+            <ul className="space-y-2">
+              {valuation.valueRisks.slice(0, 5).map((r) => (
+                <li key={r} className="text-[12px] text-slate-300 flex gap-2">
+                  <span className="text-amber-400">⚠</span>
+                  <span>{r}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
 
+      {/* Insurance */}
+      {insurance.length > 0 && (
+        <div className="card">
+          <SectionHeading>Insurance ({insurance.length} active policies)</SectionHeading>
+          <div className="text-[13px] text-slate-400 space-y-1">
+            {insurance.map((p) => (
+              <div key={p.id}>
+                <span className="text-slate-200">{p.policy_type ?? "Policy"}</span>
+                {" — "}
+                {p.carrier ?? "Unknown carrier"}
+                {p.annual_premium ? ` — ${fmtDollar(p.annual_premium)}/yr` : ""}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="text-[11px] text-slate-600 pb-4">
-        Report generated by LaundroCFO — Sunnyvale Super Wash — {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+        Report generated by LaundroCFO — {storeName} — {generatedDate}
       </div>
+
+      {/* Share modal */}
+      {shareModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+          <div className="card max-w-lg w-full">
+            <div className="text-[15px] font-semibold text-slate-100 mb-1">Share with Lender</div>
+            <p className="text-[12px] text-slate-400 mb-4">
+              This secure link expires on {shareExpires} (7 days).
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                readOnly
+                value={shareUrl}
+                className="flex-1 bg-[#1e2a3a] border border-white/[0.08] rounded-lg px-3 py-2 text-[12px] text-slate-300"
+              />
+              <button type="button" className="btn-primary text-[12px] px-4" onClick={handleCopyLink}>
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <button
+              type="button"
+              className="btn-outline w-full mt-4 text-[12px]"
+              onClick={() => setShareModalOpen(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
