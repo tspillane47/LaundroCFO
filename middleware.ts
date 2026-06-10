@@ -2,6 +2,29 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+const PROTECTED_PREFIXES = [
+  '/portfolio',
+  '/dashboard',
+  '/valuation',
+  '/financials',
+  '/lease',
+  '/equipment',
+  '/insurance',
+  '/scenarios',
+  '/benchmarking',
+  '/reports',
+  '/alerts',
+  '/settings',
+  '/onboarding',
+  '/integrations',
+]
+
+function isProtectedRoute(pathname: string): boolean {
+  return PROTECTED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  )
+}
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request: { headers: request.headers } })
 
@@ -24,24 +47,13 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
+  const { pathname } = request.nextUrl
 
-  const isProtected = request.nextUrl.pathname.startsWith('/portfolio') ||
-    request.nextUrl.pathname.startsWith('/dashboard') ||
-    request.nextUrl.pathname.startsWith('/financials') ||
-    request.nextUrl.pathname.startsWith('/lease') ||
-    request.nextUrl.pathname.startsWith('/equipment') ||
-    request.nextUrl.pathname.startsWith('/scenarios') ||
-    request.nextUrl.pathname.startsWith('/benchmarking') ||
-    request.nextUrl.pathname.startsWith('/reports') ||
-    request.nextUrl.pathname.startsWith('/insurance') ||
-    request.nextUrl.pathname.startsWith('/alerts') ||
-    request.nextUrl.pathname.startsWith('/settings')
-
-  if (!user && isProtected) {
+  if (!user && isProtectedRoute(pathname)) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
+  if (user && (pathname === '/login' || pathname === '/signup')) {
     return NextResponse.redirect(new URL('/portfolio', request.url))
   }
 

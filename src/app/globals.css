@@ -220,3 +220,49 @@ html, body {
   .card-warning { background: var(--bg-warning-tint); border-color: rgba(180,83,9,0.15); }
   .card-danger { background: var(--bg-danger-tint); border-color: rgba(185,28,28,0.15); }
 }
+
+/* ============ MARKETING HERO ============ */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes particle-drift {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.6; }
+  100% { transform: translateY(-100vh) translateX(20px); opacity: 0; }
+}
+
+.marketing-hero-grid {
+  background-image:
+    linear-gradient(rgba(37, 99, 235, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.08) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.marketing-hero-particles::before,
+.marketing-hero-particles::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(96, 165, 250, 0.5);
+  animation: particle-drift 12s linear infinite;
+}
+
+.marketing-hero-particles::before {
+  left: 20%;
+  bottom: -10px;
+  animation-delay: 0s;
+}
+
+.marketing-hero-particles::after {
+  left: 70%;
+  bottom: -10px;
+  width: 3px;
+  height: 3px;
+  animation-delay: 4s;
+  animation-duration: 15s;
+}

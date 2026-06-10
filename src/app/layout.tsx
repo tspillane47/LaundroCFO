@@ -59,6 +59,7 @@ const pageTitles: Record<string, string> = {
 };
 
 const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password"];
+const marketingPages = ["/", "/pricing", "/about"];
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -292,6 +293,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const [isDark, setIsDark] = useState(false);
   const isAuthPage = authPages.includes(pathname);
+  const isMarketingPage = marketingPages.includes(pathname);
 
   useEffect(() => {
     const saved = localStorage.getItem("theme");
@@ -305,7 +307,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     else document.documentElement.classList.remove("dark");
   }, []);
 
-  if (isAuthPage) {
+  if (isAuthPage || isMarketingPage) {
     return (
       <html lang="en" className={isDark ? "dark" : ""}>
         <body>{children}</body>
