@@ -354,6 +354,11 @@ export default function ValuationPage() {
   const equipmentValAdj = sumCategoryAdj(valuation, "equipment");
   const leaseValAdj = sumCategoryAdj(valuation, "lease");
 
+  const ebitdaMargin = useMemo(() => {
+    const annualRevenue = monthlyRevenue * 12;
+    return annualRevenue > 0 ? (annualEbitda / annualRevenue) * 100 : 0;
+  }, [annualEbitda, monthlyRevenue]);
+
   async function handleSave() {
     if (!storeId) return;
     setSaving(true);
@@ -421,30 +426,21 @@ export default function ValuationPage() {
 
       {/* Section 1 — Hero banner */}
       <div
-        className="rounded-xl p-6 overflow-hidden"
+        className="rounded-xl px-5 py-3.5 overflow-hidden min-h-[120px] flex flex-col justify-center"
         style={{ background: "linear-gradient(135deg, #0f1e3d 0%, #1e3a5f 100%)" }}
       >
-        <div className="text-[11px] uppercase tracking-wider text-white/50 mb-1">
-          {storeName} — Business Value
-        </div>
-        <div
-          className="text-white font-extrabold tracking-tight"
-          style={{ fontSize: "52px", lineHeight: 1.1 }}
-        >
-          {fmtDollar(valuation.businessValue)}
-        </div>
-        <div className="flex flex-wrap items-center gap-3 mt-4">
-          <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[13px] font-semibold bg-blue-500/20 text-blue-200 border border-blue-400/30">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <span className="text-[11px] uppercase tracking-wider text-white/50">{storeName}</span>
+          <span className="text-[28px] font-extrabold text-white tracking-tight leading-none">
+            {fmtDollar(valuation.businessValue)}
+          </span>
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/20 text-blue-200 border border-blue-400/30">
             {fmtMultiple(valuation.finalMultiple)} EBITDA Multiple
           </span>
-          {isOwnerOccupied && realEstateValue > 0 && (
-            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[13px] font-semibold bg-green-500/20 text-green-300 border border-green-400/30">
-              Combined Value: {fmtDollar(valuation.combinedValue)}
-            </span>
-          )}
         </div>
         {isOwnerOccupied && realEstateValue > 0 && (
-          <div className="flex gap-6 mt-4 text-[12px] text-white/50">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5 text-[11px] text-white/45">
+            <span>Combined: {fmtDollar(valuation.combinedValue)}</span>
             <span>Business: {fmtDollar(valuation.businessValue)}</span>
             <span>Real Estate: {fmtDollar(valuation.realEstateValue)}</span>
           </div>
@@ -452,60 +448,132 @@ export default function ValuationPage() {
       </div>
 
       {/* Section 2 — Valuation Breakdown */}
-      <div className="card">
-        <div className="section-title mb-0">How We Arrived At This Value</div>
-        <div className="mt-4 space-y-2">
-          <div className="flex items-center justify-between text-[13px]">
-            <span className="text-slate-400">Base Multiple</span>
-            <span className="font-semibold text-slate-100">{fmtMultiple(valuation.baseMultiple)}</span>
+      <div className="card !p-3.5">
+        <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-3 lg:gap-4">
+          {/* Left — adjustment waterfall */}
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+              How We Arrived At This Value
+            </div>
+
+            <div className="flex items-center h-9 text-[11px] border-b border-white/[0.06]">
+              <span className="text-slate-400 flex-shrink-0">Base Multiple</span>
+              <span className="ml-auto font-semibold text-slate-100 tabular-nums">
+                {fmtMultiple(valuation.baseMultiple)}
+              </span>
+            </div>
+
+            {valuation.adjustments.map((adj) => (
+              <div
+                key={`${adj.label}-${adj.category}`}
+                className="flex items-center gap-1.5 h-9 text-[11px] border-b border-white/[0.06] min-w-0"
+              >
+                <span className="text-slate-300 font-medium flex-shrink-0">{adj.label}</span>
+                <span
+                  className={clsx(
+                    "text-[9px] px-1 py-px rounded border uppercase tracking-wide flex-shrink-0",
+                    CATEGORY_COLORS[adj.category] ?? "bg-slate-500/15 text-slate-400 border-slate-500/30"
+                  )}
+                >
+                  {adj.category.replace("_", " ")}
+                </span>
+                <span className="text-[10px] text-slate-500 truncate min-w-0 flex-1">{adj.reason}</span>
+                <span
+                  className={clsx(
+                    "font-semibold flex-shrink-0 tabular-nums",
+                    adj.value >= 0 ? "text-green-400" : "text-red-400"
+                  )}
+                >
+                  {formatAdj(adj.value)}
+                </span>
+              </div>
+            ))}
+
+            <div className="mt-2 pt-2 space-y-0.5 text-right">
+              <div className="text-[17px] font-bold text-blue-400 tabular-nums">
+                Final Multiple: {fmtMultiple(valuation.finalMultiple)}
+              </div>
+              <div className="text-[11px] text-slate-500 tabular-nums">
+                × Annual EBITDA: {fmtDollar(annualEbitda)}
+              </div>
+              <div className="text-[17px] font-bold text-green-400 tabular-nums">
+                = Business Value: {fmtDollar(valuation.businessValue)}
+              </div>
+            </div>
           </div>
 
-          {valuation.adjustments.map((adj) => (
-            <div
-              key={`${adj.label}-${adj.category}`}
-              className="flex items-start justify-between gap-4 text-[13px] py-1"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-slate-300 font-medium">{adj.label}</span>
-                  <span
-                    className={clsx(
-                      "text-[10px] px-1.5 py-0.5 rounded border uppercase tracking-wide",
-                      CATEGORY_COLORS[adj.category] ?? "bg-slate-500/15 text-slate-400 border-slate-500/30"
-                    )}
-                  >
-                    {adj.category.replace("_", " ")}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 mt-0.5">{adj.reason}</div>
+          {/* Right — key metrics & drivers */}
+          <div className="flex flex-col gap-2 min-w-0">
+            <div className="card2 !p-2.5 space-y-1.5">
+              <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+                Key Metrics
               </div>
-              <span
-                className={clsx(
-                  "font-semibold flex-shrink-0",
-                  adj.value >= 0 ? "text-green-400" : "text-red-400"
-                )}
-              >
-                {formatAdj(adj.value)}
-              </span>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[10px] text-slate-500">Store Value</span>
+                <span className="text-[15px] font-bold text-green-400 tabular-nums">
+                  {fmtDollar(valuation.businessValue)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[10px] text-slate-500">Final Multiple</span>
+                <span className="text-[13px] font-bold text-blue-400 tabular-nums">
+                  {fmtMultiple(valuation.finalMultiple)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[10px] text-slate-500">Annual EBITDA</span>
+                <span className="text-[12px] font-semibold text-slate-200 tabular-nums">
+                  {fmtDollar(annualEbitda)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[10px] text-slate-500">EBITDA Margin</span>
+                <span className="text-[12px] font-semibold text-slate-200 tabular-nums">
+                  {ebitdaMargin.toFixed(1)}%
+                </span>
+              </div>
             </div>
-          ))}
 
-          <div className="border-t border-white/[0.08] pt-3 mt-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[14px] font-semibold text-slate-200">Final Multiple</span>
-              <span className="text-[22px] font-bold text-blue-400">
-                {fmtMultiple(valuation.finalMultiple)}
-              </span>
+            <div className="card2 !p-2.5 border-green-500/25 bg-green-500/[0.06]">
+              <div className="text-[10px] font-semibold text-green-400/90 mb-1.5">
+                Helping Value ✓
+              </div>
+              {valuation.valueDrivers.length === 0 ? (
+                <p className="text-[10px] text-slate-500">No major drivers identified.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {valuation.valueDrivers.slice(0, 3).map((driver) => (
+                    <li
+                      key={driver}
+                      className="flex items-center gap-1.5 text-[10px] text-slate-300 min-w-0"
+                    >
+                      <span className="text-green-400 flex-shrink-0">✓</span>
+                      <span className="truncate">{driver}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            <div className="flex items-center justify-between text-[13px]">
-              <span className="text-slate-400">× Annual EBITDA</span>
-              <span className="font-semibold text-slate-100">{fmtDollar(annualEbitda)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[14px] font-semibold text-slate-200">= Business Value</span>
-              <span className="text-[22px] font-bold text-green-400">
-                {fmtDollar(valuation.businessValue)}
-              </span>
+
+            <div className="card2 !p-2.5 border-amber-500/25 bg-amber-500/[0.06]">
+              <div className="text-[10px] font-semibold text-amber-400/90 mb-1.5">
+                Hurting Value ⚠
+              </div>
+              {valuation.valueRisks.length === 0 ? (
+                <p className="text-[10px] text-slate-500">No significant risks flagged.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {valuation.valueRisks.slice(0, 3).map((risk) => (
+                    <li
+                      key={risk}
+                      className="flex items-center gap-1.5 text-[10px] text-slate-300 min-w-0"
+                    >
+                      <span className="text-amber-400 flex-shrink-0">⚠</span>
+                      <span className="truncate">{risk}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>
@@ -617,41 +685,8 @@ export default function ValuationPage() {
         </div>
       </div>
 
-      {/* Section 4 — Drivers, Risks, Improvements */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="card">
-          <div className="section-title mb-3">Value Drivers</div>
-          {valuation.valueDrivers.length === 0 ? (
-            <p className="text-[12px] text-slate-500">No major value drivers identified.</p>
-          ) : (
-            <ul className="space-y-2.5">
-              {valuation.valueDrivers.map((driver) => (
-                <li key={driver} className="flex items-start gap-2 text-[12px] text-slate-300">
-                  <span className="text-green-400 flex-shrink-0 mt-0.5">✓</span>
-                  <span>{driver}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="card">
-          <div className="section-title mb-3">Value Risks</div>
-          {valuation.valueRisks.length === 0 ? (
-            <p className="text-[12px] text-slate-500">No significant risks flagged.</p>
-          ) : (
-            <ul className="space-y-2.5">
-              {valuation.valueRisks.map((risk) => (
-                <li key={risk} className="flex items-start gap-2 text-[12px] text-slate-300">
-                  <span className="text-amber-400 flex-shrink-0 mt-0.5">⚠</span>
-                  <span>{risk}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="card">
+      {/* Section 4 — Improvement Opportunities */}
+      <div className="card">
           <div className="section-title mb-3">Improvement Opportunities</div>
           {valuation.improvements.length === 0 ? (
             <p className="text-[12px] text-slate-500">Store is well-optimized across key factors.</p>
@@ -678,7 +713,6 @@ export default function ValuationPage() {
               ))}
             </ul>
           )}
-        </div>
       </div>
 
       {/* Section 5 — Equipment & Lease summary */}
