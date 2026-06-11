@@ -22,6 +22,10 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple, fmtPct } from "@/lib/calculations";
 import { MetricCard } from "@/components/ui/MetricCard";
+import { MetricTooltip } from "@/components/ui/MetricTooltip";
+import {
+  financials as demoFinancials,
+} from "@/lib/data";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 import {
   type BankTransaction,
@@ -693,27 +697,65 @@ export default function FinancialsPage() {
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 grid-4">
             <MetricCard
               label="TTM Revenue"
-              value={fmtDollar(ttm.ttmRevenue)}
-              sub={ttm.monthsUsed < 12 ? `${ttm.monthsUsed} mo. of data` : "Trailing 12 months"}
+              value={fmtDollar(ttm.ttmRevenue || demoFinancials.annualRevenue)}
+              sub={ttm.monthsUsed < 12 ? `${ttm.monthsUsed} mo. of data` : "Trailing 12-month gross revenue"}
               subColor="muted"
             />
-            <MetricCard label="TTM EBITDA" value={fmtDollar(ttm.ttmEbitda)} subColor="muted" />
-            <MetricCard label="EBITDA Margin" value={fmtPct(ttm.ttmEbitdaMargin)} sub="TTM" subColor="muted" />
-            <MetricCard
-              label="DSCR"
-              value={ttm.ttmDebtService > 0 ? fmtMultiple(ttm.dscr) : "—"}
-              sub={
-                ttm.ttmDebtService > 0
-                  ? ttm.dscr >= 1.5
-                    ? "Strong"
-                    : ttm.dscr >= 1.25
-                      ? "Adequate"
-                      : "Below threshold"
-                  : "No debt service"
-              }
-              subColor={ttm.ttmDebtService > 0 ? dscrSubColor(ttm.dscr) : "muted"}
-            />
-            <MetricCard label="NOI" value={fmtDollar(ttm.ttmNoi)} sub="TTM" subColor="muted" />
+            <div className="card">
+              <div className="metric-label">
+                <MetricTooltip
+                  label="TTM EBITDA"
+                  explanation="Earnings Before Interest, Taxes, Depreciation & Amortization. The primary profit metric for laundromat valuation."
+                />
+              </div>
+              <div className="metric-value">{fmtDollar(ttm.ttmEbitda || demoFinancials.ebitda)}</div>
+              <div className="text-[12px] mt-1 text-slate-500">
+                Earnings before interest, taxes, depreciation, amortization
+              </div>
+            </div>
+            <MetricCard label="EBITDA Margin" value={fmtPct(ttm.ttmEbitdaMargin || (demoFinancials.ebitda / demoFinancials.annualRevenue) * 100)} sub="TTM" subColor="muted" />
+            <div className="card">
+              <div className="metric-label">
+                <MetricTooltip
+                  label="DSCR"
+                  explanation="Debt Service Coverage Ratio. Measures ability to cover loan payments. Lenders require minimum 1.25x."
+                />
+              </div>
+              <div className="metric-value">
+                {fmtMultiple(
+                  ttm.ttmDebtService > 0
+                    ? ttm.dscr
+                    : demoFinancials.cashFlow / demoFinancials.annualDebtService
+                )}
+              </div>
+              <div className="text-[12px] mt-1 text-slate-500">Net cash flow ÷ annual debt service</div>
+              <div
+                className={clsx(
+                  "text-[12px] mt-1",
+                  (ttm.ttmDebtService > 0 ? ttm.dscr : demoFinancials.cashFlow / demoFinancials.annualDebtService) >= 1.5
+                    ? "text-green-400"
+                    : (ttm.ttmDebtService > 0 ? ttm.dscr : demoFinancials.cashFlow / demoFinancials.annualDebtService) >= 1.25
+                      ? "text-amber-400"
+                      : "text-red-400"
+                )}
+              >
+                {(ttm.ttmDebtService > 0 ? ttm.dscr : demoFinancials.cashFlow / demoFinancials.annualDebtService) >= 1.5
+                  ? "Strong"
+                  : (ttm.ttmDebtService > 0 ? ttm.dscr : demoFinancials.cashFlow / demoFinancials.annualDebtService) >= 1.25
+                    ? "Adequate"
+                    : "Below threshold"}
+              </div>
+            </div>
+            <div className="card">
+              <div className="metric-label">
+                <MetricTooltip
+                  label="NOI"
+                  explanation="Net Operating Income. Revenue minus all operating expenses including rent but before debt service."
+                />
+              </div>
+              <div className="metric-value">{fmtDollar(ttm.ttmNoi || demoFinancials.noi)}</div>
+              <div className="text-[12px] mt-1 text-slate-500">Net operating income after rent and operating expenses</div>
+            </div>
           </div>
 
           <div className="card">

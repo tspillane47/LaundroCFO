@@ -31,6 +31,7 @@ const navSections = [
       { href: "/scenarios", label: "Scenarios", emoji: "🔀" },
       { href: "/benchmarking", label: "Benchmarking", emoji: "📈" },
       { href: "/reports", label: "Reports", emoji: "📄" },
+      { href: "/integrations", label: "Integrations", emoji: "🔌" },
     ],
   },
   {
@@ -58,7 +59,7 @@ const pageTitles: Record<string, string> = {
   "/settings": "Settings",
 };
 
-const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password"];
+const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password", "/auth/callback"];
 const marketingPages = ["/", "/pricing", "/about"];
 
 function AppShell({ children }: { children: React.ReactNode }) {

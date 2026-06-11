@@ -10,9 +10,18 @@ import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
 import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
+import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { MetricTooltip } from "@/components/ui/MetricTooltip";
+import {
+  financials as demoFinancials,
+  valueTrend as demoValueTrend,
+  DEMO_MONTHLY_REVENUE,
+  DEMO_MONTHLY_EXPENSES,
+  DEMO_ANNUAL_DEBT_SERVICE,
+} from "@/lib/data";
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const VALUATION_MULTIPLE = 3.47;
+const VALUATION_MULTIPLE = demoFinancials.valuationMultiple;
 
 type Store = {
   id: string;
@@ -113,6 +122,18 @@ export default function PortfolioPage() {
   const [realEstateTotal, setRealEstateTotal] = useState(0);
   const [equipmentByStore, setEquipmentByStore] = useState<Record<string, any[]>>({});
   const [insuranceByStore, setInsuranceByStore] = useState<Record<string, any[]>>({});
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  useEffect(() => {
+    if (localStorage.getItem("laundrocfo_show_welcome") === "true") {
+      setShowWelcome(true);
+    }
+  }, []);
+
+  function dismissWelcome() {
+    localStorage.removeItem("laundrocfo_show_welcome");
+    setShowWelcome(false);
+  }
 
   useEffect(() => {
     async function load() {
@@ -153,15 +174,23 @@ export default function PortfolioPage() {
 
   const storeMetrics = useMemo(() => {
     return (stores as Store[]).map((store) => {
-      const monthlyRevenue = store.monthly_revenue ?? 0;
-      const monthlyExpenses = store.monthly_expenses ?? 0;
+      const hasRealData = (store.monthly_revenue ?? 0) > 0;
+      const monthlyRevenue = hasRealData ? (store.monthly_revenue ?? 0) : DEMO_MONTHLY_REVENUE;
+      const monthlyExpenses = hasRealData
+        ? (store.monthly_expenses ?? 0)
+        : DEMO_MONTHLY_EXPENSES;
       const monthlyEbitda = monthlyRevenue - monthlyExpenses;
       const annualEbitda = monthlyEbitda * 12;
-      const debtService = store.annual_debt_service ?? 0;
-      const dscr = debtService > 0 ? annualEbitda / debtService : 0;
-      const estimatedValue = annualEbitda * VALUATION_MULTIPLE;
+      const debtService = hasRealData
+        ? (store.annual_debt_service ?? 0)
+        : DEMO_ANNUAL_DEBT_SERVICE;
+      const annualCashFlow = hasRealData ? annualEbitda - debtService : demoFinancials.cashFlow;
+      const dscr = debtService > 0 ? annualCashFlow / debtService : 0;
+      const estimatedValue = hasRealData
+        ? annualEbitda * VALUATION_MULTIPLE
+        : demoFinancials.estimatedValue;
       const loanBalance = store.loan_balance ?? 0;
-      const avgMachineAge = store.avg_machine_age ?? 0;
+      const avgMachineAge = store.avg_machine_age ?? 6.1;
 
       const isOwnerOccupied = store.occupancy_type === "owner_occupied";
       const storeLease = leases.find((l) => l.store_id === store.id);
@@ -175,6 +204,7 @@ export default function PortfolioPage() {
 
       return {
         store,
+        hasRealData,
         estimatedValue,
         monthlyRevenue,
         monthlyEbitda,
@@ -188,37 +218,59 @@ export default function PortfolioPage() {
     });
   }, [stores, leases]);
 
+  const usingDemoData = storeMetrics.some((m) => !m.hasRealData);
+
   const aggregates = useMemo(() => {
     const totalPortfolioValue = storeMetrics.reduce((s, m) => s + m.estimatedValue, 0);
     const totalAnnualRevenue = storeMetrics.reduce((s, m) => s + m.monthlyRevenue * 12, 0);
     const totalAnnualEbitda = storeMetrics.reduce((s, m) => s + m.annualEbitda, 0);
     const totalMonthlyEbitda = totalAnnualEbitda / 12;
     const totalDebt = (stores as Store[]).reduce((s, st) => s + (st.loan_balance ?? 0), 0);
-    const totalAnnualDebtService = (stores as Store[]).reduce((s, st) => s + (st.annual_debt_service ?? 0), 0);
-    const globalDSCR = totalAnnualDebtService > 0 ? totalAnnualEbitda / totalAnnualDebtService : 0;
+    const totalAnnualDebtService = storeMetrics.reduce((s, m) => {
+      const hasRealData = (m.store.monthly_revenue ?? 0) > 0;
+      return s + (hasRealData ? (m.store.annual_debt_service ?? 0) : DEMO_ANNUAL_DEBT_SERVICE);
+    }, 0);
+    const totalAnnualCashFlow = storeMetrics.reduce((s, m) => {
+      const ds = (m.store.monthly_revenue ?? 0) > 0 ? (m.store.annual_debt_service ?? 0) : DEMO_ANNUAL_DEBT_SERVICE;
+      return s + m.annualEbitda - ds;
+    }, 0);
+    const globalDSCR =
+      totalAnnualDebtService > 0
+        ? totalAnnualCashFlow / totalAnnualDebtService
+        : demoFinancials.cashFlow / demoFinancials.annualDebtService;
     const portfolioNetWorth = totalPortfolioValue - totalDebt;
     const ebitdaMargin = totalAnnualRevenue > 0 ? (totalAnnualEbitda / totalAnnualRevenue) * 100 : 0;
-    const availableMonthlyCashFlow = Math.max(0, totalMonthlyEbitda - totalAnnualDebtService / 12);
-    const acquisitionCapacity = availableMonthlyCashFlow / 0.1 / 12;
+    const availableMonthlyCashFlow = Math.max(0, (totalAnnualEbitda - totalAnnualDebtService) / 12);
+    const acquisitionCapacity = (availableMonthlyCashFlow * 12) / 0.12;
 
     return {
-      totalPortfolioValue,
-      totalAnnualRevenue,
-      totalAnnualEbitda,
-      totalMonthlyEbitda,
+      totalPortfolioValue:
+        usingDemoData && totalPortfolioValue === 0 ? demoFinancials.estimatedValue : totalPortfolioValue,
+      totalAnnualRevenue:
+        usingDemoData && totalAnnualRevenue === 0 ? demoFinancials.annualRevenue : totalAnnualRevenue,
+      totalAnnualEbitda:
+        usingDemoData && totalAnnualEbitda === 0 ? demoFinancials.ebitda : totalAnnualEbitda,
+      totalMonthlyEbitda:
+        usingDemoData && totalAnnualEbitda === 0 ? demoFinancials.ebitda / 12 : totalMonthlyEbitda,
       totalDebt,
-      totalAnnualDebtService,
+      totalAnnualDebtService:
+        usingDemoData && totalAnnualDebtService === 0
+          ? demoFinancials.annualDebtService
+          : totalAnnualDebtService,
       globalDSCR,
       portfolioNetWorth,
       ebitdaMargin,
       availableMonthlyCashFlow,
       acquisitionCapacity,
     };
-  }, [storeMetrics, stores]);
+  }, [storeMetrics, stores, usingDemoData]);
 
   const valuationTrend = useMemo(
-    () => generateValuationTrend(aggregates.totalPortfolioValue),
-    [aggregates.totalPortfolioValue]
+    () =>
+      usingDemoData
+        ? demoValueTrend
+        : generateValuationTrend(aggregates.totalPortfolioValue),
+    [aggregates.totalPortfolioValue, usingDemoData]
   );
 
   const monthlyChange = valuationTrend[11].value - valuationTrend[10].value;
@@ -253,8 +305,18 @@ export default function PortfolioPage() {
 
   if (storesLoading || loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-[14px]" style={{ color: "var(--text-muted)" }}>Loading portfolio…</div>
+      <div className="space-y-5">
+        <CardSkeleton />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
+          {Array.from({ length: 2 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -298,6 +360,41 @@ export default function PortfolioPage() {
 
   return (
     <div className="space-y-5">
+      {showWelcome && (
+        <div
+          className="rounded-xl p-6 relative"
+          style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f1e3d 100%)", border: "1px solid rgba(96,165,250,0.2)" }}
+        >
+          <button
+            type="button"
+            onClick={dismissWelcome}
+            className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 text-[18px]"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+          <div className="text-[16px] font-semibold text-white mb-1">
+            🎉 Welcome to LaundroCFO! Your store has been set up. Here&apos;s what to do next:
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+            {[
+              { href: "/equipment", label: "Add your equipment", icon: "⚙️" },
+              { href: "/lease", label: "Set up your lease", icon: "📋" },
+              { href: "/insurance", label: "Add insurance policies", icon: "🛡️" },
+            ].map((step) => (
+              <Link
+                key={step.href}
+                href={step.href}
+                className="flex items-center gap-3 rounded-lg p-4 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+              >
+                <span className="text-[24px]">{step.icon}</span>
+                <span className="text-[13px] font-medium text-slate-200">{step.label} →</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Hero Banner */}
       <div
         className="rounded-xl p-6 overflow-hidden"
@@ -305,7 +402,14 @@ export default function PortfolioPage() {
       >
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 hero-banner">
           <div className="flex-1">
-            <div className="text-[11px] uppercase tracking-wider text-white/50 mb-1">Total Portfolio Value</div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="text-[11px] uppercase tracking-wider text-white/50">Total Portfolio Value</div>
+              {usingDemoData && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/20 text-amber-200 border border-amber-400/30">
+                  Demo data — add your store to see real numbers
+                </span>
+              )}
+            </div>
             <div className="text-white font-extrabold tracking-tight" style={{ fontSize: "52px", lineHeight: 1.1 }}>
               {fmtDollar(aggregates.totalPortfolioValue)}
             </div>
@@ -361,7 +465,12 @@ export default function PortfolioPage() {
         </div>
 
         <div className="card">
-          <div className="metric-label">Global DSCR</div>
+          <div className="metric-label">
+            <MetricTooltip
+              label="Global DSCR"
+              explanation="Combined debt coverage across all stores and personal obligations. Banks use this for total borrower risk assessment."
+            />
+          </div>
           <div className={clsx("text-[28px] font-bold tracking-tight", dscrColorClass(aggregates.globalDSCR))}>
             {fmtMultiple(aggregates.globalDSCR)}
           </div>
@@ -454,7 +563,7 @@ export default function PortfolioPage() {
                 <button type="button" onClick={() => openStore(m.store)} className="btn-primary flex-1 text-[12px]">
                   Open Store →
                 </button>
-                <Link href="/settings/edit-store" className="btn-outline flex-1 text-[12px] text-center">
+                <Link href="/settings" className="btn-outline flex-1 text-[12px] text-center">
                   Edit →
                 </Link>
               </div>
@@ -495,12 +604,20 @@ export default function PortfolioPage() {
             </span>
           </div>
           <div className="flex justify-between text-[13px]">
-            <span style={{ color: "var(--text-secondary)" }}>Est. Acquisition Capacity</span>
+            <span style={{ color: "var(--text-secondary)" }}>
+              <MetricTooltip
+                label="Est. Acquisition Capacity"
+                explanation="Capitalization rate. NOI divided by property value. Used in real estate valuation."
+              />
+            </span>
             <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
               {fmtDollar(aggregates.acquisitionCapacity)}
             </span>
           </div>
         </div>
+        <p className="text-[11px] mb-2" style={{ color: "var(--text-muted)" }}>
+          Based on 12% cap rate assumption. Actual capacity depends on lender terms.
+        </p>
         <p className="text-[13px] mb-4" style={{ color: "var(--text-secondary)" }}>{acquisitionMessage}</p>
         <Link href="/scenarios" className="btn-primary inline-flex text-[13px]">
           Run Scenarios →

@@ -2,6 +2,17 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+const PUBLIC_ROUTES = [
+  '/',
+  '/pricing',
+  '/about',
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/auth/callback',
+]
+
 const PROTECTED_PREFIXES = [
   '/portfolio',
   '/dashboard',
@@ -19,7 +30,17 @@ const PROTECTED_PREFIXES = [
   '/integrations',
 ]
 
+function isPublicRoute(pathname: string): boolean {
+  if (PUBLIC_ROUTES.includes(pathname)) return true
+  if (pathname.startsWith('/auth/callback')) return true
+  return false
+}
+
 function isProtectedRoute(pathname: string): boolean {
+  if (isPublicRoute(pathname)) return false
+  if (pathname === '/onboarding/complete' || pathname.startsWith('/onboarding/complete/')) {
+    return true
+  }
   return PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   )

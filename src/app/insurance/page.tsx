@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { ScoreRing } from "@/components/ui/ScoreRing";
+import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import {
   INPUT_CLASS,
   formatCurrency,
@@ -760,8 +761,13 @@ export default function InsurancePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-slate-500 text-[13px]">Loading insurance data...</div>
+      <div className="space-y-5">
+        <div className="grid grid-cols-3 lg:grid-cols-6 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+        <CardSkeleton />
       </div>
     );
   }

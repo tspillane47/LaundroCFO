@@ -23,6 +23,7 @@ import {
   formatAdjustment,
 } from "@/lib/equipment";
 import { fmtDollar } from "@/lib/calculations";
+import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 
 type Store = {
   id: string;
@@ -265,8 +266,13 @@ export default function EquipmentPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-slate-500 text-[13px]">Loading equipment inventory...</div>
+      <div className="space-y-5">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+        <CardSkeleton />
       </div>
     );
   }
@@ -280,6 +286,9 @@ export default function EquipmentPage() {
             Fleet tracking, age analysis, and valuation impact for {store?.name ?? "your store"}
           </p>
         </div>
+        <button type="button" onClick={openAddForm} className="btn-primary text-[13px] py-2 px-4 flex-shrink-0">
+          + Add Machine Group
+        </button>
       </div>
 
       {error && (

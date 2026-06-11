@@ -25,6 +25,17 @@ import {
 import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
+import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { MetricTooltip } from "@/components/ui/MetricTooltip";
+import {
+  financials as demoFinancials,
+  store as demoStore,
+  scores as demoScores,
+  valueTrend as demoValueTrend,
+  DEMO_MONTHLY_REVENUE,
+  DEMO_MONTHLY_EXPENSES,
+  DEMO_ANNUAL_DEBT_SERVICE,
+} from "@/lib/data";
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -271,12 +282,16 @@ export default function DashboardPage() {
     };
   }, [realEstate, store]);
 
-  const revenue = store?.monthly_revenue ?? 69250;
-  const expenses = store?.monthly_expenses ?? 49470;
+  const revenue = store?.monthly_revenue ?? DEMO_MONTHLY_REVENUE;
+  const expenses = store?.monthly_expenses ?? DEMO_MONTHLY_EXPENSES;
   const ebitda = revenue - expenses;
   const annualEbitda = ebitda * 12;
-  const debtService = store?.annual_debt_service ?? 100000;
-  const dscrNum = debtService > 0 ? annualEbitda / debtService : 0;
+  const debtService = store?.annual_debt_service ?? DEMO_ANNUAL_DEBT_SERVICE;
+  const annualCashFlow = store?.monthly_revenue != null
+    ? annualEbitda - debtService
+    : demoFinancials.cashFlow;
+  const monthlyCashFlow = annualCashFlow / 12;
+  const dscrNum = debtService > 0 ? annualCashFlow / debtService : 0;
   const ebitdaMargin = revenue > 0 ? (ebitda / revenue) * 100 : 0;
   const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
   const utilities = store?.monthly_utilities ?? 12340;
@@ -303,10 +318,20 @@ export default function DashboardPage() {
     });
   }, [annualEbitda, store, leaseMetrics, isOwnerOccupied, realEstateMetrics, avgEquipmentAge, sqft]);
 
-  const estimatedValue = Math.round(valuation.businessValue);
-  const finalMultiple = valuation.finalMultiple;
+  const estimatedValue = store?.monthly_revenue != null
+    ? Math.round(valuation.businessValue)
+    : demoFinancials.estimatedValue;
+  const finalMultiple = store?.monthly_revenue != null
+    ? valuation.finalMultiple
+    : demoFinancials.valuationMultiple;
 
-  const valuationTrend = useMemo(() => generateValuationTrend(estimatedValue), [estimatedValue]);
+  const valuationTrend = useMemo(
+    () =>
+      store?.monthly_revenue != null
+        ? generateValuationTrend(estimatedValue)
+        : demoValueTrend,
+    [estimatedValue, store?.monthly_revenue]
+  );
   const revenueEbitdaData = useMemo(() => generateRevenueEbitdaData(revenue, ebitda), [revenue, ebitda]);
 
   const monthlyChange = valuationTrend[11].value - valuationTrend[10].value;
@@ -315,15 +340,20 @@ export default function DashboardPage() {
       ? ((estimatedValue - valuationTrend[0].value) / valuationTrend[0].value) * 100
       : 0;
 
-  const leaseScore = leaseMetrics?.score ?? (isOwnerOccupied ? 80 : 50);
-  const insuranceScore = insuranceCount > 0 ? 85 : 85;
-  const storeHealthScore = Math.round((leaseScore + equipmentScore + insuranceScore) / 3);
+  const leaseScore = leaseMetrics?.score ?? demoScores.lease;
+  const insuranceScore = insuranceCount > 0 ? demoScores.insurance : demoScores.insurance;
+  const financialScore = demoScores.financial;
+  const laundrocfoScore = Math.round(
+    (leaseScore + equipmentScore + financialScore + insuranceScore) / 4
+  );
+  const leaseYearsDisplay = leaseMetrics?.yearsRemaining ?? 7.3;
+  const totalLeaseControl = leaseMetrics?.totalControl ?? 17.3;
 
   const dscrColor =
     dscrNum >= 1.5 ? "text-green-500" : dscrNum >= 1.25 ? "text-amber-500" : "text-red-500";
 
   const healthRingColor =
-    storeHealthScore >= 80 ? "#22c55e" : storeHealthScore >= 60 ? "#3b82f6" : storeHealthScore >= 40 ? "#f59e0b" : "#ef4444";
+    laundrocfoScore >= 80 ? "#22c55e" : laundrocfoScore >= 60 ? "#3b82f6" : laundrocfoScore >= 40 ? "#f59e0b" : "#ef4444";
 
   const actions = useMemo(() => {
     const items: ActionItem[] = [];
@@ -418,8 +448,14 @@ export default function DashboardPage() {
 
   if (storesLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-[14px]" style={{ color: "var(--text-muted)" }}>Loading dashboard…</div>
+      <div className="space-y-5">
+        <CardSkeleton />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+        <CardSkeleton />
       </div>
     );
   }
@@ -464,8 +500,13 @@ export default function DashboardPage() {
 
   if (!store) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-[14px]" style={{ color: "var(--text-muted)" }}>Loading store data…</div>
+      <div className="space-y-5">
+        <CardSkeleton />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -507,6 +548,20 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>
+            {store.name ?? "Store Dashboard"}
+          </h1>
+          <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+            {store.address ?? "No address set"}
+          </p>
+        </div>
+        <Link href="/settings" className="btn-outline text-[12px]">
+          Edit Store
+        </Link>
+      </div>
+
       {/* Section 1: Hero Valuation Banner */}
       <div
         className="rounded-xl p-6 overflow-hidden"
@@ -528,8 +583,8 @@ export default function DashboardPage() {
                 {yearChangePct >= 0 ? "+" : ""}{yearChangePct.toFixed(1)}% vs last year
               </span>
             </div>
-            <div className="text-[12px] text-white/40 mt-3">
-              Based on {fmtMultiple(finalMultiple)} EBITDA multiple
+            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", marginTop: "8px", lineHeight: 1.6 }}>
+              Based on {fmtMultiple(finalMultiple)} EBITDA multiple · Equipment grade B · {leaseYearsDisplay.toFixed(1)}yr lease · {sqft.toLocaleString()} SF
             </div>
           </div>
           <div className="hero-chart w-full lg:w-[280px] h-[80px]">
@@ -558,45 +613,50 @@ export default function DashboardPage() {
 
       {/* Section 2: KPI Cards */}
       <div
-        className="grid-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
+        className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
         style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}
       >
-        {/* Monthly Revenue */}
-        <div className="card">
-          <div className="metric-label">Monthly Revenue</div>
-          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-            {fmtDollar(revenue)}
-          </div>
-          <div className="text-[12px] text-green-500 mt-2 font-medium">
-            ▲ {((revenue / (revenue * 0.97) - 1) * 100).toFixed(1)}% vs prior month
-          </div>
-        </div>
-
-        {/* EBITDA */}
-        <div className="card">
-          <div className="metric-label">EBITDA</div>
-          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-            {fmtDollar(ebitda)}
-          </div>
-          <div className="text-[12px] mt-2 font-medium" style={{ color: "var(--text-secondary)" }}>
-            {ebitdaMargin.toFixed(1)}% margin
-          </div>
-        </div>
-
         {/* DSCR */}
         <div className="card">
-          <div className="metric-label">DSCR</div>
+          <div className="metric-label">
+            <MetricTooltip
+              label="DSCR"
+              explanation="Debt Service Coverage Ratio. Measures ability to cover loan payments. Lenders require minimum 1.25x."
+            />
+          </div>
           <div className={clsx("text-[28px] font-bold tracking-tight", dscrColor)}>
             {dscrNum.toFixed(2)}x
           </div>
           <div className="text-[12px] mt-2 font-medium" style={{ color: "var(--text-secondary)" }}>
             {dscrNum >= 1.5 ? "▲ Strong coverage" : dscrNum >= 1.25 ? "● Adequate" : "▼ Below threshold"}
           </div>
+          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
+            Cash flow / annual debt service · Min threshold 1.25x
+          </div>
         </div>
 
-        {/* Store Health Score */}
+        {/* EBITDA Margin */}
         <div className="card">
-          <div className="metric-label">Store Health Score</div>
+          <div className="metric-label">
+            <MetricTooltip
+              label="EBITDA Margin"
+              explanation="Earnings Before Interest, Taxes, Depreciation & Amortization. The primary profit metric for laundromat valuation."
+            />
+          </div>
+          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+            {ebitdaMargin.toFixed(1)}%
+          </div>
+          <div className="text-[12px] mt-2 font-medium" style={{ color: "var(--text-secondary)" }}>
+            {fmtDollar(ebitda)}/mo EBITDA
+          </div>
+          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
+            Industry median 22% · Top quartile 28%+
+          </div>
+        </div>
+
+        {/* LaundroCFO Score */}
+        <div className="card">
+          <div className="metric-label">LaundroCFO Score</div>
           <div className="flex items-center gap-4 mt-1">
             <div className="relative" style={{ width: 64, height: 64 }}>
               <svg width={64} height={64} viewBox="0 0 64 64">
@@ -607,7 +667,7 @@ export default function DashboardPage() {
                   stroke={healthRingColor}
                   strokeWidth={8}
                   strokeDasharray={2 * Math.PI * 26}
-                  strokeDashoffset={2 * Math.PI * 26 * (1 - storeHealthScore / 100)}
+                  strokeDashoffset={2 * Math.PI * 26 * (1 - laundrocfoScore / 100)}
                   strokeLinecap="round"
                   transform="rotate(-90 32 32)"
                 />
@@ -616,17 +676,34 @@ export default function DashboardPage() {
                 className="absolute inset-0 flex items-center justify-center text-[14px] font-bold"
                 style={{ color: "var(--text-primary)" }}
               >
-                {storeHealthScore}
+                {laundrocfoScore}
               </div>
             </div>
             <div>
               <div className="text-[22px] font-bold" style={{ color: "var(--text-primary)" }}>
-                {storeHealthScore}/100
+                {laundrocfoScore}/100
               </div>
               <div className="text-[12px]" style={{ color: "var(--text-muted)" }}>
                 Composite health index
               </div>
             </div>
+          </div>
+          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px", lineHeight: 1.6 }}>
+            Lease {leaseScore} · Equipment {equipmentScore} · Financial {financialScore} · Insurance {insuranceScore}
+          </div>
+        </div>
+
+        {/* Monthly Cash Flow */}
+        <div className="card">
+          <div className="metric-label">Monthly Cash Flow</div>
+          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+            {fmtDollar(monthlyCashFlow)}
+          </div>
+          <div className="text-[12px] mt-2 font-medium" style={{ color: "var(--text-secondary)" }}>
+            {fmtDollar(annualCashFlow)}/yr after debt service
+          </div>
+          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
+            After all expenses and debt service
           </div>
         </div>
       </div>
@@ -858,9 +935,28 @@ export default function DashboardPage() {
                   {leaseMetrics.expires}
                 </span>
               </div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
+                {leaseMetrics.yearsRemaining.toFixed(1)}yr base + {leaseMetrics.optionYears}yr options = {leaseMetrics.totalControl.toFixed(1)}yr total control
+              </div>
             </div>
           ) : (
-            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>No lease on file.</p>
+            <div className="space-y-2 text-[13px]" style={{ color: "var(--text-secondary)" }}>
+              <div className="flex justify-between">
+                <span>Lease Score</span>
+                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {demoScores.lease}/100
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Years Remaining</span>
+                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                  7.3 yrs
+                </span>
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
+                7.3yr base + 10yr options = 17.3yr total control
+              </div>
+            </div>
           )}
         </div>
 
@@ -891,6 +987,9 @@ export default function DashboardPage() {
                 {machines}
               </span>
             </div>
+            <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
+              Avg {avgEquipmentAge.toFixed(1)}yr · 87% under 10yr · 0% over 15yr
+            </div>
           </div>
         </div>
 
@@ -915,6 +1014,39 @@ export default function DashboardPage() {
               </Link>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Valuation Summary */}
+      <div className="card">
+        <div className="section-title mb-4">Valuation Summary</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          {[
+            { label: "Est. Value", value: fmtDollar(estimatedValue) },
+            {
+              label: "Multiple",
+              value: fmtMultiple(finalMultiple),
+              tooltip: "Applied to annual EBITDA to estimate store value. Higher multiples reflect better lease, equipment, and market factors.",
+            },
+            { label: "Annual EBITDA", value: fmtDollar(store?.monthly_revenue != null ? annualEbitda : demoFinancials.ebitda) },
+            { label: "Annual Revenue", value: fmtDollar(store?.monthly_revenue != null ? revenue * 12 : demoFinancials.annualRevenue) },
+            { label: "NOI", value: fmtDollar(store?.monthly_revenue != null ? annualEbitda - (store?.monthly_rent ?? demoFinancials.monthlyRent) * 12 : demoFinancials.noi) },
+            { label: "DSCR", value: `${dscrNum.toFixed(2)}x` },
+            { label: "Cash Flow", value: fmtDollar(annualCashFlow) },
+          ].map((item) => (
+            <div key={item.label}>
+              <div className="metric-label">
+                {"tooltip" in item && item.tooltip ? (
+                  <MetricTooltip label={item.label} explanation={item.tooltip} />
+                ) : (
+                  item.label
+                )}
+              </div>
+              <div className="text-[16px] font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>
+                {item.value}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

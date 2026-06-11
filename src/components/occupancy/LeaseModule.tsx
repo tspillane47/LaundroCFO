@@ -218,9 +218,12 @@ function calcDaysUntilNoticeDeadline(
 
 type Props = {
   store: Store;
+  editTrigger?: number;
+  hideHeader?: boolean;
+  onLeaseStatus?: (hasLease: boolean) => void;
 };
 
-export function LeaseModule({ store }: Props) {
+export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: Props) {
   const supabase = createClient();
 
   const [loading, setLoading] = useState(true);
@@ -261,6 +264,7 @@ export function LeaseModule({ store }: Props) {
 
     if (leaseData) {
       setLease(leaseData);
+      onLeaseStatus?.(true);
       setLeaseForm(leaseToForm(leaseData));
 
       const { data: optionsData, error: optionsError } = await supabase
@@ -278,6 +282,7 @@ export function LeaseModule({ store }: Props) {
       }
     } else {
       setLease(null);
+      onLeaseStatus?.(false);
       setOptions([]);
       setLeaseForm(emptyLeaseForm());
       setOptionForms([]);
@@ -331,6 +336,12 @@ export function LeaseModule({ store }: Props) {
     setError("");
     setSuccess("");
   }
+
+  useEffect(() => {
+    if (editTrigger && editTrigger > 0) {
+      enterEditMode();
+    }
+  }, [editTrigger]);
 
   function cancelEdit() {
     if (lease) {
@@ -468,26 +479,38 @@ export function LeaseModule({ store }: Props) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-[15px] font-semibold text-slate-100">Lease Management</h2>
-          <p className="text-slate-500 text-[13px] mt-0.5">Third-party leased location</p>
-        </div>
-        {mode === "view" ? (
-          <button onClick={enterEditMode} className="btn-primary">
-            {lease ? "Edit Lease" : "Add Lease"}
-          </button>
-        ) : (
-          <div className="flex gap-2">
-            <button onClick={cancelEdit} className="btn-outline" disabled={saving}>
-              Cancel
-            </button>
-            <button onClick={handleSave} className="btn-primary" disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
+      {!hideHeader && (
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-[15px] font-semibold text-slate-100">Lease Management</h2>
+            <p className="text-slate-500 text-[13px] mt-0.5">Third-party leased location</p>
           </div>
-        )}
-      </div>
+          {mode === "view" ? (
+            <button onClick={enterEditMode} className="btn-primary">
+              {lease ? "Edit Lease" : "Add Lease"}
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button onClick={cancelEdit} className="btn-outline" disabled={saving}>
+                Cancel
+              </button>
+              <button onClick={handleSave} className="btn-primary" disabled={saving}>
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {hideHeader && mode === "edit" && (
+        <div className="flex justify-end gap-2">
+          <button onClick={cancelEdit} className="btn-outline" disabled={saving}>
+            Cancel
+          </button>
+          <button onClick={handleSave} className="btn-primary" disabled={saving}>
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[12px] text-red-400">
@@ -500,7 +523,7 @@ export function LeaseModule({ store }: Props) {
         </div>
       )}
 
-      {mode === "view" && !lease ? (
+      {mode === "view" && !lease && hideHeader ? null : mode === "view" && !lease && !hideHeader ? (
         <div className="card text-center py-12">
           <div className="text-slate-300 text-[14px]">No lease on file</div>
           <p className="text-slate-500 text-[13px] mt-2 mb-4">

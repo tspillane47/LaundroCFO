@@ -7,6 +7,7 @@ import { useStores } from "@/lib/store-context";
 import { OccupancySelector, type OccupancyType } from "@/components/occupancy/OccupancySelector";
 import { LeaseModule } from "@/components/occupancy/LeaseModule";
 import { RealEstateModule } from "@/components/occupancy/RealEstateModule";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 
 type Store = {
   id: string;
@@ -31,6 +32,8 @@ export default function OccupancyPage() {
   const [error, setError] = useState("");
   const [store, setStore] = useState<Store | null>(null);
   const [showSelector, setShowSelector] = useState(false);
+  const [hasLease, setHasLease] = useState(false);
+  const [editTrigger, setEditTrigger] = useState(0);
 
   async function loadStore() {
     setLoading(true);
@@ -97,10 +100,14 @@ export default function OccupancyPage() {
     setShowSelector(true);
   }
 
+  function triggerLeaseEdit() {
+    setEditTrigger((t) => t + 1);
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-slate-500 text-[13px]">Loading occupancy data...</div>
+      <div className="space-y-5">
+        <LoadingSkeleton rows={4} />
       </div>
     );
   }
@@ -116,6 +123,8 @@ export default function OccupancyPage() {
     );
   }
 
+  const isLeased = store.occupancy_type === "leased" && !showSelector;
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -128,11 +137,18 @@ export default function OccupancyPage() {
             )}
           </p>
         </div>
-        {store.occupancy_type && !showSelector && (
-          <button onClick={handleChangeOccupancyType} className="btn-outline">
-            Change Occupancy Type
-          </button>
-        )}
+        <div className="flex gap-2">
+          {isLeased && (
+            <button onClick={triggerLeaseEdit} className="btn-primary">
+              {hasLease ? "Edit Lease" : "Set Up Your Lease →"}
+            </button>
+          )}
+          {store.occupancy_type && !showSelector && (
+            <button onClick={handleChangeOccupancyType} className="btn-outline">
+              Change Occupancy Type
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -144,7 +160,26 @@ export default function OccupancyPage() {
       {showSelector ? (
         <OccupancySelector saving={savingType} onSelect={handleSelectOccupancy} />
       ) : store.occupancy_type === "leased" ? (
-        <LeaseModule store={store} />
+        <>
+          {!hasLease && (
+            <div className="card text-center py-16">
+              <div className="text-[40px] mb-4">📋</div>
+              <div className="text-slate-200 text-[16px] font-semibold mb-2">No lease on file yet</div>
+              <p className="text-slate-500 text-[13px] mb-6 max-w-sm mx-auto">
+                Add your lease terms to calculate risk score and track renewal options.
+              </p>
+              <button onClick={triggerLeaseEdit} className="btn-primary px-8 py-3 text-[14px]">
+                Set Up Your Lease →
+              </button>
+            </div>
+          )}
+          <LeaseModule
+            store={store}
+            editTrigger={editTrigger}
+            hideHeader
+            onLeaseStatus={setHasLease}
+          />
+        </>
       ) : store.occupancy_type === "owner_occupied" ? (
         <RealEstateModule store={store} />
       ) : null}

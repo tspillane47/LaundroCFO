@@ -14,6 +14,13 @@ import {
 } from "@/lib/equipment";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
+import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { MetricTooltip } from "@/components/ui/MetricTooltip";
+import {
+  DEMO_MONTHLY_REVENUE,
+  DEMO_MONTHLY_EXPENSES,
+  DEMO_ANNUAL_DEBT_SERVICE,
+} from "@/lib/data";
 
 type MarketDensity = "urban" | "suburban" | "average" | "rural";
 type RevenueTrend = "growing" | "stable" | "declining";
@@ -199,6 +206,7 @@ export default function ValuationPage() {
   const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
   const [yearsRemaining, setYearsRemaining] = useState(0);
   const [totalLeaseControl, setTotalLeaseControl] = useState(0);
+  const [calcExpanded, setCalcExpanded] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -239,8 +247,8 @@ export default function ValuationPage() {
       if (store.retool_investment) setRetoolInvestment(String(store.retool_investment));
       if (store.retool_type) setRetoolType(store.retool_type);
 
-      const revenue = store.monthly_revenue ?? 69250;
-      const expenses = store.monthly_expenses ?? 49470;
+      const revenue = store.monthly_revenue ?? DEMO_MONTHLY_REVENUE;
+      const expenses = store.monthly_expenses ?? DEMO_MONTHLY_EXPENSES;
       setMonthlyRevenue(revenue);
       setAnnualEbitda((revenue - expenses) * 12);
 
@@ -393,8 +401,13 @@ export default function ValuationPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-slate-500 text-[13px]">Loading valuation data...</div>
+      <div className="space-y-5">
+        <CardSkeleton />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -469,26 +482,28 @@ export default function ValuationPage() {
             {valuation.adjustments.map((adj) => (
               <div
                 key={`${adj.label}-${adj.category}`}
-                className="flex items-center gap-1.5 h-9 text-[11px] border-b border-white/[0.06] min-w-0"
+                className="flex flex-col justify-center min-h-9 py-1 text-[11px] border-b border-white/[0.06] min-w-0"
               >
-                <span className="text-slate-300 font-medium flex-shrink-0">{adj.label}</span>
-                <span
-                  className={clsx(
-                    "text-[9px] px-1 py-px rounded border uppercase tracking-wide flex-shrink-0",
-                    CATEGORY_COLORS[adj.category] ?? "bg-slate-500/15 text-slate-400 border-slate-500/30"
-                  )}
-                >
-                  {adj.category.replace("_", " ")}
-                </span>
-                <span className="text-[10px] text-slate-500 truncate min-w-0 flex-1">{adj.reason}</span>
-                <span
-                  className={clsx(
-                    "font-semibold flex-shrink-0 tabular-nums",
-                    adj.value >= 0 ? "text-green-400" : "text-red-400"
-                  )}
-                >
-                  {formatAdj(adj.value)}
-                </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-slate-300 font-medium flex-shrink-0">{adj.label}</span>
+                  <span
+                    className={clsx(
+                      "text-[9px] px-1 py-px rounded border uppercase tracking-wide flex-shrink-0",
+                      CATEGORY_COLORS[adj.category] ?? "bg-slate-500/15 text-slate-400 border-slate-500/30"
+                    )}
+                  >
+                    {adj.category.replace("_", " ")}
+                  </span>
+                  <span
+                    className={clsx(
+                      "font-semibold flex-shrink-0 tabular-nums ml-auto",
+                      adj.value >= 0 ? "text-green-400" : "text-red-400"
+                    )}
+                  >
+                    {formatAdj(adj.value)}
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-500 truncate pl-0.5">{adj.reason}</div>
               </div>
             ))}
 
@@ -496,11 +511,19 @@ export default function ValuationPage() {
               <div className="text-[17px] font-bold text-blue-400 tabular-nums">
                 Final Multiple: {fmtMultiple(valuation.finalMultiple)}
               </div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px", textAlign: "right" }}>
+                Laundromat multiples typically range from 2.5x to 6.0x depending on lease,
+                equipment, location, and revenue quality.
+              </div>
               <div className="text-[11px] text-slate-500 tabular-nums">
                 × Annual EBITDA: {fmtDollar(annualEbitda)}
               </div>
               <div className="text-[17px] font-bold text-green-400 tabular-nums">
                 = Business Value: {fmtDollar(valuation.businessValue)}
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px", textAlign: "right" }}>
+                Estimated market value based on EBITDA multiple approach used by laundromat
+                brokers, SBA lenders, and industry buyers.
               </div>
             </div>
           </div>
@@ -518,13 +541,23 @@ export default function ValuationPage() {
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[10px] text-slate-500">Final Multiple</span>
+                <span className="text-[10px] text-slate-500">
+                  <MetricTooltip
+                    label="Final Multiple"
+                    explanation="Applied to annual EBITDA to estimate store value. Higher multiples reflect better lease, equipment, and market factors."
+                  />
+                </span>
                 <span className="text-[13px] font-bold text-blue-400 tabular-nums">
                   {fmtMultiple(valuation.finalMultiple)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[10px] text-slate-500">Annual EBITDA</span>
+                <span className="text-[10px] text-slate-500">
+                  <MetricTooltip
+                    label="Annual EBITDA"
+                    explanation="Earnings Before Interest, Taxes, Depreciation & Amortization. The primary profit metric for laundromat valuation."
+                  />
+                </span>
                 <span className="text-[12px] font-semibold text-slate-200 tabular-nums">
                   {fmtDollar(annualEbitda)}
                 </span>
@@ -581,6 +614,27 @@ export default function ValuationPage() {
           </div>
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setCalcExpanded((v) => !v)}
+        className="card2 w-full text-left !p-3.5 hover:opacity-90 transition-opacity"
+      >
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-semibold text-slate-200">How is this calculated?</span>
+          <span className="text-slate-400 text-[12px]">{calcExpanded ? "▲" : "▼"}</span>
+        </div>
+        {calcExpanded && (
+          <p className="text-[12px] text-slate-400 mt-3 leading-relaxed">
+            LaundroCFO uses an EBITDA multiple approach, which is the standard valuation
+            method used by laundromat brokers, SBA lenders, and industry buyers. We start
+            with a base multiple of 4.0x and apply positive and negative adjustments based
+            on lease quality, equipment age, store size, market density, revenue trend, store
+            condition, competition, and service mix. The final multiple is capped between
+            2.5x and 6.0x.
+          </p>
+        )}
+      </button>
 
       {/* Section 3 — Qualitative inputs */}
       <div
