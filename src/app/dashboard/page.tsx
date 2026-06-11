@@ -27,6 +27,7 @@ import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
+import { CashCard } from "@/components/ui/CashCard";
 import {
   financials as demoFinancials,
   store as demoStore,
@@ -139,6 +140,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { stores, selectedStore, isAllStores, setSelectedStore, setIsAllStores, loading: storesLoading } = useStores();
   const [store, setStore] = useState<any>(null);
+  const [storeData, setStoreData] = useState<any>(null);
   const [lease, setLease] = useState<any>(null);
   const [leaseOptions, setLeaseOptions] = useState<any[]>([]);
   const [realEstate, setRealEstate] = useState<any>(null);
@@ -154,29 +156,30 @@ export default function DashboardPage() {
         return;
       }
 
-      const storeData = selectedStore;
-      setStore(storeData);
+      const loadedStore = selectedStore;
+      setStore(loadedStore);
+      setStoreData(loadedStore);
 
       const [{ data: policiesData }, { data: equipmentData }] = await Promise.all([
         supabase
           .from("insurance_policies")
           .select("*")
-          .eq("store_id", storeData.id)
+          .eq("store_id", loadedStore.id)
           .eq("is_active", true),
         supabase
           .from("equipment_inventory")
           .select("*")
-          .eq("store_id", storeData.id),
+          .eq("store_id", loadedStore.id),
       ]);
       setInsurancePolicies(policiesData ?? []);
       setInsuranceCount(policiesData?.length ?? 0);
       setEquipment(equipmentData ?? []);
 
-      if (storeData.occupancy_type === "owner_occupied") {
+      if (loadedStore.occupancy_type === "owner_occupied") {
         const { data: reData } = await supabase
           .from("real_estate")
           .select("*")
-          .eq("store_id", storeData.id)
+          .eq("store_id", loadedStore.id)
           .limit(1)
           .maybeSingle();
         setRealEstate(reData);
@@ -187,7 +190,7 @@ export default function DashboardPage() {
         const { data: leaseData } = await supabase
           .from("leases")
           .select("*")
-          .eq("store_id", storeData.id)
+          .eq("store_id", loadedStore.id)
           .limit(1)
           .maybeSingle();
 
@@ -308,6 +311,11 @@ export default function DashboardPage() {
   const finalMultiple = store?.monthly_revenue != null
     ? valuation.finalMultiple
     : demoFinancials.valuationMultiple;
+
+  const totalCash = (storeData?.operating_account_balance ?? 0) + (storeData?.reserve_account_balance ?? 0) + (storeData?.petty_cash ?? 0);
+  const totalDebt = storeData?.loan_balance ?? 0;
+  const businessValue = Math.round(annualEbitda * finalMultiple);
+  const equity = businessValue - totalDebt + totalCash;
 
   const valuationTrend = useMemo(
     () =>
@@ -655,6 +663,48 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Financial Position */}
+      <div
+        className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
+        style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}
+      >
+        <div className="card">
+          <div className="metric-label">Business Value</div>
+          <div className="metric-value">${businessValue.toLocaleString()}</div>
+          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+            {fmtMultiple(finalMultiple)} EBITDA multiple
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="metric-label">Cash</div>
+          <div className="metric-value">${totalCash.toLocaleString()}</div>
+          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+            Operating + reserves
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="metric-label">Total Debt</div>
+          <div className="metric-value" style={{ color: totalDebt > 0 ? "var(--text-primary)" : "var(--text-primary)" }}>
+            ${totalDebt.toLocaleString()}
+          </div>
+          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+            Outstanding loan balance
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="metric-label">Net Equity</div>
+          <div className="metric-value" style={{ color: equity > 0 ? "var(--text-success)" : "var(--text-danger)" }}>
+            ${equity.toLocaleString()}
+          </div>
+          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+            Value + cash − debt
+          </div>
+        </div>
+      </div>
+
       {/* Section 3: Two Column Layout */}
       <div className="grid-3 grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Left Column */}
@@ -944,27 +994,14 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Quick Links */}
-        <div className="card">
-          <div className="section-title mb-3">Quick Links</div>
-          <div className="grid-2 grid grid-cols-2 gap-2">
-            {[
-              { href: "/valuation", label: "Valuation" },
-              { href: "/reports", label: "Reports" },
-              { href: "/scenarios", label: "Scenarios" },
-              { href: "/insurance", label: "Insurance" },
-            ].map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="flex items-center justify-center rounded-lg px-3 py-2.5 text-[12px] font-medium transition-colors duration-300 hover:opacity-80"
-                style={{ background: "var(--bg-card2)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        </div>
+        {/* Cash Position */}
+        <CashCard
+          store={storeData}
+          onUpdate={(data) => {
+            setStoreData(data);
+            setStore(data);
+          }}
+        />
       </div>
 
       {/* Valuation Summary */}

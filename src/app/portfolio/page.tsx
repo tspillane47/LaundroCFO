@@ -30,6 +30,9 @@ type Store = {
   monthly_expenses: number | null;
   annual_debt_service: number | null;
   loan_balance: number | null;
+  operating_account_balance: number | null;
+  reserve_account_balance: number | null;
+  petty_cash: number | null;
   avg_machine_age: number | null;
   store_condition: string | null;
   occupancy_type: string | null;
@@ -167,6 +170,10 @@ export default function PortfolioPage() {
         ? annualEbitda * VALUATION_MULTIPLE
         : demoFinancials.estimatedValue;
       const loanBalance = store.loan_balance ?? 0;
+      const storeCash =
+        (store.operating_account_balance ?? 0) +
+        (store.reserve_account_balance ?? 0) +
+        (store.petty_cash ?? 0);
       const avgMachineAge = store.avg_machine_age ?? 6.1;
 
       const isOwnerOccupied = store.occupancy_type === "owner_occupied";
@@ -190,6 +197,7 @@ export default function PortfolioPage() {
         healthScore,
         leaseYearsRemaining,
         avgMachineAge,
+        storeCash,
         hasDscrWarning: debtService > 0 && dscr < 1.25,
       };
     });
@@ -203,6 +211,14 @@ export default function PortfolioPage() {
     const totalAnnualEbitda = storeMetrics.reduce((s, m) => s + m.annualEbitda, 0);
     const totalMonthlyEbitda = totalAnnualEbitda / 12;
     const totalDebt = (stores as Store[]).reduce((s, st) => s + (st.loan_balance ?? 0), 0);
+    const totalCash = (stores as Store[]).reduce(
+      (s, store) =>
+        s +
+        (store.operating_account_balance ?? 0) +
+        (store.reserve_account_balance ?? 0) +
+        (store.petty_cash ?? 0),
+      0
+    );
     const totalAnnualDebtService = storeMetrics.reduce((s, m) => {
       const hasRealData = (m.store.monthly_revenue ?? 0) > 0;
       return s + (hasRealData ? (m.store.annual_debt_service ?? 0) : DEMO_ANNUAL_DEBT_SERVICE);
@@ -215,7 +231,7 @@ export default function PortfolioPage() {
       totalAnnualDebtService > 0
         ? totalAnnualCashFlow / totalAnnualDebtService
         : demoFinancials.cashFlow / demoFinancials.annualDebtService;
-    const portfolioNetWorth = totalPortfolioValue - totalDebt;
+    const portfolioNetWorth = totalPortfolioValue - totalDebt + totalCash;
     const ebitdaMargin = totalAnnualRevenue > 0 ? (totalAnnualEbitda / totalAnnualRevenue) * 100 : 0;
     const availableMonthlyCashFlow = Math.max(0, (totalAnnualEbitda - totalAnnualDebtService) / 12);
     const acquisitionCapacity = (availableMonthlyCashFlow * 12) / 0.12;
@@ -230,6 +246,7 @@ export default function PortfolioPage() {
       totalMonthlyEbitda:
         usingDemoData && totalAnnualEbitda === 0 ? demoFinancials.ebitda / 12 : totalMonthlyEbitda,
       totalDebt,
+      totalCash,
       totalAnnualDebtService:
         usingDemoData && totalAnnualDebtService === 0
           ? demoFinancials.annualDebtService
@@ -284,8 +301,8 @@ export default function PortfolioPage() {
     return (
       <div className="space-y-5">
         <CardSkeleton />
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
             <CardSkeleton key={i} />
           ))}
         </div>
@@ -401,10 +418,10 @@ export default function PortfolioPage() {
         </div>
       </div>
 
-      {/* KPI Row - 5 cards */}
+      {/* KPI Row - 6 cards */}
       <div
-        className="grid-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4"
-        style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "16px" }}
+        className="grid-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4"
+        style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "16px" }}
       >
         <div className="card">
           <div className="metric-label">Annual Revenue</div>
@@ -436,6 +453,16 @@ export default function PortfolioPage() {
         </div>
 
         <div className="card">
+          <div className="metric-label">Cash</div>
+          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+            {fmtDollar(aggregates.totalCash)}
+          </div>
+          <div className="text-[12px] mt-2" style={{ color: "var(--text-secondary)" }}>
+            across all stores
+          </div>
+        </div>
+
+        <div className="card">
           <div className="metric-label">Total Debt</div>
           <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
             {fmtDollar(aggregates.totalDebt)}
@@ -446,6 +473,9 @@ export default function PortfolioPage() {
           <div className="metric-label">Net Worth</div>
           <div className="text-[28px] font-bold tracking-tight text-green-400">
             {fmtDollar(aggregates.portfolioNetWorth)}
+          </div>
+          <div className="text-[12px] mt-2" style={{ color: "var(--text-secondary)" }}>
+            Value + cash − debt
           </div>
         </div>
       </div>
@@ -494,6 +524,10 @@ export default function PortfolioPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className="text-[11px] mb-4" style={{ color: "var(--text-muted)" }}>
+                Cash: {fmtDollar(m.storeCash)}
               </div>
 
               <div className="flex gap-2 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
@@ -576,13 +610,17 @@ export default function PortfolioPage() {
             <span className="font-medium" style={{ color: "var(--text-primary)" }}>{fmtDollar(realEstateTotal)}</span>
           </div>
           <div className="flex justify-between">
+            <span style={{ color: "var(--text-secondary)" }}>+ Cash:</span>
+            <span className="font-medium" style={{ color: "var(--text-primary)" }}>{fmtDollar(aggregates.totalCash)}</span>
+          </div>
+          <div className="flex justify-between">
             <span style={{ color: "var(--text-secondary)" }}>− Total Debt:</span>
             <span className="font-medium text-red-400">−{fmtDollar(aggregates.totalDebt)}</span>
           </div>
           <div className="border-t pt-3 mt-3 flex justify-between" style={{ borderColor: "var(--border)" }}>
             <span className="font-semibold" style={{ color: "var(--text-primary)" }}>= Portfolio Net Worth:</span>
             <span className="text-[24px] font-bold text-green-400">
-              {fmtDollar(aggregates.totalPortfolioValue + realEstateTotal - aggregates.totalDebt)}
+              {fmtDollar(aggregates.totalPortfolioValue + realEstateTotal - aggregates.totalDebt + aggregates.totalCash)}
             </span>
           </div>
         </div>

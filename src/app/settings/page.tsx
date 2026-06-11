@@ -54,6 +54,8 @@ export default function SettingsPage() {
   const [editingStore, setEditingStore] = useState(false);
   const [editingNotifications, setEditingNotifications] = useState(false);
   const [editingValuation, setEditingValuation] = useState(false);
+  const [editingCash, setEditingCash] = useState(false);
+  const [savingCash, setSavingCash] = useState(false);
 
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
@@ -89,6 +91,12 @@ export default function SettingsPage() {
     commercial_pct: "12",
   });
 
+  const [cashForm, setCashForm] = useState({
+    operating_account_balance: "",
+    reserve_account_balance: "",
+    petty_cash: "",
+  });
+
   function setField(field: keyof StoreForm, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
   }
@@ -119,6 +127,18 @@ export default function SettingsPage() {
           self_service_pct: selectedStore.self_service_pct != null ? String(selectedStore.self_service_pct) : "70",
           wdf_pct: selectedStore.wdf_pct != null ? String(selectedStore.wdf_pct) : "18",
           commercial_pct: selectedStore.commercial_pct != null ? String(selectedStore.commercial_pct) : "12",
+        });
+        setCashForm({
+          operating_account_balance:
+            selectedStore.operating_account_balance != null
+              ? String(selectedStore.operating_account_balance)
+              : "",
+          reserve_account_balance:
+            selectedStore.reserve_account_balance != null
+              ? String(selectedStore.reserve_account_balance)
+              : "",
+          petty_cash:
+            selectedStore.petty_cash != null ? String(selectedStore.petty_cash) : "",
         });
       }
       setLoading(false);
@@ -160,6 +180,37 @@ export default function SettingsPage() {
       await refreshStores();
     }
     setSaving(false);
+  }
+
+  async function handleSaveCash() {
+    if (!selectedStore?.id) return;
+    setSavingCash(true);
+    setError("");
+    setSuccess("");
+
+    const { error: updateError } = await supabase
+      .from("stores")
+      .update({
+        operating_account_balance: cashForm.operating_account_balance
+          ? Number(cashForm.operating_account_balance)
+          : 0,
+        reserve_account_balance: cashForm.reserve_account_balance
+          ? Number(cashForm.reserve_account_balance)
+          : 0,
+        petty_cash: cashForm.petty_cash ? Number(cashForm.petty_cash) : 0,
+        cash_last_updated: new Date().toISOString(),
+        cash_source: "manual",
+      })
+      .eq("id", selectedStore.id);
+
+    if (updateError) {
+      setError(updateError.message);
+    } else {
+      setSuccess("Cash balances updated successfully.");
+      setEditingCash(false);
+      await refreshStores();
+    }
+    setSavingCash(false);
   }
 
   async function handleSignOut() {
@@ -306,6 +357,104 @@ export default function SettingsPage() {
                 </div>
                 <button onClick={() => setEditingStore(true)} className="btn-outline w-full mt-4">
                   Edit Store Profile
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Cash & Bank Accounts */}
+          <div className="card">
+            <div className="section-title">Cash & Bank Accounts</div>
+            {editingCash ? (
+              <div className="space-y-3">
+                <div>
+                  <div className="metric-label mb-1.5">Operating Account Balance</div>
+                  <input
+                    type="number"
+                    value={cashForm.operating_account_balance}
+                    onChange={(e) =>
+                      setCashForm((c) => ({ ...c, operating_account_balance: e.target.value }))
+                    }
+                    className={inputClass}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <div className="metric-label mb-1.5">Reserve Account Balance</div>
+                  <input
+                    type="number"
+                    value={cashForm.reserve_account_balance}
+                    onChange={(e) =>
+                      setCashForm((c) => ({ ...c, reserve_account_balance: e.target.value }))
+                    }
+                    className={inputClass}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <div className="metric-label mb-1.5">Petty Cash</div>
+                  <input
+                    type="number"
+                    value={cashForm.petty_cash}
+                    onChange={(e) => setCashForm((c) => ({ ...c, petty_cash: e.target.value }))}
+                    className={inputClass}
+                    placeholder="0"
+                  />
+                </div>
+                <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                  Connect QuickBooks or Plaid to sync automatically (coming soon)
+                </p>
+                <div className="flex gap-2 pt-2">
+                  <button onClick={handleSaveCash} disabled={savingCash} className="btn-primary flex-1">
+                    {savingCash ? "Saving..." : "Save Cash Balances"}
+                  </button>
+                  <button onClick={() => setEditingCash(false)} className="btn-outline flex-1">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="divide-y divide-white/[0.04]">
+                  {[
+                    [
+                      "Operating Account",
+                      cashForm.operating_account_balance
+                        ? `$${Number(cashForm.operating_account_balance).toLocaleString()}`
+                        : "$0",
+                    ],
+                    [
+                      "Reserve Account",
+                      cashForm.reserve_account_balance
+                        ? `$${Number(cashForm.reserve_account_balance).toLocaleString()}`
+                        : "$0",
+                    ],
+                    [
+                      "Petty Cash",
+                      cashForm.petty_cash
+                        ? `$${Number(cashForm.petty_cash).toLocaleString()}`
+                        : "$0",
+                    ],
+                    [
+                      "Total Cash",
+                      `$${(
+                        (Number(cashForm.operating_account_balance) || 0) +
+                        (Number(cashForm.reserve_account_balance) || 0) +
+                        (Number(cashForm.petty_cash) || 0)
+                      ).toLocaleString()}`,
+                    ],
+                  ].map(([label, value]) => (
+                    <div key={String(label)} className="flex justify-between py-2.5 text-[13px]">
+                      <span className="text-slate-400">{label}</span>
+                      <span className="font-semibold text-slate-100">{value}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] mt-3" style={{ color: "var(--text-muted)" }}>
+                  Connect QuickBooks or Plaid to sync automatically (coming soon)
+                </p>
+                <button onClick={() => setEditingCash(true)} className="btn-outline w-full mt-4">
+                  Update Cash Balances
                 </button>
               </>
             )}
