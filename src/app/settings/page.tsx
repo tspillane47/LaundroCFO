@@ -37,6 +37,21 @@ const CONDITION_OPTIONS = ["excellent", "good", "fair", "poor"];
 const TREND_OPTIONS = ["growing", "stable", "declining"];
 const COMPETITION_OPTIONS = ["protected", "normal", "heavy"];
 const STORE_TYPES = ["Coin", "Card", "Hybrid"];
+const PREFERENCES_KEY = "laundrocfo_preferences";
+
+type NotificationPrefs = {
+  emailAlerts: boolean;
+  monthlyReport: boolean;
+  lenderShare: boolean;
+  smsAlerts: boolean;
+};
+
+const DEFAULT_NOTIFICATIONS: NotificationPrefs = {
+  emailAlerts: true,
+  monthlyReport: true,
+  lenderShare: false,
+  smsAlerts: false,
+};
 
 function labelize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
@@ -45,7 +60,7 @@ function labelize(value: string): string {
 export default function SettingsPage() {
   const router = useRouter();
   const supabase = createClient();
-  const { selectedStore, refreshStores } = useStores();
+  const { stores, selectedStore, refreshStores } = useStores();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -110,6 +125,16 @@ export default function SettingsPage() {
       }
       setUserEmail(user.email ?? "");
       setUserName(user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "User");
+
+      try {
+        const saved = localStorage.getItem(PREFERENCES_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved) as Partial<NotificationPrefs>;
+          setNotifications({ ...DEFAULT_NOTIFICATIONS, ...parsed });
+        }
+      } catch {
+        /* ignore invalid preferences */
+      }
 
       if (selectedStore) {
         setForm({
@@ -211,6 +236,13 @@ export default function SettingsPage() {
       await refreshStores();
     }
     setSavingCash(false);
+  }
+
+  function handleSaveNotifications() {
+    localStorage.setItem(PREFERENCES_KEY, JSON.stringify(notifications));
+    setEditingNotifications(false);
+    setSuccess("Notification preferences saved.");
+    setTimeout(() => setSuccess(""), 3000);
   }
 
   async function handleSignOut() {
@@ -482,8 +514,21 @@ export default function SettingsPage() {
                   </label>
                 ))}
                 <div className="flex gap-2 pt-2">
-                  <button onClick={() => setEditingNotifications(false)} className="btn-primary flex-1">Save</button>
-                  <button onClick={() => setEditingNotifications(false)} className="btn-outline flex-1">Cancel</button>
+                  <button onClick={handleSaveNotifications} className="btn-primary flex-1">Save</button>
+                  <button
+                    onClick={() => {
+                      try {
+                        const saved = localStorage.getItem(PREFERENCES_KEY);
+                        if (saved) setNotifications({ ...DEFAULT_NOTIFICATIONS, ...JSON.parse(saved) });
+                      } catch {
+                        setNotifications(DEFAULT_NOTIFICATIONS);
+                      }
+                      setEditingNotifications(false);
+                    }}
+                    className="btn-outline flex-1"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             ) : (
@@ -569,9 +614,8 @@ export default function SettingsPage() {
               {[
                 ["Name", userName],
                 ["Email", userEmail],
-                ["Role", "Owner / Operator"],
-                ["Plan", "Pro"],
-                ["Stores", "Active"],
+                ["Plan", "Beta"],
+                ["Stores", String(stores.length)],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between py-2.5 text-[13px]">
                   <span className="text-slate-400">{label}</span>

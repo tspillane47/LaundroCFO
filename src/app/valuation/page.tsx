@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
@@ -15,6 +15,7 @@ import {
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { PageError } from "@/components/ui/PageError";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import {
   DEMO_MONTHLY_REVENUE,
@@ -177,6 +178,7 @@ export default function ValuationPage() {
   const supabase = createClient();
   const { selectedStore, isAllStores, stores } = useStores();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -208,23 +210,25 @@ export default function ValuationPage() {
   const [totalLeaseControl, setTotalLeaseControl] = useState(0);
   const [calcExpanded, setCalcExpanded] = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      if (!selectedStore?.id) {
-        setLoading(false);
-        return;
-      }
+  const loadValuationData = useCallback(async () => {
+    if (!selectedStore?.id) {
+      setLoading(false);
+      setLoadError(false);
+      return;
+    }
 
-      const { data: storeData } = await supabase
+    setLoading(true);
+    setLoadError(false);
+
+    try {
+      const { data: storeData, error: storeError } = await supabase
         .from("stores")
         .select("*")
         .eq("id", selectedStore.id)
         .single();
 
-      if (!storeData) {
-        setLoading(false);
-        return;
-      }
+      if (storeError) throw storeError;
+      if (!storeData) throw new Error("Store not found");
 
       const store = storeData as StoreRow;
       setStoreId(store.id);
@@ -255,11 +259,12 @@ export default function ValuationPage() {
       const ownerOccupied = store.occupancy_type === "owner_occupied";
       setIsOwnerOccupied(ownerOccupied);
 
-      const { data: equipmentData } = await supabase
+      const { data: equipmentData, error: equipmentError } = await supabase
         .from("equipment_inventory")
         .select("id, user_id, store_id, machine_type, manufacturer, machine_size, quantity, installation_year, high_speed_extract, condition, notes")
         .eq("store_id", store.id);
 
+      if (equipmentError) throw equipmentError;
       setEquipment((equipmentData ?? []) as EquipmentRecord[]);
 
       if (ownerOccupied) {
@@ -301,10 +306,16 @@ export default function ValuationPage() {
         setRealEstateValue(0);
       }
 
+    } catch {
+      setLoadError(true);
+    } finally {
       setLoading(false);
     }
-    load();
   }, [selectedStore?.id, supabase]);
+
+  useEffect(() => {
+    loadValuationData();
+  }, [loadValuationData]);
 
   const equipMetrics = useMemo(
     () => computeEquipmentMetrics(equipment),
@@ -397,6 +408,10 @@ export default function ValuationPage() {
       setTimeout(() => setSaveSuccess(false), 3000);
     }
     setSaving(false);
+  }
+
+  if (loadError) {
+    return <PageError onRetry={loadValuationData} />;
   }
 
   if (loading) {

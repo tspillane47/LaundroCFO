@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
@@ -8,6 +8,7 @@ import { useStores } from "@/lib/store-context";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { PageError } from "@/components/ui/PageError";
 import {
   INPUT_CLASS,
   formatCurrency,
@@ -446,6 +447,7 @@ export default function InsurancePage() {
   const { selectedStore } = useStores();
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [store, setStore] = useState<Store | null>(null);
@@ -468,81 +470,78 @@ export default function InsurancePage() {
   });
   const [viewClaimsPolicyId, setViewClaimsPolicyId] = useState<string | null>(null);
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     setError("");
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-    setUserId(user.id);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      setUserId(user.id);
 
-    if (!selectedStore?.id) {
-      setError("Select a store from the dropdown above.");
+      if (!selectedStore?.id) {
+        setError("Select a store from the dropdown above.");
+        setStore(null);
+        setPolicies([]);
+        setClaims([]);
+        return;
+      }
+
+      const { data: storeData, error: storeError } = await supabase
+        .from("stores")
+        .select("id, name, address")
+        .eq("id", selectedStore.id)
+        .single();
+
+      if (storeError) throw storeError;
+      if (!storeData) throw new Error("No store found");
+      setStore(storeData);
+
+      const { data: policyData, error: policyError } = await supabase
+        .from("insurance_policies")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("store_id", storeData.id)
+        .eq("is_active", true)
+        .order("expiration_date", { ascending: true });
+
+      if (policyError) throw policyError;
+
+      const activePolicies = (policyData ?? []) as InsurancePolicy[];
+      setPolicies(activePolicies);
+
+      if (activePolicies.length > 0) {
+        const policyIds = activePolicies.map((p) => p.id);
+        const { data: claimData, error: claimError } = await supabase
+          .from("insurance_claims")
+          .select("*")
+          .in("policy_id", policyIds)
+          .order("claim_date", { ascending: false });
+
+        if (claimError) throw claimError;
+        setClaims((claimData ?? []) as InsuranceClaim[]);
+      } else {
+        setClaims([]);
+      }
+    } catch {
+      setLoadError(true);
       setStore(null);
       setPolicies([]);
       setClaims([]);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const { data: storeData, error: storeError } = await supabase
-      .from("stores")
-      .select("id, name, address")
-      .eq("id", selectedStore.id)
-      .single();
-
-    if (storeError || !storeData) {
-      setError(storeError?.message ?? "No store found. Complete onboarding first.");
-      setLoading(false);
-      return;
-    }
-    setStore(storeData);
-
-    const { data: policyData, error: policyError } = await supabase
-      .from("insurance_policies")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("store_id", storeData.id)
-      .eq("is_active", true)
-      .order("expiration_date", { ascending: true });
-
-    if (policyError) {
-      setError(policyError.message);
-      setLoading(false);
-      return;
-    }
-
-    const activePolicies = (policyData ?? []) as InsurancePolicy[];
-    setPolicies(activePolicies);
-
-    if (activePolicies.length > 0) {
-      const policyIds = activePolicies.map((p) => p.id);
-      const { data: claimData, error: claimError } = await supabase
-        .from("insurance_claims")
-        .select("*")
-        .in("policy_id", policyIds)
-        .order("claim_date", { ascending: false });
-
-      if (claimError) {
-        setError(claimError.message);
-      } else {
-        setClaims((claimData ?? []) as InsuranceClaim[]);
-      }
-    } else {
-      setClaims([]);
-    }
-
-    setLoading(false);
-  }
+  }, [router, supabase, selectedStore?.id]);
 
   useEffect(() => {
     loadData();
-  }, [selectedStore?.id]);
+  }, [loadData]);
 
   const metrics = useMemo(() => {
     const totalPremium = policies.reduce((s, p) => s + (p.annual_premium ?? 0), 0);
@@ -757,6 +756,10 @@ export default function InsurancePage() {
 
   function updatePolicyForm<K extends keyof PolicyForm>(key: K, value: PolicyForm[K]) {
     setPolicyForm((f) => ({ ...f, [key]: value }));
+  }
+
+  if (loadError) {
+    return <PageError onRetry={loadData} />;
   }
 
   if (loading) {
@@ -1193,10 +1196,13 @@ export default function InsurancePage() {
       <div className="card">
         <div className="section-title">Policies</div>
         {policies.length === 0 ? (
-          <div className="text-center py-10">
-            <div className="text-slate-400 text-[13px]">No active insurance policies on file.</div>
-            <button type="button" onClick={openAddPolicy} className="btn-primary mt-4">
-              Add Your First Policy
+          <div className="text-center py-12">
+            <div className="text-[15px] font-semibold text-slate-200 mb-2">No insurance policies on file</div>
+            <div className="text-[13px] text-slate-500 mb-6 max-w-sm mx-auto">
+              Track policies, renewals, and coverage gaps to protect your store and satisfy lenders.
+            </div>
+            <button type="button" onClick={openAddPolicy} className="btn-primary px-8 py-3 text-[14px]">
+              + Add Your First Policy
             </button>
           </div>
         ) : (

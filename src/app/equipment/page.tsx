@@ -24,6 +24,7 @@ import {
 } from "@/lib/equipment";
 import { fmtDollar } from "@/lib/calculations";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { PageError } from "@/components/ui/PageError";
 
 type Store = {
   id: string;
@@ -86,6 +87,7 @@ export default function EquipmentPage() {
   const currentYear = new Date().getFullYear();
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [store, setStore] = useState<Store | null>(null);
@@ -97,53 +99,53 @@ export default function EquipmentPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     setError("");
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-    setUserId(user.id);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      setUserId(user.id);
 
-    if (!selectedStore?.id) {
-      setError("Select a store from the dropdown above.");
+      if (!selectedStore?.id) {
+        setError("Select a store from the dropdown above.");
+        setStore(null);
+        setEquipment([]);
+        return;
+      }
+
+      const { data: storeData, error: storeError } = await supabase
+        .from("stores")
+        .select("id, name, monthly_revenue, monthly_expenses")
+        .eq("id", selectedStore.id)
+        .single();
+      if (storeError) throw storeError;
+      if (!storeData) throw new Error("No store found");
+      setStore(storeData);
+
+      const { data: equipmentData, error: equipmentError } = await supabase
+        .from("equipment_inventory")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("store_id", storeData.id)
+        .order("machine_type", { ascending: true })
+        .order("installation_year", { ascending: false });
+
+      if (equipmentError) throw equipmentError;
+
+      setEquipment((equipmentData ?? []) as EquipmentRecord[]);
+    } catch {
+      setLoadError(true);
       setStore(null);
       setEquipment([]);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const { data: storeData, error: storeError } = await supabase
-      .from("stores")
-      .select("id, name, monthly_revenue, monthly_expenses")
-      .eq("id", selectedStore.id)
-      .single();
-    if (storeError || !storeData) {
-      setError(storeError?.message ?? "No store found. Complete onboarding first.");
-      setLoading(false);
-      return;
-    }
-    setStore(storeData);
-
-    const { data: equipmentData, error: equipmentError } = await supabase
-      .from("equipment_inventory")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("store_id", storeData.id)
-      .order("machine_type", { ascending: true })
-      .order("installation_year", { ascending: false });
-
-    if (equipmentError) {
-      setError(equipmentError.message);
-      setLoading(false);
-      return;
-    }
-
-    setEquipment((equipmentData ?? []) as EquipmentRecord[]);
-    setLoading(false);
   }, [router, supabase, selectedStore?.id]);
 
   useEffect(() => {
@@ -263,6 +265,10 @@ export default function EquipmentPage() {
   }
 
   const sizeOptions = form.machine_type === "Washer" ? WASHER_SIZES : DRYER_SIZES;
+
+  if (loadError) {
+    return <PageError onRetry={loadData} />;
+  }
 
   if (loading) {
     return (
@@ -391,10 +397,13 @@ export default function EquipmentPage() {
             </div>
 
             {equipment.length === 0 && !showForm ? (
-              <div className="text-center py-10">
-                <div className="text-[13px] text-slate-400">No equipment added yet</div>
-                <button type="button" onClick={openAddForm} className="btn-primary mt-4">
-                  Add Machine Group
+              <div className="text-center py-12">
+                <div className="text-[15px] font-semibold text-slate-200 mb-2">No equipment added yet</div>
+                <div className="text-[13px] text-slate-500 mb-6 max-w-sm mx-auto">
+                  Add your washer and dryer fleet to track age, quality score, and valuation impact.
+                </div>
+                <button type="button" onClick={openAddForm} className="btn-primary px-8 py-3 text-[14px]">
+                  + Add Machine Group
                 </button>
               </div>
             ) : (

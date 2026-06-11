@@ -343,7 +343,7 @@ export default function MarketingHomePage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[13px] font-semibold text-slate-300">Store Value</span>
-                <span className="text-[24px] font-bold text-green-400 tabular-nums">$1,117,862</span>
+                <span className="text-[24px] font-bold text-green-400 tabular-nums">$1,098,472</span>
               </div>
             </div>
           </div>

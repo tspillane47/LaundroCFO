@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
@@ -10,6 +10,7 @@ import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { PageError } from "@/components/ui/PageError";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import {
   financials as demoFinancials,
@@ -98,6 +99,7 @@ export default function PortfolioPage() {
   const router = useRouter();
   const { stores, loading: storesLoading, setSelectedStore, setIsAllStores } = useStores();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [leases, setLeases] = useState<Lease[]>([]);
   const [realEstateTotal, setRealEstateTotal] = useState(0);
   const [equipmentByStore, setEquipmentByStore] = useState<Record<string, any[]>>({});
@@ -115,21 +117,33 @@ export default function PortfolioPage() {
     setShowWelcome(false);
   }
 
-  useEffect(() => {
-    async function load() {
-      if (storesLoading) return;
-      if (stores.length === 0) {
-        setLoading(false);
-        return;
-      }
+  const loadPortfolioData = useCallback(async () => {
+    if (storesLoading) return;
+    if (stores.length === 0) {
+      setLoading(false);
+      setLoadError(false);
+      return;
+    }
 
+    setLoading(true);
+    setLoadError(false);
+
+    try {
       const storeIds = stores.map((s) => s.id);
-      const [{ data: leasesData }, { data: reData }, { data: equipmentData }, { data: insuranceData }] = await Promise.all([
+      const [
+        { data: leasesData, error: leasesError },
+        { data: reData, error: reError },
+        { data: equipmentData, error: equipmentError },
+        { data: insuranceData, error: insuranceError },
+      ] = await Promise.all([
         supabase.from("leases").select("id, store_id, lease_end_date, monthly_rent").in("store_id", storeIds),
         supabase.from("real_estate").select("store_id, estimated_value").in("store_id", storeIds),
         supabase.from("equipment_inventory").select("*").in("store_id", storeIds),
         supabase.from("insurance_policies").select("*").in("store_id", storeIds).eq("is_active", true),
       ]);
+
+      const errors = [leasesError, reError, equipmentError, insuranceError].filter(Boolean);
+      if (errors.length > 0) throw errors[0];
 
       setLeases((leasesData ?? []) as Lease[]);
       setRealEstateTotal((reData ?? []).reduce((s, r) => s + (r.estimated_value ?? 0), 0));
@@ -147,10 +161,16 @@ export default function PortfolioPage() {
         insMap[p.store_id].push(p);
       }
       setInsuranceByStore(insMap);
+    } catch {
+      setLoadError(true);
+    } finally {
       setLoading(false);
     }
-    load();
   }, [stores, storesLoading, supabase]);
+
+  useEffect(() => {
+    loadPortfolioData();
+  }, [loadPortfolioData]);
 
   const storeMetrics = useMemo(() => {
     return (stores as Store[]).map((store) => {
@@ -295,6 +315,10 @@ export default function PortfolioPage() {
     setSelectedStore(store);
     setIsAllStores(false);
     router.push("/dashboard");
+  }
+
+  if (loadError) {
+    return <PageError onRetry={loadPortfolioData} />;
   }
 
   if (storesLoading || loading) {

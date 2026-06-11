@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
@@ -28,6 +28,7 @@ import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { CashCard } from "@/components/ui/CashCard";
+import { PageError } from "@/components/ui/PageError";
 import {
   financials as demoFinancials,
   store as demoStore,
@@ -147,69 +148,89 @@ export default function DashboardPage() {
   const [insuranceCount, setInsuranceCount] = useState(0);
   const [equipment, setEquipment] = useState<any[]>([]);
   const [insurancePolicies, setInsurancePolicies] = useState<any[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const supabase = createClient();
 
-  useEffect(() => {
-    async function load() {
-      if (!selectedStore) {
-        setStore(null);
-        return;
-      }
+  const loadDashboardData = useCallback(async () => {
+    if (!selectedStore) {
+      setStore(null);
+      setLoadError(false);
+      return;
+    }
 
-      const loadedStore = selectedStore;
-      setStore(loadedStore);
-      setStoreData(loadedStore);
+    const loadedStore = selectedStore;
+    setStore(loadedStore);
+    setStoreData(loadedStore);
+    setDetailLoading(true);
+    setLoadError(false);
 
-      const [{ data: policiesData }, { data: equipmentData }] = await Promise.all([
-        supabase
-          .from("insurance_policies")
-          .select("*")
-          .eq("store_id", loadedStore.id)
-          .eq("is_active", true),
-        supabase
-          .from("equipment_inventory")
-          .select("*")
-          .eq("store_id", loadedStore.id),
-      ]);
+    try {
+      const [{ data: policiesData, error: policiesError }, { data: equipmentData, error: equipmentError }] =
+        await Promise.all([
+          supabase
+            .from("insurance_policies")
+            .select("*")
+            .eq("store_id", loadedStore.id)
+            .eq("is_active", true),
+          supabase
+            .from("equipment_inventory")
+            .select("*")
+            .eq("store_id", loadedStore.id),
+        ]);
+
+      if (policiesError) throw policiesError;
+      if (equipmentError) throw equipmentError;
+
       setInsurancePolicies(policiesData ?? []);
       setInsuranceCount(policiesData?.length ?? 0);
       setEquipment(equipmentData ?? []);
 
       if (loadedStore.occupancy_type === "owner_occupied") {
-        const { data: reData } = await supabase
+        const { data: reData, error: reError } = await supabase
           .from("real_estate")
           .select("*")
           .eq("store_id", loadedStore.id)
           .limit(1)
           .maybeSingle();
+        if (reError) throw reError;
         setRealEstate(reData);
         setLease(null);
         setLeaseOptions([]);
       } else {
         setRealEstate(null);
-        const { data: leaseData } = await supabase
+        const { data: leaseData, error: leaseError } = await supabase
           .from("leases")
           .select("*")
           .eq("store_id", loadedStore.id)
           .limit(1)
           .maybeSingle();
+        if (leaseError) throw leaseError;
 
         if (leaseData) {
           setLease(leaseData);
-          const { data: optionsData } = await supabase
+          const { data: optionsData, error: optionsError } = await supabase
             .from("lease_options")
             .select("*")
             .eq("lease_id", leaseData.id)
             .order("option_number", { ascending: true });
+          if (optionsError) throw optionsError;
           setLeaseOptions(optionsData ?? []);
         } else {
           setLease(null);
           setLeaseOptions([]);
         }
       }
+    } catch {
+      setLoadError(true);
+    } finally {
+      setDetailLoading(false);
     }
-    load();
   }, [selectedStore, supabase]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   function openStore(s: (typeof stores)[0]) {
     setSelectedStore(s);
@@ -435,7 +456,11 @@ export default function DashboardPage() {
     [store, lease, equipment, insurancePolicies]
   );
 
-  if (storesLoading) {
+  if (loadError) {
+    return <PageError onRetry={loadDashboardData} />;
+  }
+
+  if (storesLoading || detailLoading) {
     return (
       <div className="space-y-5">
         <CardSkeleton />

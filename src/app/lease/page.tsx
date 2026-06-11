@@ -8,6 +8,7 @@ import { OccupancySelector, type OccupancyType } from "@/components/occupancy/Oc
 import { LeaseModule } from "@/components/occupancy/LeaseModule";
 import { RealEstateModule } from "@/components/occupancy/RealEstateModule";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { PageError } from "@/components/ui/PageError";
 
 type Store = {
   id: string;
@@ -28,6 +29,7 @@ export default function OccupancyPage() {
   const { selectedStore } = useStores();
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [savingType, setSavingType] = useState(false);
   const [error, setError] = useState("");
   const [store, setStore] = useState<Store | null>(null);
@@ -37,38 +39,41 @@ export default function OccupancyPage() {
 
   async function loadStore() {
     setLoading(true);
+    setLoadError(false);
     setError("");
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      return;
-    }
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
 
-    if (!selectedStore?.id) {
-      setError("Select a store from the dropdown above.");
+      if (!selectedStore?.id) {
+        setError("Select a store from the dropdown above.");
+        setStore(null);
+        return;
+      }
+
+      const { data: storeData, error: storeError } = await supabase
+        .from("stores")
+        .select("id, address, monthly_revenue, monthly_expenses, occupancy_type")
+        .eq("id", selectedStore.id)
+        .single();
+
+      if (storeError) throw storeError;
+      if (!storeData) throw new Error("No store found");
+
+      setStore(storeData);
+      setShowSelector(!storeData.occupancy_type);
+    } catch {
+      setLoadError(true);
       setStore(null);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const { data: storeData, error: storeError } = await supabase
-      .from("stores")
-      .select("id, address, monthly_revenue, monthly_expenses, occupancy_type")
-      .eq("id", selectedStore.id)
-      .single();
-
-    if (storeError || !storeData) {
-      setError(storeError?.message ?? "No store found. Complete onboarding first.");
-      setLoading(false);
-      return;
-    }
-
-    setStore(storeData);
-    setShowSelector(!storeData.occupancy_type);
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -110,6 +115,10 @@ export default function OccupancyPage() {
         <LoadingSkeleton rows={4} />
       </div>
     );
+  }
+
+  if (loadError) {
+    return <PageError onRetry={loadStore} />;
   }
 
   if (!store) {
