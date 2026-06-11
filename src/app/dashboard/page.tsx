@@ -109,16 +109,10 @@ function formatAxisValue(value: number): string {
   return `$${value}`;
 }
 
-function benchmarkBarPercent(value: number, median: number, invert = false): number {
-  const ratio = value / median;
-  const pct = invert ? Math.max(5, Math.min(95, (2 - ratio) * 50)) : Math.max(5, Math.min(95, ratio * 50));
-  return pct;
-}
-
 type ActionItem = {
   id: string;
   severity: "urgent" | "warning" | "info";
-  icon: string;
+  severityLabel: string;
   title: string;
   description: string;
   href: string;
@@ -137,16 +131,6 @@ const ChartTooltip = ({ active, payload, label }: any) => {
           {p.name}: {typeof p.value === "number" && p.dataKey !== "month" ? fmtDollar(p.value) : p.value}
         </div>
       ))}
-    </div>
-  );
-};
-
-const HeroTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-white/10 backdrop-blur border border-white/20 rounded-lg p-2 text-xs text-white">
-      <div className="text-white/60 mb-0.5">{label}</div>
-      <div className="font-semibold">{fmtDollar(payload[0].value)}</div>
     </div>
   );
 };
@@ -352,9 +336,6 @@ export default function DashboardPage() {
   const dscrColor =
     dscrNum >= 1.5 ? "text-green-500" : dscrNum >= 1.25 ? "text-amber-500" : "text-red-500";
 
-  const healthRingColor =
-    laundrocfoScore >= 80 ? "#22c55e" : laundrocfoScore >= 60 ? "#3b82f6" : laundrocfoScore >= 40 ? "#f59e0b" : "#ef4444";
-
   const actions = useMemo(() => {
     const items: ActionItem[] = [];
 
@@ -362,7 +343,7 @@ export default function DashboardPage() {
       items.push({
         id: "lease",
         severity: "urgent",
-        icon: "📋",
+        severityLabel: "URGENT",
         title: "Lease Expiring",
         description: `Only ${leaseMetrics.yearsRemaining.toFixed(1)} years remaining on your lease.`,
         href: "/lease",
@@ -373,7 +354,7 @@ export default function DashboardPage() {
       items.push({
         id: "dscr",
         severity: "urgent",
-        icon: "⚠️",
+        severityLabel: "URGENT",
         title: "DSCR Below Threshold",
         description: `Current DSCR of ${dscrNum.toFixed(2)}x is below the 1.25x minimum.`,
         href: "/financials",
@@ -384,7 +365,7 @@ export default function DashboardPage() {
       items.push({
         id: "utility",
         severity: "warning",
-        icon: "💡",
+        severityLabel: "WARN",
         title: "High Utility Costs",
         description: `Utilities are ${utilityRatio.toFixed(1)}% of revenue — above the 20% threshold.`,
         href: "/financials",
@@ -395,7 +376,7 @@ export default function DashboardPage() {
       items.push({
         id: "equipment",
         severity: "warning",
-        icon: "⚙️",
+        severityLabel: "WARN",
         title: "Equipment Aging",
         description: `Average machine age is ${avgEquipmentAge.toFixed(1)} years — consider replacement planning.`,
         href: "/equipment",
@@ -406,7 +387,7 @@ export default function DashboardPage() {
       items.push({
         id: "insurance",
         severity: "warning",
-        icon: "🛡️",
+        severityLabel: "WARN",
         title: "Add Insurance Policies",
         description: "No active insurance policies on file for this store.",
         href: "/insurance",
@@ -417,7 +398,7 @@ export default function DashboardPage() {
       items.push({
         id: "valuation",
         severity: "info",
-        icon: "📈",
+        severityLabel: "INFO",
         title: "Valuation Increased",
         description: `Store value rose ${fmtDollar(monthlyChange)} this month.`,
         href: "/valuation",
@@ -587,26 +568,17 @@ export default function DashboardPage() {
               Based on {fmtMultiple(finalMultiple)} EBITDA multiple · Equipment grade B · {leaseYearsDisplay.toFixed(1)}yr lease · {sqft.toLocaleString()} SF
             </div>
           </div>
-          <div className="hero-chart w-full lg:w-[280px] h-[80px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={valuationTrend}>
-                <defs>
-                  <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#93c5fd" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke="#bfdbfe"
-                  strokeWidth={2}
-                  fill="url(#heroGrad)"
-                  dot={false}
-                />
-                <Tooltip content={<HeroTooltip />} />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="hero-chart w-full lg:w-[200px] h-[32px] flex items-end">
+            <svg width="100%" height="32" viewBox="0 0 200 32" preserveAspectRatio="none">
+              <polyline
+                points="0,28 25,24 50,26 75,20 100,22 125,16 150,18 175,12 200,8"
+                fill="none"
+                stroke="rgba(255,255,255,0.6)"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </div>
         </div>
       </div>
@@ -628,7 +600,7 @@ export default function DashboardPage() {
             {dscrNum.toFixed(2)}x
           </div>
           <div className="text-[12px] mt-2 font-medium" style={{ color: "var(--text-secondary)" }}>
-            {dscrNum >= 1.5 ? "▲ Strong coverage" : dscrNum >= 1.25 ? "● Adequate" : "▼ Below threshold"}
+            {dscrNum >= 1.5 ? "Strong coverage" : dscrNum >= 1.25 ? "Adequate" : "Below threshold"}
           </div>
           <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
             Cash flow / annual debt service · Min threshold 1.25x
@@ -657,36 +629,11 @@ export default function DashboardPage() {
         {/* LaundroCFO Score */}
         <div className="card">
           <div className="metric-label">LaundroCFO Score</div>
-          <div className="flex items-center gap-4 mt-1">
-            <div className="relative" style={{ width: 64, height: 64 }}>
-              <svg width={64} height={64} viewBox="0 0 64 64">
-                <circle cx={32} cy={32} r={26} fill="none" stroke="var(--border2)" strokeWidth={8} />
-                <circle
-                  cx={32} cy={32} r={26}
-                  fill="none"
-                  stroke={healthRingColor}
-                  strokeWidth={8}
-                  strokeDasharray={2 * Math.PI * 26}
-                  strokeDashoffset={2 * Math.PI * 26 * (1 - laundrocfoScore / 100)}
-                  strokeLinecap="round"
-                  transform="rotate(-90 32 32)"
-                />
-              </svg>
-              <div
-                className="absolute inset-0 flex items-center justify-center text-[14px] font-bold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                {laundrocfoScore}
-              </div>
-            </div>
-            <div>
-              <div className="text-[22px] font-bold" style={{ color: "var(--text-primary)" }}>
-                {laundrocfoScore}/100
-              </div>
-              <div className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                Composite health index
-              </div>
-            </div>
+          <div className="text-[36px] font-bold tracking-tight" style={{ color: "var(--text-primary)", letterSpacing: "-0.03em" }}>
+            {laundrocfoScore}
+          </div>
+          <div className="text-[12px] mt-1" style={{ color: "var(--text-muted)" }}>
+            out of 100
           </div>
           <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px", lineHeight: 1.6 }}>
             Lease {leaseScore} · Equipment {equipmentScore} · Financial {financialScore} · Insurance {insuranceScore}
@@ -805,8 +752,7 @@ export default function DashboardPage() {
             </div>
             {actions.length === 0 ? (
               <div className="text-center py-6">
-                <div className="text-3xl mb-2">✅</div>
-                <div className="text-[14px] font-semibold text-green-500">All Clear</div>
+                <div className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>All Clear</div>
                 <div className="text-[12px] mt-1" style={{ color: "var(--text-muted)" }}>
                   No urgent actions needed right now.
                 </div>
@@ -823,7 +769,12 @@ export default function DashboardPage() {
                     style={{ background: "var(--bg-card2)" }}
                   >
                     <div className="flex items-start gap-2">
-                      <span className="text-base flex-shrink-0">{action.icon}</span>
+                      <span
+                        className="text-[9px] font-bold tracking-wider flex-shrink-0 mt-0.5"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        {action.severityLabel}
+                      </span>
                       <div className="flex-1 min-w-0">
                         <div className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
                           {action.title}
@@ -849,26 +800,26 @@ export default function DashboardPage() {
           {/* Store Benchmarks */}
           <div className="card">
             <div className="section-title">How You Compare</div>
-            <div className="space-y-4">
+            <div className="space-y-0">
               {benchmarks.map((b) => {
                 const aboveMedian = b.invert ? b.storeValue < b.median : b.storeValue >= b.median;
-                const barPct = benchmarkBarPercent(b.storeValue, b.median, b.invert);
                 return (
-                  <div key={b.label}>
-                    <div className="flex items-center justify-between text-[12px] mb-1.5">
-                      <span style={{ color: "var(--text-secondary)" }}>{b.label}</span>
-                      <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                  <div
+                    key={b.label}
+                    className="flex items-center justify-between py-2.5 text-[12px] border-b last:border-b-0"
+                    style={{ borderColor: "var(--border)" }}
+                  >
+                    <span style={{ color: "var(--text-secondary)" }}>{b.label}</span>
+                    <div className="text-right">
+                      <span
+                        className="font-semibold tabular-nums"
+                        style={{ color: aboveMedian ? "var(--text-success)" : "var(--text-warning)" }}
+                      >
                         {b.value}
                       </span>
-                    </div>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-card2)" }}>
-                      <div
-                        className={clsx("h-full rounded-full transition-all", aboveMedian ? "bg-green-500" : "bg-amber-500")}
-                        style={{ width: `${barPct}%` }}
-                      />
-                    </div>
-                    <div className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>
-                      Industry median: {b.displayMedian}
+                      <span className="text-[10px] ml-2" style={{ color: "var(--text-muted)" }}>
+                        vs {b.displayMedian} median
+                      </span>
                     </div>
                   </div>
                 );
@@ -998,18 +949,17 @@ export default function DashboardPage() {
           <div className="section-title mb-3">Quick Links</div>
           <div className="grid-2 grid grid-cols-2 gap-2">
             {[
-              { href: "/valuation", label: "Valuation", emoji: "💎" },
-              { href: "/reports", label: "Reports", emoji: "📄" },
-              { href: "/scenarios", label: "Scenarios", emoji: "🔀" },
-              { href: "/insurance", label: "Insurance", emoji: "🛡️" },
+              { href: "/valuation", label: "Valuation" },
+              { href: "/reports", label: "Reports" },
+              { href: "/scenarios", label: "Scenarios" },
+              { href: "/insurance", label: "Insurance" },
             ].map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-[12px] font-medium transition-colors duration-300 hover:opacity-80"
+                className="flex items-center justify-center rounded-lg px-3 py-2.5 text-[12px] font-medium transition-colors duration-300 hover:opacity-80"
                 style={{ background: "var(--bg-card2)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
               >
-                <span>{link.emoji}</span>
                 {link.label}
               </Link>
             ))}

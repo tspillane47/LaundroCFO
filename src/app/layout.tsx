@@ -6,39 +6,38 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { StoreProvider, useStores } from "@/lib/store-context";
 import clsx from "clsx";
+import { NavIcon, SunIcon, MoonIcon, ChevronDownIcon, MenuIcon, CloseIcon } from "@/components/ui/NavIcons";
 
 const navSections = [
   {
-    label: "Portfolio",
+    label: "PORTFOLIO",
+    items: [{ href: "/portfolio", label: "Portfolio", icon: "portfolio" }],
+  },
+  {
+    label: "STORE",
     items: [
-      { href: "/portfolio", label: "Portfolio", emoji: "🏦" },
+      { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
+      { href: "/valuation", label: "Valuation", icon: "valuation" },
+      { href: "/financials", label: "Financials", icon: "financials" },
+      { href: "/lease", label: "Occupancy", icon: "occupancy" },
+      { href: "/equipment", label: "Equipment", icon: "equipment" },
+      { href: "/insurance", label: "Insurance", icon: "insurance" },
     ],
   },
   {
-    label: "Store",
+    label: "TOOLS",
     items: [
-      { href: "/dashboard", label: "Dashboard", emoji: "⬛" },
-      { href: "/valuation", label: "Valuation", emoji: "💎" },
-      { href: "/financials", label: "Financials", emoji: "📊" },
-      { href: "/lease", label: "Occupancy", emoji: "📋" },
-      { href: "/equipment", label: "Equipment", emoji: "⚙️" },
-      { href: "/insurance", label: "Insurance", emoji: "🛡️" },
+      { href: "/scenarios", label: "Scenarios", icon: "scenarios" },
+      { href: "/benchmarking", label: "Benchmarking", icon: "benchmarking" },
+      { href: "/reports", label: "Reports", icon: "reports" },
+      { href: "/integrations", label: "Integrations", icon: "integrations" },
     ],
   },
   {
-    label: "Tools",
+    label: "ACCOUNT",
     items: [
-      { href: "/scenarios", label: "Scenarios", emoji: "🔀" },
-      { href: "/benchmarking", label: "Benchmarking", emoji: "📈" },
-      { href: "/reports", label: "Reports", emoji: "📄" },
-      { href: "/integrations", label: "Integrations", emoji: "🔌" },
-    ],
-  },
-  {
-    label: "Settings",
-    items: [
-      { href: "/alerts", label: "Alerts", emoji: "🔔" },
-      { href: "/settings", label: "Settings", emoji: "⚙️" },
+      { href: "/alerts", label: "Alerts", icon: "alerts" },
+      { href: "/settings", label: "Settings", icon: "settings" },
     ],
   },
 ];
@@ -71,6 +70,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
+  const sidebarStoreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("theme");
@@ -96,9 +96,14 @@ function AppShell({ children }: { children: React.ReactNode }) {
     if (!showStoreDropdown) return;
 
     function handleClickOutside(e: MouseEvent) {
-      if (storeDropdownRef.current && !storeDropdownRef.current.contains(e.target as Node)) {
-        setShowStoreDropdown(false);
+      const target = e.target as Node;
+      if (
+        storeDropdownRef.current?.contains(target) ||
+        sidebarStoreRef.current?.contains(target)
+      ) {
+        return;
       }
+      setShowStoreDropdown(false);
     }
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -139,56 +144,126 @@ function AppShell({ children }: { children: React.ReactNode }) {
         )}
         style={{ background: "var(--bg-sidebar)", borderColor: "var(--border)" }}
       >
-        <div className="px-5 py-[18px] border-b" style={{ borderColor: "var(--border)" }}>
-          <div className="text-[15px] font-bold text-blue-300 tracking-tight">LaundroCFO</div>
-          <div className="text-[10px] text-slate-500 mt-0.5 tracking-widest uppercase">Valuation & Underwriting</div>
+        <div
+          className="px-5 py-4 border-b"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <div
+            style={{
+              fontSize: "15px",
+              fontWeight: 700,
+              color: "var(--text-primary)",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            LaundroCFO
+          </div>
         </div>
 
-        <nav className="flex-1 py-3 overflow-y-auto">
-          {navSections.map((section, sectionIndex) => (
+        <nav className="flex-1 overflow-y-auto">
+          {navSections.map((section) => (
             <div key={section.label}>
               <div
-                className={clsx(
-                  "text-[10px] px-5 pb-1 uppercase tracking-widest",
-                  sectionIndex === 0 ? "pt-2" : "pt-4"
-                )}
-                style={{ color: "var(--text-muted)" }}
+                style={{
+                  fontSize: "10px",
+                  color: "var(--text-muted)",
+                  padding: "16px 20px 4px",
+                  letterSpacing: "0.08em",
+                  fontWeight: 600,
+                }}
               >
                 {section.label}
               </div>
-              {section.items.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={clsx("nav-item", pathname === item.href && "nav-item-active")}
-                >
-                  <span className="text-[13px] w-4 text-center">{item.emoji}</span>
-                  {item.label}
-                </Link>
-              ))}
+              {section.items.map((item) => {
+                const active = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setSidebarOpen(false)}
+                    className="nav-item"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      padding: "7px 20px",
+                      fontSize: "13px",
+                      textDecoration: "none",
+                      fontWeight: active ? 500 : 400,
+                      color: active ? "var(--text-primary)" : "var(--text-muted)",
+                      background: active ? "var(--bg-card2)" : "transparent",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!active) e.currentTarget.style.background = "color-mix(in srgb, var(--bg-card2) 50%, transparent)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active) e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <NavIcon name={item.icon} />
+                    {item.label}
+                  </Link>
+                );
+              })}
             </div>
           ))}
         </nav>
 
-        {/* Store pill */}
-        <div className="p-4 border-t" style={{ borderColor: "var(--border)" }}>
-          <div
-            className="w-full rounded-lg p-3 flex items-center gap-2.5"
-            style={{ background: "var(--bg-card2)", border: "1px solid var(--border2)" }}
+        {/* Store switcher */}
+        <div className="p-4 border-t relative" style={{ borderColor: "var(--border)" }} ref={sidebarStoreRef}>
+          <button
+            type="button"
+            onClick={() => setShowStoreDropdown((v) => !v)}
+            className="w-full rounded-lg px-3 py-2.5 flex items-center justify-between gap-2 transition-colors hover:opacity-90"
+            style={{
+              background: "var(--bg-card2)",
+              border: "1px solid var(--border)",
+            }}
           >
-            <div className={clsx("w-2 h-2 rounded-full flex-shrink-0", isAllStores ? "bg-blue-400" : "bg-green-400")} />
-            <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-semibold leading-tight truncate" style={{ color: "var(--text-primary)" }}>
-                {isAllStores ? "All Stores" : (selectedStore?.name ?? "No store selected")}
-              </div>
-              <div className="text-[10px] leading-tight truncate" style={{ color: "var(--text-muted)" }}>
-                {isAllStores
-                  ? `${stores.length} store${stores.length !== 1 ? "s" : ""} in portfolio`
-                  : (selectedStore?.address ?? "Select a store")}
-              </div>
+            <span
+              className="text-[12px] font-medium truncate text-left"
+              style={{ color: "var(--text-primary)" }}
+            >
+              {isAllStores ? "All Stores" : (selectedStore?.name ?? "Select store")}
+            </span>
+            <ChevronDownIcon />
+          </button>
+
+          {showStoreDropdown && (
+            <div
+              className="absolute bottom-full left-4 right-4 mb-1 rounded-lg overflow-hidden z-50"
+              style={{ background: "var(--bg-card2)", border: "1px solid var(--border)" }}
+            >
+              <button
+                type="button"
+                onClick={selectAllStores}
+                className="w-full px-3 py-2.5 text-left text-[12px] font-medium hover:opacity-90 transition-colors"
+                style={{
+                  color: "var(--text-primary)",
+                  background: isAllStores ? "var(--bg-card)" : undefined,
+                }}
+              >
+                All Stores
+              </button>
+              {stores.map((store) => (
+                <button
+                  key={store.id}
+                  type="button"
+                  onClick={() => selectStore(store)}
+                  className="w-full px-3 py-2.5 text-left hover:opacity-90 transition-colors border-t"
+                  style={{
+                    borderColor: "var(--border)",
+                    background:
+                      !isAllStores && selectedStore?.id === store.id ? "var(--bg-card)" : undefined,
+                  }}
+                >
+                  <div className="text-[12px] font-medium leading-tight" style={{ color: "var(--text-primary)" }}>
+                    {store.name}
+                  </div>
+                </button>
+              ))}
             </div>
-          </div>
+          )}
         </div>
       </aside>
 
@@ -196,96 +271,111 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <div className="app-main flex-1 flex flex-col overflow-hidden">
         {/* Topbar */}
         <header
-          className="px-6 py-3 flex items-center justify-between flex-shrink-0 transition-colors duration-300"
-          style={{ background: "var(--bg-card)", borderBottom: "1px solid var(--border)" }}
+          className="px-6 flex items-center justify-between flex-shrink-0 transition-colors duration-300"
+          style={{
+            background: "var(--bg-card)",
+            borderBottom: "1px solid var(--border)",
+            height: "48px",
+          }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
               className="mobile-menu-btn"
               onClick={() => setSidebarOpen(!sidebarOpen)}
               aria-label="Toggle menu"
             >
-              {sidebarOpen ? "✕" : "☰"}
+              {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
             </button>
             <span className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
               {pageTitles[pathname] ?? "LaundroCFO"}
             </span>
 
-            {/* Store selector dropdown */}
             {!storesLoading && stores.length > 0 && (
-              <div className="relative" ref={storeDropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => setShowStoreDropdown((v) => !v)}
-                  className="topbar-store-badge flex items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors hover:opacity-90"
-                  style={{
-                    background: "var(--bg-card2)",
-                    border: "1px solid var(--border)",
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  <span>{dropdownLabel}</span>
-                  <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-                    {showStoreDropdown ? "▲" : "▼"}
-                  </span>
-                </button>
-
-                {showStoreDropdown && (
-                  <div
-                    className="absolute top-full left-0 mt-1 min-w-[200px] rounded-lg overflow-hidden shadow-lg z-50"
-                    style={{ background: "var(--bg-card2)", border: "1px solid var(--border)" }}
+              <>
+                <span style={{ color: "var(--border2)" }}>|</span>
+                <div className="relative" ref={storeDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowStoreDropdown((v) => !v)}
+                    className="topbar-store-badge flex items-center gap-1.5 text-[12px] transition-colors hover:opacity-80"
+                    style={{ color: "var(--text-muted)" }}
                   >
-                    <button
-                      type="button"
-                      onClick={selectAllStores}
-                      className={clsx(
-                        "w-full px-3 py-2.5 text-left text-[12px] font-medium hover:bg-white/5 transition-colors",
-                        isAllStores && "bg-blue-500/10 text-blue-300"
-                      )}
-                      style={{ color: isAllStores ? undefined : "var(--text-primary)" }}
+                    <span>{dropdownLabel}</span>
+                    <ChevronDownIcon />
+                  </button>
+
+                  {showStoreDropdown && (
+                    <div
+                      className="absolute top-full left-0 mt-1 min-w-[200px] rounded-lg overflow-hidden z-50"
+                      style={{ background: "var(--bg-card2)", border: "1px solid var(--border)" }}
                     >
-                      All Stores
-                    </button>
-                    {stores.map((store) => (
                       <button
-                        key={store.id}
                         type="button"
-                        onClick={() => selectStore(store)}
+                        onClick={selectAllStores}
                         className={clsx(
-                          "w-full px-3 py-2.5 text-left hover:bg-white/5 transition-colors border-t",
-                          !isAllStores && selectedStore?.id === store.id && "bg-blue-500/10"
+                          "w-full px-3 py-2.5 text-left text-[12px] font-medium hover:bg-white/5 transition-colors",
+                          isAllStores && "font-semibold"
                         )}
-                        style={{ borderColor: "var(--border)" }}
+                        style={{
+                          color: "var(--text-primary)",
+                          background: isAllStores ? "var(--bg-card)" : undefined,
+                        }}
                       >
-                        <div className="text-[12px] font-medium text-slate-200 leading-tight">{store.name}</div>
-                        {store.address && (
-                          <div className="text-[10px] text-slate-500 leading-tight truncate mt-0.5">{store.address}</div>
-                        )}
+                        All Stores
                       </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      {stores.map((store) => (
+                        <button
+                          key={store.id}
+                          type="button"
+                          onClick={() => selectStore(store)}
+                          className="w-full px-3 py-2.5 text-left hover:bg-white/5 transition-colors border-t"
+                          style={{
+                            borderColor: "var(--border)",
+                            background:
+                              !isAllStores && selectedStore?.id === store.id
+                                ? "var(--bg-card)"
+                                : undefined,
+                          }}
+                        >
+                          <div
+                            className="text-[12px] font-medium leading-tight"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            {store.name}
+                          </div>
+                          {store.address && (
+                            <div
+                              className="text-[10px] leading-tight truncate mt-0.5"
+                              style={{ color: "var(--text-muted)" }}
+                            >
+                              {store.address}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
 
             <span
-              className="topbar-synced flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px]"
-              style={{ background: "var(--bg-card2)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
+              className="topbar-synced text-[11px] hide-mobile"
+              style={{ color: "var(--text-muted)" }}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-              Synced
+              Last synced 2m ago
             </span>
           </div>
 
           <div className="flex items-center gap-2.5">
             <button
               type="button"
-              className="btn-outline w-9 h-9 flex items-center justify-center p-0 text-base"
+              className="btn-outline w-8 h-8 flex items-center justify-center p-0"
               onClick={toggleTheme}
               aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
             >
-              {isDark ? "☀️" : "🌙"}
+              {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
             <button type="button" className="btn-outline" onClick={handleSignOut}>
               Sign Out

@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
-import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
 import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
@@ -90,28 +89,6 @@ function dscrColorClass(dscr: number): string {
   if (dscr >= 1.25) return "text-amber-500";
   return "text-red-500";
 }
-
-function healthBarColor(score: number): string {
-  if (score >= 80) return "bg-green-500";
-  if (score >= 60) return "bg-blue-500";
-  if (score >= 40) return "bg-amber-500";
-  return "bg-red-500";
-}
-
-function conditionLabel(condition: string | null): string {
-  if (!condition) return "Average";
-  return condition.charAt(0).toUpperCase() + condition.slice(1);
-}
-
-const HeroTooltip = ({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-white/10 backdrop-blur border border-white/20 rounded-lg p-2 text-xs text-white">
-      <div className="text-white/60 mb-0.5">{label}</div>
-      <div className="font-semibold">{fmtDollar(payload[0].value)}</div>
-    </div>
-  );
-};
 
 export default function PortfolioPage() {
   const supabase = createClient();
@@ -327,7 +304,9 @@ export default function PortfolioPage() {
         className="flex flex-col items-center justify-center min-h-[calc(100vh-120px)] text-center px-6"
         style={{ background: "var(--bg-page)" }}
       >
-        <div className="text-[48px] font-bold text-blue-300 tracking-tight mb-2">🏦 LaundroCFO</div>
+        <div className="text-[15px] font-bold tracking-tight mb-2" style={{ color: "var(--text-primary)" }}>
+          LaundroCFO
+        </div>
         <h1 className="text-[32px] font-bold tracking-tight mb-3" style={{ color: "var(--text-primary)" }}>
           Your Laundromat Portfolio Command Center
         </h1>
@@ -336,7 +315,7 @@ export default function PortfolioPage() {
         </p>
 
         <div className="flex flex-wrap justify-center gap-3 mb-10">
-          {["💎 Valuation", "📋 Lease Risk", "⚙️ Equipment", "🛡️ Insurance"].map((pill) => (
+          {["Valuation", "Lease Risk", "Equipment", "Insurance"].map((pill) => (
             <span
               key={pill}
               className="px-4 py-2 rounded-full text-[13px] font-medium"
@@ -361,34 +340,34 @@ export default function PortfolioPage() {
   return (
     <div className="space-y-5">
       {showWelcome && (
-        <div
-          className="rounded-xl p-6 relative"
-          style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f1e3d 100%)", border: "1px solid rgba(96,165,250,0.2)" }}
-        >
+        <div className="card relative">
           <button
             type="button"
             onClick={dismissWelcome}
-            className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 text-[18px]"
+            className="absolute top-4 right-4 text-[14px] hover:opacity-70"
+            style={{ color: "var(--text-muted)" }}
             aria-label="Dismiss"
           >
-            ✕
+            ×
           </button>
-          <div className="text-[16px] font-semibold text-white mb-1">
-            🎉 Welcome to LaundroCFO! Your store has been set up. Here&apos;s what to do next:
+          <div className="text-[15px] font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
+            Welcome to LaundroCFO. Your store has been set up. Here&apos;s what to do next:
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
             {[
-              { href: "/equipment", label: "Add your equipment", icon: "⚙️" },
-              { href: "/lease", label: "Set up your lease", icon: "📋" },
-              { href: "/insurance", label: "Add insurance policies", icon: "🛡️" },
+              { href: "/equipment", label: "Add your equipment" },
+              { href: "/lease", label: "Set up your lease" },
+              { href: "/insurance", label: "Add insurance policies" },
             ].map((step) => (
               <Link
                 key={step.href}
                 href={step.href}
-                className="flex items-center gap-3 rounded-lg p-4 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                className="flex items-center rounded-lg p-4 transition-colors hover:opacity-90"
+                style={{ background: "var(--bg-card2)", border: "1px solid var(--border)" }}
               >
-                <span className="text-[24px]">{step.icon}</span>
-                <span className="text-[13px] font-medium text-slate-200">{step.label} →</span>
+                <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
+                  {step.label} →
+                </span>
               </Link>
             ))}
           </div>
@@ -396,48 +375,28 @@ export default function PortfolioPage() {
       )}
 
       {/* Hero Banner */}
-      <div
-        className="rounded-xl p-6 overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #0f1e3d 0%, #1e3a5f 100%)" }}
-      >
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 hero-banner">
+      <div className="card">
+        <div className="flex flex-col gap-2 hero-banner">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <div className="text-[11px] uppercase tracking-wider text-white/50">Total Portfolio Value</div>
+              <div className="metric-label mb-0">Total Portfolio Value</div>
               {usingDemoData && (
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/20 text-amber-200 border border-amber-400/30">
                   Demo data — add your store to see real numbers
                 </span>
               )}
             </div>
-            <div className="text-white font-extrabold tracking-tight" style={{ fontSize: "52px", lineHeight: 1.1 }}>
+            <div className="metric-value" style={{ fontSize: "36px" }}>
               {fmtDollar(aggregates.totalPortfolioValue)}
             </div>
-            <div className="flex flex-wrap gap-2 mt-3">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold bg-green-500/20 text-green-300">
-                {monthlyChange >= 0 ? "+" : ""}{fmtDollar(monthlyChange)} this month
-              </span>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold bg-green-500/20 text-green-300">
-                {yearChangePct >= 0 ? "+" : ""}{yearChangePct.toFixed(1)}% annual
-              </span>
+            <div className="flex flex-wrap gap-3 mt-3 text-[12px]" style={{ color: "var(--text-muted)" }}>
+              <span>{monthlyChange >= 0 ? "+" : ""}{fmtDollar(monthlyChange)} this month</span>
+              <span>·</span>
+              <span>{yearChangePct >= 0 ? "+" : ""}{yearChangePct.toFixed(1)}% annual</span>
             </div>
-            <div className="text-[12px] text-white/40 mt-3">
+            <div className="text-[12px] mt-2" style={{ color: "var(--text-muted)" }}>
               {stores.length} store{stores.length !== 1 ? "s" : ""} · Est. EBITDA {fmtDollar(aggregates.totalMonthlyEbitda)}/mo · Global DSCR {fmtMultiple(aggregates.globalDSCR)}
             </div>
-          </div>
-          <div className="hero-chart w-full lg:w-[280px] h-[80px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={valuationTrend}>
-                <defs>
-                  <linearGradient id="portfolioHeroGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#93c5fd" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Area type="monotone" dataKey="value" stroke="#bfdbfe" strokeWidth={2} fill="url(#portfolioHeroGrad)" dot={false} />
-                <Tooltip content={<HeroTooltip />} />
-              </AreaChart>
-            </ResponsiveContainer>
           </div>
         </div>
       </div>
@@ -514,57 +473,35 @@ export default function PortfolioPage() {
                 {m.store.address ?? "No address"}
               </div>
 
-              <div className="grid grid-cols-4 gap-2 mb-4">
+              <div className="grid grid-cols-4 gap-3 mb-4 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
                 {[
-                  { label: "Est Value", value: fmtDollar(m.estimatedValue) },
+                  { label: "Value", value: fmtDollar(m.estimatedValue) },
                   { label: "Revenue", value: fmtDollar(m.monthlyRevenue) },
                   { label: "EBITDA", value: fmtDollar(m.monthlyEbitda) },
                   {
                     label: "DSCR",
-                    value: m.store.annual_debt_service ? fmtMultiple(m.dscr) : "—",
-                    color: m.store.annual_debt_service ? dscrColorClass(m.dscr) : undefined,
+                    value: m.store.annual_debt_service || !m.hasRealData ? fmtMultiple(m.dscr) : "—",
+                    color: m.store.annual_debt_service || !m.hasRealData ? dscrColorClass(m.dscr) : undefined,
                   },
                 ].map((metric) => (
-                  <div key={metric.label} className="text-center">
-                    <div className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: "var(--text-muted)" }}>
-                      {metric.label}
-                    </div>
-                    <div className={clsx("text-[13px] font-semibold", metric.color)} style={metric.color ? undefined : { color: "var(--text-primary)" }}>
+                  <div key={metric.label}>
+                    <div className="metric-label mb-1">{metric.label}</div>
+                    <div
+                      className={clsx("text-[14px] font-semibold tabular-nums", metric.color)}
+                      style={metric.color ? undefined : { color: "var(--text-primary)" }}
+                    >
                       {metric.value}
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="mb-4">
-                <div className="flex justify-between text-[11px] mb-1">
-                  <span style={{ color: "var(--text-muted)" }}>Health Score</span>
-                  <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{m.healthScore}/100</span>
-                </div>
-                <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--bg-card2)" }}>
-                  <div
-                    className={clsx("h-full rounded-full transition-all", healthBarColor(m.healthScore))}
-                    style={{ width: `${m.healthScore}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2 mb-4">
-                <span className="badge badge-blue">Equipment B</span>
-                {m.leaseYearsRemaining != null ? (
-                  <span className="badge badge-blue">{m.leaseYearsRemaining.toFixed(1)} yrs</span>
-                ) : (
-                  <span className="badge badge-green">Owner Occupied</span>
-                )}
-                <span className="badge badge-amber">{conditionLabel(m.store.store_condition)}</span>
-              </div>
-
-              <div className="flex gap-2">
+              <div className="flex gap-2 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
                 <button type="button" onClick={() => openStore(m.store)} className="btn-primary flex-1 text-[12px]">
-                  Open Store →
+                  Open Store
                 </button>
                 <Link href="/settings" className="btn-outline flex-1 text-[12px] text-center">
-                  Edit →
+                  Edit
                 </Link>
               </div>
             </div>

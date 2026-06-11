@@ -91,18 +91,18 @@ export default function PricingPage() {
           <p className="text-[18px] text-slate-500">Free during beta. Paid plans launching soon.</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
           {tiers.map((tier) => (
             <div
               key={tier.name}
-              className={`relative rounded-2xl p-8 flex flex-col ${
+              className={`relative rounded-lg p-6 flex flex-col border ${
                 tier.highlighted
-                  ? "bg-white border-2 border-[#2563eb] shadow-xl shadow-blue-500/10 scale-[1.02]"
-                  : "bg-white border border-slate-200 hover:shadow-lg transition-shadow"
+                  ? "border-[#1D4ED8] bg-white"
+                  : "border-slate-200 bg-white"
               }`}
             >
               {tier.badge && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-[12px] font-semibold bg-[#2563eb] text-white">
+                <div className="absolute -top-2.5 left-4 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#1D4ED8] text-white">
                   {tier.badge}
                 </div>
               )}
@@ -114,10 +114,10 @@ export default function PricingPage() {
                 </div>
                 <p className="text-[14px] text-slate-500">{tier.for}</p>
               </div>
-              <ul className="space-y-3 mb-8 flex-1">
+              <ul className="space-y-2.5 mb-6 flex-1">
                 {tier.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2 text-[14px] text-slate-600">
-                    <span className="text-[#2563eb] mt-0.5 flex-shrink-0">✓</span>
+                  <li key={feature} className="flex items-start gap-2 text-[13px] text-slate-600">
+                    <span className="text-slate-400 mt-0.5 flex-shrink-0">—</span>
                     {feature}
                   </li>
                 ))}
@@ -149,15 +149,15 @@ export default function PricingPage() {
           ))}
         </div>
 
-        <p className="text-center text-[14px] text-slate-500 mb-20">
-          🔒 All plans free during beta period. Early users lock in founding member pricing.
+        <p className="text-center text-[13px] text-slate-500 mb-16">
+          All plans free during beta period. Early users lock in founding member pricing.
         </p>
 
         <div className="max-w-3xl mx-auto">
           <h2 className="text-[28px] font-bold text-slate-900 text-center mb-10">Frequently asked questions</h2>
           <div className="space-y-6">
             {faqs.map((faq) => (
-              <div key={faq.q} className="p-6 rounded-2xl bg-white border border-slate-200">
+              <div key={faq.q} className="p-5 rounded-lg bg-white border border-slate-200">
                 <h3 className="text-[16px] font-bold text-slate-900 mb-2">{faq.q}</h3>
                 <p className="text-[14px] text-slate-500 leading-relaxed">{faq.a}</p>
               </div>
