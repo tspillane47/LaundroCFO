@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
-import { getStoreValuation } from "@/lib/getStoreValuation";
+import { getStoreValuation, getStoreDebt } from "@/lib/getStoreValuation";
 import type { ValuationResult } from "@/lib/valuation";
 import {
   calcBuildingEquity,
@@ -155,12 +155,14 @@ export default function DashboardPage() {
   const [loadError, setLoadError] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [valuation, setValuation] = useState<(ValuationResult & { store: Record<string, unknown> }) | null>(null);
+  const [totalDebt, setTotalDebt] = useState(0);
   const supabase = createClient();
 
   const loadDashboardData = useCallback(async () => {
     if (!selectedStore) {
       setStore(null);
       setValuation(null);
+      setTotalDebt(0);
       setLoadError(false);
       return;
     }
@@ -174,6 +176,9 @@ export default function DashboardPage() {
     try {
       const storeValuation = await getStoreValuation(loadedStore.id);
       setValuation(storeValuation);
+
+      const debt = await getStoreDebt(loadedStore.id);
+      setTotalDebt(debt);
 
       const [{ data: policiesData, error: policiesError }, { data: equipmentData, error: equipmentError }] =
         await Promise.all([
@@ -327,11 +332,10 @@ export default function DashboardPage() {
     : demoFinancials.valuationMultiple;
 
   const totalCash = (storeData?.operating_account_balance ?? 0) + (storeData?.reserve_account_balance ?? 0) + (storeData?.petty_cash ?? 0);
-  const totalDebt = storeData?.loan_balance ?? 0;
   const businessValue = store?.monthly_revenue != null && valuation
     ? Math.round(valuation.businessValue)
     : demoFinancials.estimatedValue;
-  const equity = businessValue - totalDebt + totalCash;
+  const equity = businessValue + totalCash - totalDebt;
 
   const valuationTrend = useMemo(
     () =>

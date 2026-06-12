@@ -22,6 +22,7 @@ const navSections = [
       { href: "/lease", label: "Occupancy", icon: "occupancy" },
       { href: "/equipment", label: "Equipment", icon: "equipment" },
       { href: "/insurance", label: "Insurance", icon: "insurance" },
+      { href: "/debt", label: "Debt", icon: "debt" },
     ],
   },
   {
@@ -53,6 +54,7 @@ const pageTitles: Record<string, string> = {
   "/benchmarking": "Benchmarking",
   "/reports": "Reports",
   "/insurance": "Insurance",
+  "/debt": "Debt Management",
   "/alerts": "Alerts",
   "/integrations": "Integrations",
   "/settings": "Settings",

@@ -723,7 +723,6 @@ export default function InsurancePage() {
       setMessage({ type: "success", text: "Saved successfully." });
       setTimeout(() => setMessage(null), 3000);
       closePolicyForm();
-      setSaving(false);
       await loadData();
     } catch (err) {
       console.error("Unexpected insurance policy save error:", err);
@@ -927,7 +926,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.carrier}
                       onChange={(e) => updatePolicyForm("carrier", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Policy Number">
@@ -935,7 +933,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.policy_number}
                       onChange={(e) => updatePolicyForm("policy_number", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Agent Name">
@@ -943,7 +940,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.agent_name}
                       onChange={(e) => updatePolicyForm("agent_name", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Agency Name">
@@ -951,7 +947,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.agency_name}
                       onChange={(e) => updatePolicyForm("agency_name", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Agent Email">
@@ -960,7 +955,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.agent_email}
                       onChange={(e) => updatePolicyForm("agent_email", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Agent Phone">
@@ -969,7 +963,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.agent_phone}
                       onChange={(e) => updatePolicyForm("agent_phone", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                 </div>
@@ -983,7 +976,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.effective_date}
                       onChange={(e) => updatePolicyForm("effective_date", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Expiration Date">
@@ -992,7 +984,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.expiration_date}
                       onChange={(e) => updatePolicyForm("expiration_date", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <div className="col-span-2">
@@ -1012,7 +1003,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.annual_premium}
                       onChange={(e) => updatePolicyForm("annual_premium", e.target.value)}
-                      onKeyDown={preventEnterSubmit}
                       placeholder="0"
                     />
                   </FormField>
@@ -1021,7 +1011,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.monthly_premium}
                       onChange={(e) => updatePolicyForm("monthly_premium", e.target.value)}
-                      onKeyDown={preventEnterSubmit}
                       placeholder="0"
                     />
                   </FormField>
@@ -1048,7 +1037,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.building_coverage}
                       onChange={(e) => updatePolicyForm("building_coverage", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Contents Coverage">
@@ -1056,7 +1044,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.contents_coverage}
                       onChange={(e) => updatePolicyForm("contents_coverage", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Equipment Coverage">
@@ -1064,7 +1051,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.equipment_coverage}
                       onChange={(e) => updatePolicyForm("equipment_coverage", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Liability Per Occurrence">
@@ -1072,7 +1058,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.liability_per_occurrence}
                       onChange={(e) => updatePolicyForm("liability_per_occurrence", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Liability Aggregate">
@@ -1080,7 +1065,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.liability_aggregate}
                       onChange={(e) => updatePolicyForm("liability_aggregate", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <div className="flex items-end pb-1">
@@ -1106,7 +1090,6 @@ export default function InsurancePage() {
                           onChange={(e) =>
                             updatePolicyForm("business_interruption_amount", e.target.value)
                           }
-                        onKeyDown={preventEnterSubmit}
                         />
                       </FormField>
                     )}
@@ -1123,7 +1106,6 @@ export default function InsurancePage() {
                           className={INPUT_CLASS}
                           value={policyForm.flood_amount}
                           onChange={(e) => updatePolicyForm("flood_amount", e.target.value)}
-                        onKeyDown={preventEnterSubmit}
                         />
                       </FormField>
                     )}
@@ -1142,7 +1124,6 @@ export default function InsurancePage() {
                           onChange={(e) =>
                             updatePolicyForm("equipment_breakdown_amount", e.target.value)
                           }
-                        onKeyDown={preventEnterSubmit}
                         />
                       </FormField>
                     )}
@@ -1155,6 +1136,7 @@ export default function InsurancePage() {
                   {ADDITIONAL_COVERAGE_FIELDS.map(({ key, label }) => (
                     <label
                       key={key}
+                      onKeyDown={preventEnterSubmit}
                       className="flex items-center gap-2 text-[13px] text-slate-300 cursor-pointer"
                     >
                       <input
@@ -1176,7 +1158,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.property_deductible}
                       onChange={(e) => updatePolicyForm("property_deductible", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Wind Deductible">
@@ -1184,7 +1165,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.wind_deductible}
                       onChange={(e) => updatePolicyForm("wind_deductible", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Flood Deductible">
@@ -1192,7 +1172,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.flood_deductible}
                       onChange={(e) => updatePolicyForm("flood_deductible", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Equipment Deductible">
@@ -1200,7 +1179,6 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.equipment_deductible}
                       onChange={(e) => updatePolicyForm("equipment_deductible", e.target.value)}
-                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                 </div>
@@ -1211,7 +1189,6 @@ export default function InsurancePage() {
                   className={clsx(INPUT_CLASS, "min-h-[80px] resize-y")}
                   value={policyForm.notes}
                   onChange={(e) => updatePolicyForm("notes", e.target.value)}
-                  onKeyDown={preventEnterSubmit}
                   placeholder="Policy notes, endorsements, special conditions..."
                 />
               </FormSection>
@@ -1399,7 +1376,6 @@ export default function InsurancePage() {
                   className={INPUT_CLASS}
                   value={claimForm.claim_date}
                   onChange={(e) => setClaimForm((f) => ({ ...f, claim_date: e.target.value }))}
-                onKeyDown={preventEnterSubmit}
                 />
               </FormField>
               <FormField label="Claim Type">
@@ -1420,7 +1396,6 @@ export default function InsurancePage() {
                   className={INPUT_CLASS}
                   value={claimForm.amount}
                   onChange={(e) => setClaimForm((f) => ({ ...f, amount: e.target.value }))}
-                onKeyDown={preventEnterSubmit}
                 />
               </FormField>
               <FormField label="Status">
@@ -1441,7 +1416,6 @@ export default function InsurancePage() {
                   className={INPUT_CLASS}
                   value={claimForm.description}
                   onChange={(e) => setClaimForm((f) => ({ ...f, description: e.target.value }))}
-                onKeyDown={preventEnterSubmit}
                 />
               </FormField>
             </div>
@@ -1449,6 +1423,7 @@ export default function InsurancePage() {
               <button
                 type="button"
                 onClick={() => setShowClaimForm(false)}
+                onKeyDown={preventEnterSubmit}
                 className="btn-outline"
               >
                 Cancel

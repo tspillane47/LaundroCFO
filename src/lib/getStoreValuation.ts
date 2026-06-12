@@ -182,3 +182,24 @@ export async function getPortfolioValuation(userId: string) {
 
   return { totalValue, storeValuations };
 }
+
+export async function getStoreDebt(storeId: string): Promise<number> {
+  const supabase = createClient();
+  const { data: loans } = await supabase
+    .from("store_loans")
+    .select("*")
+    .eq("store_id", storeId)
+    .eq("is_active", true);
+  if (!loans) return 0;
+
+  const { calcEstimatedBalance } = await import("@/lib/amortization");
+  return loans.reduce((sum, loan) => {
+    const estimated = calcEstimatedBalance({
+      currentBalance: loan.current_balance,
+      interestRate: loan.interest_rate,
+      monthlyPayment: loan.monthly_payment,
+      lastUpdated: loan.updated_at,
+    });
+    return sum + estimated;
+  }, 0);
+}
