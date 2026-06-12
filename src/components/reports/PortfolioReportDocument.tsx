@@ -11,9 +11,17 @@ export interface PortfolioReportProps {
 
 const styles = StyleSheet.create({
   page: { backgroundColor: "#F8FAFC", padding: 40, fontFamily: "Helvetica" },
-  coverPage: { backgroundColor: "#0f1e3d", padding: 60, height: "100%" },
-  coverTitle: { color: "white", fontSize: 36, fontWeight: "bold", marginBottom: 8 },
-  coverSubtitle: { color: "#93c5fd", fontSize: 16, marginBottom: 40 },
+  coverPage: { backgroundColor: "#0f1e3d", padding: 50, height: "100%" },
+  coverTitle: {
+    color: "white",
+    fontSize: 30,
+    fontFamily: "Helvetica-Bold",
+    fontWeight: "bold",
+    letterSpacing: -0.5,
+    marginBottom: 6,
+  },
+  coverTagline: { color: "#93c5fd", fontSize: 14, marginBottom: 24 },
+  coverSubtitle: { color: "#94a3b8", fontSize: 12, marginBottom: 40 },
   coverMeta: { color: "#94a3b8", fontSize: 12, marginTop: 8 },
   sectionHeader: {
     backgroundColor: "#0f1e3d",
@@ -185,7 +193,8 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
         <Text style={{ color: "#93c5fd", fontSize: 14, fontWeight: "bold", marginBottom: 48 }}>
           LAUNDROCFO
         </Text>
-        <Text style={styles.coverTitle}>Portfolio Underwriting Report</Text>
+        <Text style={styles.coverTitle}>Portfolio Report</Text>
+        <Text style={styles.coverTagline}>Underwriting & Valuation Summary</Text>
         <Text style={styles.coverSubtitle}>
           {totals.storeCount} Store{totals.storeCount !== 1 ? "s" : ""} · Generated {generatedDate}
         </Text>

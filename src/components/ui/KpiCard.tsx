@@ -17,13 +17,12 @@ export function KpiCard({ label, value, sub, valueColor, className, style }: Kpi
       </div>
       <div
         style={{
-          fontSize: "28px",
+          fontSize: "22px",
           fontWeight: 700,
           letterSpacing: "-0.02em",
           color: valueColor ?? "var(--text-primary)",
           lineHeight: 1.2,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
+          overflow: "visible",
           whiteSpace: "nowrap",
         }}
       >
