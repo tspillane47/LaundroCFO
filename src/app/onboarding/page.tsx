@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { FormBanner } from "@/components/ui/FormBanner";
+import { preventEnterSubmit } from "@/components/occupancy/shared";
 
 const STORAGE_KEY = "laundrocfo_onboarding";
 const VALUATION_MULTIPLE = 3.47;
@@ -126,7 +127,8 @@ export default function OnboardingPage() {
   const { refreshStores } = useStores();
   const [data, setData] = useState<OnboardingData>(DEFAULT_DATA);
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -173,10 +175,12 @@ export default function OnboardingPage() {
 
   const step2Valid = data.name.trim() !== "" && data.address.trim() !== "";
 
-  async function saveStore(includeLease: boolean) {
-    if (submitting) return;
+  async function handleSubmit(includeLease: boolean) {
+    if (submitting || submitStatus === "success") return;
+
     setSubmitting(true);
-    setMessage(null);
+    setSubmitStatus("idle");
+    setErrorMessage("");
 
     try {
       const {
@@ -184,13 +188,40 @@ export default function OnboardingPage() {
       } = await supabase.auth.getUser();
       if (!user) {
         router.push("/login");
+        setSubmitting(false);
         return;
+      }
+
+      const name = data.name.trim();
+      const address = data.address.trim();
+
+      const { data: existingStores } = await supabase
+        .from("stores")
+        .select("id, name, address, created_at")
+        .eq("user_id", user.id)
+        .eq("name", name)
+        .eq("address", address);
+
+      if (existingStores && existingStores.length > 0) {
+        const recentDuplicate = existingStores.find((s) => {
+          const createdAt = new Date(s.created_at).getTime();
+          return Date.now() - createdAt < 60000;
+        });
+
+        if (recentDuplicate) {
+          localStorage.removeItem(STORAGE_KEY);
+          localStorage.setItem("laundrocfo_show_welcome", "true");
+          await refreshStores();
+          setSubmitStatus("success");
+          setTimeout(() => router.push("/portfolio"), 600);
+          return;
+        }
       }
 
       const storePayload: Record<string, unknown> = {
         user_id: user.id,
-        name: data.name.trim(),
-        address: data.address.trim(),
+        name,
+        address,
         square_footage: data.square_footage ? Number(data.square_footage) : null,
         store_type: data.store_type,
         year_opened: data.year_opened ? Number(data.year_opened) : null,
@@ -210,55 +241,73 @@ export default function OnboardingPage() {
         storePayload.lease_expiration = data.lease_expiration || null;
       }
 
-      const { data: storeRow, error: storeError } = await supabase
+      const { data: newStore, error: storeError } = await supabase
         .from("stores")
         .insert(storePayload)
         .select("id")
         .single();
 
       if (storeError) {
-        setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+        console.error("Store creation error:", storeError);
+        setSubmitStatus("error");
+        setErrorMessage("Store was not created. Please try again.");
+        setSubmitting(false);
         return;
       }
 
-      if (includeLease && data.lease_expiration && storeRow?.id) {
+      if (!newStore) {
+        setSubmitStatus("error");
+        setErrorMessage("Store was not created. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+
+      if (includeLease && data.lease_expiration) {
         const { data: leaseRow, error: leaseError } = await supabase
           .from("leases")
-          .insert({
-            store_id: storeRow.id,
-            lease_end_date: data.lease_expiration,
-            monthly_rent: data.monthly_rent ? Number(data.monthly_rent) : null,
-            personal_guaranty: data.personal_guaranty,
-            assignment_rights: data.assignment_rights,
-          })
+          .upsert(
+            {
+              store_id: newStore.id,
+              user_id: user.id,
+              lease_end_date: data.lease_expiration,
+              monthly_rent: data.monthly_rent ? Number(data.monthly_rent) : null,
+              personal_guaranty: data.personal_guaranty,
+              assignment_rights: data.assignment_rights,
+            },
+            { onConflict: "store_id" }
+          )
           .select("id")
           .single();
 
         if (leaseError) {
-          setMessage({ type: "error", text: "We couldn't save this. Please try again." });
-          return;
-        }
-
-        const optionCount = RENEWAL_COUNT[data.renewal_options] ?? 0;
-        if (optionCount > 0 && leaseRow?.id) {
-          const options = Array.from({ length: optionCount }, (_, i) => ({
-            lease_id: leaseRow.id,
-            option_number: i + 1,
-            option_years: 5,
-            status: "Available",
-            notice_days: 180,
-          }));
-          await supabase.from("lease_options").insert(options);
+          console.error("Lease creation error (non-blocking):", leaseError);
+        } else {
+          const optionCount = RENEWAL_COUNT[data.renewal_options] ?? 0;
+          if (optionCount > 0 && leaseRow?.id) {
+            const options = Array.from({ length: optionCount }, (_, i) => ({
+              lease_id: leaseRow.id,
+              option_number: i + 1,
+              option_years: 5,
+              status: "Available",
+              notice_days: 180,
+            }));
+            const { error: optionsError } = await supabase.from("lease_options").insert(options);
+            if (optionsError) {
+              console.error("Lease options error (non-blocking):", optionsError);
+            }
+          }
         }
       }
 
       localStorage.removeItem(STORAGE_KEY);
       localStorage.setItem("laundrocfo_show_welcome", "true");
       await refreshStores();
-      router.push("/portfolio");
-    } catch {
-      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
-    } finally {
+      setSubmitStatus("success");
+      setTimeout(() => router.push("/portfolio"), 600);
+    } catch (err) {
+      console.error("Unexpected error during store creation:", err);
+      setSubmitStatus("error");
+      setErrorMessage("Store was not created. Please try again.");
       setSubmitting(false);
     }
   }
@@ -295,7 +344,13 @@ export default function OnboardingPage() {
             )}
           </div>
 
-          <FormBanner message={message} />
+          <FormBanner
+            message={
+              submitStatus === "error"
+                ? { type: "error", text: errorMessage }
+                : null
+            }
+          />
 
           {/* Step 1 — Welcome */}
           {data.step === 1 && (
@@ -348,6 +403,7 @@ export default function OnboardingPage() {
                     type="text"
                     value={data.name}
                     onChange={(e) => set("name", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     className={largeInputClass}
                     placeholder="Sunnyvale Super Wash"
                   />
@@ -357,6 +413,7 @@ export default function OnboardingPage() {
                     type="text"
                     value={data.address}
                     onChange={(e) => set("address", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     className={inputClass}
                     placeholder="445 W Olive Ave, Sunnyvale, CA"
                   />
@@ -367,6 +424,7 @@ export default function OnboardingPage() {
                       type="number"
                       value={data.square_footage}
                       onChange={(e) => set("square_footage", e.target.value)}
+                      onKeyDown={preventEnterSubmit}
                       className={inputClass}
                       placeholder="4450"
                     />
@@ -387,6 +445,7 @@ export default function OnboardingPage() {
                       type="number"
                       value={data.year_opened}
                       onChange={(e) => set("year_opened", e.target.value)}
+                      onKeyDown={preventEnterSubmit}
                       className={inputClass}
                       placeholder="2015"
                     />
@@ -446,6 +505,7 @@ export default function OnboardingPage() {
                           type="number"
                           value={data[f.key]}
                           onChange={(e) => set(f.key, e.target.value)}
+                          onKeyDown={preventEnterSubmit}
                           className={inputClass}
                           placeholder={f.ph}
                         />
@@ -516,6 +576,7 @@ export default function OnboardingPage() {
                       type="date"
                       value={data.lease_expiration}
                       onChange={(e) => set("lease_expiration", e.target.value)}
+                      onKeyDown={preventEnterSubmit}
                       className={inputClass}
                     />
                   </Field>
@@ -524,6 +585,7 @@ export default function OnboardingPage() {
                       type="number"
                       value={data.monthly_rent}
                       onChange={(e) => set("monthly_rent", e.target.value)}
+                      onKeyDown={preventEnterSubmit}
                       className={inputClass}
                       placeholder="6200"
                     />
@@ -597,21 +659,54 @@ export default function OnboardingPage() {
                 <button onClick={() => goToStep(3)} className="text-[13px] text-slate-500 hover:text-slate-300">
                   ← Back
                 </button>
-                <div className="flex flex-col sm:flex-row items-center gap-3">
+                <div className="flex flex-col w-full sm:w-auto items-stretch sm:items-center gap-3">
                   <button
-                    onClick={() => saveStore(false)}
-                    disabled={submitting}
+                    onClick={() => handleSubmit(false)}
+                    disabled={submitting || submitStatus === "success"}
                     className="text-[13px] text-slate-500 hover:text-slate-300 disabled:opacity-40"
                   >
                     Skip for now
                   </button>
                   <button
-                    onClick={() => saveStore(true)}
-                    disabled={submitting}
+                    onClick={() => handleSubmit(true)}
+                    disabled={submitting || submitStatus === "success"}
                     className="btn-primary px-8 py-2.5 text-[13px] disabled:opacity-40"
+                    style={{ width: "100%" }}
                   >
-                    {submitting ? "Creating store..." : "Finish Setup →"}
+                    {submitStatus === "success"
+                      ? "Store Created ✓"
+                      : submitting
+                        ? "Creating store..."
+                        : "Finish Setup →"}
                   </button>
+                  {submitStatus === "success" && (
+                    <div
+                      style={{
+                        background: "var(--bg-success-tint)",
+                        color: "var(--text-success)",
+                        padding: "12px",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        textAlign: "center",
+                      }}
+                    >
+                      Store created successfully. Redirecting...
+                    </div>
+                  )}
+                  {submitStatus === "error" && (
+                    <div
+                      style={{
+                        background: "var(--bg-danger-tint)",
+                        color: "var(--text-danger)",
+                        padding: "12px",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        textAlign: "center",
+                      }}
+                    >
+                      {errorMessage}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

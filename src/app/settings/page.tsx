@@ -393,9 +393,9 @@ export default function SettingsPage() {
                 </button>
                 <Link
                   href="/settings/manage-stores"
-                  className="btn-outline w-full mt-2 text-center block text-[13px]"
+                  className="btn-primary w-full mt-3 text-center block text-[13px] py-2.5"
                 >
-                  Manage Stores →
+                  Manage Stores / Remove Duplicates →
                 </Link>
               </>
             )}

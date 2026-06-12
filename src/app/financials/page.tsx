@@ -27,7 +27,7 @@ import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import {
   financials as demoFinancials,
 } from "@/lib/data";
-import { INPUT_CLASS } from "@/components/occupancy/shared";
+import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import { PageError } from "@/components/ui/PageError";
 import {
   type BankTransaction,
@@ -254,6 +254,7 @@ export default function FinancialsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [store, setStore] = useState<StoreFinancialProfile | null>(null);
@@ -431,6 +432,7 @@ export default function FinancialsPage() {
     setSelectedMonth(month);
     const existing = records.find((r) => r.year === selectedYear && r.month === month);
     setForm(existing ? recordToForm(existing) : { ...emptyMonthlyForm(store), year: selectedYear, month });
+    setSaveStatus("idle");
     setShowForm(true);
   }
 
@@ -443,54 +445,70 @@ export default function FinancialsPage() {
   }
 
   async function saveMonthlyRecord() {
-    if (!store?.id || !userId) return;
+    if (!store?.id || !userId || saving || saveStatus === "success") return;
     setSaving(true);
+    setSaveStatus("idle");
     setError("");
     setSuccess("");
 
-    const payload = {
-      store_id: store.id,
-      user_id: userId,
-      year: selectedYear,
-      month: selectedMonth,
-      revenue: form.revenue,
-      utilities: form.utilities,
-      rent: form.rent,
-      payroll: form.payroll,
-      repairs_maintenance: form.repairs_maintenance,
-      insurance_expense: form.insurance_expense,
-      supplies: form.supplies,
-      marketing: form.marketing,
-      professional_fees: form.professional_fees,
-      other_expenses: form.other_expenses,
-      debt_service: form.debt_service,
-      notes: form.notes,
-    };
+    try {
+      const payload = {
+        store_id: store.id,
+        user_id: userId,
+        year: selectedYear,
+        month: selectedMonth,
+        revenue: form.revenue,
+        utilities: form.utilities,
+        rent: form.rent,
+        payroll: form.payroll,
+        repairs_maintenance: form.repairs_maintenance,
+        insurance_expense: form.insurance_expense,
+        supplies: form.supplies,
+        marketing: form.marketing,
+        professional_fees: form.professional_fees,
+        other_expenses: form.other_expenses,
+        debt_service: form.debt_service,
+        notes: form.notes,
+      };
 
-    if (selectedRecord?.id) {
-      const { error: updateError } = await supabase
-        .from("monthly_financials")
-        .update(payload)
-        .eq("id", selectedRecord.id);
-      if (updateError) {
-        setError(updateError.message);
-        setSaving(false);
-        return;
+      if (selectedRecord?.id) {
+        const { error: updateError } = await supabase
+          .from("monthly_financials")
+          .update(payload)
+          .eq("id", selectedRecord.id);
+        if (updateError) {
+          console.error("Monthly financials save error:", updateError);
+          setSaveStatus("error");
+          setError("We couldn't save this. Please try again.");
+          setSaving(false);
+          return;
+        }
+      } else {
+        const { error: insertError } = await supabase.from("monthly_financials").insert(payload);
+        if (insertError) {
+          console.error("Monthly financials save error:", insertError);
+          setSaveStatus("error");
+          setError("We couldn't save this. Please try again.");
+          setSaving(false);
+          return;
+        }
       }
-    } else {
-      const { error: insertError } = await supabase.from("monthly_financials").insert(payload);
-      if (insertError) {
-        setError(insertError.message);
+
+      invalidateValuationCache(store.id);
+      setSaveStatus("success");
+      setSuccess(`${MONTH_NAMES[selectedMonth - 1]} ${selectedYear} saved successfully.`);
+      setTimeout(() => {
+        setShowForm(false);
+        setSaveStatus("idle");
         setSaving(false);
-        return;
-      }
+      }, 600);
+      await loadData();
+    } catch (err) {
+      console.error("Unexpected monthly financials save error:", err);
+      setSaveStatus("error");
+      setError("We couldn't save this. Please try again.");
+      setSaving(false);
     }
-
-    invalidateValuationCache(store.id);
-    setSuccess(`${MONTH_NAMES[selectedMonth - 1]} ${selectedYear} saved.`);
-    setShowForm(false);
-    setSaving(false);
-    await loadData();
   }
 
   function handleCSVUpload(file: File) {
@@ -854,6 +872,7 @@ export default function FinancialsPage() {
                       type="number"
                       value={form[key] === 0 && key !== "revenue" ? "" : form[key]}
                       onChange={(e) => setFormField(key, e.target.value)}
+                      onKeyDown={preventEnterSubmit}
                       className={INPUT_CLASS}
                       placeholder="0"
                     />
@@ -882,8 +901,8 @@ export default function FinancialsPage() {
                 <button type="button" className="btn-outline" onClick={() => setShowForm(false)}>
                   Cancel
                 </button>
-                <button type="button" className="btn-primary" onClick={saveMonthlyRecord} disabled={saving}>
-                  {saving ? "Saving…" : "Save to monthly_financials"}
+                <button type="button" className="btn-primary" onClick={saveMonthlyRecord} disabled={saving || saveStatus === "success"}>
+                  {saveStatus === "success" ? "Saved ✓" : saving ? "Saving…" : "Save to monthly_financials"}
                 </button>
               </div>
             </div>
@@ -1395,6 +1414,7 @@ export default function FinancialsPage() {
                               prev.map((m, i) => (i === idx ? { ...m, qb_account_name: e.target.value } : m))
                             )
                           }
+                          onKeyDown={preventEnterSubmit}
                           className={clsx(INPUT_CLASS, "py-1.5 text-[12px]")}
                         />
                       </td>

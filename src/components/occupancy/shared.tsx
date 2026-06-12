@@ -1,5 +1,13 @@
+import type { KeyboardEvent } from "react";
+
 export const INPUT_CLASS =
   "w-full bg-[#1e2a3a] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-blue-500";
+
+export function preventEnterSubmit(e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+  }
+}
 
 export function parseDate(value: string | null): Date | null {
   if (!value) return null;

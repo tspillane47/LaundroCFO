@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { useStores } from "@/lib/store-context";
 import { MetricCard } from "@/components/ui/MetricCard";
-import { INPUT_CLASS } from "@/components/occupancy/shared";
+import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import {
   MANUFACTURERS,
   WASHER_SIZES,
@@ -91,6 +91,7 @@ export default function EquipmentPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [store, setStore] = useState<Store | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -183,6 +184,7 @@ export default function EquipmentPage() {
   function openAddForm() {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setSaveStatus("idle");
     setShowForm(true);
   }
 
@@ -198,6 +200,7 @@ export default function EquipmentPage() {
       condition: item.condition,
       notes: item.notes ?? "",
     });
+    setSaveStatus("idle");
     setShowForm(true);
   }
 
@@ -208,7 +211,7 @@ export default function EquipmentPage() {
   }
 
   async function handleSave() {
-    if (!store || !userId || saving) return;
+    if (!store || !userId || saving || saveStatus === "success") return;
 
     const quantity = parseInt(form.quantity, 10);
     const installationYear = parseInt(form.installation_year, 10);
@@ -223,35 +226,51 @@ export default function EquipmentPage() {
     }
 
     setSaving(true);
+    setSaveStatus("idle");
     setMessage(null);
 
-    const payload = {
-      user_id: userId,
-      store_id: store.id,
-      machine_type: form.machine_type,
-      manufacturer: form.manufacturer,
-      machine_size: form.machine_size,
-      quantity,
-      installation_year: installationYear,
-      high_speed_extract: form.machine_type === "Washer" ? form.high_speed_extract : false,
-      condition: form.condition,
-      notes: form.notes.trim() || null,
-    };
+    try {
+      const payload = {
+        user_id: userId,
+        store_id: store.id,
+        machine_type: form.machine_type,
+        manufacturer: form.manufacturer,
+        machine_size: form.machine_size,
+        quantity,
+        installation_year: installationYear,
+        high_speed_extract: form.machine_type === "Washer" ? form.high_speed_extract : false,
+        condition: form.condition,
+        notes: form.notes.trim() || null,
+      };
 
-    const { error: saveError } = editingId
-      ? await supabase.from("equipment_inventory").update(payload).eq("id", editingId)
-      : await supabase.from("equipment_inventory").insert(payload);
+      const { error: saveError } = editingId
+        ? await supabase.from("equipment_inventory").update(payload).eq("id", editingId)
+        : await supabase.from("equipment_inventory").insert(payload);
 
-    if (saveError) {
-      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
-    } else {
+      if (saveError) {
+        console.error("Equipment save error:", saveError);
+        setSaveStatus("error");
+        setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+        setSaving(false);
+        return;
+      }
+
       invalidateValuationCache(store.id);
+      setSaveStatus("success");
       setMessage({ type: "success", text: "Saved successfully." });
-      setTimeout(() => setMessage(null), 3000);
+      setTimeout(() => {
+        setMessage(null);
+        setSaveStatus("idle");
+      }, 3000);
       closeForm();
+      setSaving(false);
       await loadData();
+    } catch (err) {
+      console.error("Unexpected equipment save error:", err);
+      setSaveStatus("error");
+      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   async function handleDelete(id: string) {
@@ -516,6 +535,7 @@ export default function EquipmentPage() {
                       min={1}
                       value={form.quantity}
                       onChange={(e) => updateForm("quantity", e.target.value)}
+                      onKeyDown={preventEnterSubmit}
                       className={INPUT_CLASS}
                     />
                   </div>
@@ -527,6 +547,7 @@ export default function EquipmentPage() {
                       max={currentYear}
                       value={form.installation_year}
                       onChange={(e) => updateForm("installation_year", e.target.value)}
+                      onKeyDown={preventEnterSubmit}
                       className={INPUT_CLASS}
                     />
                   </div>
@@ -555,6 +576,7 @@ export default function EquipmentPage() {
                     <textarea
                       value={form.notes}
                       onChange={(e) => updateForm("notes", e.target.value)}
+                      onKeyDown={preventEnterSubmit}
                       className={clsx(INPUT_CLASS, "min-h-[80px] resize-y")}
                       placeholder="Optional notes about this machine group..."
                     />
@@ -565,10 +587,16 @@ export default function EquipmentPage() {
                   <button
                     type="button"
                     onClick={handleSave}
-                    disabled={saving}
+                    disabled={saving || saveStatus === "success"}
                     className="btn-primary py-2 px-5 text-[13px]"
                   >
-                    {saving ? "Saving..." : editingId ? "Update Machine Group" : "Save Machine Group"}
+                    {saveStatus === "success"
+                      ? "Saved ✓"
+                      : saving
+                        ? "Saving..."
+                        : editingId
+                          ? "Update Machine Group"
+                          : "Save Machine Group"}
                   </button>
                   <button type="button" onClick={closeForm} className="btn-outline py-2 px-5 text-[13px]">
                     Cancel

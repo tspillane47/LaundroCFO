@@ -15,6 +15,7 @@ import {
   formatCurrency,
   formatDate,
   parseDate,
+  preventEnterSubmit,
 } from "@/components/occupancy/shared";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -450,6 +451,7 @@ export default function InsurancePage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [store, setStore] = useState<Store | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -628,12 +630,14 @@ export default function InsurancePage() {
   function openAddPolicy() {
     setEditingPolicyId(null);
     setPolicyForm(emptyPolicyForm());
+    setSaveStatus("idle");
     setShowPolicyForm(true);
   }
 
   function openEditPolicy(policy: InsurancePolicy) {
     setEditingPolicyId(policy.id);
     setPolicyForm(policyToForm(policy));
+    setSaveStatus("idle");
     setShowPolicyForm(true);
   }
 
@@ -644,76 +648,89 @@ export default function InsurancePage() {
   }
 
   async function handleSavePolicy() {
-    if (!store || !userId || saving) return;
+    if (!store || !userId || saving || saveStatus === "success") return;
     setSaving(true);
+    setSaveStatus("idle");
     setMessage(null);
 
-    const payload = {
-      user_id: userId,
-      store_id: store.id,
-      is_active: true,
-      policy_type: policyForm.policy_type || null,
-      carrier: policyForm.carrier || null,
-      policy_number: policyForm.policy_number || null,
-      agent_name: policyForm.agent_name || null,
-      agency_name: policyForm.agency_name || null,
-      agent_email: policyForm.agent_email || null,
-      agent_phone: policyForm.agent_phone || null,
-      effective_date: policyForm.effective_date || null,
-      expiration_date: policyForm.expiration_date || null,
-      auto_renewal: policyForm.auto_renewal,
-      annual_premium: parseNum(policyForm.annual_premium),
-      monthly_premium: parseNum(policyForm.monthly_premium),
-      payment_frequency: policyForm.payment_frequency || null,
-      building_coverage: parseNum(policyForm.building_coverage),
-      contents_coverage: parseNum(policyForm.contents_coverage),
-      equipment_coverage: parseNum(policyForm.equipment_coverage),
-      replacement_cost: policyForm.replacement_cost,
-      liability_per_occurrence: parseNum(policyForm.liability_per_occurrence),
-      liability_aggregate: parseNum(policyForm.liability_aggregate),
-      business_interruption: policyForm.business_interruption,
-      business_interruption_amount: parseNum(policyForm.business_interruption_amount),
-      flood_coverage: policyForm.flood_coverage,
-      flood_amount: parseNum(policyForm.flood_amount),
-      equipment_breakdown: policyForm.equipment_breakdown,
-      equipment_breakdown_amount: parseNum(policyForm.equipment_breakdown_amount),
-      sewer_backup: policyForm.sewer_backup,
-      water_damage: policyForm.water_damage,
-      employee_theft: policyForm.employee_theft,
-      cyber_coverage: policyForm.cyber_coverage,
-      utility_interruption: policyForm.utility_interruption,
-      ordinance_law: policyForm.ordinance_law,
-      property_deductible: parseNum(policyForm.property_deductible),
-      wind_deductible: parseNum(policyForm.wind_deductible),
-      flood_deductible: parseNum(policyForm.flood_deductible),
-      equipment_deductible: parseNum(policyForm.equipment_deductible),
-      notes: policyForm.notes || null,
-    };
+    try {
+      const payload = {
+        user_id: userId,
+        store_id: store.id,
+        is_active: true,
+        policy_type: policyForm.policy_type || null,
+        carrier: policyForm.carrier || null,
+        policy_number: policyForm.policy_number || null,
+        agent_name: policyForm.agent_name || null,
+        agency_name: policyForm.agency_name || null,
+        agent_email: policyForm.agent_email || null,
+        agent_phone: policyForm.agent_phone || null,
+        effective_date: policyForm.effective_date || null,
+        expiration_date: policyForm.expiration_date || null,
+        auto_renewal: policyForm.auto_renewal,
+        annual_premium: parseNum(policyForm.annual_premium),
+        monthly_premium: parseNum(policyForm.monthly_premium),
+        payment_frequency: policyForm.payment_frequency || null,
+        building_coverage: parseNum(policyForm.building_coverage),
+        contents_coverage: parseNum(policyForm.contents_coverage),
+        equipment_coverage: parseNum(policyForm.equipment_coverage),
+        replacement_cost: policyForm.replacement_cost,
+        liability_per_occurrence: parseNum(policyForm.liability_per_occurrence),
+        liability_aggregate: parseNum(policyForm.liability_aggregate),
+        business_interruption: policyForm.business_interruption,
+        business_interruption_amount: parseNum(policyForm.business_interruption_amount),
+        flood_coverage: policyForm.flood_coverage,
+        flood_amount: parseNum(policyForm.flood_amount),
+        equipment_breakdown: policyForm.equipment_breakdown,
+        equipment_breakdown_amount: parseNum(policyForm.equipment_breakdown_amount),
+        sewer_backup: policyForm.sewer_backup,
+        water_damage: policyForm.water_damage,
+        employee_theft: policyForm.employee_theft,
+        cyber_coverage: policyForm.cyber_coverage,
+        utility_interruption: policyForm.utility_interruption,
+        ordinance_law: policyForm.ordinance_law,
+        property_deductible: parseNum(policyForm.property_deductible),
+        wind_deductible: parseNum(policyForm.wind_deductible),
+        flood_deductible: parseNum(policyForm.flood_deductible),
+        equipment_deductible: parseNum(policyForm.equipment_deductible),
+        notes: policyForm.notes || null,
+      };
 
-    if (editingPolicyId) {
-      const { error: updateError } = await supabase
-        .from("insurance_policies")
-        .update(payload)
-        .eq("id", editingPolicyId);
-      if (updateError) {
-        setMessage({ type: "error", text: "We couldn't save this. Please try again." });
-        setSaving(false);
-        return;
+      if (editingPolicyId) {
+        const { error: updateError } = await supabase
+          .from("insurance_policies")
+          .update(payload)
+          .eq("id", editingPolicyId);
+        if (updateError) {
+          console.error("Insurance policy save error:", updateError);
+          setSaveStatus("error");
+          setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+          setSaving(false);
+          return;
+        }
+      } else {
+        const { error: insertError } = await supabase.from("insurance_policies").insert(payload);
+        if (insertError) {
+          console.error("Insurance policy save error:", insertError);
+          setSaveStatus("error");
+          setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+          setSaving(false);
+          return;
+        }
       }
-    } else {
-      const { error: insertError } = await supabase.from("insurance_policies").insert(payload);
-      if (insertError) {
-        setMessage({ type: "error", text: "We couldn't save this. Please try again." });
-        setSaving(false);
-        return;
-      }
+
+      setSaveStatus("success");
+      setMessage({ type: "success", text: "Saved successfully." });
+      setTimeout(() => setMessage(null), 3000);
+      closePolicyForm();
+      setSaving(false);
+      await loadData();
+    } catch (err) {
+      console.error("Unexpected insurance policy save error:", err);
+      setSaveStatus("error");
+      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+      setSaving(false);
     }
-
-    setMessage({ type: "success", text: "Saved successfully." });
-    setTimeout(() => setMessage(null), 3000);
-    closePolicyForm();
-    await loadData();
-    setSaving(false);
   }
 
   function openAddClaim(policyId?: string) {
@@ -910,6 +927,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.carrier}
                       onChange={(e) => updatePolicyForm("carrier", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Policy Number">
@@ -917,6 +935,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.policy_number}
                       onChange={(e) => updatePolicyForm("policy_number", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Agent Name">
@@ -924,6 +943,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.agent_name}
                       onChange={(e) => updatePolicyForm("agent_name", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Agency Name">
@@ -931,6 +951,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.agency_name}
                       onChange={(e) => updatePolicyForm("agency_name", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Agent Email">
@@ -939,6 +960,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.agent_email}
                       onChange={(e) => updatePolicyForm("agent_email", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Agent Phone">
@@ -947,6 +969,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.agent_phone}
                       onChange={(e) => updatePolicyForm("agent_phone", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                 </div>
@@ -960,6 +983,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.effective_date}
                       onChange={(e) => updatePolicyForm("effective_date", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Expiration Date">
@@ -968,6 +992,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.expiration_date}
                       onChange={(e) => updatePolicyForm("expiration_date", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <div className="col-span-2">
@@ -987,6 +1012,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.annual_premium}
                       onChange={(e) => updatePolicyForm("annual_premium", e.target.value)}
+                      onKeyDown={preventEnterSubmit}
                       placeholder="0"
                     />
                   </FormField>
@@ -995,6 +1021,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.monthly_premium}
                       onChange={(e) => updatePolicyForm("monthly_premium", e.target.value)}
+                      onKeyDown={preventEnterSubmit}
                       placeholder="0"
                     />
                   </FormField>
@@ -1021,6 +1048,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.building_coverage}
                       onChange={(e) => updatePolicyForm("building_coverage", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Contents Coverage">
@@ -1028,6 +1056,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.contents_coverage}
                       onChange={(e) => updatePolicyForm("contents_coverage", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Equipment Coverage">
@@ -1035,6 +1064,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.equipment_coverage}
                       onChange={(e) => updatePolicyForm("equipment_coverage", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Liability Per Occurrence">
@@ -1042,6 +1072,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.liability_per_occurrence}
                       onChange={(e) => updatePolicyForm("liability_per_occurrence", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Liability Aggregate">
@@ -1049,6 +1080,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.liability_aggregate}
                       onChange={(e) => updatePolicyForm("liability_aggregate", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <div className="flex items-end pb-1">
@@ -1074,6 +1106,7 @@ export default function InsurancePage() {
                           onChange={(e) =>
                             updatePolicyForm("business_interruption_amount", e.target.value)
                           }
+                        onKeyDown={preventEnterSubmit}
                         />
                       </FormField>
                     )}
@@ -1090,6 +1123,7 @@ export default function InsurancePage() {
                           className={INPUT_CLASS}
                           value={policyForm.flood_amount}
                           onChange={(e) => updatePolicyForm("flood_amount", e.target.value)}
+                        onKeyDown={preventEnterSubmit}
                         />
                       </FormField>
                     )}
@@ -1108,6 +1142,7 @@ export default function InsurancePage() {
                           onChange={(e) =>
                             updatePolicyForm("equipment_breakdown_amount", e.target.value)
                           }
+                        onKeyDown={preventEnterSubmit}
                         />
                       </FormField>
                     )}
@@ -1141,6 +1176,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.property_deductible}
                       onChange={(e) => updatePolicyForm("property_deductible", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Wind Deductible">
@@ -1148,6 +1184,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.wind_deductible}
                       onChange={(e) => updatePolicyForm("wind_deductible", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Flood Deductible">
@@ -1155,6 +1192,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.flood_deductible}
                       onChange={(e) => updatePolicyForm("flood_deductible", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                   <FormField label="Equipment Deductible">
@@ -1162,6 +1200,7 @@ export default function InsurancePage() {
                       className={INPUT_CLASS}
                       value={policyForm.equipment_deductible}
                       onChange={(e) => updatePolicyForm("equipment_deductible", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     />
                   </FormField>
                 </div>
@@ -1172,6 +1211,7 @@ export default function InsurancePage() {
                   className={clsx(INPUT_CLASS, "min-h-[80px] resize-y")}
                   value={policyForm.notes}
                   onChange={(e) => updatePolicyForm("notes", e.target.value)}
+                  onKeyDown={preventEnterSubmit}
                   placeholder="Policy notes, endorsements, special conditions..."
                 />
               </FormSection>
@@ -1184,10 +1224,16 @@ export default function InsurancePage() {
               <button
                 type="button"
                 onClick={handleSavePolicy}
-                disabled={saving}
+                disabled={saving || saveStatus === "success"}
                 className="btn-primary"
               >
-                {saving ? "Saving..." : editingPolicyId ? "Update Policy" : "Save Policy"}
+                {saveStatus === "success"
+                  ? "Saved ✓"
+                  : saving
+                    ? "Saving..."
+                    : editingPolicyId
+                      ? "Update Policy"
+                      : "Save Policy"}
               </button>
             </div>
           </div>
@@ -1353,6 +1399,7 @@ export default function InsurancePage() {
                   className={INPUT_CLASS}
                   value={claimForm.claim_date}
                   onChange={(e) => setClaimForm((f) => ({ ...f, claim_date: e.target.value }))}
+                onKeyDown={preventEnterSubmit}
                 />
               </FormField>
               <FormField label="Claim Type">
@@ -1373,6 +1420,7 @@ export default function InsurancePage() {
                   className={INPUT_CLASS}
                   value={claimForm.amount}
                   onChange={(e) => setClaimForm((f) => ({ ...f, amount: e.target.value }))}
+                onKeyDown={preventEnterSubmit}
                 />
               </FormField>
               <FormField label="Status">
@@ -1393,6 +1441,7 @@ export default function InsurancePage() {
                   className={INPUT_CLASS}
                   value={claimForm.description}
                   onChange={(e) => setClaimForm((f) => ({ ...f, description: e.target.value }))}
+                onKeyDown={preventEnterSubmit}
                 />
               </FormField>
             </div>

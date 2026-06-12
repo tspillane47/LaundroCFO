@@ -14,6 +14,7 @@ import {
   formatDate,
   formatPct,
   parseDate,
+  preventEnterSubmit,
 } from "./shared";
 
 type Lease = {
@@ -229,6 +230,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [mode, setMode] = useState<"view" | "edit">("view");
@@ -334,6 +336,8 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       setOptionForms([emptyOptionForm(0)]);
     }
     setMode("edit");
+    setSaveStatus("idle");
+    setSaving(false);
     setError("");
     setSuccess("");
   }
@@ -350,114 +354,121 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       setOptionForms(options.map(optionToForm));
     }
     setMode("view");
+    setSaveStatus("idle");
+    setSaving(false);
     setError("");
     setSuccess("");
   }
 
   async function handleSave() {
-    if (saving) return;
+    if (saving || saveStatus === "success") return;
     setSaving(true);
+    setSaveStatus("idle");
     setError("");
     setSuccess("");
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      setError("We couldn't save this lease. Please try again.");
-      setSaving(false);
-      return;
-    }
-
-    const { data: savedLease, error: leaseError } = await supabase
-      .from("leases")
-      .upsert(
-        {
-          store_id: store.id,
-          user_id: user.id,
-          landlord: leaseForm.landlord || null,
-          tenant_entity: leaseForm.tenant_entity || null,
-          lease_start_date: leaseForm.lease_start_date || null,
-          lease_end_date: leaseForm.lease_end_date || null,
-          monthly_rent: Number(leaseForm.monthly_rent) || 0,
-          annual_escalation_pct: Number(leaseForm.annual_escalation_pct) || 0,
-          cam_charges: Number(leaseForm.cam_charges) || 0,
-          security_deposit: Number(leaseForm.security_deposit) || 0,
-          square_footage: Number(leaseForm.square_footage) || 0,
-          personal_guaranty: leaseForm.personal_guaranty,
-          assignment_rights: leaseForm.assignment_rights || null,
-          sublease_rights: leaseForm.sublease_rights || null,
-          exclusivity_clause: leaseForm.exclusivity_clause,
-          use_restrictions: leaseForm.use_restrictions || null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "store_id" }
-      )
-      .select()
-      .single();
-
-    if (leaseError || !savedLease) {
-      setError("We couldn't save this lease. Please try again.");
-      setSaving(false);
-      return;
-    }
-
-    const leaseId = savedLease.id;
-
-    const existingIds = options.map((o) => o.id);
-    const formIds = optionForms.filter((f) => f.id).map((f) => f.id!);
-    const toDelete = existingIds.filter((id) => !formIds.includes(id));
-
-    if (toDelete.length > 0) {
-      const { error: deleteError } = await supabase
-        .from("lease_options")
-        .delete()
-        .in("id", toDelete);
-      if (deleteError) {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setSaveStatus("error");
         setError("We couldn't save this lease. Please try again.");
         setSaving(false);
         return;
       }
-    }
 
-    for (const form of optionForms) {
-      if (!form.option_years && !form.notice_days) continue;
+      const { data: savedLease, error: leaseError } = await supabase
+        .from("leases")
+        .upsert(
+          {
+            store_id: store.id,
+            user_id: user.id,
+            landlord: leaseForm.landlord || null,
+            tenant_entity: leaseForm.tenant_entity || null,
+            lease_start_date: leaseForm.lease_start_date || null,
+            lease_end_date: leaseForm.lease_end_date || null,
+            monthly_rent: Number(leaseForm.monthly_rent) || 0,
+            annual_escalation_pct: Number(leaseForm.annual_escalation_pct) || 0,
+            cam_charges: Number(leaseForm.cam_charges) || 0,
+            security_deposit: Number(leaseForm.security_deposit) || 0,
+            square_footage: Number(leaseForm.square_footage) || 0,
+            personal_guaranty: leaseForm.personal_guaranty,
+            assignment_rights: leaseForm.assignment_rights || null,
+            sublease_rights: leaseForm.sublease_rights || null,
+            exclusivity_clause: leaseForm.exclusivity_clause,
+            use_restrictions: leaseForm.use_restrictions || null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "store_id" }
+        )
+        .select()
+        .single();
 
-      const optionPayload = {
-        lease_id: leaseId,
-        store_id: store.id,
-        user_id: user.id,
-        option_number: form.option_number ? Number(form.option_number) : null,
-        option_years: form.option_years ? Number(form.option_years) : null,
-        status: form.status || "Available",
-        notice_days: form.notice_days ? Number(form.notice_days) : null,
-      };
+      if (leaseError || !savedLease) {
+        console.error("Lease save error:", leaseError);
+        setSaveStatus("error");
+        setError("We couldn't save this lease. Please try again.");
+        setSaving(false);
+        return;
+      }
 
-      if (form.id) {
-        const { error: optError } = await supabase
+      const leaseId = savedLease.id;
+      const existingIds = options.map((o) => o.id);
+      const formIds = optionForms.filter((f) => f.id).map((f) => f.id!);
+      const toDelete = existingIds.filter((id) => !formIds.includes(id));
+
+      if (toDelete.length > 0) {
+        const { error: deleteError } = await supabase
           .from("lease_options")
-          .upsert({ id: form.id, ...optionPayload }, { onConflict: "id" });
-        if (optError) {
-          setError("We couldn't save this lease. Please try again.");
-          setSaving(false);
-          return;
-        }
-      } else {
-        const { error: optError } = await supabase.from("lease_options").insert(optionPayload);
-        if (optError) {
-          setError("We couldn't save this lease. Please try again.");
-          setSaving(false);
-          return;
+          .delete()
+          .in("id", toDelete);
+        if (deleteError) {
+          console.error("Lease options delete error (non-blocking):", deleteError);
         }
       }
-    }
 
-    invalidateValuationCache(store.id);
-    setSuccess("Lease saved successfully.");
-    setTimeout(() => setSuccess(""), 3000);
-    setMode("view");
-    setSaving(false);
-    await loadData();
+      for (const form of optionForms) {
+        if (!form.option_years && !form.notice_days) continue;
+
+        const optionPayload = {
+          lease_id: leaseId,
+          store_id: store.id,
+          user_id: user.id,
+          option_number: form.option_number ? Number(form.option_number) : null,
+          option_years: form.option_years ? Number(form.option_years) : null,
+          status: form.status || "Available",
+          notice_days: form.notice_days ? Number(form.notice_days) : null,
+        };
+
+        if (form.id) {
+          const { error: optError } = await supabase
+            .from("lease_options")
+            .upsert({ id: form.id, ...optionPayload }, { onConflict: "id" });
+          if (optError) {
+            console.error("Lease option update error (non-blocking):", optError);
+          }
+        } else {
+          const { error: optError } = await supabase.from("lease_options").insert(optionPayload);
+          if (optError) {
+            console.error("Lease option insert error (non-blocking):", optError);
+          }
+        }
+      }
+
+      invalidateValuationCache(store.id);
+      setSaveStatus("success");
+      setSuccess("Saved successfully.");
+      setTimeout(() => setSuccess(""), 3000);
+      setMode("view");
+      setSaving(false);
+      await loadData();
+    } catch (err) {
+      console.error("Unexpected lease save error:", err);
+      setSaveStatus("error");
+      setError("We couldn't save this lease. Please try again.");
+      setSaving(false);
+    }
   }
 
   if (loading) {
@@ -495,8 +506,8 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               <button onClick={cancelEdit} className="btn-outline" disabled={saving}>
                 Cancel
               </button>
-              <button onClick={handleSave} className="btn-primary" disabled={saving}>
-                {saving ? "Saving..." : "Save Changes"}
+              <button onClick={handleSave} className="btn-primary" disabled={saving || saveStatus === "success"}>
+                {saveStatus === "success" ? "Saved ✓" : saving ? "Saving..." : "Save Changes"}
               </button>
             </div>
           )}
@@ -507,8 +518,8 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
           <button onClick={cancelEdit} className="btn-outline" disabled={saving}>
             Cancel
           </button>
-          <button onClick={handleSave} className="btn-primary" disabled={saving}>
-            {saving ? "Saving..." : "Save Changes"}
+          <button onClick={handleSave} className="btn-primary" disabled={saving || saveStatus === "success"}>
+            {saveStatus === "success" ? "Saved ✓" : saving ? "Saving..." : "Save Changes"}
           </button>
         </div>
       )}
@@ -706,6 +717,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                   type="text"
                   value={leaseForm.landlord}
                   onChange={(e) => setLeaseField("landlord", e.target.value)}
+                  onKeyDown={preventEnterSubmit}
                   className={INPUT_CLASS}
                   placeholder="Property owner or LLC"
                 />
@@ -716,6 +728,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                   type="text"
                   value={leaseForm.tenant_entity}
                   onChange={(e) => setLeaseField("tenant_entity", e.target.value)}
+                  onKeyDown={preventEnterSubmit}
                   className={INPUT_CLASS}
                   placeholder="Your LLC or entity name"
                 />
@@ -740,6 +753,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                   type="date"
                   value={leaseForm.lease_start_date}
                   onChange={(e) => setLeaseField("lease_start_date", e.target.value)}
+                  onKeyDown={preventEnterSubmit}
                   className={INPUT_CLASS}
                 />
               </div>
@@ -749,6 +763,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                   type="date"
                   value={leaseForm.lease_end_date}
                   onChange={(e) => setLeaseField("lease_end_date", e.target.value)}
+                  onKeyDown={preventEnterSubmit}
                   className={INPUT_CLASS}
                 />
               </div>
@@ -761,6 +776,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                   type="number"
                   value={leaseForm.monthly_rent}
                   onChange={(e) => setLeaseField("monthly_rent", e.target.value)}
+                  onKeyDown={preventEnterSubmit}
                   className={INPUT_CLASS}
                   placeholder="6200"
                 />
@@ -772,6 +788,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                   step="0.1"
                   value={leaseForm.annual_escalation_pct}
                   onChange={(e) => setLeaseField("annual_escalation_pct", e.target.value)}
+                  onKeyDown={preventEnterSubmit}
                   className={INPUT_CLASS}
                   placeholder="3.0"
                 />
@@ -782,6 +799,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                   type="number"
                   value={leaseForm.cam_charges}
                   onChange={(e) => setLeaseField("cam_charges", e.target.value)}
+                  onKeyDown={preventEnterSubmit}
                   className={INPUT_CLASS}
                   placeholder="850"
                 />
@@ -795,6 +813,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                   type="number"
                   value={leaseForm.square_footage}
                   onChange={(e) => setLeaseField("square_footage", e.target.value)}
+                  onKeyDown={preventEnterSubmit}
                   className={INPUT_CLASS}
                   placeholder="4450"
                 />
@@ -805,6 +824,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                   type="number"
                   value={leaseForm.security_deposit}
                   onChange={(e) => setLeaseField("security_deposit", e.target.value)}
+                  onKeyDown={preventEnterSubmit}
                   className={INPUT_CLASS}
                   placeholder="15000"
                 />
@@ -868,6 +888,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               <textarea
                 value={leaseForm.use_restrictions}
                 onChange={(e) => setLeaseField("use_restrictions", e.target.value)}
+                onKeyDown={preventEnterSubmit}
                 className={INPUT_CLASS + " min-h-[80px] resize-y"}
                 placeholder="Any use restrictions in the lease..."
               />
@@ -894,6 +915,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                     type="number"
                     value={form.option_number}
                     onChange={(e) => setOptionField(i, "option_number", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     className={INPUT_CLASS}
                   />
                 </div>
@@ -903,6 +925,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                     type="number"
                     value={form.option_years}
                     onChange={(e) => setOptionField(i, "option_years", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     className={INPUT_CLASS}
                     placeholder="5"
                   />
@@ -927,6 +950,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                     type="number"
                     value={form.notice_days}
                     onChange={(e) => setOptionField(i, "notice_days", e.target.value)}
+                    onKeyDown={preventEnterSubmit}
                     className={INPUT_CLASS}
                     placeholder="180"
                   />

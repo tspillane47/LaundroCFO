@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormBanner } from "@/components/ui/FormBanner";
+import { preventEnterSubmit } from "@/components/occupancy/shared";
 
 function EditStoreForm() {
   const router = useRouter();
@@ -11,6 +12,7 @@ function EditStoreForm() {
   const supabase = createClient();
   const [storeId, setStoreId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [fetching, setFetching] = useState(true);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [form, setForm] = useState({
@@ -83,35 +85,47 @@ function EditStoreForm() {
   }, [searchParams]);
 
   async function handleSubmit() {
-    if (!storeId || saving) return;
+    if (!storeId || saving || saveStatus === "success") return;
     setSaving(true);
+    setSaveStatus("idle");
     setMessage(null);
 
-    const { error: updateError } = await supabase
-      .from("stores")
-      .update({
-        name: form.name,
-        address: form.address,
-        square_footage: Number(form.square_footage),
-        monthly_revenue: Number(form.monthly_revenue),
-        monthly_expenses: Number(form.monthly_expenses),
-        monthly_rent: Number(form.monthly_rent),
-        annual_debt_service: Number(form.annual_debt_service),
-        loan_balance: Number(form.loan_balance),
-        lease_expiration: form.lease_expiration,
-        washers: Number(form.washers),
-        dryers: Number(form.dryers),
-        avg_machine_age: Number(form.avg_machine_age),
-      })
-      .eq("id", storeId);
+    try {
+      const { error: updateError } = await supabase
+        .from("stores")
+        .update({
+          name: form.name,
+          address: form.address,
+          square_footage: Number(form.square_footage),
+          monthly_revenue: Number(form.monthly_revenue),
+          monthly_expenses: Number(form.monthly_expenses),
+          monthly_rent: Number(form.monthly_rent),
+          annual_debt_service: Number(form.annual_debt_service),
+          loan_balance: Number(form.loan_balance),
+          lease_expiration: form.lease_expiration,
+          washers: Number(form.washers),
+          dryers: Number(form.dryers),
+          avg_machine_age: Number(form.avg_machine_age),
+        })
+        .eq("id", storeId);
 
-    if (updateError) {
-      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
-    } else {
+      if (updateError) {
+        console.error("Store profile save error:", updateError);
+        setSaveStatus("error");
+        setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+        setSaving(false);
+        return;
+      }
+
       invalidateValuationCache(storeId);
+      setSaveStatus("success");
       setMessage({ type: "success", text: "Saved successfully." });
+    } catch (err) {
+      console.error("Unexpected store profile save error:", err);
+      setSaveStatus("error");
+      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   if (fetching) {
@@ -140,6 +154,7 @@ function EditStoreForm() {
             onChange={(e) => set("name", e.target.value)}
             className={inputClass}
             placeholder="Sunnyvale Super Wash"
+          onKeyDown={preventEnterSubmit}
           />
         </div>
         <div>
@@ -150,6 +165,7 @@ function EditStoreForm() {
             onChange={(e) => set("address", e.target.value)}
             className={inputClass}
             placeholder="445 W Olive Ave, Sunnyvale, CA"
+          onKeyDown={preventEnterSubmit}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -161,6 +177,7 @@ function EditStoreForm() {
               onChange={(e) => set("square_footage", e.target.value)}
               className={inputClass}
               placeholder="4450"
+            onKeyDown={preventEnterSubmit}
             />
           </div>
           <div>
@@ -170,6 +187,7 @@ function EditStoreForm() {
               value={form.lease_expiration}
               onChange={(e) => set("lease_expiration", e.target.value)}
               className={inputClass}
+            onKeyDown={preventEnterSubmit}
             />
           </div>
         </div>
@@ -182,6 +200,7 @@ function EditStoreForm() {
               onChange={(e) => set("monthly_revenue", e.target.value)}
               className={inputClass}
               placeholder="69250"
+            onKeyDown={preventEnterSubmit}
             />
           </div>
           <div>
@@ -192,6 +211,7 @@ function EditStoreForm() {
               onChange={(e) => set("monthly_expenses", e.target.value)}
               className={inputClass}
               placeholder="49430"
+            onKeyDown={preventEnterSubmit}
             />
           </div>
         </div>
@@ -204,6 +224,7 @@ function EditStoreForm() {
               onChange={(e) => set("monthly_rent", e.target.value)}
               className={inputClass}
               placeholder="6200"
+            onKeyDown={preventEnterSubmit}
             />
           </div>
           <div>
@@ -214,6 +235,7 @@ function EditStoreForm() {
               onChange={(e) => set("annual_debt_service", e.target.value)}
               className={inputClass}
               placeholder="100000"
+            onKeyDown={preventEnterSubmit}
             />
           </div>
         </div>
@@ -225,6 +247,7 @@ function EditStoreForm() {
             onChange={(e) => set("loan_balance", e.target.value)}
             className={inputClass}
             placeholder="850000"
+          onKeyDown={preventEnterSubmit}
           />
         </div>
         <div className="grid grid-cols-3 gap-4">
@@ -236,6 +259,7 @@ function EditStoreForm() {
               onChange={(e) => set("washers", e.target.value)}
               className={inputClass}
               placeholder="28"
+            onKeyDown={preventEnterSubmit}
             />
           </div>
           <div>
@@ -246,6 +270,7 @@ function EditStoreForm() {
               onChange={(e) => set("dryers", e.target.value)}
               className={inputClass}
               placeholder="32"
+            onKeyDown={preventEnterSubmit}
             />
           </div>
           <div>
@@ -256,15 +281,16 @@ function EditStoreForm() {
               onChange={(e) => set("avg_machine_age", e.target.value)}
               className={inputClass}
               placeholder="6"
+            onKeyDown={preventEnterSubmit}
             />
           </div>
         </div>
         <button
           onClick={handleSubmit}
-          disabled={saving}
+          disabled={saving || saveStatus === "success"}
           className="btn-primary w-full py-2.5 text-[13px] disabled:opacity-40"
         >
-          {saving ? "Saving..." : "Save Changes"}
+          {saveStatus === "success" ? "Saved ✓" : saving ? "Saving..." : "Save Changes"}
         </button>
       </div>
     </div>
