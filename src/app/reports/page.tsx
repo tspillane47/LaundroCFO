@@ -24,7 +24,14 @@ import {
   fmtPct,
 } from "@/lib/calculations";
 import { ReportDocument, type ReportProps } from "@/components/reports/ReportDocument";
+import {
+  PortfolioReportDocument,
+} from "@/components/reports/PortfolioReportDocument";
 import { generateExecutiveSummary } from "@/components/reports/generateExecutiveSummary";
+import { getPortfolioReport, type PortfolioReportData } from "@/lib/getPortfolioReport";
+import { KpiCard } from "@/components/ui/KpiCard";
+import { MetricTooltip } from "@/components/ui/MetricTooltip";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 
 function parseDate(value: string | null): Date | null {
   if (!value) return null;
@@ -80,9 +87,37 @@ function PreviewRow({ label, value, className }: { label: string; value: string;
   );
 }
 
+type ReportMode = "store" | "portfolio";
+
+function parseMachineCapacity(size: string): number {
+  const match = size.match(/(\d+)/);
+  return match ? parseInt(match[1], 10) : 0;
+}
+
+function getLargestMachine(equipment: EquipmentRecord[]): string {
+  if (!equipment.length) return "—";
+  let max = 0;
+  let label = "—";
+  for (const e of equipment) {
+    const cap = parseMachineCapacity(e.machine_size);
+    if (cap > max) {
+      max = cap;
+      label = e.machine_size;
+    }
+  }
+  return label;
+}
+
+function formatLeaseExpiration(lease: any, isOwnerOccupied: boolean): string {
+  if (isOwnerOccupied) return "Owner-Occ.";
+  if (!lease?.lease_end_date) return "—";
+  const d = parseDate(lease.lease_end_date);
+  return d ? d.toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "—";
+}
+
 export default function ReportsPage() {
   const supabase = createClient();
-  const { stores, selectedStore, isAllStores, loading: storesLoading } = useStores();
+  const { stores, selectedStore, loading: storesLoading } = useStores();
 
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -102,6 +137,10 @@ export default function ReportsPage() {
   const [shareUrl, setShareUrl] = useState("");
   const [shareExpires, setShareExpires] = useState("");
   const [copied, setCopied] = useState(false);
+  const [reportMode, setReportMode] = useState<ReportMode>("store");
+  const [portfolioData, setPortfolioData] = useState<PortfolioReportData | null>(null);
+  const [portfolioLoading, setPortfolioLoading] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -114,7 +153,10 @@ export default function ReportsPage() {
       setError("");
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) setUserId(user.id);
+      if (user) {
+        setUserId(user.id);
+        setUserEmail(user.email ?? null);
+      }
 
       const { data: storeData } = await supabase
         .from("stores")
@@ -191,6 +233,38 @@ export default function ReportsPage() {
 
     load();
   }, [selectedStore?.id, supabase]);
+
+  useEffect(() => {
+    async function loadPortfolio() {
+      if (reportMode !== "portfolio" || !userId) return;
+
+      setPortfolioLoading(true);
+      setError("");
+      try {
+        const data = await getPortfolioReport(userId);
+        setPortfolioData(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load portfolio report");
+        setPortfolioData(null);
+      } finally {
+        setPortfolioLoading(false);
+      }
+    }
+
+    loadPortfolio();
+  }, [reportMode, userId]);
+
+  useEffect(() => {
+    if (reportMode !== "store") return;
+    async function ensureUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+        setUserEmail(user.email ?? null);
+      }
+    }
+    ensureUser();
+  }, [reportMode, supabase]);
 
   const equipMetrics = useMemo(() => computeEquipmentMetrics(equipment), [equipment]);
 
@@ -314,12 +388,27 @@ export default function ReportsPage() {
   ]);
 
   const buildPdfBlob = useCallback(async () => {
+    if (reportMode === "portfolio") {
+      if (!portfolioData) throw new Error("Portfolio report data not ready");
+      return pdf(
+        <PortfolioReportDocument
+          data={portfolioData}
+          generatedDate={generatedDate}
+          userEmail={userEmail}
+        />
+      ).toBlob();
+    }
     if (!reportProps) throw new Error("Report data not ready");
     return pdf(<ReportDocument {...reportProps} />).toBlob();
-  }, [reportProps]);
+  }, [reportMode, portfolioData, generatedDate, userEmail, reportProps]);
 
   async function handleGeneratePdf() {
-    if (!reportProps || !store) return;
+    if (reportMode === "portfolio") {
+      if (!portfolioData) return;
+    } else if (!reportProps || !store) {
+      return;
+    }
+
     setGeneratingPdf(true);
     setError("");
     try {
@@ -327,7 +416,10 @@ export default function ReportsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${(store.name ?? "store").replace(/\s+/g, "-").toLowerCase()}-underwriting-report.pdf`;
+      a.download =
+        reportMode === "portfolio"
+          ? "portfolio-underwriting-report.pdf"
+          : `${(store!.name ?? "store").replace(/\s+/g, "-").toLowerCase()}-underwriting-report.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -340,10 +432,12 @@ export default function ReportsPage() {
   }
 
   async function handleShareWithLender() {
-    if (!reportProps || !store || !userId) {
+    if (!userId) {
       setError("You must be signed in to share reports.");
       return;
     }
+    if (reportMode === "portfolio" && !portfolioData) return;
+    if (reportMode === "store" && (!reportProps || !store)) return;
 
     setSharing(true);
     setError("");
@@ -351,7 +445,10 @@ export default function ReportsPage() {
     try {
       const blob = await buildPdfBlob();
       const timestamp = Date.now();
-      const filePath = `${userId}/${store.id}/report-${timestamp}.pdf`;
+      const filePath =
+        reportMode === "portfolio"
+          ? `${userId}/portfolio/report-${timestamp}.pdf`
+          : `${userId}/${store!.id}/report-${timestamp}.pdf`;
 
       const { error: uploadError } = await supabase.storage
         .from("reports")
@@ -372,7 +469,7 @@ export default function ReportsPage() {
 
       const { error: insertError } = await supabase.from("shared_reports").insert({
         user_id: userId,
-        store_id: store.id,
+        store_id: reportMode === "portfolio" ? null : store!.id,
         file_path: filePath,
         signed_url: signedData.signedUrl,
         expires_at: expiresAt,
@@ -408,39 +505,54 @@ export default function ReportsPage() {
     }
   }
 
-  if (storesLoading || loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-slate-500 text-[13px]">Loading report data...</div>
-      </div>
-    );
-  }
+  const storeName = store?.name ?? "Your Store";
+  const isStoreReady = Boolean(store && valuation && metrics);
+  const portfolioReady = Boolean(portfolioData && portfolioData.totals.storeCount > 0);
+  const totals = portfolioData?.totals;
+  const cashFlow = portfolioData?.cashFlow;
+  const storeDetails = portfolioData?.storeDetails ?? [];
 
-  if (stores.length === 0 || isAllStores || !selectedStore || !store || !valuation || !metrics) {
-    return (
-      <div className="card text-center py-10 max-w-4xl">
-        <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
-          Select a store from the dropdown above to generate an underwriting report.
-        </p>
-      </div>
-    );
-  }
-
-  const storeName = store.name ?? "Your Store";
+  const pdfDisabled =
+    generatingPdf ||
+    sharing ||
+    (reportMode === "portfolio" ? !portfolioReady : !isStoreReady);
 
   return (
     <div className="space-y-4 max-w-4xl">
+      <div className="flex gap-1 p-1 rounded-full w-fit" style={{ background: "var(--bg-card2)", border: "1px solid var(--border)" }}>
+        {(["store", "portfolio"] as ReportMode[]).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => setReportMode(mode)}
+            className={clsx(
+              "px-4 py-1.5 rounded-full text-[12px] font-medium transition-colors",
+              reportMode === mode ? "text-white" : "text-slate-400 hover:text-slate-200"
+            )}
+            style={reportMode === mode ? { background: "var(--accent)" } : undefined}
+          >
+            {mode === "store" ? "Store Report" : "Portfolio Report"}
+          </button>
+        ))}
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[15px] font-semibold text-slate-100">Underwriting Report</h1>
-          <p className="text-slate-500 text-[12px] mt-0.5">{storeName} — {generatedDate}</p>
+          <h1 className="text-[15px] font-semibold text-slate-100">
+            {reportMode === "portfolio" ? "Portfolio Underwriting Report" : "Underwriting Report"}
+          </h1>
+          <p className="text-slate-500 text-[12px] mt-0.5">
+            {reportMode === "portfolio"
+              ? `${totals?.storeCount ?? stores.length} store${(totals?.storeCount ?? stores.length) !== 1 ? "s" : ""} — ${generatedDate}`
+              : `${storeName} — ${generatedDate}`}
+          </p>
         </div>
         <div className="flex gap-2.5">
           <button
             type="button"
             className="btn-outline"
             onClick={handleGeneratePdf}
-            disabled={generatingPdf || sharing}
+            disabled={pdfDisabled}
           >
             {generatingPdf ? "Generating..." : "Generate PDF"}
           </button>
@@ -448,7 +560,7 @@ export default function ReportsPage() {
             type="button"
             className="btn-primary"
             onClick={handleShareWithLender}
-            disabled={generatingPdf || sharing || !userId}
+            disabled={pdfDisabled || !userId}
           >
             {sharing ? "Sharing..." : "Share with Lender"}
           </button>
@@ -461,7 +573,299 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* Executive Summary */}
+      {reportMode === "portfolio" && (portfolioLoading || storesLoading) && (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-slate-500 text-[13px]">Loading portfolio report...</div>
+        </div>
+      )}
+
+      {reportMode === "portfolio" && !portfolioLoading && !storesLoading && !portfolioReady && (
+        <div className="card text-center py-10">
+          <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
+            Add at least one store to generate a portfolio report.
+          </p>
+        </div>
+      )}
+
+      {reportMode === "store" && (storesLoading || loading) && (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-slate-500 text-[13px]">Loading report data...</div>
+        </div>
+      )}
+
+      {reportMode === "store" && !storesLoading && !loading && !isStoreReady && (
+        <div className="card text-center py-10">
+          <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
+            {stores.length === 0
+              ? "Add a store to generate an underwriting report."
+              : "Select a store from the dropdown above to generate an underwriting report."}
+          </p>
+        </div>
+      )}
+
+      {reportMode === "portfolio" && portfolioReady && totals && cashFlow && (
+        <>
+          <div className="hero-value-card">
+            <div style={{ fontSize: "12px", color: "#93c5fd", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
+              Portfolio Net Worth
+            </div>
+            <AnimatedNumber value={totals.portfolioNetWorth} prefix="$" className="hero-value-text" duration={1200} />
+            <p className="text-[13px] text-slate-400 mt-4">
+              Portfolio Value {fmtDollar(totals.portfolioValue)} − Debt {fmtDollar(totals.portfolioDebt)} + Cash {fmtDollar(totals.portfolioCash)}
+            </p>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: "20px",
+            }}
+          >
+            <KpiCard label="Portfolio Value" value={<AnimatedNumber value={totals.portfolioValue} prefix="$" duration={1000} />} />
+            <KpiCard label="Portfolio Debt" value={<AnimatedNumber value={totals.portfolioDebt} prefix="$" duration={1000} />} />
+            <KpiCard label="Portfolio Equity" value={<AnimatedNumber value={totals.portfolioEquity} prefix="$" duration={1000} />} />
+            <KpiCard label="Portfolio Cash" value={<AnimatedNumber value={totals.portfolioCash} prefix="$" duration={1000} />} />
+            <KpiCard
+              label="Global DSCR"
+              value={
+                totals.annualDebtService > 0 ? (
+                  <AnimatedNumber value={totals.globalDSCR} decimals={2} suffix="x" duration={1000} />
+                ) : (
+                  "—"
+                )
+              }
+            />
+            <KpiCard label="Global LTV" value={<AnimatedNumber value={totals.globalLTV} decimals={1} suffix="%" duration={1000} />} />
+            <KpiCard label="Annual Revenue" value={<AnimatedNumber value={totals.annualRevenue} prefix="$" duration={1000} />} />
+            <KpiCard label="Annual EBITDA" value={<AnimatedNumber value={totals.annualEbitda} prefix="$" duration={1000} />} />
+          </div>
+
+          <div className="card">
+            <SectionHeading>Store Summary</SectionHeading>
+            <div className="table-scroll">
+              <table className="w-full text-[12px] min-w-[900px]">
+                <thead>
+                  <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+                    <th className="pb-3 pr-3 font-medium">Store Name</th>
+                    <th className="pb-3 pr-3 font-medium">Address</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Revenue</th>
+                    <th className="pb-3 pr-3 font-medium text-right">EBITDA</th>
+                    <th className="pb-3 pr-3 font-medium text-right">DSCR</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Value</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Debt</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Cash</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Equity</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Lease Score</th>
+                    <th className="pb-3 font-medium text-right">Equip. Grade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeDetails.map((d) => (
+                    <tr key={d.store.id} className="border-b border-white/[0.04]">
+                      <td className="py-2.5 pr-3 text-slate-200">{d.store.name ?? "Store"}</td>
+                      <td className="py-2.5 pr-3 text-slate-400">{d.store.address ?? "—"}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-200">{fmtDollar(d.annualRevenue)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-400">{fmtDollar(d.annualEbitda)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">
+                        {d.annualDebtService > 0 ? fmtMultiple(d.dscr) : "—"}
+                      </td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-200">{fmtDollar(d.valuation.businessValue)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{fmtDollar(d.debt)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{fmtDollar(d.cash)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-400">{fmtDollar(d.equity)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{d.leaseScore}</td>
+                      <td className="py-2.5 text-right tabular-nums text-slate-200">{d.equipmentGrade}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="card">
+            <SectionHeading>Global Cash Flow</SectionHeading>
+            <table className="w-full text-[13px]">
+              <tbody className="divide-y divide-white/[0.04]">
+                {[
+                  ["Revenue", cashFlow.revenue],
+                  ["Utilities", cashFlow.utilities],
+                  ["Rent", cashFlow.rent],
+                  ["Payroll", cashFlow.payroll],
+                  ["Repairs", cashFlow.repairs],
+                  ["Other Expenses", cashFlow.otherExpenses],
+                  ["EBITDA", cashFlow.ebitda],
+                  ["Debt Service", cashFlow.debtService],
+                  ["Cash Flow After Debt", cashFlow.cashFlowAfterDebt],
+                ].map(([label, amount]) => (
+                  <tr key={label as string}>
+                    <td className="py-2.5 text-slate-400">{label}</td>
+                    <td
+                      className={clsx(
+                        "py-2.5 text-right font-semibold tabular-nums",
+                        label === "EBITDA" || label === "Cash Flow After Debt"
+                          ? "text-green-400"
+                          : "text-slate-100"
+                      )}
+                    >
+                      {fmtDollar(amount as number)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="card">
+            <SectionHeading>Global Credit Metrics</SectionHeading>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                {
+                  label: "Global DSCR",
+                  value: totals.annualDebtService > 0 ? fmtMultiple(totals.globalDSCR) : "N/A",
+                  explanation: "Combined EBITDA divided by total annual debt service across all stores.",
+                },
+                {
+                  label: "Global LTV",
+                  value: fmtPct(totals.globalLTV),
+                  explanation: "Total debt as a percentage of total portfolio business value.",
+                },
+                {
+                  label: "Debt Yield",
+                  value: totals.portfolioDebt > 0 ? fmtPct(totals.debtYield) : "N/A",
+                  explanation: "Annual EBITDA divided by total outstanding debt.",
+                },
+                {
+                  label: "Debt / EBITDA",
+                  value: totals.annualEbitda > 0 ? fmtMultiple(totals.debtToEbitda) : "N/A",
+                  explanation: "Total debt relative to annual EBITDA — lower is better.",
+                },
+                {
+                  label: "Portfolio Cash",
+                  value: fmtDollar(totals.portfolioCash),
+                  explanation: "Combined operating, reserve, and petty cash across all stores.",
+                },
+                {
+                  label: "Portfolio Debt",
+                  value: fmtDollar(totals.portfolioDebt),
+                  explanation: "Total outstanding loan balances across active store loans.",
+                },
+                {
+                  label: "Portfolio Equity",
+                  value: fmtDollar(totals.portfolioEquity),
+                  explanation: "Portfolio value minus debt plus cash on hand.",
+                },
+              ].map((item) => (
+                <div key={item.label} className="card2 p-4">
+                  <div className="metric-label mb-1">
+                    <MetricTooltip label={item.label} explanation={item.explanation} />
+                  </div>
+                  <div className="text-[18px] font-bold text-slate-100">{item.value}</div>
+                  <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">{item.explanation}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card">
+            <SectionHeading>Lease Summary</SectionHeading>
+            <div className="table-scroll">
+              <table className="w-full text-[12px] min-w-[640px]">
+                <thead>
+                  <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+                    <th className="pb-3 pr-3 font-medium">Store</th>
+                    <th className="pb-3 pr-3 font-medium">Lease Expiration</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Years Remaining</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Options Remaining</th>
+                    <th className="pb-3 font-medium text-right">Lease Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeDetails.map((d) => (
+                    <tr key={`lease-${d.store.id}`} className="border-b border-white/[0.04]">
+                      <td className="py-2.5 pr-3 text-slate-200">{d.store.name ?? "Store"}</td>
+                      <td className="py-2.5 pr-3 text-slate-400">
+                        {formatLeaseExpiration(d.lease, d.store.occupancy_type === "owner_occupied")}
+                      </td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">
+                        {d.lease ? d.yearsRemaining.toFixed(1) : "—"}
+                      </td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">
+                        {d.availableLeaseOptions > 0 ? d.availableLeaseOptions : "—"}
+                      </td>
+                      <td className="py-2.5 text-right tabular-nums text-slate-200">{d.leaseScore}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="card">
+            <SectionHeading>Equipment Summary</SectionHeading>
+            <div className="table-scroll">
+              <table className="w-full text-[12px] min-w-[720px]">
+                <thead>
+                  <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+                    <th className="pb-3 pr-3 font-medium">Store</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Equipment Grade</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Avg Age</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Washers</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Dryers</th>
+                    <th className="pb-3 pr-3 font-medium">Largest Machine</th>
+                    <th className="pb-3 font-medium text-right">Equipment Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeDetails.map((d) => {
+                    const equipMetrics = computeEquipmentMetrics(d.equipment as EquipmentRecord[]);
+                    return (
+                      <tr key={`equip-${d.store.id}`} className="border-b border-white/[0.04]">
+                        <td className="py-2.5 pr-3 text-slate-200">{d.store.name ?? "Store"}</td>
+                        <td className="py-2.5 pr-3 text-right text-slate-200">{d.equipmentGrade}</td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{d.avgEquipmentAge.toFixed(1)} yrs</td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{equipMetrics.totalWashers}</td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{equipMetrics.totalDryers}</td>
+                        <td className="py-2.5 pr-3 text-slate-300">{getLargestMachine(d.equipment as EquipmentRecord[])}</td>
+                        <td className="py-2.5 text-right tabular-nums text-slate-200">{equipMetrics.qualityScore}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="card">
+            <SectionHeading>Portfolio Net Worth</SectionHeading>
+            <div className="text-[14px] space-y-2 font-mono">
+              <div className="flex justify-between text-slate-300">
+                <span>Portfolio Value:</span>
+                <span>{fmtDollar(totals.portfolioValue)}</span>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>+ Cash:</span>
+                <span>{fmtDollar(totals.portfolioCash)}</span>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>− Debt:</span>
+                <span className="text-red-400">−{fmtDollar(totals.portfolioDebt).replace("$", "")}</span>
+              </div>
+              <div className="border-t border-white/[0.06] pt-3 flex justify-between items-baseline">
+                <span className="text-slate-200 font-semibold">= Portfolio Net Worth:</span>
+                <span className="text-[28px] font-bold text-green-400">{fmtDollar(totals.portfolioNetWorth)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-[11px] text-slate-600 pb-4">
+            Report generated by LaundroCFO — Portfolio — {generatedDate}
+          </div>
+        </>
+      )}
+
+      {reportMode === "store" && isStoreReady && store && valuation && metrics && (
+        <>
       <div className="card">
         <SectionHeading>Executive Summary</SectionHeading>
         <p className="text-[13px] text-slate-300 leading-relaxed">{executiveSummary}</p>
@@ -684,6 +1088,8 @@ export default function ReportsPage() {
       <div className="text-[11px] text-slate-600 pb-4">
         Report generated by LaundroCFO — {storeName} — {generatedDate}
       </div>
+        </>
+      )}
 
       {/* Share modal */}
       {shareModalOpen && (
