@@ -202,7 +202,7 @@ export default function MarketingHomePage() {
   return (
     <>
       {/* Hero */}
-      <section className="relative min-h-screen flex items-center overflow-hidden pt-16 bg-[#020B1F]">
+      <section className="relative min-h-screen flex items-center overflow-x-hidden pt-16 bg-[#020B1F]">
         <div
           className="pointer-events-none absolute top-1/4 right-0 w-[600px] h-[600px] rounded-full opacity-40 blur-[120px]"
           style={{ background: "radial-gradient(circle, rgba(37,99,235,0.35) 0%, transparent 70%)" }}
@@ -275,7 +275,7 @@ export default function MarketingHomePage() {
               </div>
             </div>
 
-            <div className="w-full lg:w-[55%]">
+            <div className="w-full lg:w-[55%] overflow-visible">
               <HeroDashboard />
             </div>
           </div>
