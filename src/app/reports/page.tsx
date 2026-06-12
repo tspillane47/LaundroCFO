@@ -618,14 +618,14 @@ export default function ReportsPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+              gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
               gap: "16px",
             }}
           >
-            <KpiCard label="Portfolio Value" value={<AnimatedNumber value={totals.portfolioValue} prefix="$" duration={1000} />} style={{ padding: "18px" }} />
-            <KpiCard label="Portfolio Debt" value={<AnimatedNumber value={totals.portfolioDebt} prefix="$" duration={1000} />} style={{ padding: "18px" }} />
-            <KpiCard label="Portfolio Equity" value={<AnimatedNumber value={totals.portfolioEquity} prefix="$" duration={1000} />} style={{ padding: "18px" }} />
-            <KpiCard label="Portfolio Cash" value={<AnimatedNumber value={totals.portfolioCash} prefix="$" duration={1000} />} style={{ padding: "18px" }} />
+            <KpiCard label="Portfolio Value" value={<AnimatedNumber value={totals.portfolioValue} prefix="$" duration={1000} />} style={{ padding: "16px 18px" }} />
+            <KpiCard label="Portfolio Debt" value={<AnimatedNumber value={totals.portfolioDebt} prefix="$" duration={1000} />} style={{ padding: "16px 18px" }} />
+            <KpiCard label="Portfolio Equity" value={<AnimatedNumber value={totals.portfolioEquity} prefix="$" duration={1000} />} style={{ padding: "16px 18px" }} />
+            <KpiCard label="Portfolio Cash" value={<AnimatedNumber value={totals.portfolioCash} prefix="$" duration={1000} />} style={{ padding: "16px 18px" }} />
             <KpiCard
               label="Global DSCR"
               value={
@@ -635,11 +635,11 @@ export default function ReportsPage() {
                   "—"
                 )
               }
-              style={{ padding: "18px" }}
+              style={{ padding: "16px 18px" }}
             />
-            <KpiCard label="Global LTV" value={<AnimatedNumber value={totals.globalLTV} decimals={1} suffix="%" duration={1000} />} style={{ padding: "18px" }} />
-            <KpiCard label="Annual Revenue" value={<AnimatedNumber value={totals.annualRevenue} prefix="$" duration={1000} />} style={{ padding: "18px" }} />
-            <KpiCard label="Annual EBITDA" value={<AnimatedNumber value={totals.annualEbitda} prefix="$" duration={1000} />} style={{ padding: "18px" }} />
+            <KpiCard label="Global LTV" value={<AnimatedNumber value={totals.globalLTV} decimals={1} suffix="%" duration={1000} />} style={{ padding: "16px 18px" }} />
+            <KpiCard label="Annual Revenue" value={<AnimatedNumber value={totals.annualRevenue} prefix="$" duration={1000} />} style={{ padding: "16px 18px" }} />
+            <KpiCard label="Annual EBITDA" value={<AnimatedNumber value={totals.annualEbitda} prefix="$" duration={1000} />} style={{ padding: "16px 18px" }} />
           </div>
 
           <div className="card">
