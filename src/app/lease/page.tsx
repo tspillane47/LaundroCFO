@@ -7,6 +7,7 @@ import { useStores } from "@/lib/store-context";
 import { OccupancySelector, type OccupancyType } from "@/components/occupancy/OccupancySelector";
 import { LeaseModule } from "@/components/occupancy/LeaseModule";
 import { RealEstateModule } from "@/components/occupancy/RealEstateModule";
+import { FormBanner } from "@/components/ui/FormBanner";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
 
@@ -31,7 +32,7 @@ export default function OccupancyPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [savingType, setSavingType] = useState(false);
-  const [error, setError] = useState("");
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [store, setStore] = useState<Store | null>(null);
   const [showSelector, setShowSelector] = useState(false);
   const [hasLease, setHasLease] = useState(false);
@@ -40,7 +41,7 @@ export default function OccupancyPage() {
   async function loadStore() {
     setLoading(true);
     setLoadError(false);
-    setError("");
+    setMessage(null);
 
     try {
       const {
@@ -52,7 +53,7 @@ export default function OccupancyPage() {
       }
 
       if (!selectedStore?.id) {
-        setError("Select a store from the dropdown above.");
+        setMessage({ type: "error", text: "Select a store from the dropdown above." });
         setStore(null);
         return;
       }
@@ -81,9 +82,9 @@ export default function OccupancyPage() {
   }, [selectedStore?.id]);
 
   async function handleSelectOccupancy(type: OccupancyType) {
-    if (!store) return;
+    if (!store || savingType) return;
     setSavingType(true);
-    setError("");
+    setMessage(null);
 
     const { error: updateError } = await supabase
       .from("stores")
@@ -91,13 +92,15 @@ export default function OccupancyPage() {
       .eq("id", store.id);
 
     if (updateError) {
-      setError(updateError.message);
+      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
       setSavingType(false);
       return;
     }
 
     setStore((s) => (s ? { ...s, occupancy_type: type } : s));
     setShowSelector(false);
+    setMessage({ type: "success", text: "Saved successfully." });
+    setTimeout(() => setMessage(null), 3000);
     setSavingType(false);
   }
 
@@ -160,11 +163,7 @@ export default function OccupancyPage() {
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[12px] text-red-400">
-          {error}
-        </div>
-      )}
+      <FormBanner message={message} />
 
       {showSelector ? (
         <OccupancySelector saving={savingType} onSelect={handleSelectOccupancy} />

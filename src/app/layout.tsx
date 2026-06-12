@@ -2,7 +2,7 @@
 import "./globals.css";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { StoreProvider, useStores } from "@/lib/store-context";
 import clsx from "clsx";
@@ -56,6 +56,8 @@ const pageTitles: Record<string, string> = {
   "/alerts": "Alerts",
   "/integrations": "Integrations",
   "/settings": "Settings",
+  "/settings/manage-stores": "Manage Stores",
+  "/settings/edit-store": "Edit Store",
 };
 
 const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password", "/auth/callback"];
@@ -67,6 +69,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const { stores, selectedStore, setSelectedStore, isAllStores, setIsAllStores, loading: storesLoading } = useStores();
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
+  const [storeSearch, setStoreSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
@@ -114,12 +117,89 @@ function AppShell({ children }: { children: React.ReactNode }) {
     setSelectedStore(null);
     setIsAllStores(true);
     setShowStoreDropdown(false);
+    setStoreSearch("");
   }
 
   function selectStore(store: (typeof stores)[0]) {
     setSelectedStore(store);
     setIsAllStores(false);
     setShowStoreDropdown(false);
+    setStoreSearch("");
+  }
+
+  const activeStores = useMemo(() => {
+    const seen = new Set<string>();
+    return stores
+      .filter((s) => !s.archived)
+      .filter((s) => {
+        if (seen.has(s.id)) return false;
+        seen.add(s.id);
+        return true;
+      });
+  }, [stores]);
+
+  const filteredStores = useMemo(() => {
+    if (!storeSearch.trim()) return activeStores;
+    const q = storeSearch.toLowerCase();
+    return activeStores.filter((s) => (s.name ?? "").toLowerCase().includes(q));
+  }, [activeStores, storeSearch]);
+
+  function renderStoreOption(store: (typeof stores)[0]) {
+    const isSelected = !isAllStores && selectedStore?.id === store.id;
+    return (
+      <button
+        key={store.id}
+        type="button"
+        onClick={() => selectStore(store)}
+        className="w-full px-3 py-2.5 text-left hover:opacity-90 transition-colors border-t"
+        style={{
+          borderColor: "var(--border)",
+          background: isSelected ? "var(--bg-card2)" : undefined,
+        }}
+      >
+        <div
+          className="font-bold leading-tight truncate"
+          style={{ fontSize: "13px", color: "var(--text-primary)", maxWidth: "100%" }}
+        >
+          {store.name}
+        </div>
+        {store.address && (
+          <div
+            className="leading-tight truncate mt-0.5"
+            style={{ fontSize: "11px", color: "var(--text-muted)", maxWidth: "100%" }}
+          >
+            {store.address}
+          </div>
+        )}
+      </button>
+    );
+  }
+
+  function renderStoreDropdown(showSearch: boolean) {
+    return (
+      <>
+        {showSearch && (
+          <div className="px-3 py-2 border-b" style={{ borderColor: "var(--border)" }}>
+            <input
+              type="text"
+              value={storeSearch}
+              onChange={(e) => setStoreSearch(e.target.value)}
+              placeholder="Search stores..."
+              className="w-full rounded-md px-2 py-1.5 text-[12px] outline-none"
+              style={{
+                background: "var(--bg-card)",
+                border: "1px solid var(--border)",
+                color: "var(--text-primary)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
+        <div style={{ maxHeight: "280px", overflowY: "auto" }}>
+          {filteredStores.map(renderStoreOption)}
+        </div>
+      </>
+    );
   }
 
   async function handleSignOut() {
@@ -245,23 +325,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
               >
                 All Stores
               </button>
-              {stores.map((store) => (
-                <button
-                  key={store.id}
-                  type="button"
-                  onClick={() => selectStore(store)}
-                  className="w-full px-3 py-2.5 text-left hover:opacity-90 transition-colors border-t"
-                  style={{
-                    borderColor: "var(--border)",
-                    background:
-                      !isAllStores && selectedStore?.id === store.id ? "var(--bg-card)" : undefined,
-                  }}
-                >
-                  <div className="text-[12px] font-medium leading-tight" style={{ color: "var(--text-primary)" }}>
-                    {store.name}
-                  </div>
-                </button>
-              ))}
+              {renderStoreDropdown(activeStores.length > 5)}
             </div>
           )}
         </div>
@@ -324,36 +388,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
                       >
                         All Stores
                       </button>
-                      {stores.map((store) => (
-                        <button
-                          key={store.id}
-                          type="button"
-                          onClick={() => selectStore(store)}
-                          className="w-full px-3 py-2.5 text-left hover:bg-white/5 transition-colors border-t"
-                          style={{
-                            borderColor: "var(--border)",
-                            background:
-                              !isAllStores && selectedStore?.id === store.id
-                                ? "var(--bg-card)"
-                                : undefined,
-                          }}
-                        >
-                          <div
-                            className="text-[12px] font-medium leading-tight"
-                            style={{ color: "var(--text-primary)" }}
-                          >
-                            {store.name}
-                          </div>
-                          {store.address && (
-                            <div
-                              className="text-[10px] leading-tight truncate mt-0.5"
-                              style={{ color: "var(--text-muted)" }}
-                            >
-                              {store.address}
-                            </div>
-                          )}
-                        </button>
-                      ))}
+                      {renderStoreDropdown(activeStores.length > 5)}
                     </div>
                   )}
                 </div>

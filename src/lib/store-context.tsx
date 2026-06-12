@@ -31,13 +31,28 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   async function loadStores() {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data } = await supabase.from("stores").select("*").eq("user_id", user.id);
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    const { data } = await supabase
+      .from("stores")
+      .select("*")
+      .eq("user_id", user.id)
+      .or("archived.is.null,archived.eq.false");
     if (data) {
       setStores(data);
       if (data.length === 1) {
         setSelectedStore(data[0]);
         setIsAllStores(false);
+      } else {
+        setSelectedStore((current: any | null) => {
+          if (current && !data.some((s) => s.id === current.id)) {
+            setIsAllStores(true);
+            return null;
+          }
+          return current;
+        });
       }
     }
     setLoading(false);

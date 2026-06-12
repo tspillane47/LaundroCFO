@@ -26,6 +26,7 @@ import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { KpiCard } from "@/components/ui/KpiCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { CashCard } from "@/components/ui/CashCard";
 import { PageError } from "@/components/ui/PageError";
@@ -362,9 +363,6 @@ export default function DashboardPage() {
   const leaseYearsDisplay = leaseMetrics?.yearsRemaining ?? 7.3;
   const totalLeaseControl = leaseMetrics?.totalControl ?? 17.3;
 
-  const dscrColor =
-    dscrNum >= 1.5 ? "text-green-500" : dscrNum >= 1.25 ? "text-amber-500" : "text-red-500";
-
   const actions = useMemo(() => {
     const items: ActionItem[] = [];
 
@@ -564,10 +562,13 @@ export default function DashboardPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>
+          <h1 className="text-[15px] font-semibold truncate" style={{ color: "var(--text-primary)", maxWidth: "100%" }}>
             {store.name ?? "Store Dashboard"}
           </h1>
-          <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+          <p
+            className="text-[12px] mt-0.5 truncate"
+            style={{ color: "var(--text-muted)", maxWidth: "100%" }}
+          >
             {store.address ?? "No address set"}
           </p>
         </div>
@@ -618,116 +619,80 @@ export default function DashboardPage() {
 
       {/* Section 2: KPI Cards */}
       <div
-        className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
-        style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "20px",
+        }}
       >
-        {/* DSCR */}
-        <div className="card">
-          <div className="metric-label">
+        <KpiCard
+          label={
             <MetricTooltip
               label="DSCR"
               explanation="Debt Service Coverage Ratio. Measures ability to cover loan payments. Lenders require minimum 1.25x."
             />
-          </div>
-          <div className={clsx("text-[28px] font-bold tracking-tight", dscrColor)}>
-            {dscrNum.toFixed(2)}x
-          </div>
-          <div className="text-[12px] mt-2 font-medium" style={{ color: "var(--text-secondary)" }}>
-            {dscrNum >= 1.5 ? "Strong coverage" : dscrNum >= 1.25 ? "Adequate" : "Below threshold"}
-          </div>
-          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
-            Cash flow / annual debt service · Min threshold 1.25x
-          </div>
-        </div>
+          }
+          value={`${dscrNum.toFixed(2)}x`}
+          sub={
+            dscrNum >= 1.5 ? "Strong coverage" : dscrNum >= 1.25 ? "Adequate" : "Below threshold"
+          }
+          valueColor={
+            dscrNum >= 1.5
+              ? "var(--text-success)"
+              : dscrNum >= 1.25
+                ? "var(--text-warning)"
+                : "var(--text-danger)"
+          }
+        />
 
-        {/* EBITDA Margin */}
-        <div className="card">
-          <div className="metric-label">
+        <KpiCard
+          label={
             <MetricTooltip
               label="EBITDA Margin"
               explanation="Earnings Before Interest, Taxes, Depreciation & Amortization. The primary profit metric for laundromat valuation."
             />
-          </div>
-          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-            {ebitdaMargin.toFixed(1)}%
-          </div>
-          <div className="text-[12px] mt-2 font-medium" style={{ color: "var(--text-secondary)" }}>
-            {fmtDollar(ebitda)}/mo EBITDA
-          </div>
-          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
-            Industry median 22% · Top quartile 28%+
-          </div>
-        </div>
+          }
+          value={`${ebitdaMargin.toFixed(1)}%`}
+          sub={`${fmtDollar(ebitda)}/mo EBITDA`}
+        />
 
-        {/* LaundroCFO Score */}
-        <div className="card">
-          <div className="metric-label">LaundroCFO Score</div>
-          <div className="text-[36px] font-bold tracking-tight" style={{ color: "var(--text-primary)", letterSpacing: "-0.03em" }}>
-            {laundrocfoScore}
-          </div>
-          <div className="text-[12px] mt-1" style={{ color: "var(--text-muted)" }}>
-            out of 100
-          </div>
-          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px", lineHeight: 1.6 }}>
-            Lease {leaseScore} · Equipment {equipmentScore} · Financial {financialScore} · Insurance {insuranceScore}
-          </div>
-        </div>
+        <KpiCard
+          label="LaundroCFO Score"
+          value={String(laundrocfoScore)}
+          sub={`Lease ${leaseScore} · Equipment ${equipmentScore} · Financial ${financialScore} · Insurance ${insuranceScore}`}
+        />
 
-        {/* Monthly Cash Flow */}
-        <div className="card">
-          <div className="metric-label">Monthly Cash Flow</div>
-          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-            {fmtDollar(monthlyCashFlow)}
-          </div>
-          <div className="text-[12px] mt-2 font-medium" style={{ color: "var(--text-secondary)" }}>
-            {fmtDollar(annualCashFlow)}/yr after debt service
-          </div>
-          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
-            After all expenses and debt service
-          </div>
-        </div>
+        <KpiCard
+          label="Monthly Cash Flow"
+          value={fmtDollar(monthlyCashFlow)}
+          sub={`${fmtDollar(annualCashFlow)}/yr after debt service`}
+        />
       </div>
 
       {/* Financial Position */}
       <div
-        className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
-        style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "20px",
+        }}
       >
-        <div className="card">
-          <div className="metric-label">Business Value</div>
-          <div className="metric-value">${businessValue.toLocaleString()}</div>
-          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
-            {fmtMultiple(finalMultiple)} EBITDA multiple
-          </div>
-        </div>
+        <KpiCard
+          label="Business Value"
+          value={fmtDollar(businessValue)}
+          sub={`${fmtMultiple(finalMultiple)} EBITDA multiple`}
+        />
 
-        <div className="card">
-          <div className="metric-label">Cash</div>
-          <div className="metric-value">${totalCash.toLocaleString()}</div>
-          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
-            Operating + reserves
-          </div>
-        </div>
+        <KpiCard label="Cash" value={fmtDollar(totalCash)} sub="Operating + reserves" />
 
-        <div className="card">
-          <div className="metric-label">Total Debt</div>
-          <div className="metric-value" style={{ color: totalDebt > 0 ? "var(--text-primary)" : "var(--text-primary)" }}>
-            ${totalDebt.toLocaleString()}
-          </div>
-          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
-            Outstanding loan balance
-          </div>
-        </div>
+        <KpiCard label="Total Debt" value={fmtDollar(totalDebt)} sub="Outstanding loan balance" />
 
-        <div className="card">
-          <div className="metric-label">Net Equity</div>
-          <div className="metric-value" style={{ color: equity > 0 ? "var(--text-success)" : "var(--text-danger)" }}>
-            ${equity.toLocaleString()}
-          </div>
-          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
-            Value + cash − debt
-          </div>
-        </div>
+        <KpiCard
+          label="Net Equity"
+          value={fmtDollar(equity)}
+          sub="Value + cash − debt"
+          valueColor={equity > 0 ? "var(--text-success)" : "var(--text-danger)"}
+        />
       </div>
 
       {/* Section 3: Two Column Layout */}

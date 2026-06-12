@@ -354,55 +354,54 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
   }
 
   async function handleSave() {
+    if (saving) return;
     setSaving(true);
     setError("");
     setSuccess("");
 
-    const leasePayload = {
-      store_id: store.id,
-      landlord: leaseForm.landlord || null,
-      tenant_entity: leaseForm.tenant_entity || null,
-      lease_start_date: leaseForm.lease_start_date || null,
-      lease_end_date: leaseForm.lease_end_date || null,
-      monthly_rent: leaseForm.monthly_rent ? Number(leaseForm.monthly_rent) : null,
-      annual_escalation_pct: leaseForm.annual_escalation_pct
-        ? Number(leaseForm.annual_escalation_pct)
-        : null,
-      cam_charges: leaseForm.cam_charges ? Number(leaseForm.cam_charges) : null,
-      square_footage: leaseForm.square_footage ? Number(leaseForm.square_footage) : null,
-      security_deposit: leaseForm.security_deposit ? Number(leaseForm.security_deposit) : null,
-      personal_guaranty: leaseForm.personal_guaranty,
-      assignment_rights: leaseForm.assignment_rights || null,
-      sublease_rights: leaseForm.sublease_rights || null,
-      exclusivity_clause: leaseForm.exclusivity_clause,
-      use_restrictions: leaseForm.use_restrictions || null,
-    };
-
-    let leaseId = lease?.id;
-
-    if (leaseId) {
-      const { error: updateError } = await supabase
-        .from("leases")
-        .update(leasePayload)
-        .eq("id", leaseId);
-      if (updateError) {
-        setError(updateError.message);
-        setSaving(false);
-        return;
-      }
-    } else {
-      const { data: inserted, error: insertError } = await supabase
-        .from("leases")
-        .insert(leasePayload)
-        .select()
-        .single();
-      if (insertError || !inserted) {
-        setError(insertError?.message ?? "Failed to create lease");
-        setSaving(false);
-        return;
-      }
-      leaseId = inserted.id;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setError("We couldn't save this lease. Please try again.");
+      setSaving(false);
+      return;
     }
+
+    const { data: savedLease, error: leaseError } = await supabase
+      .from("leases")
+      .upsert(
+        {
+          store_id: store.id,
+          user_id: user.id,
+          landlord: leaseForm.landlord || null,
+          tenant_entity: leaseForm.tenant_entity || null,
+          lease_start_date: leaseForm.lease_start_date || null,
+          lease_end_date: leaseForm.lease_end_date || null,
+          monthly_rent: Number(leaseForm.monthly_rent) || 0,
+          annual_escalation_pct: Number(leaseForm.annual_escalation_pct) || 0,
+          cam_charges: Number(leaseForm.cam_charges) || 0,
+          security_deposit: Number(leaseForm.security_deposit) || 0,
+          square_footage: Number(leaseForm.square_footage) || 0,
+          personal_guaranty: leaseForm.personal_guaranty,
+          assignment_rights: leaseForm.assignment_rights || null,
+          sublease_rights: leaseForm.sublease_rights || null,
+          exclusivity_clause: leaseForm.exclusivity_clause,
+          use_restrictions: leaseForm.use_restrictions || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "store_id" }
+      )
+      .select()
+      .single();
+
+    if (leaseError || !savedLease) {
+      setError("We couldn't save this lease. Please try again.");
+      setSaving(false);
+      return;
+    }
+
+    const leaseId = savedLease.id;
 
     const existingIds = options.map((o) => o.id);
     const formIds = optionForms.filter((f) => f.id).map((f) => f.id!);
@@ -414,7 +413,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
         .delete()
         .in("id", toDelete);
       if (deleteError) {
-        setError(deleteError.message);
+        setError("We couldn't save this lease. Please try again.");
         setSaving(false);
         return;
       }
@@ -425,6 +424,8 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
 
       const optionPayload = {
         lease_id: leaseId,
+        store_id: store.id,
+        user_id: user.id,
         option_number: form.option_number ? Number(form.option_number) : null,
         option_years: form.option_years ? Number(form.option_years) : null,
         status: form.status || "Available",
@@ -432,21 +433,18 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       };
 
       if (form.id) {
-        const { error: optUpdateError } = await supabase
+        const { error: optError } = await supabase
           .from("lease_options")
-          .update(optionPayload)
-          .eq("id", form.id);
-        if (optUpdateError) {
-          setError(optUpdateError.message);
+          .upsert({ id: form.id, ...optionPayload }, { onConflict: "id" });
+        if (optError) {
+          setError("We couldn't save this lease. Please try again.");
           setSaving(false);
           return;
         }
       } else {
-        const { error: optInsertError } = await supabase
-          .from("lease_options")
-          .insert(optionPayload);
-        if (optInsertError) {
-          setError(optInsertError.message);
+        const { error: optError } = await supabase.from("lease_options").insert(optionPayload);
+        if (optError) {
+          setError("We couldn't save this lease. Please try again.");
           setSaving(false);
           return;
         }
@@ -454,6 +452,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
     }
 
     setSuccess("Lease saved successfully.");
+    setTimeout(() => setSuccess(""), 3000);
     setMode("view");
     setSaving(false);
     await loadData();
@@ -513,12 +512,18 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       )}
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[12px] text-red-400">
+        <div
+          className="rounded-lg p-3 text-[12px] mb-4"
+          style={{ background: "var(--bg-danger-tint)", color: "var(--text-danger)" }}
+        >
           {error}
         </div>
       )}
       {success && (
-        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-[12px] text-green-400">
+        <div
+          className="rounded-lg p-3 text-[12px] mb-4"
+          style={{ background: "var(--bg-success-tint)", color: "var(--text-success)" }}
+        >
           {success}
         </div>
       )}

@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
+import { FormBanner } from "@/components/ui/FormBanner";
 
 const STORAGE_KEY = "laundrocfo_onboarding";
 const VALUATION_MULTIPLE = 3.47;
@@ -124,8 +125,8 @@ export default function OnboardingPage() {
   const supabase = createClient();
   const { refreshStores } = useStores();
   const [data, setData] = useState<OnboardingData>(DEFAULT_DATA);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -173,8 +174,9 @@ export default function OnboardingPage() {
   const step2Valid = data.name.trim() !== "" && data.address.trim() !== "";
 
   async function saveStore(includeLease: boolean) {
-    setLoading(true);
-    setError("");
+    if (submitting) return;
+    setSubmitting(true);
+    setMessage(null);
 
     const {
       data: { user },
@@ -214,8 +216,8 @@ export default function OnboardingPage() {
       .single();
 
     if (storeError) {
-      setError(storeError.message);
-      setLoading(false);
+      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+      setSubmitting(false);
       return;
     }
 
@@ -233,8 +235,8 @@ export default function OnboardingPage() {
         .single();
 
       if (leaseError) {
-        setError(leaseError.message);
-        setLoading(false);
+        setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+        setSubmitting(false);
         return;
       }
 
@@ -255,7 +257,6 @@ export default function OnboardingPage() {
     localStorage.setItem("laundrocfo_show_welcome", "true");
     await refreshStores();
     router.push("/portfolio");
-    setLoading(false);
   }
 
   if (!hydrated) {
@@ -290,11 +291,7 @@ export default function OnboardingPage() {
             )}
           </div>
 
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[12px] text-red-400 mb-4">
-              {error}
-            </div>
-          )}
+          <FormBanner message={message} />
 
           {/* Step 1 — Welcome */}
           {data.step === 1 && (
@@ -599,17 +596,17 @@ export default function OnboardingPage() {
                 <div className="flex flex-col sm:flex-row items-center gap-3">
                   <button
                     onClick={() => saveStore(false)}
-                    disabled={loading}
-                    className="text-[13px] text-slate-500 hover:text-slate-300"
+                    disabled={submitting}
+                    className="text-[13px] text-slate-500 hover:text-slate-300 disabled:opacity-40"
                   >
                     Skip for now
                   </button>
                   <button
                     onClick={() => saveStore(true)}
-                    disabled={loading}
-                    className="btn-primary px-8 py-2.5 text-[13px]"
+                    disabled={submitting}
+                    className="btn-primary px-8 py-2.5 text-[13px] disabled:opacity-40"
                   >
-                    {loading ? "Saving..." : "Finish Setup →"}
+                    {submitting ? "Creating store..." : "Finish Setup →"}
                   </button>
                 </div>
               </div>

@@ -23,6 +23,7 @@ import {
   formatAdjustment,
 } from "@/lib/equipment";
 import { fmtDollar } from "@/lib/calculations";
+import { FormBanner } from "@/components/ui/FormBanner";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
 
@@ -89,7 +90,7 @@ export default function EquipmentPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [store, setStore] = useState<Store | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
@@ -100,7 +101,7 @@ export default function EquipmentPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
-    setError("");
+    setMessage(null);
 
     try {
       const {
@@ -113,7 +114,7 @@ export default function EquipmentPage() {
       setUserId(user.id);
 
       if (!selectedStore?.id) {
-        setError("Select a store from the dropdown above.");
+        setMessage({ type: "error", text: "Select a store from the dropdown above." });
         setStore(null);
         setEquipment([]);
         return;
@@ -206,22 +207,22 @@ export default function EquipmentPage() {
   }
 
   async function handleSave() {
-    if (!store || !userId) return;
+    if (!store || !userId || saving) return;
 
     const quantity = parseInt(form.quantity, 10);
     const installationYear = parseInt(form.installation_year, 10);
 
     if (!quantity || quantity < 1) {
-      setError("Quantity must be at least 1.");
+      setMessage({ type: "error", text: "Quantity must be at least 1." });
       return;
     }
     if (!installationYear || installationYear < 1980 || installationYear > currentYear) {
-      setError(`Installation year must be between 1980 and ${currentYear}.`);
+      setMessage({ type: "error", text: `Installation year must be between 1980 and ${currentYear}.` });
       return;
     }
 
     setSaving(true);
-    setError("");
+    setMessage(null);
 
     const payload = {
       user_id: userId,
@@ -241,23 +242,23 @@ export default function EquipmentPage() {
       : await supabase.from("equipment_inventory").insert(payload);
 
     if (saveError) {
-      setError(saveError.message);
-      setSaving(false);
-      return;
+      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+    } else {
+      setMessage({ type: "success", text: "Saved successfully." });
+      setTimeout(() => setMessage(null), 3000);
+      closeForm();
+      await loadData();
     }
-
-    closeForm();
-    await loadData();
     setSaving(false);
   }
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this machine group? This cannot be undone.")) return;
 
-    setError("");
+    setMessage(null);
     const { error: deleteError } = await supabase.from("equipment_inventory").delete().eq("id", id);
     if (deleteError) {
-      setError(deleteError.message);
+      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
       return;
     }
     if (editingId === id) closeForm();
@@ -297,11 +298,7 @@ export default function EquipmentPage() {
         </button>
       </div>
 
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[12px] text-red-400">
-          {error}
-        </div>
-      )}
+      <FormBanner message={message} />
 
       {/* Section 1 — Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 grid-4">

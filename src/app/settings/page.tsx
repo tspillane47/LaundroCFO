@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
@@ -390,6 +391,12 @@ export default function SettingsPage() {
                 <button onClick={() => setEditingStore(true)} className="btn-outline w-full mt-4">
                   Edit Store Profile
                 </button>
+                <Link
+                  href="/settings/manage-stores"
+                  className="btn-outline w-full mt-2 text-center block text-[13px]"
+                >
+                  Manage Stores →
+                </Link>
               </>
             )}
           </div>

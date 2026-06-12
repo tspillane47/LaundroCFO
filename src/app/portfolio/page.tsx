@@ -11,6 +11,7 @@ import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
+import { KpiCard } from "@/components/ui/KpiCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import {
   financials as demoFinancials,
@@ -256,26 +257,36 @@ export default function PortfolioPage() {
     const availableMonthlyCashFlow = Math.max(0, (totalAnnualEbitda - totalAnnualDebtService) / 12);
     const acquisitionCapacity = (availableMonthlyCashFlow * 12) / 0.12;
 
+    const hasDebtData = (stores as Store[]).some((st) => (st.annual_debt_service ?? 0) > 0);
+    const resolvedPortfolioValue =
+      usingDemoData && totalPortfolioValue === 0 ? demoFinancials.estimatedValue : totalPortfolioValue;
+    const resolvedAnnualRevenue =
+      usingDemoData && totalAnnualRevenue === 0 ? demoFinancials.annualRevenue : totalAnnualRevenue;
+    const resolvedAnnualEbitda =
+      usingDemoData && totalAnnualEbitda === 0 ? demoFinancials.ebitda : totalAnnualEbitda;
+    const resolvedMonthlyEbitda =
+      usingDemoData && totalAnnualEbitda === 0 ? demoFinancials.ebitda / 12 : totalMonthlyEbitda;
+    const resolvedAnnualDebtService =
+      usingDemoData && totalAnnualDebtService === 0
+        ? demoFinancials.annualDebtService
+        : totalAnnualDebtService;
+    const portfolioEquity = resolvedPortfolioValue + totalCash - totalDebt;
+
     return {
-      totalPortfolioValue:
-        usingDemoData && totalPortfolioValue === 0 ? demoFinancials.estimatedValue : totalPortfolioValue,
-      totalAnnualRevenue:
-        usingDemoData && totalAnnualRevenue === 0 ? demoFinancials.annualRevenue : totalAnnualRevenue,
-      totalAnnualEbitda:
-        usingDemoData && totalAnnualEbitda === 0 ? demoFinancials.ebitda : totalAnnualEbitda,
-      totalMonthlyEbitda:
-        usingDemoData && totalAnnualEbitda === 0 ? demoFinancials.ebitda / 12 : totalMonthlyEbitda,
+      totalPortfolioValue: resolvedPortfolioValue,
+      totalAnnualRevenue: resolvedAnnualRevenue,
+      totalAnnualEbitda: resolvedAnnualEbitda,
+      totalMonthlyEbitda: resolvedMonthlyEbitda,
       totalDebt,
       totalCash,
-      totalAnnualDebtService:
-        usingDemoData && totalAnnualDebtService === 0
-          ? demoFinancials.annualDebtService
-          : totalAnnualDebtService,
+      totalAnnualDebtService: resolvedAnnualDebtService,
       globalDSCR,
       portfolioNetWorth,
       ebitdaMargin,
       availableMonthlyCashFlow,
       acquisitionCapacity,
+      hasDebtData,
+      portfolioEquity,
     };
   }, [storeMetrics, stores, usingDemoData]);
 
@@ -442,66 +453,54 @@ export default function PortfolioPage() {
         </div>
       </div>
 
-      {/* KPI Row - 6 cards */}
+      {/* KPI Row - 8 cards */}
       <div
-        className="grid-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4"
-        style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "16px" }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "20px",
+        }}
       >
-        <div className="card">
-          <div className="metric-label">Annual Revenue</div>
-          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-            {fmtDollar(aggregates.totalAnnualRevenue)}
-          </div>
-        </div>
+        <KpiCard label="Total Portfolio Value" value={fmtDollar(aggregates.totalPortfolioValue)} />
 
-        <div className="card">
-          <div className="metric-label">Annual EBITDA</div>
-          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-            {fmtDollar(aggregates.totalAnnualEbitda)}
-          </div>
-          <div className="text-[12px] mt-2" style={{ color: "var(--text-secondary)" }}>
-            {aggregates.ebitdaMargin.toFixed(1)}% margin
-          </div>
-        </div>
+        <KpiCard label="Annual Revenue" value={fmtDollar(aggregates.totalAnnualRevenue)} />
 
-        <div className="card">
-          <div className="metric-label">
+        <KpiCard
+          label="Annual EBITDA"
+          value={fmtDollar(aggregates.totalAnnualEbitda)}
+          sub={`${aggregates.ebitdaMargin.toFixed(1)}% margin`}
+        />
+
+        <KpiCard label="Portfolio Cash" value={fmtDollar(aggregates.totalCash)} sub="across all stores" />
+
+        <KpiCard label="Total Debt" value={fmtDollar(aggregates.totalDebt)} />
+
+        <KpiCard
+          label="Portfolio Equity"
+          value={fmtDollar(aggregates.portfolioEquity)}
+          sub="Value + cash − debt"
+          valueColor={aggregates.portfolioEquity > 0 ? "var(--text-success)" : "var(--text-danger)"}
+        />
+
+        <KpiCard
+          label="Store Count"
+          value={String(stores.length)}
+          sub={`${stores.length} store${stores.length !== 1 ? "s" : ""}`}
+        />
+
+        <KpiCard
+          label={
             <MetricTooltip
               label="Global DSCR"
               explanation="Combined debt coverage across all stores and personal obligations. Banks use this for total borrower risk assessment."
             />
-          </div>
-          <div className={clsx("text-[28px] font-bold tracking-tight", dscrColorClass(aggregates.globalDSCR))}>
-            {fmtMultiple(aggregates.globalDSCR)}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="metric-label">Cash</div>
-          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-            {fmtDollar(aggregates.totalCash)}
-          </div>
-          <div className="text-[12px] mt-2" style={{ color: "var(--text-secondary)" }}>
-            across all stores
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="metric-label">Total Debt</div>
-          <div className="text-[28px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-            {fmtDollar(aggregates.totalDebt)}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="metric-label">Net Worth</div>
-          <div className="text-[28px] font-bold tracking-tight text-green-400">
-            {fmtDollar(aggregates.portfolioNetWorth)}
-          </div>
-          <div className="text-[12px] mt-2" style={{ color: "var(--text-secondary)" }}>
-            Value + cash − debt
-          </div>
-        </div>
+          }
+          value={aggregates.hasDebtData ? fmtMultiple(aggregates.globalDSCR) : "—"}
+          sub={aggregates.hasDebtData ? undefined : "Add debt data"}
+          valueColor={
+            aggregates.hasDebtData ? undefined : "var(--text-muted)"
+          }
+        />
       </div>
 
       {/* Store Cards */}
@@ -520,10 +519,16 @@ export default function PortfolioPage() {
                 <span className="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-red-500" />
               )}
 
-              <div className="text-[18px] font-bold mb-1" style={{ color: "var(--text-primary)" }}>
+              <div
+                className="text-[18px] font-bold mb-1 truncate"
+                style={{ color: "var(--text-primary)", maxWidth: "100%" }}
+              >
                 {m.store.name ?? "Unnamed Store"}
               </div>
-              <div className="text-[12px] mb-4" style={{ color: "var(--text-muted)" }}>
+              <div
+                className="text-[12px] mb-4 truncate"
+                style={{ color: "var(--text-muted)", maxWidth: "100%" }}
+              >
                 {m.store.address ?? "No address"}
               </div>
 

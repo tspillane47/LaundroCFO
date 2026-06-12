@@ -1,16 +1,17 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormBanner } from "@/components/ui/FormBanner";
 
-export default function EditStorePage() {
+function EditStoreForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [storeId, setStoreId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [form, setForm] = useState({
     name: "",
     address: "",
@@ -34,6 +35,12 @@ export default function EditStorePage() {
   }
 
   useEffect(() => {
+    if (!message || message.type !== "success") return;
+    const timer = setTimeout(() => setMessage(null), 3000);
+    return () => clearTimeout(timer);
+  }, [message]);
+
+  useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -41,12 +48,16 @@ export default function EditStorePage() {
         return;
       }
 
-      const { data } = await supabase
-        .from("stores")
-        .select("*")
-        .eq("user_id", user.id)
-        .limit(1)
-        .single();
+      const paramStoreId = searchParams.get("store");
+      let query = supabase.from("stores").select("*").eq("user_id", user.id);
+
+      if (paramStoreId) {
+        query = query.eq("id", paramStoreId);
+      } else {
+        query = query.limit(1);
+      }
+
+      const { data } = await query.single();
 
       if (data) {
         setStoreId(data.id);
@@ -68,12 +79,12 @@ export default function EditStorePage() {
       setFetching(false);
     }
     load();
-  }, []);
+  }, [searchParams]);
 
   async function handleSubmit() {
-    if (!storeId) return;
-    setLoading(true);
-    setError("");
+    if (!storeId || saving) return;
+    setSaving(true);
+    setMessage(null);
 
     const { error: updateError } = await supabase
       .from("stores")
@@ -94,14 +105,11 @@ export default function EditStorePage() {
       .eq("id", storeId);
 
     if (updateError) {
-      setError(updateError.message);
-      setLoading(false);
-      return;
+      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+    } else {
+      setMessage({ type: "success", text: "Saved successfully." });
     }
-
-    setSuccess(true);
-    setTimeout(() => router.push("/dashboard"), 1500);
-    setLoading(false);
+    setSaving(false);
   }
 
   if (fetching) {
@@ -119,17 +127,9 @@ export default function EditStorePage() {
         <p className="text-slate-500 text-[13px] mt-1">Update your store profile and financials</p>
       </div>
 
+      <FormBanner message={message} />
+
       <div className="card space-y-4">
-        {success && (
-          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-[12px] text-green-400">
-            Changes saved successfully! Redirecting to dashboard...
-          </div>
-        )}
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[12px] text-red-400">
-            {error}
-          </div>
-        )}
         <div>
           <div className="metric-label mb-1.5">Store Name</div>
           <input
@@ -259,12 +259,26 @@ export default function EditStorePage() {
         </div>
         <button
           onClick={handleSubmit}
-          disabled={loading || success}
-          className="btn-primary w-full py-2.5 text-[13px]"
+          disabled={saving}
+          className="btn-primary w-full py-2.5 text-[13px] disabled:opacity-40"
         >
-          {loading ? "Saving..." : "Save Changes"}
+          {saving ? "Saving..." : "Save Changes"}
         </button>
       </div>
     </div>
+  );
+}
+
+export default function EditStorePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center py-20">
+          <div className="text-slate-500 text-[13px]">Loading store data...</div>
+        </div>
+      }
+    >
+      <EditStoreForm />
+    </Suspense>
   );
 }

@@ -8,6 +8,7 @@ import { useStores } from "@/lib/store-context";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { FormBanner } from "@/components/ui/FormBanner";
 import { PageError } from "@/components/ui/PageError";
 import {
   INPUT_CLASS,
@@ -449,7 +450,7 @@ export default function InsurancePage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [store, setStore] = useState<Store | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [policies, setPolicies] = useState<InsurancePolicy[]>([]);
@@ -473,7 +474,7 @@ export default function InsurancePage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
-    setError("");
+    setMessage(null);
 
     try {
       const {
@@ -486,7 +487,7 @@ export default function InsurancePage() {
       setUserId(user.id);
 
       if (!selectedStore?.id) {
-        setError("Select a store from the dropdown above.");
+        setMessage({ type: "error", text: "Select a store from the dropdown above." });
         setStore(null);
         setPolicies([]);
         setClaims([]);
@@ -643,9 +644,9 @@ export default function InsurancePage() {
   }
 
   async function handleSavePolicy() {
-    if (!store || !userId) return;
+    if (!store || !userId || saving) return;
     setSaving(true);
-    setError("");
+    setMessage(null);
 
     const payload = {
       user_id: userId,
@@ -695,19 +696,21 @@ export default function InsurancePage() {
         .update(payload)
         .eq("id", editingPolicyId);
       if (updateError) {
-        setError(updateError.message);
+        setMessage({ type: "error", text: "We couldn't save this. Please try again." });
         setSaving(false);
         return;
       }
     } else {
       const { error: insertError } = await supabase.from("insurance_policies").insert(payload);
       if (insertError) {
-        setError(insertError.message);
+        setMessage({ type: "error", text: "We couldn't save this. Please try again." });
         setSaving(false);
         return;
       }
     }
 
+    setMessage({ type: "success", text: "Saved successfully." });
+    setTimeout(() => setMessage(null), 3000);
     closePolicyForm();
     await loadData();
     setSaving(false);
@@ -727,11 +730,12 @@ export default function InsurancePage() {
 
   async function handleSaveClaim() {
     if (!claimForm.policy_id) {
-      setError("Select a policy for this claim.");
+      setMessage({ type: "error", text: "Select a policy for this claim." });
       return;
     }
+    if (saving) return;
     setSaving(true);
-    setError("");
+    setMessage(null);
 
     const payload = {
       policy_id: claimForm.policy_id,
@@ -744,11 +748,13 @@ export default function InsurancePage() {
 
     const { error: insertError } = await supabase.from("insurance_claims").insert(payload);
     if (insertError) {
-      setError(insertError.message);
+      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
       setSaving(false);
       return;
     }
 
+    setMessage({ type: "success", text: "Saved successfully." });
+    setTimeout(() => setMessage(null), 3000);
     setShowClaimForm(false);
     await loadData();
     setSaving(false);
@@ -790,11 +796,7 @@ export default function InsurancePage() {
         </button>
       </div>
 
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[12px] text-red-400">
-          {error}
-        </div>
-      )}
+      <FormBanner message={message} />
 
       {/* Dashboard Summary */}
       <div className="grid grid-cols-3 lg:grid-cols-6 gap-4 grid-4">
