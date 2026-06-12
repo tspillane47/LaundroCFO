@@ -15,7 +15,6 @@ import {
   formatCurrency,
   formatDate,
   parseDate,
-  preventEnterSubmit,
 } from "@/components/occupancy/shared";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1136,7 +1135,6 @@ export default function InsurancePage() {
                   {ADDITIONAL_COVERAGE_FIELDS.map(({ key, label }) => (
                     <label
                       key={key}
-                      onKeyDown={preventEnterSubmit}
                       className="flex items-center gap-2 text-[13px] text-slate-300 cursor-pointer"
                     >
                       <input
@@ -1423,7 +1421,6 @@ export default function InsurancePage() {
               <button
                 type="button"
                 onClick={() => setShowClaimForm(false)}
-                onKeyDown={preventEnterSubmit}
                 className="btn-outline"
               >
                 Cancel
