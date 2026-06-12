@@ -14,15 +14,15 @@ import { PageError } from "@/components/ui/PageError";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { FormBanner } from "@/components/ui/FormBanner";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
 import {
   financials as demoFinancials,
-  valueTrend as demoValueTrend,
   DEMO_MONTHLY_REVENUE,
   DEMO_MONTHLY_EXPENSES,
   DEMO_ANNUAL_DEBT_SERVICE,
 } from "@/lib/data";
 
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const VALUATION_MULTIPLE = demoFinancials.valuationMultiple;
 
 type Store = {
@@ -75,19 +75,6 @@ function calcHealthScore(
   if (leaseYearsRemaining != null && leaseYearsRemaining > 5) score += 10;
   if (loanBalance < monthlyRevenue * 36) score += 10;
   return Math.min(100, score);
-}
-
-function generateValuationTrend(totalValue: number) {
-  const start = totalValue * 0.88;
-  return MONTH_LABELS.map((month, i) => {
-    const progress = i / 11;
-    const base = start + (totalValue - start) * progress;
-    const variation = 1 + Math.sin(i * 1.7) * 0.015 + Math.cos(i * 0.9) * 0.01;
-    return {
-      month,
-      value: Math.round(i === 11 ? totalValue : base * variation),
-    };
-  });
 }
 
 function dscrColorClass(dscr: number): string {
@@ -317,20 +304,6 @@ export default function PortfolioPage() {
     };
   }, [storeMetrics, stores, usingDemoData]);
 
-  const valuationTrend = useMemo(
-    () =>
-      usingDemoData
-        ? demoValueTrend
-        : generateValuationTrend(aggregates.totalPortfolioValue),
-    [aggregates.totalPortfolioValue, usingDemoData]
-  );
-
-  const monthlyChange = valuationTrend[11].value - valuationTrend[10].value;
-  const yearChangePct =
-    valuationTrend[0].value > 0
-      ? ((aggregates.totalPortfolioValue - valuationTrend[0].value) / valuationTrend[0].value) * 100
-      : 0;
-
   const allFeedItems = useMemo(() => {
     const items = (stores as Store[]).flatMap((store) => {
       const storeLease = leases.find((l) => l.store_id === store.id);
@@ -503,27 +476,46 @@ export default function PortfolioPage() {
       )}
 
       {/* Hero Banner */}
-      <div className="card">
-        <div className="flex flex-col gap-2 hero-banner">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="metric-label mb-0">Total Portfolio Value</div>
-              {usingDemoData && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/20 text-amber-200 border border-amber-400/30">
-                  Demo data — add your store to see real numbers
-                </span>
-              )}
+      <div className="hero-value-card">
+        <div style={{ fontSize: '12px', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>
+          Portfolio Value
+          {usingDemoData && (
+            <span className="inline-flex items-center ml-3 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/20 text-amber-200 border border-amber-400/30 normal-case tracking-normal">
+              Demo data
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
+          <AnimatedNumber value={aggregates.totalPortfolioValue} prefix="$" className="hero-value-text" duration={1200} />
+          <ValueChangeIndicator value={aggregates.totalPortfolioValue} />
+        </div>
+
+        <div style={{ display: 'flex', gap: '24px', marginTop: '28px', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Stores</div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: 'white' }}>
+              <AnimatedNumber value={stores.length} duration={800} />
             </div>
-            <div className="metric-value" style={{ fontSize: "36px" }}>
-              {fmtDollar(aggregates.totalPortfolioValue)}
+          </div>
+          <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
+          <div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Cash</div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#4ade80' }}>
+              $<AnimatedNumber value={aggregates.totalCash} duration={1000} />
             </div>
-            <div className="flex flex-wrap gap-3 mt-3 text-[12px]" style={{ color: "var(--text-muted)" }}>
-              <span>{monthlyChange >= 0 ? "+" : ""}{fmtDollar(monthlyChange)} this month</span>
-              <span>·</span>
-              <span>{yearChangePct >= 0 ? "+" : ""}{yearChangePct.toFixed(1)}% annual</span>
+          </div>
+          <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
+          <div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>EBITDA</div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: 'white' }}>
+              $<AnimatedNumber value={aggregates.totalAnnualEbitda} duration={1000} />
             </div>
-            <div className="text-[12px] mt-2" style={{ color: "var(--text-muted)" }}>
-              {stores.length} store{stores.length !== 1 ? "s" : ""} · Est. EBITDA {fmtDollar(aggregates.totalMonthlyEbitda)}/mo · Global DSCR {fmtMultiple(aggregates.globalDSCR)}
+          </div>
+          <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
+          <div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Global DSCR</div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: 'white' }}>
+              <AnimatedNumber value={aggregates.globalDSCR} decimals={2} suffix="x" duration={1000} />
             </div>
           </div>
         </div>
@@ -537,45 +529,78 @@ export default function PortfolioPage() {
           gap: "20px",
         }}
       >
-        <KpiCard label="Total Portfolio Value" value={fmtDollar(aggregates.totalPortfolioValue)} />
-
-        <KpiCard label="Annual Revenue" value={fmtDollar(aggregates.totalAnnualRevenue)} />
+        <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0s" }}
+          label="Total Portfolio Value"
+          value={<AnimatedNumber value={aggregates.totalPortfolioValue} prefix="$" duration={1000} />}
+        />
 
         <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0.05s" }}
+          label="Annual Revenue"
+          value={<AnimatedNumber value={aggregates.totalAnnualRevenue} prefix="$" duration={1000} />}
+        />
+
+        <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0.1s" }}
           label="Annual EBITDA"
-          value={fmtDollar(aggregates.totalAnnualEbitda)}
+          value={<AnimatedNumber value={aggregates.totalAnnualEbitda} prefix="$" duration={1000} />}
           sub={`${aggregates.ebitdaMargin.toFixed(1)}% margin`}
         />
 
-        <KpiCard label="Portfolio Cash" value={fmtDollar(aggregates.totalCash)} sub="across all stores" />
-
-        <KpiCard label="Total Debt" value={fmtDollar(aggregates.totalDebt)} />
+        <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0.15s" }}
+          label="Portfolio Cash"
+          value={<AnimatedNumber value={aggregates.totalCash} prefix="$" duration={1000} />}
+          sub="across all stores"
+        />
 
         <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0.2s" }}
+          label="Total Debt"
+          value={<AnimatedNumber value={aggregates.totalDebt} prefix="$" duration={1000} />}
+        />
+
+        <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0.25s" }}
           label="Portfolio Equity"
-          value={fmtDollar(aggregates.portfolioEquity)}
+          value={<AnimatedNumber value={aggregates.portfolioEquity} prefix="$" duration={1000} />}
           sub="Value + cash − debt"
           valueColor={aggregates.portfolioEquity > 0 ? "var(--text-success)" : "var(--text-danger)"}
         />
 
         <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0.3s" }}
           label="Store Count"
-          value={String(stores.length)}
+          value={<AnimatedNumber value={stores.length} duration={800} />}
           sub={`${stores.length} store${stores.length !== 1 ? "s" : ""}`}
         />
 
         <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0.35s" }}
           label={
             <MetricTooltip
               label="Global DSCR"
               explanation="Combined debt coverage across all stores and personal obligations. Banks use this for total borrower risk assessment."
             />
           }
-          value={aggregates.hasDebtData ? fmtMultiple(aggregates.globalDSCR) : "—"}
-          sub={aggregates.hasDebtData ? undefined : "Add debt data"}
-          valueColor={
-            aggregates.hasDebtData ? undefined : "var(--text-muted)"
+          value={
+            aggregates.hasDebtData ? (
+              <AnimatedNumber value={aggregates.globalDSCR} decimals={2} suffix="x" duration={1000} />
+            ) : (
+              "—"
+            )
           }
+          sub={aggregates.hasDebtData ? undefined : "Add debt data"}
+          valueColor={aggregates.hasDebtData ? undefined : "var(--text-muted)"}
         />
       </div>
 

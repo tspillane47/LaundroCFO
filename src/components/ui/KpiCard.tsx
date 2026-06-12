@@ -5,11 +5,13 @@ type KpiCardProps = {
   value: ReactNode;
   sub?: ReactNode;
   valueColor?: string;
+  className?: string;
+  style?: React.CSSProperties;
 };
 
-export function KpiCard({ label, value, sub, valueColor }: KpiCardProps) {
+export function KpiCard({ label, value, sub, valueColor, className, style }: KpiCardProps) {
   return (
-    <div className="card" style={{ padding: "24px", minHeight: "110px" }}>
+    <div className={className ? `card ${className}` : "card"} style={{ padding: "24px", minHeight: "110px", ...style }}>
       <div className="metric-label" style={{ marginBottom: "8px" }}>
         {label}
       </div>

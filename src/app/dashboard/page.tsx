@@ -30,6 +30,8 @@ import { KpiCard } from "@/components/ui/KpiCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { CashCard } from "@/components/ui/CashCard";
 import { PageError } from "@/components/ui/PageError";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
 import {
   financials as demoFinancials,
   store as demoStore,
@@ -578,42 +580,24 @@ export default function DashboardPage() {
       </div>
 
       {/* Section 1: Hero Valuation Banner */}
-      <div
-        className="rounded-xl p-6 overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #0f1e3d 0%, #1e3a5f 100%)" }}
-      >
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 hero-banner">
-          <div className="flex-1">
-            <div className="text-[11px] uppercase tracking-wider text-white/50 mb-1">
-              Estimated Store Value
-            </div>
-            <div className="text-white font-extrabold tracking-tight" style={{ fontSize: "52px", lineHeight: 1.1 }}>
-              {fmtDollar(estimatedValue)}
-            </div>
-            <div className="flex flex-wrap gap-2 mt-3">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold bg-green-500/20 text-green-300">
-                {monthlyChange >= 0 ? "+" : ""}{fmtDollar(monthlyChange)} this month
-              </span>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold bg-green-500/20 text-green-300">
-                {yearChangePct >= 0 ? "+" : ""}{yearChangePct.toFixed(1)}% vs last year
-              </span>
-            </div>
-            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", marginTop: "8px", lineHeight: 1.6 }}>
-              Based on {fmtMultiple(finalMultiple)} EBITDA multiple · Equipment grade B · {leaseYearsDisplay.toFixed(1)}yr lease · {sqft.toLocaleString()} SF
-            </div>
-          </div>
-          <div className="hero-chart w-full lg:w-[200px] h-[32px] flex items-end">
-            <svg width="100%" height="32" viewBox="0 0 200 32" preserveAspectRatio="none">
-              <polyline
-                points="0,28 25,24 50,26 75,20 100,22 125,16 150,18 175,12 200,8"
-                fill="none"
-                stroke="rgba(255,255,255,0.6)"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
+      <div className="hero-value-card">
+        <div style={{ fontSize: '12px', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>
+          Estimated Store Value
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
+          <AnimatedNumber value={estimatedValue} prefix="$" className="hero-value-text" duration={1200} />
+          <ValueChangeIndicator value={estimatedValue} />
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
+          <span style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
+            {monthlyChange >= 0 ? "+" : ""}{fmtDollar(monthlyChange)} this month
+          </span>
+          <span style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
+            {yearChangePct >= 0 ? "+" : ""}{yearChangePct.toFixed(1)}% vs last year
+          </span>
+        </div>
+        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', marginTop: '12px', lineHeight: 1.6 }}>
+          Based on {fmtMultiple(finalMultiple)} EBITDA multiple · Equipment grade B · {leaseYearsDisplay.toFixed(1)}yr lease · {sqft.toLocaleString()} SF
         </div>
       </div>
 
@@ -626,13 +610,15 @@ export default function DashboardPage() {
         }}
       >
         <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0s" }}
           label={
             <MetricTooltip
               label="DSCR"
               explanation="Debt Service Coverage Ratio. Measures ability to cover loan payments. Lenders require minimum 1.25x."
             />
           }
-          value={`${dscrNum.toFixed(2)}x`}
+          value={<AnimatedNumber value={dscrNum} decimals={2} suffix="x" duration={1000} />}
           sub={
             dscrNum >= 1.5 ? "Strong coverage" : dscrNum >= 1.25 ? "Adequate" : "Below threshold"
           }
@@ -646,25 +632,31 @@ export default function DashboardPage() {
         />
 
         <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0.05s" }}
           label={
             <MetricTooltip
               label="EBITDA Margin"
               explanation="Earnings Before Interest, Taxes, Depreciation & Amortization. The primary profit metric for laundromat valuation."
             />
           }
-          value={`${ebitdaMargin.toFixed(1)}%`}
+          value={<AnimatedNumber value={ebitdaMargin} decimals={1} suffix="%" duration={1000} />}
           sub={`${fmtDollar(ebitda)}/mo EBITDA`}
         />
 
         <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0.1s" }}
           label="LaundroCFO Score"
-          value={String(laundrocfoScore)}
+          value={<AnimatedNumber value={laundrocfoScore} duration={1000} />}
           sub={`Lease ${leaseScore} · Equipment ${equipmentScore} · Financial ${financialScore} · Insurance ${insuranceScore}`}
         />
 
         <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0.15s" }}
           label="Monthly Cash Flow"
-          value={fmtDollar(monthlyCashFlow)}
+          value={<AnimatedNumber value={monthlyCashFlow} prefix="$" duration={1000} />}
           sub={`${fmtDollar(annualCashFlow)}/yr after debt service`}
         />
       </div>
@@ -678,18 +670,34 @@ export default function DashboardPage() {
         }}
       >
         <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0.2s" }}
           label="Business Value"
-          value={fmtDollar(businessValue)}
+          value={<AnimatedNumber value={businessValue} prefix="$" duration={1000} />}
           sub={`${fmtMultiple(finalMultiple)} EBITDA multiple`}
         />
 
-        <KpiCard label="Cash" value={fmtDollar(totalCash)} sub="Operating + reserves" />
-
-        <KpiCard label="Total Debt" value={fmtDollar(totalDebt)} sub="Outstanding loan balance" />
+        <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0.25s" }}
+          label="Cash"
+          value={<AnimatedNumber value={totalCash} prefix="$" duration={1000} />}
+          sub="Operating + reserves"
+        />
 
         <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0.3s" }}
+          label="Total Debt"
+          value={<AnimatedNumber value={totalDebt} prefix="$" duration={1000} />}
+          sub="Outstanding loan balance"
+        />
+
+        <KpiCard
+          className="kpi-fade-in kpi-glow-card"
+          style={{ animationDelay: "0.35s" }}
           label="Net Equity"
-          value={fmtDollar(equity)}
+          value={<AnimatedNumber value={equity} prefix="$" duration={1000} />}
           sub="Value + cash − debt"
           valueColor={equity > 0 ? "var(--text-success)" : "var(--text-danger)"}
         />

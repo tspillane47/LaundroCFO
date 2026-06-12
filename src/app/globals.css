@@ -472,3 +472,55 @@ html, body {
   /* Hide secondary topbar items */
   .topbar-add-store { display: none !important; }
 }
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(4px); }
+  15% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
+@keyframes heroGlow {
+  0%, 100% { box-shadow: 0 0 40px rgba(59,130,246,0.15), 0 20px 60px rgba(0,0,0,0.3); }
+  50% { box-shadow: 0 0 60px rgba(59,130,246,0.25), 0 20px 60px rgba(0,0,0,0.3); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.hero-value-card {
+  background: linear-gradient(135deg, #0f1e3d 0%, #1e3a5f 100%);
+  border-radius: 20px;
+  padding: 32px 40px;
+  position: relative;
+  overflow: hidden;
+  animation: heroGlow 4s ease-in-out infinite;
+}
+
+.hero-value-text {
+  font-size: 64px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  text-shadow: 0 0 40px rgba(96,165,250,0.4);
+}
+
+@media (max-width: 767px) {
+  .hero-value-text { font-size: 40px !important; }
+}
+
+.kpi-fade-in {
+  animation: fadeInUp 0.5s ease-out backwards;
+}
+
+.kpi-glow-card {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.kpi-glow-card:hover {
+  box-shadow: 0 0 0 1px rgba(59,130,246,0.3), 0 4px 20px rgba(59,130,246,0.1);
+  border-color: rgba(59,130,246,0.3);
+}

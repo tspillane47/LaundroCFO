@@ -1,4 +1,7 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 
 /* ── Mini charts (div-only) ── */
 
@@ -131,7 +134,7 @@ function WashingMachineGauge() {
           className="hero-gauge-value text-[22px] lg:text-[30px] font-bold tabular-nums leading-none mb-1.5"
           style={{ color: "#4ade80", textShadow: "0 0 20px rgba(74,222,128,0.4)" }}
         >
-          $824,817
+          <AnimatedNumber value={824817} prefix="$" duration={1500} />
         </span>
         <span className="text-[7px] lg:text-[8px] uppercase tracking-[0.12em] text-slate-500 mb-0.5">
           Current Multiple
@@ -285,10 +288,10 @@ function FloatIcon({ type }: { type: "chart" | "dollar" | "star" | "washer" | "l
 
 export default function HeroDashboard() {
   const kpis = [
-    { label: "Store Value", value: "$824,817", sub: "↗ 12.2%", valueColor: "#4ade80", delay: 0.1 },
-    { label: "EBITDA", value: "$237,843", sub: "↗ 8.7%", valueColor: "#f1f5f9", delay: 0.2 },
-    { label: "DSCR", value: "2.18x", sub: "↗ 0.18x", valueColor: "#f1f5f9", delay: 0.3 },
-    { label: "Store Score", value: "89/100", sub: "Excellent", valueColor: "#f1f5f9", delay: 0.4 },
+    { label: "Store Value", numericValue: 824817, prefix: "$", decimals: 0, suffix: "", sub: "↗ 12.2%", valueColor: "#4ade80", delay: 0.1 },
+    { label: "EBITDA", numericValue: 237843, prefix: "$", decimals: 0, suffix: "", sub: "↗ 8.7%", valueColor: "#f1f5f9", delay: 0.2 },
+    { label: "DSCR", numericValue: 2.18, prefix: "", decimals: 2, suffix: "x", sub: "↗ 0.18x", valueColor: "#f1f5f9", delay: 0.3 },
+    { label: "Store Score", numericValue: 89, prefix: "", decimals: 0, suffix: "/100", sub: "Excellent", valueColor: "#f1f5f9", delay: 0.4 },
   ];
 
   return (
@@ -417,7 +420,13 @@ export default function HeroDashboard() {
                 className="text-[11px] lg:text-[14px] font-bold tabular-nums leading-tight"
                 style={{ color: kpi.valueColor }}
               >
-                {kpi.value}
+                <AnimatedNumber
+                  value={kpi.numericValue}
+                  prefix={kpi.prefix}
+                  suffix={kpi.suffix}
+                  decimals={kpi.decimals}
+                  duration={1500}
+                />
               </div>
               <div className="text-[8px] lg:text-[9px] text-emerald-400 mt-0.5">{kpi.sub}</div>
             </div>
