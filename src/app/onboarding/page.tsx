@@ -178,85 +178,89 @@ export default function OnboardingPage() {
     setSubmitting(true);
     setMessage(null);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-
-    const storePayload: Record<string, unknown> = {
-      user_id: user.id,
-      name: data.name.trim(),
-      address: data.address.trim(),
-      square_footage: data.square_footage ? Number(data.square_footage) : null,
-      store_type: data.store_type,
-      year_opened: data.year_opened ? Number(data.year_opened) : null,
-      market_density: MARKET_MAP[data.market_type] ?? "suburban",
-      monthly_revenue: data.monthly_revenue ? Number(data.monthly_revenue) : null,
-      monthly_expenses: data.monthly_expenses ? Number(data.monthly_expenses) : null,
-      monthly_rent: data.monthly_rent ? Number(data.monthly_rent) : null,
-      annual_debt_service: data.annual_debt_service ? Number(data.annual_debt_service) : null,
-      loan_balance: data.loan_balance ? Number(data.loan_balance) : null,
-      washers: data.washers ? Number(data.washers) : null,
-      dryers: data.dryers ? Number(data.dryers) : null,
-      avg_machine_age: data.avg_machine_age ? Number(data.avg_machine_age) : null,
-    };
-
-    if (includeLease) {
-      storePayload.occupancy_type = "leased";
-      storePayload.lease_expiration = data.lease_expiration || null;
-    }
-
-    const { data: storeRow, error: storeError } = await supabase
-      .from("stores")
-      .insert(storePayload)
-      .select("id")
-      .single();
-
-    if (storeError) {
-      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
-      setSubmitting(false);
-      return;
-    }
-
-    if (includeLease && data.lease_expiration && storeRow?.id) {
-      const { data: leaseRow, error: leaseError } = await supabase
-        .from("leases")
-        .insert({
-          store_id: storeRow.id,
-          lease_end_date: data.lease_expiration,
-          monthly_rent: data.monthly_rent ? Number(data.monthly_rent) : null,
-          personal_guaranty: data.personal_guaranty,
-          assignment_rights: data.assignment_rights,
-        })
-        .select("id")
-        .single();
-
-      if (leaseError) {
-        setMessage({ type: "error", text: "We couldn't save this. Please try again." });
-        setSubmitting(false);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
         return;
       }
 
-      const optionCount = RENEWAL_COUNT[data.renewal_options] ?? 0;
-      if (optionCount > 0 && leaseRow?.id) {
-        const options = Array.from({ length: optionCount }, (_, i) => ({
-          lease_id: leaseRow.id,
-          option_number: i + 1,
-          option_years: 5,
-          status: "Available",
-          notice_days: 180,
-        }));
-        await supabase.from("lease_options").insert(options);
-      }
-    }
+      const storePayload: Record<string, unknown> = {
+        user_id: user.id,
+        name: data.name.trim(),
+        address: data.address.trim(),
+        square_footage: data.square_footage ? Number(data.square_footage) : null,
+        store_type: data.store_type,
+        year_opened: data.year_opened ? Number(data.year_opened) : null,
+        market_density: MARKET_MAP[data.market_type] ?? "suburban",
+        monthly_revenue: data.monthly_revenue ? Number(data.monthly_revenue) : null,
+        monthly_expenses: data.monthly_expenses ? Number(data.monthly_expenses) : null,
+        monthly_rent: data.monthly_rent ? Number(data.monthly_rent) : null,
+        annual_debt_service: data.annual_debt_service ? Number(data.annual_debt_service) : null,
+        loan_balance: data.loan_balance ? Number(data.loan_balance) : null,
+        washers: data.washers ? Number(data.washers) : null,
+        dryers: data.dryers ? Number(data.dryers) : null,
+        avg_machine_age: data.avg_machine_age ? Number(data.avg_machine_age) : null,
+      };
 
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.setItem("laundrocfo_show_welcome", "true");
-    await refreshStores();
-    router.push("/portfolio");
+      if (includeLease) {
+        storePayload.occupancy_type = "leased";
+        storePayload.lease_expiration = data.lease_expiration || null;
+      }
+
+      const { data: storeRow, error: storeError } = await supabase
+        .from("stores")
+        .insert(storePayload)
+        .select("id")
+        .single();
+
+      if (storeError) {
+        setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+        return;
+      }
+
+      if (includeLease && data.lease_expiration && storeRow?.id) {
+        const { data: leaseRow, error: leaseError } = await supabase
+          .from("leases")
+          .insert({
+            store_id: storeRow.id,
+            lease_end_date: data.lease_expiration,
+            monthly_rent: data.monthly_rent ? Number(data.monthly_rent) : null,
+            personal_guaranty: data.personal_guaranty,
+            assignment_rights: data.assignment_rights,
+          })
+          .select("id")
+          .single();
+
+        if (leaseError) {
+          setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+          return;
+        }
+
+        const optionCount = RENEWAL_COUNT[data.renewal_options] ?? 0;
+        if (optionCount > 0 && leaseRow?.id) {
+          const options = Array.from({ length: optionCount }, (_, i) => ({
+            lease_id: leaseRow.id,
+            option_number: i + 1,
+            option_years: 5,
+            status: "Available",
+            notice_days: 180,
+          }));
+          await supabase.from("lease_options").insert(options);
+        }
+      }
+
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem("laundrocfo_show_welcome", "true");
+      await refreshStores();
+      router.push("/portfolio");
+    } catch {
+      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (!hydrated) {

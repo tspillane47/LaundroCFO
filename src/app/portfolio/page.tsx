@@ -13,6 +13,7 @@ import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
+import { FormBanner } from "@/components/ui/FormBanner";
 import {
   financials as demoFinancials,
   valueTrend as demoValueTrend,
@@ -98,7 +99,14 @@ function dscrColorClass(dscr: number): string {
 export default function PortfolioPage() {
   const supabase = createClient();
   const router = useRouter();
-  const { stores, loading: storesLoading, setSelectedStore, setIsAllStores } = useStores();
+  const {
+    stores,
+    loading: storesLoading,
+    selectedStore,
+    setSelectedStore,
+    setIsAllStores,
+    refreshStores,
+  } = useStores();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [leases, setLeases] = useState<Lease[]>([]);
@@ -106,12 +114,31 @@ export default function PortfolioPage() {
   const [equipmentByStore, setEquipmentByStore] = useState<Record<string, any[]>>({});
   const [insuranceByStore, setInsuranceByStore] = useState<Record<string, any[]>>({});
   const [showWelcome, setShowWelcome] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Store | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [archivingId, setArchivingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (localStorage.getItem("laundrocfo_show_welcome") === "true") {
       setShowWelcome(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => setMessage(null), 3000);
+    return () => clearTimeout(timer);
+  }, [message]);
+
+  useEffect(() => {
+    if (!deleteTarget) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [deleteTarget]);
 
   function dismissWelcome() {
     localStorage.removeItem("laundrocfo_show_welcome");
@@ -328,6 +355,53 @@ export default function PortfolioPage() {
     router.push("/dashboard");
   }
 
+  async function handleArchive(store: Store) {
+    if (archivingId) return;
+    setArchivingId(store.id);
+    setMessage(null);
+
+    const { error } = await supabase
+      .from("stores")
+      .update({ archived: true })
+      .eq("id", store.id);
+
+    if (error) {
+      setMessage({ type: "error", text: "We couldn't archive this store. Please try again." });
+    } else {
+      if (selectedStore?.id === store.id) {
+        setSelectedStore(null);
+        setIsAllStores(true);
+      }
+      await refreshStores();
+      setMessage({ type: "success", text: "Store archived" });
+    }
+    setArchivingId(null);
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    setMessage(null);
+
+    const { error } = await supabase.from("stores").delete().eq("id", deleteTarget.id);
+
+    if (error) {
+      setMessage({ type: "error", text: "We couldn't delete this store. Please try again." });
+      setDeleting(false);
+      return;
+    }
+
+    if (selectedStore?.id === deleteTarget.id) {
+      setSelectedStore(null);
+      setIsAllStores(true);
+    }
+
+    setDeleteTarget(null);
+    setMessage({ type: "success", text: "Store deleted" });
+    await refreshStores();
+    setDeleting(false);
+  }
+
   if (loadError) {
     return <PageError onRetry={loadPortfolioData} />;
   }
@@ -391,6 +465,8 @@ export default function PortfolioPage() {
 
   return (
     <div className="space-y-5">
+      <FormBanner message={message} />
+
       {showWelcome && (
         <div className="card relative">
           <button
@@ -559,18 +635,83 @@ export default function PortfolioPage() {
                 Cash: {fmtDollar(m.storeCash)}
               </div>
 
-              <div className="flex gap-2 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
-                <button type="button" onClick={() => openStore(m.store)} className="btn-primary flex-1 text-[12px]">
-                  Open Store
+              <div
+                className="pt-2 border-t"
+                style={{ borderColor: "var(--border)", display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}
+              >
+                <button type="button" onClick={() => openStore(m.store)} className="btn-primary text-[12px] px-3 py-1.5">
+                  View
                 </button>
-                <Link href="/settings" className="btn-outline flex-1 text-[12px] text-center">
+                <Link
+                  href={`/settings/edit-store?store=${m.store.id}`}
+                  className="btn-outline text-[12px] px-3 py-1.5 text-center"
+                >
                   Edit
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(m.store)}
+                  className="btn-outline text-[12px] px-3 py-1.5 text-red-400 border-red-500/20"
+                >
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleArchive(m.store)}
+                  disabled={archivingId === m.store.id}
+                  className="text-[12px] px-1 py-1 disabled:opacity-40"
+                  style={{ color: "var(--text-muted)", background: "none", border: "none" }}
+                >
+                  {archivingId === m.store.id ? "Archiving..." : "Archive"}
+                </button>
               </div>
             </div>
           ))}
         </div>
       </div>
+
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.6)", padding: "20px" }}
+          onClick={() => !deleting && setDeleteTarget(null)}
+        >
+          <div
+            className="card w-full"
+            style={{ maxWidth: "min(400px, 90vw)", padding: "20px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-[16px] font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
+              Delete Store?
+            </h2>
+            <p className="text-[13px] mb-3" style={{ color: "var(--text-secondary)" }}>
+              This action cannot be undone.
+            </p>
+            <p className="text-[13px] mb-6 font-medium" style={{ color: "var(--text-primary)" }}>
+              Store Name: {deleteTarget.name ?? "Unnamed Store"}
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="btn-outline flex-1 min-w-[120px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+                className="flex-1 min-w-[120px] rounded-lg px-4 py-2.5 text-[13px] font-medium text-white disabled:opacity-40"
+                style={{ background: "var(--text-danger)" }}
+              >
+                {deleting ? "Deleting..." : "Delete Store"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Portfolio Intelligence Feed */}
       <div className="card">
