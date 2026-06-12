@@ -5,7 +5,8 @@ import clsx from "clsx";
 import { pdf } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
-import { calcValuation, type ValuationResult } from "@/lib/valuation";
+import { getStoreValuation } from "@/lib/getStoreValuation";
+import type { ValuationResult } from "@/lib/valuation";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import {
   calcDSCR,
@@ -35,22 +36,6 @@ function calcYearsRemaining(endDate: string | null): number {
   const end = parseDate(endDate);
   if (!end) return 0;
   return Math.max(0, (end.getTime() - Date.now()) / (365.25 * 24 * 60 * 60 * 1000));
-}
-
-function normalizeMarketDensity(raw: string | null): string {
-  const v = (raw ?? "average").toLowerCase();
-  if (v === "urban" || v === "dense_urban") return "urban";
-  if (v === "suburban") return "suburban";
-  if (v === "rural") return "rural";
-  return "average";
-}
-
-function normalizeStoreCondition(raw: string | null): string {
-  const v = (raw ?? "fair").toLowerCase();
-  if (v === "excellent" || v === "remodeled") return "excellent";
-  if (v === "good") return "good";
-  if (v === "poor" || v === "needs_renovation") return "poor";
-  return "fair";
 }
 
 function financeabilityRating(dscr: number, globalDscr: number): string {
@@ -108,6 +93,7 @@ export default function ReportsPage() {
   const [insurance, setInsurance] = useState<any[]>([]);
   const [realEstate, setRealEstate] = useState<any>(null);
   const [totalLeaseControl, setTotalLeaseControl] = useState(0);
+  const [valuation, setValuation] = useState<ValuationResult | null>(null);
 
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -142,6 +128,9 @@ export default function ReportsPage() {
       }
 
       setStore(storeData);
+
+      const storeValuation = await getStoreValuation(storeData.id);
+      setValuation(storeValuation);
 
       const [{ data: equipmentData }, { data: policiesData }] = await Promise.all([
         supabase.from("equipment_inventory").select("*").eq("store_id", storeData.id),
@@ -204,37 +193,6 @@ export default function ReportsPage() {
   }, [selectedStore?.id, supabase]);
 
   const equipMetrics = useMemo(() => computeEquipmentMetrics(equipment), [equipment]);
-
-  const valuation: ValuationResult | null = useMemo(() => {
-    if (!store) return null;
-    const monthlyRevenue = store.monthly_revenue ?? 0;
-    const monthlyExpenses = store.monthly_expenses ?? 0;
-    const annualEbitda = (monthlyRevenue - monthlyExpenses) * 12;
-    const isOwnerOccupied = store.occupancy_type === "owner_occupied";
-
-    return calcValuation({
-      ebitda: annualEbitda,
-      monthlyRevenue,
-      squareFootage: store.square_footage ?? 3500,
-      avgEquipmentAge: equipMetrics.totalMachines > 0 ? equipMetrics.weightedAvgAge : 6,
-      pct200G: equipMetrics.pct200GWashers,
-      equipmentScore: equipMetrics.qualityScore,
-      totalLeaseControl,
-      occupancyType: isOwnerOccupied ? "owned" : "leased",
-      marketDensity: normalizeMarketDensity(store.market_density ?? store.location_type),
-      storeCondition: normalizeStoreCondition(store.store_condition),
-      lastRetoolYear: store.last_retool_year ?? undefined,
-      retoolInvestment: store.retool_investment ?? undefined,
-      retoolType: store.retool_type ?? undefined,
-      revenueTrend: store.revenue_trend ?? "stable",
-      competitionLevel: store.competition_level ?? "normal",
-      selfServicePct: store.self_service_pct ?? 70,
-      wdfPct: store.wdf_pct ?? 18,
-      commercialPct: store.commercial_pct ?? 12,
-      pickupDeliveryPct: store.pickup_delivery_pct ?? 0,
-      realEstateValue: isOwnerOccupied ? (realEstate?.estimated_value ?? 0) : undefined,
-    });
-  }, [store, equipMetrics, totalLeaseControl, realEstate]);
 
   const generatedDate = useMemo(
     () =>

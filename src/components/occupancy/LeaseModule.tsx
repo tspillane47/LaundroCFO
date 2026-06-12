@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { SmallMetric } from "@/components/ui/MetricCard";
 import clsx from "clsx";
@@ -451,6 +452,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       }
     }
 
+    invalidateValuationCache(store.id);
     setSuccess("Lease saved successfully.");
     setTimeout(() => setSuccess(""), 3000);
     setMode("view");

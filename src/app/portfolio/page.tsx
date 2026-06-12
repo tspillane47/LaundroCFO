@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
+import { getStoreValuation } from "@/lib/getStoreValuation";
+import type { ValuationResult } from "@/lib/valuation";
 import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
@@ -22,8 +24,6 @@ import {
   DEMO_MONTHLY_EXPENSES,
   DEMO_ANNUAL_DEBT_SERVICE,
 } from "@/lib/data";
-
-const VALUATION_MULTIPLE = demoFinancials.valuationMultiple;
 
 type Store = {
   id: string;
@@ -105,6 +105,9 @@ export default function PortfolioPage() {
   const [deleteTarget, setDeleteTarget] = useState<Store | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [storeValuations, setStoreValuations] = useState<
+    { store: Store; valuation: ValuationResult & { store: Record<string, unknown> } }[]
+  >([]);
 
   useEffect(() => {
     if (localStorage.getItem("laundrocfo_show_welcome") === "true") {
@@ -176,6 +179,25 @@ export default function PortfolioPage() {
         insMap[p.store_id].push(p);
       }
       setInsuranceByStore(insMap);
+
+      const valuations = await Promise.all(
+        (stores as Store[]).map(async (store) => {
+          const valuation = await getStoreValuation(store.id);
+          return { store, valuation };
+        })
+      );
+      setStoreValuations(valuations);
+
+      const totalPortfolioValue = valuations.reduce((s, sv) => s + sv.valuation.businessValue, 0);
+      if (stores.length === 1 && valuations.length === 1) {
+        const singleStoreValue = valuations[0].valuation.businessValue;
+        if (Math.abs(totalPortfolioValue - singleStoreValue) > 1) {
+          console.warn("VALUATION MISMATCH: Portfolio value does not match single store value", {
+            portfolioValue: totalPortfolioValue,
+            storeValue: singleStoreValue,
+          });
+        }
+      }
     } catch {
       setLoadError(true);
     } finally {
@@ -186,6 +208,14 @@ export default function PortfolioPage() {
   useEffect(() => {
     loadPortfolioData();
   }, [loadPortfolioData]);
+
+  const valuationByStoreId = useMemo(() => {
+    const map = new Map<string, ValuationResult & { store: Record<string, unknown> }>();
+    for (const sv of storeValuations) {
+      map.set(sv.store.id, sv.valuation);
+    }
+    return map;
+  }, [storeValuations]);
 
   const storeMetrics = useMemo(() => {
     return (stores as Store[]).map((store) => {
@@ -201,8 +231,9 @@ export default function PortfolioPage() {
         : DEMO_ANNUAL_DEBT_SERVICE;
       const annualCashFlow = hasRealData ? annualEbitda - debtService : demoFinancials.cashFlow;
       const dscr = debtService > 0 ? annualCashFlow / debtService : 0;
-      const estimatedValue = hasRealData
-        ? annualEbitda * VALUATION_MULTIPLE
+      const storeValuation = valuationByStoreId.get(store.id);
+      const estimatedValue = hasRealData && storeValuation
+        ? storeValuation.businessValue
         : demoFinancials.estimatedValue;
       const loanBalance = store.loan_balance ?? 0;
       const storeCash =
@@ -236,7 +267,7 @@ export default function PortfolioPage() {
         hasDscrWarning: debtService > 0 && dscr < 1.25,
       };
     });
-  }, [stores, leases]);
+  }, [stores, leases, valuationByStoreId]);
 
   const usingDemoData = storeMetrics.some((m) => !m.hasRealData);
 

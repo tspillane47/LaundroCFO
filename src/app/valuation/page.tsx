@@ -5,7 +5,13 @@ import Link from "next/link";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
-import { calcValuation, type ValuationResult } from "@/lib/valuation";
+import {
+  computeStoreValuation,
+  getStoreValuation,
+  invalidateValuationCache,
+  type StoreValuationContext,
+} from "@/lib/getStoreValuation";
+import type { ValuationResult } from "@/lib/valuation";
 import {
   computeEquipmentMetrics,
   formatAdjustment,
@@ -108,6 +114,18 @@ const RETOOL_TYPES = [
   "Store Renovation + Equipment",
   "Other",
 ];
+
+const EMPTY_VALUATION: ValuationResult = {
+  baseMultiple: 4,
+  adjustments: [],
+  finalMultiple: 4,
+  businessValue: 0,
+  realEstateValue: 0,
+  combinedValue: 0,
+  valueDrivers: [],
+  valueRisks: [],
+  improvements: [],
+};
 
 const CATEGORY_COLORS: Record<string, string> = {
   equipment: "bg-purple-500/15 text-purple-300 border-purple-500/30",
@@ -349,6 +367,7 @@ export default function ValuationPage() {
   const [yearsRemaining, setYearsRemaining] = useState(0);
   const [totalLeaseControl, setTotalLeaseControl] = useState(0);
   const [calcExpanded, setCalcExpanded] = useState(false);
+  const [valuationContext, setValuationContext] = useState<StoreValuationContext | null>(null);
 
   const loadValuationData = useCallback(async () => {
     if (!selectedStore?.id) {
@@ -361,16 +380,9 @@ export default function ValuationPage() {
     setLoadError(false);
 
     try {
-      const { data: storeData, error: storeError } = await supabase
-        .from("stores")
-        .select("*")
-        .eq("id", selectedStore.id)
-        .single();
-
-      if (storeError) throw storeError;
-      if (!storeData) throw new Error("Store not found");
-
-      const store = storeData as StoreRow;
+      const valuationResult = await getStoreValuation(selectedStore.id);
+      const store = valuationResult.store as StoreRow;
+      if (!store?.id) throw new Error("Store not found");
       setStore(store);
       setStoreId(store.id);
       setStoreName(store.name ?? "Your Store");
@@ -469,6 +481,26 @@ export default function ValuationPage() {
         setRealEstateValue(0);
       }
 
+      const { data: leaseRow } = await supabase
+        .from("leases")
+        .select("*")
+        .eq("store_id", store.id)
+        .maybeSingle();
+      const { data: leaseOpts } = leaseRow
+        ? await supabase.from("lease_options").select("*").eq("lease_id", leaseRow.id)
+        : { data: [] };
+      const { data: reRow } = ownerOccupied
+        ? await supabase.from("real_estate").select("*").eq("store_id", store.id).maybeSingle()
+        : { data: null };
+
+      setValuationContext({
+        store: store as unknown as Record<string, unknown>,
+        equipment: (equipmentData ?? []) as EquipmentRecord[],
+        lease: leaseRow ?? null,
+        leaseOptions: leaseOpts ?? [],
+        realEstate: reRow ?? null,
+      });
+
     } catch {
       setLoadError(true);
     } finally {
@@ -485,53 +517,39 @@ export default function ValuationPage() {
     [equipment]
   );
 
-  const valuation = useMemo(
-    () =>
-      calcValuation({
-        ebitda: annualEbitda,
-        monthlyRevenue,
-        squareFootage,
-        avgEquipmentAge: equipMetrics.totalMachines > 0
-          ? equipMetrics.weightedAvgAge
-          : 6,
-        pct200G: equipMetrics.pct200GWashers,
-        equipmentScore: equipMetrics.qualityScore,
-        totalLeaseControl,
-        occupancyType: isOwnerOccupied ? "owned" : "leased",
-        marketDensity,
-        storeCondition,
-        lastRetoolYear: lastRetoolYear ? parseInt(lastRetoolYear, 10) : undefined,
-        retoolInvestment: retoolInvestment ? parseFloat(retoolInvestment) : undefined,
-        retoolType: retoolType || undefined,
-        revenueTrend,
-        competitionLevel,
-        selfServicePct,
-        wdfPct,
-        commercialPct,
-        pickupDeliveryPct,
-        realEstateValue: isOwnerOccupied ? realEstateValue : undefined,
-      }),
-    [
-      annualEbitda,
-      monthlyRevenue,
-      squareFootage,
-      equipMetrics,
-      totalLeaseControl,
-      isOwnerOccupied,
+  const valuation = useMemo(() => {
+    if (!valuationContext) return EMPTY_VALUATION;
+
+    return computeStoreValuation(valuationContext, {
       marketDensity,
       storeCondition,
-      lastRetoolYear,
-      retoolInvestment,
-      retoolType,
       revenueTrend,
       competitionLevel,
       selfServicePct,
       wdfPct,
       commercialPct,
       pickupDeliveryPct,
-      realEstateValue,
-    ]
-  );
+      lastRetoolYear: lastRetoolYear ? parseInt(lastRetoolYear, 10) : undefined,
+      retoolInvestment: retoolInvestment ? parseFloat(retoolInvestment) : undefined,
+      retoolType: retoolType || undefined,
+      realEstateValue: isOwnerOccupied ? realEstateValue : undefined,
+    });
+  }, [
+    valuationContext,
+    marketDensity,
+    storeCondition,
+    revenueTrend,
+    competitionLevel,
+    selfServicePct,
+    wdfPct,
+    commercialPct,
+    pickupDeliveryPct,
+    lastRetoolYear,
+    retoolInvestment,
+    retoolType,
+    isOwnerOccupied,
+    realEstateValue,
+  ]);
 
   const equipmentValAdj = sumCategoryAdj(valuation, "equipment");
   const leaseValAdj = sumCategoryAdj(valuation, "lease");
@@ -587,6 +605,28 @@ export default function ValuationPage() {
     if (updateError) {
       setError(updateError.message);
     } else {
+      invalidateValuationCache(storeId);
+      setValuationContext((prev) =>
+        prev
+          ? {
+              ...prev,
+              store: {
+                ...prev.store,
+                market_density: marketDensity,
+                revenue_trend: revenueTrend,
+                store_condition: storeCondition,
+                competition_level: competitionLevel,
+                self_service_pct: selfServicePct,
+                wdf_pct: wdfPct,
+                commercial_pct: commercialPct,
+                pickup_delivery_pct: pickupDeliveryPct,
+                last_retool_year: lastRetoolYear ? parseInt(lastRetoolYear, 10) : null,
+                retool_investment: retoolInvestment ? parseFloat(retoolInvestment) : null,
+                retool_type: retoolType || null,
+              },
+            }
+          : prev
+      );
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     }

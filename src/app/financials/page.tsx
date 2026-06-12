@@ -19,6 +19,7 @@ import {
   YAxis,
 } from "recharts";
 import { createClient } from "@/lib/supabase";
+import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple, fmtPct } from "@/lib/calculations";
 import { MetricCard } from "@/components/ui/MetricCard";
@@ -485,6 +486,7 @@ export default function FinancialsPage() {
       }
     }
 
+    invalidateValuationCache(store.id);
     setSuccess(`${MONTH_NAMES[selectedMonth - 1]} ${selectedYear} saved.`);
     setShowForm(false);
     setSaving(false);

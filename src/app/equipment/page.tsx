@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
+import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { useStores } from "@/lib/store-context";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
@@ -244,6 +245,7 @@ export default function EquipmentPage() {
     if (saveError) {
       setMessage({ type: "error", text: "We couldn't save this. Please try again." });
     } else {
+      invalidateValuationCache(store.id);
       setMessage({ type: "success", text: "Saved successfully." });
       setTimeout(() => setMessage(null), 3000);
       closeForm();

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
-import { calcValuationMultiple } from "@/lib/valuation";
+import { getStoreValuation } from "@/lib/getStoreValuation";
+import type { ValuationResult } from "@/lib/valuation";
 import {
   calcBuildingEquity,
   calcOccupancyCostRatioFromRent,
@@ -153,11 +154,13 @@ export default function DashboardPage() {
   const [insurancePolicies, setInsurancePolicies] = useState<any[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [valuation, setValuation] = useState<(ValuationResult & { store: Record<string, unknown> }) | null>(null);
   const supabase = createClient();
 
   const loadDashboardData = useCallback(async () => {
     if (!selectedStore) {
       setStore(null);
+      setValuation(null);
       setLoadError(false);
       return;
     }
@@ -169,6 +172,9 @@ export default function DashboardPage() {
     setLoadError(false);
 
     try {
+      const storeValuation = await getStoreValuation(loadedStore.id);
+      setValuation(storeValuation);
+
       const [{ data: policiesData, error: policiesError }, { data: equipmentData, error: equipmentError }] =
         await Promise.all([
           supabase
@@ -313,32 +319,18 @@ export default function DashboardPage() {
   const equipmentScore = calcEquipmentScore(avgEquipmentAge);
   const machines = (store?.washers ?? 28) + (store?.dryers ?? 32);
 
-  const valuation = useMemo(() => {
-    const totalControl = leaseMetrics?.totalControl ?? (isOwnerOccupied ? 15 : 0);
-    return calcValuationMultiple({
-      ebitda: annualEbitda,
-      locationCategory: store?.location_type ?? "suburban",
-      totalLeaseControl: totalControl,
-      occupancyType: isOwnerOccupied ? "owned" : "leased",
-      avgEquipmentAge,
-      squareFootage: sqft,
-      revenueTrend: store?.revenue_trend ?? "stable",
-      storeCondition: store?.store_condition ?? "average",
-      competitionLevel: store?.competition_level ?? "normal",
-      realEstateValue: realEstateMetrics?.estimatedValue ?? undefined,
-    });
-  }, [annualEbitda, store, leaseMetrics, isOwnerOccupied, realEstateMetrics, avgEquipmentAge, sqft]);
-
-  const estimatedValue = store?.monthly_revenue != null
+  const estimatedValue = store?.monthly_revenue != null && valuation
     ? Math.round(valuation.businessValue)
     : demoFinancials.estimatedValue;
-  const finalMultiple = store?.monthly_revenue != null
+  const finalMultiple = store?.monthly_revenue != null && valuation
     ? valuation.finalMultiple
     : demoFinancials.valuationMultiple;
 
   const totalCash = (storeData?.operating_account_balance ?? 0) + (storeData?.reserve_account_balance ?? 0) + (storeData?.petty_cash ?? 0);
   const totalDebt = storeData?.loan_balance ?? 0;
-  const businessValue = Math.round(annualEbitda * finalMultiple);
+  const businessValue = store?.monthly_revenue != null && valuation
+    ? Math.round(valuation.businessValue)
+    : demoFinancials.estimatedValue;
   const equity = businessValue - totalDebt + totalCash;
 
   const valuationTrend = useMemo(

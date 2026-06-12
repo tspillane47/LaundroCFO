@@ -1,6 +1,7 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormBanner } from "@/components/ui/FormBanner";
 
@@ -107,6 +108,7 @@ function EditStoreForm() {
     if (updateError) {
       setMessage({ type: "error", text: "We couldn't save this. Please try again." });
     } else {
+      invalidateValuationCache(storeId);
       setMessage({ type: "success", text: "Saved successfully." });
     }
     setSaving(false);

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { useRouter } from "next/navigation";
 import { useStores } from "@/lib/store-context";
 import { OccupancySelector, type OccupancyType } from "@/components/occupancy/OccupancySelector";
@@ -97,6 +98,7 @@ export default function OccupancyPage() {
       return;
     }
 
+    invalidateValuationCache(store.id);
     setStore((s) => (s ? { ...s, occupancy_type: type } : s));
     setShowSelector(false);
     setMessage({ type: "success", text: "Saved successfully." });
