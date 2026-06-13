@@ -393,10 +393,10 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             cam_charges: Number(leaseForm.cam_charges) || 0,
             security_deposit: Number(leaseForm.security_deposit) || 0,
             square_footage: Number(leaseForm.square_footage) || 0,
-            personal_guaranty: leaseForm.personal_guaranty,
+            personal_guaranty: Boolean(leaseForm.personal_guaranty),
             assignment_rights: leaseForm.assignment_rights || null,
             sublease_rights: leaseForm.sublease_rights || null,
-            exclusivity_clause: leaseForm.exclusivity_clause,
+            exclusivity_clause: Boolean(leaseForm.exclusivity_clause),
             use_restrictions: leaseForm.use_restrictions || null,
             updated_at: new Date().toISOString(),
           },
@@ -435,10 +435,10 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
           lease_id: leaseId,
           store_id: store.id,
           user_id: user.id,
-          option_number: form.option_number ? Number(form.option_number) : null,
-          option_years: form.option_years ? Number(form.option_years) : null,
+          option_number: Number(form.option_number) || 0,
+          option_years: Number(form.option_years) || 0,
           status: form.status || "Available",
-          notice_days: form.notice_days ? Number(form.notice_days) : null,
+          notice_days: Number(form.notice_days) || 0,
         };
 
         if (form.id) {
