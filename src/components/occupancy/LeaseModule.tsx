@@ -31,7 +31,7 @@ type Lease = {
   security_deposit: number | null;
   personal_guaranty: boolean | null;
   assignment_rights: string | null;
-  sublease_rights: string | null;
+  sublease_rights: boolean | null;
   exclusivity_clause: boolean | null;
   use_restrictions: string | null;
 };
@@ -63,7 +63,7 @@ type LeaseForm = {
   security_deposit: string;
   personal_guaranty: boolean;
   assignment_rights: string;
-  sublease_rights: string;
+  sublease_rights: boolean;
   exclusivity_clause: boolean;
   use_restrictions: string;
 };
@@ -77,7 +77,6 @@ type OptionForm = {
 };
 
 const ASSIGNMENT_OPTIONS = ["Allowed", "With Consent", "Not Allowed"];
-const SUBLEASE_OPTIONS = ["Allowed", "With Consent", "Not Allowed", "Prohibited"];
 const OPTION_STATUSES = ["Available", "Exercised", "Expired", "Declined"];
 
 function emptyLeaseForm(): LeaseForm {
@@ -93,7 +92,7 @@ function emptyLeaseForm(): LeaseForm {
     security_deposit: "",
     personal_guaranty: false,
     assignment_rights: "With Consent",
-    sublease_rights: "With Consent",
+    sublease_rights: false,
     exclusivity_clause: false,
     use_restrictions: "",
   };
@@ -113,7 +112,7 @@ function leaseToForm(lease: Lease): LeaseForm {
     security_deposit: lease.security_deposit != null ? String(lease.security_deposit) : "",
     personal_guaranty: lease.personal_guaranty ?? false,
     assignment_rights: lease.assignment_rights ?? "With Consent",
-    sublease_rights: lease.sublease_rights ?? "With Consent",
+    sublease_rights: lease.sublease_rights ?? false,
     exclusivity_clause: lease.exclusivity_clause ?? false,
     use_restrictions: lease.use_restrictions ?? "",
   };
@@ -395,7 +394,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             square_footage: Number(leaseForm.square_footage) || 0,
             personal_guaranty: Boolean(leaseForm.personal_guaranty),
             assignment_rights: leaseForm.assignment_rights || null,
-            sublease_rights: leaseForm.sublease_rights || null,
+            sublease_rights: Boolean(leaseForm.sublease_rights),
             exclusivity_clause: Boolean(leaseForm.exclusivity_clause),
             use_restrictions: leaseForm.use_restrictions || null,
             updated_at: new Date().toISOString(),
@@ -632,7 +631,10 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                 value={lease.assignment_rights ?? "—"}
                 badge={assignmentBadge}
               />
-              <LabelValue label="Sublease Rights" value={lease.sublease_rights ?? "—"} />
+              <LabelValue
+                label="Sublease Rights"
+                value={formatBool(lease.sublease_rights)}
+              />
               <LabelValue
                 label="Exclusivity Clause"
                 value={formatBool(lease.exclusivity_clause)}
@@ -846,23 +848,18 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                   ))}
                 </select>
               </div>
-              <div>
-                <div className="metric-label mb-1.5">Sublease Rights</div>
-                <select
-                  value={leaseForm.sublease_rights}
-                  onChange={(e) => setLeaseField("sublease_rights", e.target.value)}
-                  className={INPUT_CLASS}
-                >
-                  {SUBLEASE_OPTIONS.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
 
             <div className="flex flex-wrap gap-6">
+              <label className="flex items-center gap-2 text-[13px] text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={leaseForm.sublease_rights}
+                  onChange={(e) => setLeaseField("sublease_rights", e.target.checked)}
+                  className="rounded border-white/20"
+                />
+                Sublease Rights
+              </label>
               <label className="flex items-center gap-2 text-[13px] text-slate-300 cursor-pointer">
                 <input
                   type="checkbox"
