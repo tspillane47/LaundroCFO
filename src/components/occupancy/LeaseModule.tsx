@@ -79,6 +79,17 @@ type OptionForm = {
 const ASSIGNMENT_OPTIONS = ["Allowed", "With Consent", "Not Allowed"];
 const OPTION_STATUSES = ["Available", "Exercised", "Expired", "Declined"];
 
+/** Coerce lease booleans; legacy sublease dropdown values must never reach the DB as text. */
+function toLeaseBoolean(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "1", "allowed", "with consent"].includes(normalized)) return true;
+    return false;
+  }
+  return Boolean(value);
+}
+
 function emptyLeaseForm(): LeaseForm {
   return {
     landlord: "",
@@ -110,10 +121,10 @@ function leaseToForm(lease: Lease): LeaseForm {
     cam_charges: lease.cam_charges != null ? String(lease.cam_charges) : "",
     square_footage: lease.square_footage != null ? String(lease.square_footage) : "",
     security_deposit: lease.security_deposit != null ? String(lease.security_deposit) : "",
-    personal_guaranty: lease.personal_guaranty ?? false,
+    personal_guaranty: toLeaseBoolean(lease.personal_guaranty),
     assignment_rights: lease.assignment_rights ?? "With Consent",
-    sublease_rights: lease.sublease_rights ?? false,
-    exclusivity_clause: lease.exclusivity_clause ?? false,
+    sublease_rights: toLeaseBoolean(lease.sublease_rights),
+    exclusivity_clause: toLeaseBoolean(lease.exclusivity_clause),
     use_restrictions: lease.use_restrictions ?? "",
   };
 }
@@ -392,10 +403,10 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             cam_charges: Number(leaseForm.cam_charges) || 0,
             security_deposit: Number(leaseForm.security_deposit) || 0,
             square_footage: Number(leaseForm.square_footage) || 0,
-            personal_guaranty: Boolean(leaseForm.personal_guaranty),
+            personal_guaranty: toLeaseBoolean(leaseForm.personal_guaranty),
             assignment_rights: leaseForm.assignment_rights || null,
-            sublease_rights: Boolean(leaseForm.sublease_rights),
-            exclusivity_clause: Boolean(leaseForm.exclusivity_clause),
+            sublease_rights: toLeaseBoolean(leaseForm.sublease_rights),
+            exclusivity_clause: toLeaseBoolean(leaseForm.exclusivity_clause),
             use_restrictions: leaseForm.use_restrictions || null,
             updated_at: new Date().toISOString(),
           },
