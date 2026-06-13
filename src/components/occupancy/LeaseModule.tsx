@@ -384,7 +384,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
           {
             store_id: store.id,
             user_id: user.id,
-            landlord: leaseForm.landlord || null,
+            landlord_name: leaseForm.landlord || null,
             tenant_entity: leaseForm.tenant_entity || null,
             lease_start_date: leaseForm.lease_start_date || null,
             lease_end_date: leaseForm.lease_end_date || null,
