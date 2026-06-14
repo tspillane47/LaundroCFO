@@ -60,7 +60,9 @@ import {
   inferTransactionType,
   normalizeVendorPattern,
   categorizeWithRules,
-  findMatchingRule,
+  findMatchingVendorRule,
+  findMatchingAmountRule,
+  isGenericTransactionDescription,
   mapBankCategoryToPlField,
   isCategoryReadyToPost,
   getImportCategoriesForType,
@@ -69,6 +71,8 @@ import {
   type TransactionType,
   type BankImportCategory,
   type CategorizationRule,
+  type RuleType,
+  type RuleMatchKind,
 } from "@/lib/financials";
 
 type TabId = "pl" | "trends" | "ratios" | "bank" | "quickbooks";
@@ -83,7 +87,7 @@ type StagedTransaction = {
   type: TransactionType;
   category: BankImportCategory;
   suggested: BankImportCategory;
-  ruleApplied?: boolean;
+  ruleApplied?: RuleMatchKind;
   possibleDuplicate?: boolean;
 };
 
@@ -96,7 +100,7 @@ type ReviewTransaction = {
   type: TransactionType;
   category: BankImportCategory;
   suggested: BankImportCategory;
-  ruleApplied?: boolean;
+  ruleApplied?: RuleMatchKind;
   possibleDuplicate?: boolean;
   staged?: StagedTransaction;
   bank?: BankTransaction;
@@ -111,7 +115,7 @@ type TransactionGroup = {
   type: TransactionType;
   category: BankImportCategory;
   suggested: BankImportCategory;
-  ruleApplied: boolean;
+  ruleApplied: RuleMatchKind;
   items: ReviewTransaction[];
 };
 
@@ -275,6 +279,136 @@ function TypeBadge({ type }: { type: TransactionType }) {
   );
 }
 
+function RuleAppliedBadge({ kind }: { kind: RuleMatchKind }) {
+  if (!kind) return null;
+  return (
+    <span className="badge badge-green text-[10px]">
+      Rule Applied ({kind === "amount" ? "Amount" : "Vendor"})
+    </span>
+  );
+}
+
+function RuleFormPanel({
+  type,
+  vendorPattern,
+  amount,
+  category,
+  ruleType,
+  ruleAmount,
+  ruleTolerance,
+  onRuleTypeChange,
+  onCategoryChange,
+  onAmountChange,
+  onToleranceChange,
+  onSave,
+  onCancel,
+}: {
+  type: TransactionType;
+  vendorPattern: string;
+  amount: number;
+  category: BankImportCategory;
+  ruleType: RuleType;
+  ruleAmount: string;
+  ruleTolerance: string;
+  onRuleTypeChange: (t: RuleType) => void;
+  onCategoryChange: (c: BankImportCategory) => void;
+  onAmountChange: (v: string) => void;
+  onToleranceChange: (v: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="space-y-3 text-[12px]">
+      <div className="flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+          <input
+            type="radio"
+            name="rule-type"
+            checked={ruleType === "vendor"}
+            onChange={() => onRuleTypeChange("vendor")}
+            className="border-white/20"
+          />
+          By vendor name
+        </label>
+        <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+          <input
+            type="radio"
+            name="rule-type"
+            checked={ruleType === "amount"}
+            onChange={() => onRuleTypeChange("amount")}
+            className="border-white/20"
+          />
+          By amount
+        </label>
+      </div>
+      {ruleType === "vendor" ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-slate-300">
+            Always categorize transactions containing{" "}
+            <span className="font-mono text-slate-100">{vendorPattern}</span> as:
+          </span>
+          <select
+            value={category}
+            onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
+            className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
+          >
+            {getImportCategoriesForType(type).map((f) => (
+              <option key={f} value={f}>
+                {BANK_IMPORT_CATEGORY_LABELS[f]}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-slate-300">
+            Always categorize {type === "income" ? "income" : "expense"} transactions of
+          </span>
+          <span className="text-slate-400">$</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={ruleAmount}
+            onChange={(e) => onAmountChange(e.target.value)}
+            className={clsx(INPUT_CLASS, "w-28 py-1.5 text-[12px] tabular-nums")}
+          />
+          <span className="text-slate-400">within $</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={ruleTolerance}
+            onChange={(e) => onToleranceChange(e.target.value)}
+            className={clsx(INPUT_CLASS, "w-20 py-1.5 text-[12px] tabular-nums")}
+          />
+          <span className="text-slate-300">as:</span>
+          <select
+            value={category}
+            onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
+            className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
+          >
+            {getImportCategoriesForType(type).map((f) => (
+              <option key={f} value={f}>
+                {BANK_IMPORT_CATEGORY_LABELS[f]}
+              </option>
+            ))}
+          </select>
+          <span className="text-slate-500">(from ${amount.toFixed(2)})</span>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="btn-primary text-[11px]" onClick={onSave}>
+          Save Rule
+        </button>
+        <button type="button" className="btn-outline text-[11px]" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function FinancialsPage() {
   const supabase = createClient();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
@@ -297,6 +431,12 @@ export default function FinancialsPage() {
   const [categorizationRules, setCategorizationRules] = useState<CategorizationRule[]>([]);
   const [ruleFormKey, setRuleFormKey] = useState<string | null>(null);
   const [ruleFormCategory, setRuleFormCategory] = useState<BankImportCategory>("revenue");
+  const [ruleFormType, setRuleFormType] = useState<RuleType>("vendor");
+  const [ruleFormAmount, setRuleFormAmount] = useState("");
+  const [ruleFormTolerance, setRuleFormTolerance] = useState("0.01");
+  const [ruleFormTxnType, setRuleFormTxnType] = useState<TransactionType>("expense");
+  const [ruleFormVendorPattern, setRuleFormVendorPattern] = useState("");
+  const [ruleFormSourceAmount, setRuleFormSourceAmount] = useState(0);
   const [showManageRules, setShowManageRules] = useState(false);
   const [qbMappings, setQbMappings] = useState<QBMappingRow[]>(DEFAULT_QB_MAPPINGS);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -493,9 +633,13 @@ export default function FinancialsPage() {
       const type = inferTransactionType(txn.amount, txn.category);
       const amount = Math.abs(txn.amount);
       const storedCategory = txn.category as BankImportCategory | null;
-      const rule = findMatchingRule(categorizationRules, txn.description);
-      if (rule) {
-        const category = rule.category as BankImportCategory;
+      const { category, suggested, ruleApplied } = categorizeWithRules(
+        txn.description,
+        type,
+        amount,
+        categorizationRules
+      );
+      if (ruleApplied) {
         return {
           key: txn.id,
           isStaged: false,
@@ -505,11 +649,11 @@ export default function FinancialsPage() {
           type,
           category,
           suggested: category,
-          ruleApplied: true,
+          ruleApplied,
           bank: txn,
         };
       }
-      const suggested = suggestTransactionCategory(txn.description, type);
+      const keywordSuggested = suggestTransactionCategory(txn.description, type);
       return {
         key: txn.id,
         isStaged: false,
@@ -517,8 +661,8 @@ export default function FinancialsPage() {
         description: txn.description,
         amount,
         type,
-        category: storedCategory ?? suggested,
-        suggested,
+        category: storedCategory ?? keywordSuggested,
+        suggested: keywordSuggested,
         ruleApplied: false,
         bank: txn,
       };
@@ -532,14 +676,16 @@ export default function FinancialsPage() {
 
     for (const txn of reviewTransactions) {
       const vendorPattern = normalizeVendorPattern(txn.description);
-      const groupKey = `${vendorPattern || "(no description)"}::${txn.type}`;
+      const groupKey = isGenericTransactionDescription(txn.description)
+        ? `__individual__::${txn.key}`
+        : `${vendorPattern || "(no description)"}::${txn.type}`;
 
       const existing = map.get(groupKey);
       if (existing) {
         existing.count += 1;
         existing.totalAmount += txn.amount;
         existing.items.push(txn);
-        if (txn.ruleApplied) existing.ruleApplied = true;
+        if (txn.ruleApplied) existing.ruleApplied = txn.ruleApplied;
         const categories = new Set(existing.items.map((i) => i.category));
         if (categories.size === 1) existing.category = txn.category;
       } else {
@@ -724,6 +870,7 @@ export default function FinancialsPage() {
         const { category, suggested, ruleApplied } = categorizeWithRules(
           parsed[i].description,
           row.type,
+          row.amount,
           rules
         );
         return {
@@ -807,19 +954,84 @@ export default function FinancialsPage() {
     setSuccess(`Removed ${count} pending transaction${count === 1 ? "" : "s"}.`);
   }
 
-  function openRuleForm(key: string, category: BankImportCategory, type: TransactionType) {
+  function openRuleForm(
+    key: string,
+    category: BankImportCategory,
+    type: TransactionType,
+    vendorPattern: string,
+    amount: number
+  ) {
     setRuleFormKey(key);
     setRuleFormCategory(category === "needs_review" ? (type === "income" ? "revenue" : "utilities") : category);
+    setRuleFormType("vendor");
+    setRuleFormAmount(amount.toFixed(2));
+    setRuleFormTolerance("0.01");
+    setRuleFormTxnType(type);
+    setRuleFormVendorPattern(vendorPattern);
+    setRuleFormSourceAmount(amount);
   }
 
-  async function saveCategorizationRule(vendorPattern: string, category: BankImportCategory) {
-    if (!userId || !vendorPattern.trim()) return;
+  async function saveCategorizationRule() {
+    if (!userId) return;
+
+    if (ruleFormType === "vendor") {
+      if (!ruleFormVendorPattern.trim()) return;
+      const { data, error: insertError } = await supabase
+        .from("categorization_rules")
+        .insert({
+          user_id: userId,
+          vendor_pattern: ruleFormVendorPattern.trim().toUpperCase(),
+          category: ruleFormCategory,
+          rule_type: "vendor",
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        setError(insertError.message);
+        return;
+      }
+
+      const rule = data as CategorizationRule;
+      setCategorizationRules((prev) => [rule, ...prev]);
+
+      setStagedTransactions((prev) =>
+        prev.map((t) => {
+          if (findMatchingAmountRule([rule], t.amount, t.type)) return t;
+          const normalized = normalizeVendorPattern(t.description);
+          if (normalized.includes(rule.vendor_pattern.toUpperCase())) {
+            return { ...t, category: ruleFormCategory, suggested: ruleFormCategory, ruleApplied: "vendor" as const };
+          }
+          return t;
+        })
+      );
+
+      setRuleFormKey(null);
+      setSuccess(`Rule saved: "${rule.vendor_pattern}" → ${BANK_IMPORT_CATEGORY_LABELS[ruleFormCategory]}`);
+      return;
+    }
+
+    const amount = parseFloat(ruleFormAmount);
+    const tolerance = parseFloat(ruleFormTolerance);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Enter a valid amount for the rule.");
+      return;
+    }
+    if (!Number.isFinite(tolerance) || tolerance < 0) {
+      setError("Enter a valid tolerance (0 or greater).");
+      return;
+    }
+
     const { data, error: insertError } = await supabase
       .from("categorization_rules")
       .insert({
         user_id: userId,
-        vendor_pattern: vendorPattern.trim().toUpperCase(),
-        category,
+        vendor_pattern: "",
+        category: ruleFormCategory,
+        rule_type: "amount",
+        amount,
+        amount_tolerance: tolerance,
+        transaction_type: ruleFormTxnType,
       })
       .select()
       .single();
@@ -834,16 +1046,17 @@ export default function FinancialsPage() {
 
     setStagedTransactions((prev) =>
       prev.map((t) => {
-        const normalized = normalizeVendorPattern(t.description);
-        if (normalized.includes(rule.vendor_pattern.toUpperCase())) {
-          return { ...t, category, suggested: category, ruleApplied: true };
+        if (findMatchingAmountRule([rule], t.amount, t.type)) {
+          return { ...t, category: ruleFormCategory, suggested: ruleFormCategory, ruleApplied: "amount" as const };
         }
         return t;
       })
     );
 
     setRuleFormKey(null);
-    setSuccess(`Rule saved: "${rule.vendor_pattern}" → ${BANK_IMPORT_CATEGORY_LABELS[category]}`);
+    setSuccess(
+      `Rule saved: ${ruleFormTxnType === "income" ? "income" : "expense"} $${amount.toFixed(2)} (±$${tolerance.toFixed(2)}) → ${BANK_IMPORT_CATEGORY_LABELS[ruleFormCategory]}`
+    );
   }
 
   async function deleteCategorizationRule(ruleId: string) {
@@ -1793,13 +2006,33 @@ export default function FinancialsPage() {
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {categorizationRules.map((rule) => (
+                    {categorizationRules.map((rule) => {
+                      const isAmountRule = rule.rule_type === "amount";
+                      return (
                       <div
                         key={rule.id}
                         className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-white/[0.04] last:border-b-0"
                       >
                         <div className="text-[12px] text-slate-300">
-                          <span className="font-mono text-slate-100">{rule.vendor_pattern}</span>
+                          {isAmountRule ? (
+                            <>
+                              When{" "}
+                              <span className="text-slate-100">
+                                {rule.transaction_type === "income" ? "income" : "expense"}
+                              </span>{" "}
+                              amount ={" "}
+                              <span className="font-mono text-slate-100">
+                                ${Number(rule.amount ?? 0).toFixed(2)}
+                              </span>{" "}
+                              <span className="text-slate-500">
+                                (±${Number(rule.amount_tolerance ?? 0.01).toFixed(2)})
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              When description contains &apos;{rule.vendor_pattern}&apos;
+                            </>
+                          )}
                           <span className="text-slate-500 mx-2">→</span>
                           <CategoryBadge category={rule.category as BankImportCategory} />
                         </div>
@@ -1811,7 +2044,7 @@ export default function FinancialsPage() {
                           Delete
                         </button>
                       </div>
-                    ))}
+                    );})}
                   </div>
                 )}
               </div>
@@ -1927,9 +2160,7 @@ export default function FinancialsPage() {
                           <td className="py-3 pr-3">
                             <div className="flex flex-wrap items-center gap-1">
                               <CategoryBadge category={group.suggested} />
-                              {group.ruleApplied && (
-                                <span className="badge badge-green text-[10px]">Rule Applied</span>
-                              )}
+                              <RuleAppliedBadge kind={group.ruleApplied} />
                               {group.items.some((i) => i.possibleDuplicate) && (
                                 <span className="badge badge-amber text-[10px]">Possible Duplicate</span>
                               )}
@@ -1954,7 +2185,15 @@ export default function FinancialsPage() {
                             <button
                               type="button"
                               className="text-[11px] text-blue-400 hover:text-blue-300"
-                              onClick={() => openRuleForm(group.groupKey, group.category, group.type)}
+                              onClick={() =>
+                                openRuleForm(
+                                  group.groupKey,
+                                  group.category,
+                                  group.type,
+                                  group.vendorPattern,
+                                  group.count === 1 ? group.totalAmount : group.items[0]?.amount ?? group.totalAmount
+                                )
+                              }
                             >
                               Set as Rule
                             </button>
@@ -1963,37 +2202,21 @@ export default function FinancialsPage() {
                         {ruleFormKey === group.groupKey && (
                           <tr key={`${group.groupKey}-rule`} className="border-b border-white/[0.04] bg-blue-500/5">
                             <td colSpan={7} className="py-3 px-3">
-                              <div className="flex flex-wrap items-center gap-3 text-[12px]">
-                                <span className="text-slate-300">
-                                  Always categorize transactions from{" "}
-                                  <span className="font-mono text-slate-100">{group.vendorPattern}</span> as:
-                                </span>
-                                <select
-                                  value={ruleFormCategory}
-                                  onChange={(e) => setRuleFormCategory(e.target.value as BankImportCategory)}
-                                  className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
-                                >
-                                  {getImportCategoriesForType(group.type).map((f) => (
-                                    <option key={f} value={f}>
-                                      {BANK_IMPORT_CATEGORY_LABELS[f]}
-                                    </option>
-                                  ))}
-                                </select>
-                                <button
-                                  type="button"
-                                  className="btn-primary text-[11px]"
-                                  onClick={() => saveCategorizationRule(group.vendorPattern, ruleFormCategory)}
-                                >
-                                  Save Rule
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn-outline text-[11px]"
-                                  onClick={() => setRuleFormKey(null)}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
+                              <RuleFormPanel
+                                type={group.type}
+                                vendorPattern={group.vendorPattern}
+                                amount={group.count === 1 ? group.totalAmount : group.items[0]?.amount ?? group.totalAmount}
+                                category={ruleFormCategory}
+                                ruleType={ruleFormType}
+                                ruleAmount={ruleFormAmount}
+                                ruleTolerance={ruleFormTolerance}
+                                onRuleTypeChange={setRuleFormType}
+                                onCategoryChange={setRuleFormCategory}
+                                onAmountChange={setRuleFormAmount}
+                                onToleranceChange={setRuleFormTolerance}
+                                onSave={saveCategorizationRule}
+                                onCancel={() => setRuleFormKey(null)}
+                              />
                             </td>
                           </tr>
                         )}
@@ -2078,9 +2301,7 @@ export default function FinancialsPage() {
                           <td className="py-3 pr-3">
                             <div className="flex flex-wrap items-center gap-1">
                               <CategoryBadge category={txn.suggested} />
-                              {txn.ruleApplied && (
-                                <span className="badge badge-green text-[10px]">Rule Applied</span>
-                              )}
+                              <RuleAppliedBadge kind={txn.ruleApplied ?? false} />
                             </div>
                           </td>
                           <td className="py-3 text-right whitespace-nowrap">
@@ -2102,7 +2323,15 @@ export default function FinancialsPage() {
                             <button
                               type="button"
                               className="text-[11px] text-blue-400 hover:text-blue-300"
-                              onClick={() => openRuleForm(txn.key, txn.category, txn.type)}
+                              onClick={() =>
+                                openRuleForm(
+                                  txn.key,
+                                  txn.category,
+                                  txn.type,
+                                  normalizeVendorPattern(txn.description) || "(no description)",
+                                  txn.amount
+                                )
+                              }
                             >
                               Set as Rule
                             </button>
@@ -2111,45 +2340,21 @@ export default function FinancialsPage() {
                         {ruleFormKey === txn.key && (
                           <tr className="border-b border-white/[0.04] bg-blue-500/5">
                             <td colSpan={8} className="py-3 px-3">
-                              <div className="flex flex-wrap items-center gap-3 text-[12px]">
-                                <span className="text-slate-300">
-                                  Always categorize transactions from{" "}
-                                  <span className="font-mono text-slate-100">
-                                    {normalizeVendorPattern(txn.description) || "(no description)"}
-                                  </span>{" "}
-                                  as:
-                                </span>
-                                <select
-                                  value={ruleFormCategory}
-                                  onChange={(e) => setRuleFormCategory(e.target.value as BankImportCategory)}
-                                  className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
-                                >
-                                  {getImportCategoriesForType(txn.type).map((f) => (
-                                    <option key={f} value={f}>
-                                      {BANK_IMPORT_CATEGORY_LABELS[f]}
-                                    </option>
-                                  ))}
-                                </select>
-                                <button
-                                  type="button"
-                                  className="btn-primary text-[11px]"
-                                  onClick={() =>
-                                    saveCategorizationRule(
-                                      normalizeVendorPattern(txn.description) || "(no description)",
-                                      ruleFormCategory
-                                    )
-                                  }
-                                >
-                                  Save Rule
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn-outline text-[11px]"
-                                  onClick={() => setRuleFormKey(null)}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
+                              <RuleFormPanel
+                                type={txn.type}
+                                vendorPattern={normalizeVendorPattern(txn.description) || "(no description)"}
+                                amount={txn.amount}
+                                category={ruleFormCategory}
+                                ruleType={ruleFormType}
+                                ruleAmount={ruleFormAmount}
+                                ruleTolerance={ruleFormTolerance}
+                                onRuleTypeChange={setRuleFormType}
+                                onCategoryChange={setRuleFormCategory}
+                                onAmountChange={setRuleFormAmount}
+                                onToleranceChange={setRuleFormTolerance}
+                                onSave={saveCategorizationRule}
+                                onCancel={() => setRuleFormKey(null)}
+                              />
                             </td>
                           </tr>
                         )}

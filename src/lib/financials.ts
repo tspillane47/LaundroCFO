@@ -428,11 +428,19 @@ export const BANK_IMPORT_CATEGORY_LABELS: Record<BankImportCategory, string> = {
   needs_review: "Needs Review",
 };
 
+export type RuleType = "vendor" | "amount";
+
+export type RuleMatchKind = false | "amount" | "vendor";
+
 export type CategorizationRule = {
   id: string;
   user_id: string;
   vendor_pattern: string;
   category: string;
+  rule_type?: RuleType | null;
+  amount?: number | null;
+  amount_tolerance?: number | null;
+  transaction_type?: TransactionType | null;
   created_at?: string;
 };
 
@@ -649,7 +657,46 @@ export function suggestTransactionCategory(
   return "needs_review";
 }
 
-export function findMatchingRule(
+const GENERIC_DESCRIPTION_PATTERNS = [
+  /^CHECK\s*#?\d*$/,
+  /^BILL\s*PAY\s*-?\s*CHECK\s*#?\d*$/,
+  /^BILLPAY$/,
+  /^ATM\s+WITHDRAWAL$/,
+  /^ATM\s+WITHDRAW$/,
+  /^TRANSFER$/,
+];
+
+export function isGenericTransactionDescription(description: string | null): boolean {
+  const candidates = [
+    normalizeVendorPattern(description),
+    (description ?? "").trim().toUpperCase().replace(/\s+/g, " "),
+  ].filter(Boolean);
+
+  return candidates.some((text) =>
+    GENERIC_DESCRIPTION_PATTERNS.some((pattern) => pattern.test(text))
+  );
+}
+
+export function findMatchingAmountRule(
+  rules: CategorizationRule[],
+  amount: number,
+  type: TransactionType
+): CategorizationRule | null {
+  const absAmount = Math.abs(amount);
+
+  for (const rule of rules) {
+    if (rule.rule_type !== "amount") continue;
+    if (rule.transaction_type && rule.transaction_type !== type) continue;
+    if (rule.amount == null) continue;
+
+    const tolerance = rule.amount_tolerance ?? 0.01;
+    if (Math.abs(absAmount - Math.abs(rule.amount)) <= tolerance) return rule;
+  }
+
+  return null;
+}
+
+export function findMatchingVendorRule(
   rules: CategorizationRule[],
   description: string | null
 ): CategorizationRule | null {
@@ -657,22 +704,39 @@ export function findMatchingRule(
   if (!normalized) return null;
 
   for (const rule of rules) {
+    if (rule.rule_type === "amount") continue;
     const pattern = rule.vendor_pattern.trim().toUpperCase();
     if (pattern && normalized.includes(pattern)) return rule;
   }
   return null;
 }
 
+/** @deprecated Use findMatchingVendorRule */
+export function findMatchingRule(
+  rules: CategorizationRule[],
+  description: string | null
+): CategorizationRule | null {
+  return findMatchingVendorRule(rules, description);
+}
+
 export function categorizeWithRules(
   description: string | null,
   type: TransactionType,
+  amount: number,
   rules: CategorizationRule[]
-): { category: BankImportCategory; suggested: BankImportCategory; ruleApplied: boolean } {
-  const rule = findMatchingRule(rules, description);
-  if (rule) {
-    const category = rule.category as BankImportCategory;
-    return { category, suggested: category, ruleApplied: true };
+): { category: BankImportCategory; suggested: BankImportCategory; ruleApplied: RuleMatchKind } {
+  const amountRule = findMatchingAmountRule(rules, amount, type);
+  if (amountRule) {
+    const category = amountRule.category as BankImportCategory;
+    return { category, suggested: category, ruleApplied: "amount" };
   }
+
+  const vendorRule = findMatchingVendorRule(rules, description);
+  if (vendorRule) {
+    const category = vendorRule.category as BankImportCategory;
+    return { category, suggested: category, ruleApplied: "vendor" };
+  }
+
   const suggested = suggestTransactionCategory(description, type);
   return { category: suggested, suggested, ruleApplied: false };
 }
