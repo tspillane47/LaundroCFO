@@ -64,6 +64,7 @@ import {
   mapBankCategoryToPlField,
   isCategoryReadyToPost,
   getImportCategoriesForType,
+  markDuplicateTransactions,
   BANK_IMPORT_CATEGORY_LABELS,
   type TransactionType,
   type BankImportCategory,
@@ -83,6 +84,7 @@ type StagedTransaction = {
   category: BankImportCategory;
   suggested: BankImportCategory;
   ruleApplied?: boolean;
+  possibleDuplicate?: boolean;
 };
 
 type ReviewTransaction = {
@@ -95,6 +97,7 @@ type ReviewTransaction = {
   category: BankImportCategory;
   suggested: BankImportCategory;
   ruleApplied?: boolean;
+  possibleDuplicate?: boolean;
   staged?: StagedTransaction;
   bank?: BankTransaction;
 };
@@ -300,6 +303,9 @@ export default function FinancialsPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<MonthlyForm>(() => emptyMonthlyForm());
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
+  const [clearAllStoreNameInput, setClearAllStoreNameInput] = useState("");
+  const [duplicateImportCount, setDuplicateImportCount] = useState(0);
 
   const currentYear = new Date().getFullYear();
   const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
@@ -479,6 +485,7 @@ export default function FinancialsPage() {
       category: txn.category,
       suggested: txn.suggested,
       ruleApplied: txn.ruleApplied,
+      possibleDuplicate: txn.possibleDuplicate,
       staged: txn,
     }));
 
@@ -554,10 +561,18 @@ export default function FinancialsPage() {
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
   }, [reviewTransactions]);
 
-  const allReviewKeys = useMemo(() => reviewTransactions.map((t) => t.key), [reviewTransactions]);
+  const selectableReviewKeys = useMemo(
+    () => reviewTransactions.filter((t) => !t.possibleDuplicate).map((t) => t.key),
+    [reviewTransactions]
+  );
   const allSelected =
-    allReviewKeys.length > 0 && allReviewKeys.every((k) => selectedTxnKeys.has(k));
+    selectableReviewKeys.length > 0 &&
+    selectableReviewKeys.every((k) => selectedTxnKeys.has(k));
   const someSelected = selectedTxnKeys.size > 0;
+  const duplicateReviewCount = useMemo(
+    () => reviewTransactions.filter((t) => t.possibleDuplicate).length,
+    [reviewTransactions]
+  );
 
   function openMonthForm(month: number) {
     setSelectedMonth(month);
@@ -648,7 +663,14 @@ export default function FinancialsPage() {
       const text = e.target?.result as string;
       const parsed = parseBankCsv(text);
       if (parsed.length === 0) {
-        setError("Could not parse CSV. Include Date and Amount (or Debit/Credit) columns.");
+        setError(
+          "Could not parse CSV. Expected columns: Processed Date, Description, Credit or Debit, Amount."
+        );
+        return;
+      }
+
+      if (!store?.id) {
+        setError("Select a store before importing transactions.");
         return;
       }
 
@@ -665,32 +687,69 @@ export default function FinancialsPage() {
         }
       }
 
+      const { data: existingBankRows } = await supabase
+        .from("bank_transactions")
+        .select("transaction_date, amount, category")
+        .eq("store_id", store.id);
+
+      const existingForDedup = [
+        ...(existingBankRows ?? []).map((row) => ({
+          transaction_date: row.transaction_date,
+          amount: Math.abs(row.amount),
+          type: inferTransactionType(row.amount, row.category),
+        })),
+        ...bankTransactions.map((txn) => ({
+          transaction_date: txn.transaction_date,
+          amount: Math.abs(txn.amount),
+          type: inferTransactionType(txn.amount, txn.category),
+        })),
+        ...stagedTransactions.map((txn) => ({
+          transaction_date: txn.transaction_date,
+          amount: txn.amount,
+          type: txn.type,
+        })),
+      ];
+
+      const parsedForDedup = parsed.map((row) => ({
+        transaction_date: row.date,
+        amount: row.amount,
+        type: row.type,
+      }));
+      const withDuplicateFlags = markDuplicateTransactions(parsedForDedup, existingForDedup);
+      const duplicateCount = withDuplicateFlags.filter((row) => row.possibleDuplicate).length;
+      setDuplicateImportCount(duplicateCount);
+
       const baseId = Date.now();
-      const staged: StagedTransaction[] = parsed.map((row, i) => {
+      const staged: StagedTransaction[] = withDuplicateFlags.map((row, i) => {
         const { category, suggested, ruleApplied } = categorizeWithRules(
-          row.description,
+          parsed[i].description,
           row.type,
           rules
         );
         return {
           tempId: `csv-${baseId}-${i}`,
-          transaction_date: row.date,
-          description: row.description,
+          transaction_date: row.transaction_date,
+          description: parsed[i].description,
           amount: row.amount,
           type: row.type,
           category,
           suggested,
           ruleApplied,
+          possibleDuplicate: row.possibleDuplicate,
         };
       });
       setStagedTransactions((prev) => [...staged, ...prev]);
-      setSuccess(`Parsed ${staged.length} transaction${staged.length === 1 ? "" : "s"} from CSV.`);
+      const dupMsg =
+        duplicateCount > 0
+          ? ` ${duplicateCount} possible duplicate${duplicateCount === 1 ? "" : "s"} flagged — review before posting.`
+          : "";
+      setSuccess(`Parsed ${staged.length} transaction${staged.length === 1 ? "" : "s"} from CSV.${dupMsg}`);
     };
     reader.readAsText(file);
   }
 
   function toggleSelectAll(checked: boolean) {
-    setSelectedTxnKeys(checked ? new Set(allReviewKeys) : new Set());
+    setSelectedTxnKeys(checked ? new Set(selectableReviewKeys) : new Set());
   }
 
   function toggleSelectKey(key: string, checked: boolean) {
@@ -855,6 +914,56 @@ export default function FinancialsPage() {
     for (const txn of group.items) {
       updateReviewCategory(txn.key, category);
     }
+  }
+
+  async function clearMonthFinancialData() {
+    if (!selectedRecord?.id || !store?.id) return;
+    const monthLabel = `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`;
+    const confirmed = window.confirm(
+      `This will permanently delete all P&L data for ${monthLabel}. This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    const { error: deleteError } = await supabase
+      .from("monthly_financials")
+      .delete()
+      .eq("id", selectedRecord.id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    invalidateValuationCache(store.id);
+    setShowForm(false);
+    setSuccess(`Cleared P&L data for ${monthLabel}.`);
+    await loadData();
+  }
+
+  async function clearAllFinancialData() {
+    if (!store?.id) return;
+    const storeName = (store.name ?? "").trim();
+    if (clearAllStoreNameInput.trim() !== storeName) {
+      setError("Store name does not match. Type the exact store name to confirm.");
+      return;
+    }
+
+    const { error: deleteError } = await supabase
+      .from("monthly_financials")
+      .delete()
+      .eq("store_id", store.id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    invalidateValuationCache(store.id);
+    setShowClearAllConfirm(false);
+    setClearAllStoreNameInput("");
+    setShowForm(false);
+    setSuccess(`Cleared all P&L data for ${storeName || "this store"}.`);
+    await loadData();
   }
 
   async function saveStagedToBank() {
@@ -1190,8 +1299,71 @@ export default function FinancialsPage() {
               <button type="button" className="btn-primary" onClick={() => openMonthForm(selectedMonth)}>
                 {selectedRecord ? "Edit Month" : "Add Month"}
               </button>
+              {selectedRecord && (
+                <button
+                  type="button"
+                  className="btn-outline text-red-400 border-red-500/30 hover:bg-red-500/10"
+                  onClick={clearMonthFinancialData}
+                >
+                  Clear Financial Data for {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn-outline text-red-400 border-red-500/30 hover:bg-red-500/10"
+                onClick={() => {
+                  setClearAllStoreNameInput("");
+                  setShowClearAllConfirm(true);
+                }}
+              >
+                Clear All Financial Data
+              </button>
             </div>
           </div>
+
+          {showClearAllConfirm && (
+            <div className="card border border-red-500/30 bg-red-500/5">
+              <div className="section-title text-red-300">Clear All Financial Data</div>
+              <p className="text-[13px] text-slate-300 mb-4">
+                This will permanently delete <strong>all</strong> P&L records for{" "}
+                <span className="text-slate-100">{store?.name ?? "this store"}</span>. This cannot be
+                undone.
+              </p>
+              <p className="text-[12px] text-slate-400 mb-2">
+                Type the store name to confirm:{" "}
+                <span className="font-mono text-slate-200">{store?.name ?? ""}</span>
+              </p>
+              <input
+                type="text"
+                value={clearAllStoreNameInput}
+                onChange={(e) => setClearAllStoreNameInput(e.target.value)}
+                onKeyDown={preventEnterSubmit}
+                className={clsx(INPUT_CLASS, "max-w-md mb-4")}
+                placeholder="Store name"
+                aria-label="Confirm store name"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="btn-outline text-red-400 border-red-500/30 hover:bg-red-500/10"
+                  onClick={clearAllFinancialData}
+                  disabled={clearAllStoreNameInput.trim() !== (store?.name ?? "").trim()}
+                >
+                  Permanently Delete All P&L Data
+                </button>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() => {
+                    setShowClearAllConfirm(false);
+                    setClearAllStoreNameInput("");
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {showForm && (
             <div className="card">
@@ -1550,8 +1722,8 @@ export default function FinancialsPage() {
             <div>
               <div className="text-[14px] font-semibold text-slate-100">Import Bank Transactions</div>
               <div className="text-[12px] text-slate-500 mt-1">
-                Upload a CSV with Date, Description, and Amount (or separate Debit/Credit columns).
-                Income and expenses are detected automatically.
+                Upload a CSV with Processed Date, Description, Credit or Debit, and Amount columns.
+                Income and expenses are detected from the Credit or Debit column.
               </div>
             </div>
             <div className="flex gap-2">
@@ -1642,6 +1814,14 @@ export default function FinancialsPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {(duplicateImportCount > 0 || duplicateReviewCount > 0) && (
+              <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[12px] text-amber-200">
+                {duplicateReviewCount > 0
+                  ? `${duplicateReviewCount} possible duplicate${duplicateReviewCount === 1 ? "" : "s"} detected (already imported or overlapping date range). Review before posting.`
+                  : `${duplicateImportCount} possible duplicate${duplicateImportCount === 1 ? "" : "s"} detected (already imported or overlapping date range). Review before posting.`}
               </div>
             )}
 
@@ -1750,6 +1930,9 @@ export default function FinancialsPage() {
                               {group.ruleApplied && (
                                 <span className="badge badge-green text-[10px]">Rule Applied</span>
                               )}
+                              {group.items.some((i) => i.possibleDuplicate) && (
+                                <span className="badge badge-amber text-[10px]">Possible Duplicate</span>
+                              )}
                             </div>
                           </td>
                           <td className="py-3 text-right whitespace-nowrap">
@@ -1851,14 +2034,22 @@ export default function FinancialsPage() {
                               type="checkbox"
                               checked={selectedTxnKeys.has(txn.key)}
                               onChange={(e) => toggleSelectKey(txn.key, e.target.checked)}
-                              className="rounded border-white/20"
+                              disabled={txn.possibleDuplicate}
+                              className="rounded border-white/20 disabled:opacity-40"
                               aria-label={`Select ${txn.description ?? "transaction"}`}
                             />
                           </td>
                           <td className="py-3 pr-3 text-slate-300 whitespace-nowrap">
                             {new Date(txn.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
                           </td>
-                          <td className="py-3 pr-3 text-slate-200 max-w-[200px] truncate">{txn.description ?? "—"}</td>
+                          <td className="py-3 pr-3 text-slate-200 max-w-[200px] truncate">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate">{txn.description ?? "—"}</span>
+                              {txn.possibleDuplicate && (
+                                <span className="badge badge-amber text-[10px] shrink-0">Possible Duplicate</span>
+                              )}
+                            </div>
+                          </td>
                           <td className="py-3 pr-3">
                             <TypeBadge type={txn.type} />
                           </td>

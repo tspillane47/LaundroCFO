@@ -443,9 +443,8 @@ export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
     "mobile deposit",
     "cknet deposit",
     "merchant deposit",
+    "merchant bankcd",
     "card payment received",
-    "ckcarbus",
-    "card business",
     "merchant services",
     "cardpayment",
     "coin",
@@ -455,11 +454,14 @@ export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
     "laundryworks",
     "laundroworks",
     "cardconnect",
+    "square inc",
     "square",
+    "sq2",
     "clover",
+    "worldpay",
+    "tsys",
     "cents",
     "spyn",
-    "payment",
     "sales",
     "income",
     "revenue",
@@ -509,6 +511,7 @@ export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
   ],
   insurance_expense: [
     "insurance",
+    "foremost",
     "geico",
     "progressive",
     "state farm",
@@ -535,7 +538,18 @@ export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
   marketing: ["marketing", "advertising", "facebook ads", "google ads", "yelp", "flyers", "advert", "facebook", "promo"],
   professional_fees: ["accountant", "cpa", "legal", "attorney", "bookkeeping", "quickbooks", "consult"],
   other_expenses: ["misc", "other", "office"],
-  debt_service: ["loan payment", "eastern funding", "sba loan", "principal", "note payment", "loan", "mortgage", "debt", "sba", "interest"],
+  debt_service: [
+    "loan payment",
+    "eastern funding",
+    "sba loan",
+    "principal",
+    "note payment",
+    "loan",
+    "mortgage",
+    "debt",
+    "sba",
+    "interest",
+  ],
 };
 
 const OTHER_INCOME_KEYWORDS = ["interest earned", "refund", "rebate", "insurance proceeds", "grant"];
@@ -567,6 +581,7 @@ const NEEDS_REVIEW_KEYWORDS = [
   "atm withdrawal",
   "cash withdraw",
   "cash withdrawal",
+  "worldnet tps",
 ];
 
 const EXPENSE_CATEGORY_ORDER: PlCategoryField[] = [
@@ -676,11 +691,23 @@ export function normalizeVendorPattern(description: string | null): string {
   if (!description?.trim()) return "";
   let s = description.trim();
   const starIdx = s.indexOf("*");
-  if (starIdx > 0) s = s.slice(0, starIdx);
+  if (starIdx > 0) s = s.slice(0, starIdx).trim() || s.slice(starIdx + 1).trim();
+  s = s.replace(/\s+/g, " ");
+  s = s.replace(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g, " ");
+  s = s.replace(/\b\d{8,}\b/g, " ");
+  s = s.replace(/\b(?=[A-Z0-9]*[A-Z])(?=[A-Z0-9]*[0-9])[A-Z0-9]{8,}\b/gi, " ");
+  s = s.replace(/^(EPM PYMT|PAYMENT|DEPOSIT|SQ\d+|CKNET|ACH CREDIT|ACH DEBIT)\s+/i, "");
+  s = s.replace(/\b(PPD|CCD|WEB|ACH|CHK|TEL|PPD|SEC)\b/gi, " ");
+  s = s.replace(/\s+-\s+[A-Z0-9\s]+$/i, "");
+  s = s.replace(/\s+[A-Z]{2,}\s+[A-Z]{2,}$/i, (match) => {
+    const parts = match.trim().split(/\s+/);
+    if (parts.length === 2 && parts.every((p) => /^[A-Z]+$/.test(p))) return "";
+    return match;
+  });
   s = s
-    .replace(/\s+\d{1,2}\/\d{1,2}(\/\d{2,4})?\s*$/i, "")
-    .replace(/\s+#?\d{4,}\s*$/i, "")
+    .replace(/\s+#?\d{4,}\s*/g, " ")
     .replace(/\s+\d+\s*$/i, "")
+    .replace(/\s+/g, " ")
     .trim();
   return s.toUpperCase();
 }
@@ -701,9 +728,81 @@ function parseCsvAmount(raw: string): number {
 
 function parseCsvTypeIndicator(raw: string): TransactionType | null {
   const t = raw.trim().toLowerCase();
-  if (["debit", "dr", "withdrawal", "expense", "payment", "check"].includes(t)) return "expense";
+  if (["debit", "dr", "withdrawal", "expense", "check"].includes(t)) return "expense";
   if (["credit", "cr", "deposit", "income"].includes(t)) return "income";
   return null;
+}
+
+function normalizeCsvHeader(raw: string): string {
+  return raw.trim().replace(/^"|"$/g, "").toLowerCase();
+}
+
+function findCsvDateColumn(headers: string[]): number {
+  const priority = ["processed date", "posting date", "transaction date", "date"];
+  for (const name of priority) {
+    const idx = headers.indexOf(name);
+    if (idx >= 0) return idx;
+  }
+  return headers.findIndex((h) => h.includes("date") && !h.includes("account"));
+}
+
+function findCsvDescriptionColumn(headers: string[]): number {
+  const priority = ["description", "transaction description", "memo", "payee"];
+  for (const name of priority) {
+    const idx = headers.indexOf(name);
+    if (idx >= 0) return idx;
+  }
+  return headers.findIndex(
+    (h) =>
+      (h.includes("description") || h === "memo" || h === "payee") &&
+      !h.includes("account") &&
+      h !== "account name"
+  );
+}
+
+function findCsvTypeColumn(headers: string[]): number {
+  const priority = [
+    "credit or debit",
+    "type",
+    "transaction type",
+    "dr/cr",
+    "debit/credit",
+    "dc",
+    "tran type",
+  ];
+  for (const name of priority) {
+    const idx = headers.indexOf(name);
+    if (idx >= 0) return idx;
+  }
+  return headers.findIndex((h) =>
+    /credit or debit|transaction type|^type$|debit\/credit|dr\/cr/.test(h)
+  );
+}
+
+function findCsvAmountColumn(headers: string[]): number {
+  const priority = ["amount", "transaction amount", "trans amount", "value"];
+  for (const name of priority) {
+    const idx = headers.indexOf(name);
+    if (idx >= 0) return idx;
+  }
+  return headers.findIndex((h) => /^amount$|transaction amount|trans amount/.test(h));
+}
+
+function findCsvDebitCreditColumns(headers: string[]): { debitIdx: number; creditIdx: number } {
+  const debitIdx = headers.findIndex(
+    (h) => /^(debit|withdrawal|dr|debits)$/.test(h) || h === "debit amount" || h === "withdrawals"
+  );
+  const creditIdx = headers.findIndex(
+    (h) => /^(credit|deposit|cr|credits)$/.test(h) || h === "credit amount" || h === "deposits"
+  );
+  return { debitIdx, creditIdx };
+}
+
+function parseCsvDate(raw: string): string {
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime())
+    ? new Date().toISOString().slice(0, 10)
+    : parsed.toISOString().slice(0, 10);
 }
 
 function splitCsvLine(line: string): string[] {
@@ -726,49 +825,70 @@ export type CsvParseFormat = {
   amountIdx: number;
   typeIdx: number;
   hasDebitCredit: boolean;
-  format: "debit_credit" | "signed_amount" | "amount_with_type";
+  format: "debit_credit" | "amount_with_type" | "signed_amount";
 };
 
-function detectCsvFormat(headers: string[]): Omit<CsvParseFormat, "format"> & { format?: CsvParseFormat["format"] } {
-  const dateIdx = headers.findIndex((h) => /date|posted|posting|transaction date/.test(h));
-  const descIdx = headers.findIndex((h) =>
-    /desc|memo|name|payee|detail|transaction description|description/.test(h)
-  );
-  const debitIdx = headers.findIndex(
-    (h) => /^(debit|withdrawal|dr|debits)$/.test(h) || h === "debit amount" || h === "withdrawals"
-  );
-  const creditIdx = headers.findIndex(
-    (h) => /^(credit|deposit|cr|credits)$/.test(h) || h === "credit amount" || h === "deposits"
-  );
-  const amountIdx = headers.findIndex((h) =>
-    /^amount$|^value$|transaction amount|trans amount/.test(h)
-  );
-  const typeIdx = headers.findIndex((h) =>
-    /^(type|transaction type|dr\/cr|debit\/credit|dc|tran type)$/.test(h)
-  );
+function detectCsvFormat(headers: string[]): CsvParseFormat | null {
+  const { debitIdx, creditIdx } = findCsvDebitCreditColumns(headers);
+  const dateIdx = findCsvDateColumn(headers);
+  const descIdx = findCsvDescriptionColumn(headers);
+  const amountIdx = findCsvAmountColumn(headers);
+  const typeIdx = findCsvTypeColumn(headers);
   const hasDebitCredit = debitIdx >= 0 && creditIdx >= 0;
 
-  let format: CsvParseFormat["format"] | undefined;
+  if (dateIdx === -1) return null;
+  if (!hasDebitCredit && amountIdx === -1) return null;
+
+  let format: CsvParseFormat["format"];
   if (hasDebitCredit) format = "debit_credit";
   else if (amountIdx >= 0 && typeIdx >= 0) format = "amount_with_type";
-  else if (amountIdx >= 0) format = "signed_amount";
+  else format = "signed_amount";
 
   return { headers, dateIdx, descIdx, debitIdx, creditIdx, amountIdx, typeIdx, hasDebitCredit, format };
+}
+
+export type DuplicateCheckTransaction = {
+  transaction_date: string;
+  amount: number;
+  type: TransactionType;
+};
+
+export function transactionDuplicateKey(txn: DuplicateCheckTransaction): string {
+  const date = txn.transaction_date.split("T")[0];
+  const amount = Math.abs(txn.amount).toFixed(2);
+  return `${date}|${amount}|${txn.type}`;
+}
+
+export function isDuplicateTransaction(
+  txn: DuplicateCheckTransaction,
+  existing: DuplicateCheckTransaction[]
+): boolean {
+  const key = transactionDuplicateKey(txn);
+  return existing.some((e) => transactionDuplicateKey(e) === key);
+}
+
+export function markDuplicateTransactions<T extends DuplicateCheckTransaction>(
+  transactions: T[],
+  existing: DuplicateCheckTransaction[]
+): (T & { possibleDuplicate: boolean })[] {
+  const seen = new Set(existing.map(transactionDuplicateKey));
+  return transactions.map((txn) => {
+    const key = transactionDuplicateKey(txn);
+    const possibleDuplicate = seen.has(key);
+    seen.add(key);
+    return { ...txn, possibleDuplicate };
+  });
 }
 
 export function parseBankCsv(text: string): ParsedCsvTransaction[] {
   const lines = text.trim().split(/\r?\n/).filter(Boolean);
   if (lines.length < 2) return [];
 
-  const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
+  const headers = splitCsvLine(lines[0]).map(normalizeCsvHeader);
   const fmt = detectCsvFormat(headers);
 
-  if (fmt.dateIdx === -1) {
-    console.warn("[Bank CSV] No date column found. Headers:", headers);
-    return [];
-  }
-  if (!fmt.hasDebitCredit && fmt.amountIdx === -1) {
-    console.warn("[Bank CSV] No amount or debit/credit columns found. Headers:", headers);
+  if (!fmt) {
+    console.warn("[Bank CSV] Unrecognized format. Headers:", headers);
     return [];
   }
 
@@ -777,13 +897,10 @@ export function parseBankCsv(text: string): ParsedCsvTransaction[] {
     return Object.fromEntries(headers.map((h, i) => [h, cols[i] ?? ""]));
   });
 
-  console.log("[Bank CSV] Detected format:", {
-    format: fmt.format,
+  console.log("[Bank CSV] Detected format:", fmt.format, {
     headers: fmt.headers,
     dateIdx: fmt.dateIdx,
     descIdx: fmt.descIdx,
-    debitIdx: fmt.debitIdx,
-    creditIdx: fmt.creditIdx,
     amountIdx: fmt.amountIdx,
     typeIdx: fmt.typeIdx,
     hasDebitCredit: fmt.hasDebitCredit,
@@ -795,17 +912,19 @@ export function parseBankCsv(text: string): ParsedCsvTransaction[] {
   for (const line of lines.slice(1)) {
     const cols = splitCsvLine(line);
     const rawDate = cols[fmt.dateIdx] ?? "";
-    const description = fmt.descIdx >= 0 ? cols[fmt.descIdx] ?? null : null;
-
-    const parsed = new Date(rawDate);
-    const date = Number.isNaN(parsed.getTime())
-      ? new Date().toISOString().slice(0, 10)
-      : parsed.toISOString().slice(0, 10);
+    const description = fmt.descIdx >= 0 ? cols[fmt.descIdx]?.trim() || null : null;
+    const date = parseCsvDate(rawDate);
 
     let amount = 0;
     let type: TransactionType = "expense";
 
-    if (fmt.hasDebitCredit) {
+    if (fmt.format === "amount_with_type") {
+      const rawAmount = cols[fmt.amountIdx] ?? "0";
+      amount = Math.abs(parseCsvAmount(rawAmount));
+      const typeHint = parseCsvTypeIndicator(cols[fmt.typeIdx] ?? "");
+      if (!typeHint || amount === 0) continue;
+      type = typeHint;
+    } else if (fmt.hasDebitCredit) {
       const debitRaw = cols[fmt.debitIdx] ?? "";
       const creditRaw = cols[fmt.creditIdx] ?? "";
       const debitVal = parseCsvAmount(debitRaw);
@@ -829,20 +948,7 @@ export function parseBankCsv(text: string): ParsedCsvTransaction[] {
     } else {
       const rawAmount = parseCsvAmount(cols[fmt.amountIdx] ?? "0");
       if (rawAmount === 0) continue;
-
-      if (fmt.typeIdx >= 0) {
-        const typeHint = parseCsvTypeIndicator(cols[fmt.typeIdx] ?? "");
-        if (typeHint) {
-          type = typeHint;
-          amount = Math.abs(rawAmount);
-        } else if (rawAmount < 0) {
-          type = "expense";
-          amount = Math.abs(rawAmount);
-        } else {
-          type = "income";
-          amount = rawAmount;
-        }
-      } else if (rawAmount < 0) {
+      if (rawAmount < 0) {
         type = "expense";
         amount = Math.abs(rawAmount);
       } else {
