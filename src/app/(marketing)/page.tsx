@@ -224,22 +224,22 @@ export default function MarketingHomePage() {
               </div>
 
               <h1 className="text-[36px] lg:text-[56px] font-bold text-white tracking-tight leading-[1.08] mb-6">
-                Know What Your Laundromat{" "}
+                The Financial Operating System{" "}
                 <span
                   className="bg-clip-text text-transparent"
                   style={{ backgroundImage: "linear-gradient(to right, #3b82f6, #60a5fa)" }}
                 >
-                  Is Worth
+                  for Laundromats
                 </span>
               </h1>
 
               <p className="text-[18px] text-slate-400 leading-relaxed mb-3 max-w-xl">
-                Track store value, leases, debt, equipment, and cash flow in one platform built for laundromat
-                owners, buyers, and lenders.
+                LaundroCFO helps laundromat owners and operators track store value, portfolio value, debt,
+                equity, leases, equipment, cash flow, and generate lender-ready reports — all in one platform.
               </p>
 
               <p className="text-[14px] text-slate-500 mb-10 max-w-xl">
-                The Financial Operating System for Laundromats.
+                Know your value. Manage your debt. Grow your portfolio.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3 mb-6">
