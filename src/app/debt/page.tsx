@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
+import { toBool, toNullableDate, toNullableNum, toNullableText } from "@/lib/formHelpers";
 import { getStoreValuation } from "@/lib/getStoreValuation";
 import type { ValuationResult } from "@/lib/valuation";
 import {
@@ -134,12 +135,6 @@ function loanToForm(loan: StoreLoan): LoanForm {
     balloon_amount: loan.balloon_amount != null ? String(loan.balloon_amount) : "",
     notes: loan.notes ?? "",
   };
-}
-
-function parseNum(value: string): number | null {
-  if (!value.trim()) return null;
-  const n = parseFloat(value.replace(/,/g, ""));
-  return Number.isNaN(n) ? null : n;
 }
 
 function enrichLoan(loan: StoreLoan): EnrichedLoan {
@@ -396,23 +391,24 @@ export default function DebtPage() {
     setMessage(null);
 
     try {
+      const balloonPayment = toBool(form.balloon_payment);
       const payload = {
         user_id: userId,
         store_id: selectedStore.id,
         is_active: true,
-        lender_name: form.lender_name || null,
-        loan_type: form.loan_type || null,
-        original_balance: parseNum(form.original_balance),
-        current_balance: parseNum(form.current_balance),
-        interest_rate: parseNum(form.interest_rate),
-        monthly_payment: parseNum(form.monthly_payment),
-        loan_start_date: form.loan_start_date || null,
-        loan_end_date: form.loan_end_date || null,
-        amortization_term_months: parseNum(form.amortization_term_months),
-        balloon_payment: form.balloon_payment,
-        balloon_date: form.balloon_payment ? form.balloon_date || null : null,
-        balloon_amount: form.balloon_payment ? parseNum(form.balloon_amount) : null,
-        notes: form.notes || null,
+        lender_name: toNullableText(form.lender_name),
+        loan_type: toNullableText(form.loan_type),
+        original_balance: toNullableNum(form.original_balance),
+        current_balance: toNullableNum(form.current_balance),
+        interest_rate: toNullableNum(form.interest_rate),
+        monthly_payment: toNullableNum(form.monthly_payment),
+        loan_start_date: toNullableDate(form.loan_start_date),
+        loan_end_date: toNullableDate(form.loan_end_date),
+        amortization_term_months: toNullableNum(form.amortization_term_months),
+        balloon_payment: balloonPayment,
+        balloon_date: balloonPayment ? toNullableDate(form.balloon_date) : null,
+        balloon_amount: balloonPayment ? toNullableNum(form.balloon_amount) : null,
+        notes: toNullableText(form.notes),
         updated_at: new Date().toISOString(),
       };
 

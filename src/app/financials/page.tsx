@@ -20,6 +20,7 @@ import {
 } from "recharts";
 import { createClient } from "@/lib/supabase";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
+import { toNum, toNullableText } from "@/lib/formHelpers";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple, fmtPct } from "@/lib/calculations";
 import { MetricCard } from "@/components/ui/MetricCard";
@@ -55,6 +56,10 @@ import {
   recordToForm,
   sortRecordsDesc,
   suggestTransactionCategory,
+  parseBankCsv,
+  inferTransactionType,
+  normalizeDescriptionForGrouping,
+  type TransactionType,
 } from "@/lib/financials";
 
 type TabId = "pl" | "trends" | "ratios" | "bank" | "quickbooks";
@@ -66,8 +71,33 @@ type StagedTransaction = {
   transaction_date: string;
   description: string | null;
   amount: number;
+  type: TransactionType;
   category: PlCategoryField;
   suggested: PlCategoryField;
+};
+
+type ReviewTransaction = {
+  key: string;
+  isStaged: boolean;
+  transaction_date: string;
+  description: string | null;
+  amount: number;
+  type: TransactionType;
+  category: PlCategoryField;
+  suggested: PlCategoryField;
+  staged?: StagedTransaction;
+  bank?: BankTransaction;
+};
+
+type TransactionGroup = {
+  groupKey: string;
+  description: string;
+  count: number;
+  totalAmount: number;
+  type: TransactionType;
+  category: PlCategoryField;
+  suggested: PlCategoryField;
+  items: ReviewTransaction[];
 };
 
 type QBMappingRow = {
@@ -206,44 +236,21 @@ function RatioCard({ item }: { item: RatioBenchmark }) {
   );
 }
 
-function parseCSVTransactions(text: string): StagedTransaction[] {
-  const lines = text.trim().split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) return [];
-
-  const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
-  const dateIdx = headers.findIndex((h) => /date|posted/.test(h));
-  const descIdx = headers.findIndex((h) => /desc|memo|name|payee/.test(h));
-  const amountIdx = headers.findIndex((h) => /amount|debit|credit|value/.test(h));
-
-  if (dateIdx === -1 || amountIdx === -1) return [];
-
-  return lines.slice(1).map((line, i) => {
-    const cols = line.match(/(".*?"|[^,]+)/g)?.map((c) => c.trim().replace(/^"|"$/g, "")) ?? line.split(",");
-    const rawDate = cols[dateIdx] ?? "";
-    const description = descIdx >= 0 ? cols[descIdx] ?? null : null;
-    let amount = parseFloat((cols[amountIdx] ?? "0").replace(/[$,]/g, ""));
-    if (Number.isNaN(amount)) amount = 0;
-
-    const parsed = new Date(rawDate);
-    const transaction_date = Number.isNaN(parsed.getTime())
-      ? new Date().toISOString().slice(0, 10)
-      : parsed.toISOString().slice(0, 10);
-
-    const suggested = suggestTransactionCategory(description);
-    return {
-      tempId: `csv-${i}-${Date.now()}`,
-      transaction_date,
-      description,
-      amount,
-      category: suggested,
-      suggested,
-    };
-  });
+function normalizeTransactionAmount(amount: number): number {
+  return Math.abs(amount);
 }
 
-function normalizeTransactionAmount(amount: number, field: PlCategoryField): number {
-  const abs = Math.abs(amount);
-  return field === "revenue" ? abs : abs;
+function TypeBadge({ type }: { type: TransactionType }) {
+  return (
+    <span
+      className={clsx(
+        "badge text-[10px]",
+        type === "income" ? "badge-green" : "badge-red"
+      )}
+    >
+      {type === "income" ? "Income" : "Expense"}
+    </span>
+  );
 }
 
 export default function FinancialsPage() {
@@ -262,6 +269,9 @@ export default function FinancialsPage() {
   const [records, setRecords] = useState<CalculatedMonthly[]>([]);
   const [bankTransactions, setBankTransactions] = useState<BankTransaction[]>([]);
   const [stagedTransactions, setStagedTransactions] = useState<StagedTransaction[]>([]);
+  const [selectedTxnKeys, setSelectedTxnKeys] = useState<Set<string>>(new Set());
+  const [bulkCategory, setBulkCategory] = useState<PlCategoryField>("revenue");
+  const [groupSimilar, setGroupSimilar] = useState(false);
   const [qbMappings, setQbMappings] = useState<QBMappingRow[]>(DEFAULT_QB_MAPPINGS);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -428,6 +438,76 @@ export default function FinancialsPage() {
     [records, selectedYear]
   );
 
+  const reviewTransactions = useMemo((): ReviewTransaction[] => {
+    const staged: ReviewTransaction[] = stagedTransactions.map((txn) => ({
+      key: txn.tempId,
+      isStaged: true,
+      transaction_date: txn.transaction_date,
+      description: txn.description,
+      amount: txn.amount,
+      type: txn.type,
+      category: txn.category,
+      suggested: txn.suggested,
+      staged: txn,
+    }));
+
+    const bank: ReviewTransaction[] = bankTransactions.map((txn) => {
+      const type = inferTransactionType(txn.amount, txn.category);
+      const suggested = suggestTransactionCategory(txn.description, type);
+      return {
+        key: txn.id,
+        isStaged: false,
+        transaction_date: txn.transaction_date,
+        description: txn.description,
+        amount: Math.abs(txn.amount),
+        type,
+        category: (txn.category ?? suggested) as PlCategoryField,
+        suggested,
+        bank: txn,
+      };
+    });
+
+    return [...staged, ...bank];
+  }, [stagedTransactions, bankTransactions]);
+
+  const transactionGroups = useMemo((): TransactionGroup[] => {
+    const map = new Map<string, TransactionGroup>();
+
+    for (const txn of reviewTransactions) {
+      const normalized = normalizeDescriptionForGrouping(txn.description);
+      const groupKey = `${normalized}::${txn.type}`;
+
+      const existing = map.get(groupKey);
+      if (existing) {
+        existing.count += 1;
+        existing.totalAmount += txn.amount;
+        existing.items.push(txn);
+        if (txn.category !== existing.category) {
+          const categories = new Set(existing.items.map((i) => i.category));
+          if (categories.size === 1) existing.category = txn.category;
+        }
+      } else {
+        map.set(groupKey, {
+          groupKey,
+          description: txn.description ?? normalized,
+          count: 1,
+          totalAmount: txn.amount,
+          type: txn.type,
+          category: txn.category,
+          suggested: txn.suggested,
+          items: [txn],
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [reviewTransactions]);
+
+  const allReviewKeys = useMemo(() => reviewTransactions.map((t) => t.key), [reviewTransactions]);
+  const allSelected =
+    allReviewKeys.length > 0 && allReviewKeys.every((k) => selectedTxnKeys.has(k));
+  const someSelected = selectedTxnKeys.size > 0;
+
   function openMonthForm(month: number) {
     setSelectedMonth(month);
     const existing = records.find((r) => r.year === selectedYear && r.month === month);
@@ -455,20 +535,20 @@ export default function FinancialsPage() {
       const payload = {
         store_id: store.id,
         user_id: userId,
-        year: selectedYear,
-        month: selectedMonth,
-        revenue: form.revenue,
-        utilities: form.utilities,
-        rent: form.rent,
-        payroll: form.payroll,
-        repairs_maintenance: form.repairs_maintenance,
-        insurance_expense: form.insurance_expense,
-        supplies: form.supplies,
-        marketing: form.marketing,
-        professional_fees: form.professional_fees,
-        other_expenses: form.other_expenses,
-        debt_service: form.debt_service,
-        notes: form.notes,
+        year: toNum(selectedYear),
+        month: toNum(selectedMonth),
+        revenue: toNum(form.revenue),
+        utilities: toNum(form.utilities),
+        rent: toNum(form.rent),
+        payroll: toNum(form.payroll),
+        repairs_maintenance: toNum(form.repairs_maintenance),
+        insurance_expense: toNum(form.insurance_expense),
+        supplies: toNum(form.supplies),
+        marketing: toNum(form.marketing),
+        professional_fees: toNum(form.professional_fees),
+        other_expenses: toNum(form.other_expenses),
+        debt_service: toNum(form.debt_service),
+        notes: toNullableText(form.notes),
       };
 
       if (selectedRecord?.id) {
@@ -515,15 +595,122 @@ export default function FinancialsPage() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      const parsed = parseCSVTransactions(text);
+      const parsed = parseBankCsv(text);
       if (parsed.length === 0) {
-        setError("Could not parse CSV. Include Date and Amount columns.");
+        setError("Could not parse CSV. Include Date and Amount (or Debit/Credit) columns.");
         return;
       }
-      setStagedTransactions((prev) => [...parsed, ...prev]);
-      setSuccess(`Parsed ${parsed.length} transaction${parsed.length === 1 ? "" : "s"} from CSV.`);
+      const baseId = Date.now();
+      const staged: StagedTransaction[] = parsed.map((row, i) => {
+        const suggested = suggestTransactionCategory(row.description, row.type);
+        return {
+          tempId: `csv-${baseId}-${i}`,
+          transaction_date: row.date,
+          description: row.description,
+          amount: row.amount,
+          type: row.type,
+          category: suggested,
+          suggested,
+        };
+      });
+      setStagedTransactions((prev) => [...staged, ...prev]);
+      setSuccess(`Parsed ${staged.length} transaction${staged.length === 1 ? "" : "s"} from CSV.`);
     };
     reader.readAsText(file);
+  }
+
+  function toggleSelectAll(checked: boolean) {
+    setSelectedTxnKeys(checked ? new Set(allReviewKeys) : new Set());
+  }
+
+  function toggleSelectKey(key: string, checked: boolean) {
+    setSelectedTxnKeys((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }
+
+  function updateReviewCategory(key: string, category: PlCategoryField) {
+    setStagedTransactions((prev) =>
+      prev.map((t) => (t.tempId === key ? { ...t, category } : t))
+    );
+    setBankTransactions((prev) =>
+      prev.map((t) => (t.id === key ? { ...t, category } : t))
+    );
+    const bankTxn = bankTransactions.find((t) => t.id === key);
+    if (bankTxn) {
+      supabase.from("bank_transactions").update({ category }).eq("id", key);
+    }
+  }
+
+  function applyBulkCategory() {
+    const keys = Array.from(selectedTxnKeys);
+    setStagedTransactions((prev) =>
+      prev.map((t) => (keys.includes(t.tempId) ? { ...t, category: bulkCategory } : t))
+    );
+    setBankTransactions((prev) =>
+      prev.map((t) => (keys.includes(t.id) ? { ...t, category: bulkCategory } : t))
+    );
+    keys.forEach((key) => {
+      if (bankTransactions.some((t) => t.id === key)) {
+        supabase.from("bank_transactions").update({ category: bulkCategory }).eq("id", key);
+      }
+    });
+    setSuccess(`Applied ${CATEGORY_LABELS[bulkCategory]} to ${keys.length} transaction${keys.length === 1 ? "" : "s"}.`);
+  }
+
+  async function postReviewTransaction(txn: ReviewTransaction) {
+    if (txn.isStaged && txn.staged) {
+      await postTransactionToPL(txn.staged, true);
+    } else if (txn.bank) {
+      await postTransactionToPL({ ...txn.bank, category: txn.category }, false);
+    }
+  }
+
+  async function postSelectedTransactions() {
+    const selected = reviewTransactions.filter((t) => selectedTxnKeys.has(t.key));
+    for (const txn of selected) {
+      await postReviewTransaction(txn);
+    }
+    setSelectedTxnKeys(new Set());
+  }
+
+  async function ignoreReviewTransaction(txn: ReviewTransaction) {
+    if (txn.isStaged && txn.staged) {
+      await ignoreTransaction(txn.staged, true);
+    } else if (txn.bank) {
+      await ignoreTransaction(txn.bank, false);
+    }
+  }
+
+  async function ignoreSelectedTransactions() {
+    const selected = reviewTransactions.filter((t) => selectedTxnKeys.has(t.key));
+    for (const txn of selected) {
+      await ignoreReviewTransaction(txn);
+    }
+    setSelectedTxnKeys(new Set());
+  }
+
+  async function postGroupTransactions(group: TransactionGroup) {
+    for (const txn of group.items) {
+      await postReviewTransaction({ ...txn, category: group.category });
+    }
+  }
+
+  async function ignoreGroupTransactions(group: TransactionGroup) {
+    for (const txn of group.items) {
+      await ignoreReviewTransaction(txn);
+    }
+  }
+
+  function updateGroupCategory(groupKey: string, category: PlCategoryField) {
+    const group = transactionGroups.find((g) => g.groupKey === groupKey);
+    if (!group) return;
+    for (const txn of group.items) {
+      updateReviewCategory(txn.key, category);
+    }
   }
 
   async function saveStagedToBank() {
@@ -559,7 +746,7 @@ export default function FinancialsPage() {
     const date = new Date(txn.transaction_date.split("T")[0] + "T12:00:00");
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
-    const amount = normalizeTransactionAmount(txn.amount, category);
+    const amount = normalizeTransactionAmount(txn.amount);
 
     const existing = records.find((r) => r.year === year && r.month === month);
     const base = existing
@@ -575,20 +762,20 @@ export default function FinancialsPage() {
     const payload = {
       store_id: store.id,
       user_id: userId,
-      year,
-      month,
-      revenue: updated.revenue,
-      utilities: updated.utilities,
-      rent: updated.rent,
-      payroll: updated.payroll,
-      repairs_maintenance: updated.repairs_maintenance,
-      insurance_expense: updated.insurance_expense,
-      supplies: updated.supplies,
-      marketing: updated.marketing,
-      professional_fees: updated.professional_fees,
-      other_expenses: updated.other_expenses,
-      debt_service: updated.debt_service,
-      notes: updated.notes,
+      year: toNum(year),
+      month: toNum(month),
+      revenue: toNum(updated.revenue),
+      utilities: toNum(updated.utilities),
+      rent: toNum(updated.rent),
+      payroll: toNum(updated.payroll),
+      repairs_maintenance: toNum(updated.repairs_maintenance),
+      insurance_expense: toNum(updated.insurance_expense),
+      supplies: toNum(updated.supplies),
+      marketing: toNum(updated.marketing),
+      professional_fees: toNum(updated.professional_fees),
+      other_expenses: toNum(updated.other_expenses),
+      debt_service: toNum(updated.debt_service),
+      notes: toNullableText(updated.notes),
     };
 
     if (existing?.id) {
@@ -1213,7 +1400,8 @@ export default function FinancialsPage() {
             <div>
               <div className="text-[14px] font-semibold text-slate-100">Import Bank Transactions</div>
               <div className="text-[12px] text-slate-500 mt-1">
-                Upload a CSV with Date, Description, and Amount columns. Transactions are parsed client-side.
+                Upload a CSV with Date, Description, and Amount (or separate Debit/Credit columns).
+                Income and expenses are detected automatically.
               </div>
             </div>
             <div className="flex gap-2">
@@ -1239,94 +1427,90 @@ export default function FinancialsPage() {
           </div>
 
           <div className="card">
-            <div className="section-title">
-              Transaction Review
-              <span className="text-[11px] text-slate-600 font-normal ml-auto">
+            <div className="section-title flex flex-wrap items-center gap-3">
+              <span>Transaction Review</span>
+              <span className="text-[11px] text-slate-600 font-normal">
                 {reviewCount} pending
               </span>
+              <label className="ml-auto flex items-center gap-2 text-[12px] text-slate-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={groupSimilar}
+                  onChange={(e) => setGroupSimilar(e.target.checked)}
+                  className="rounded border-white/20"
+                />
+                Group similar transactions
+              </label>
             </div>
+
+            {someSelected && !groupSimilar && (
+              <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <span className="text-[12px] text-blue-300 font-medium">
+                  {selectedTxnKeys.size} selected
+                </span>
+                <span className="text-[12px] text-slate-500">Apply category to selected:</span>
+                <select
+                  value={bulkCategory}
+                  onChange={(e) => setBulkCategory(e.target.value as PlCategoryField)}
+                  className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
+                >
+                  {PL_CATEGORY_FIELDS.map((f) => (
+                    <option key={f} value={f}>
+                      {CATEGORY_LABELS[f]}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="btn-outline text-[11px]" onClick={applyBulkCategory}>
+                  Apply Category
+                </button>
+                <button type="button" className="btn-primary text-[11px]" onClick={postSelectedTransactions}>
+                  Post Selected to P&L
+                </button>
+                <button type="button" className="btn-outline text-[11px]" onClick={ignoreSelectedTransactions}>
+                  Ignore Selected
+                </button>
+              </div>
+            )}
+
             {reviewCount === 0 ? (
               <p className="text-[13px] text-slate-500 py-6 text-center">
                 No transactions to review. Upload a CSV to get started.
               </p>
-            ) : (
+            ) : groupSimilar ? (
               <div className="table-scroll">
-              <table className="w-full text-[12px]">
-                <thead>
-                  <tr className="text-left text-slate-500 border-b border-white/[0.06]">
-                    <th className="pb-3 pr-3 font-medium">Date</th>
-                    <th className="pb-3 pr-3 font-medium">Description</th>
-                    <th className="pb-3 pr-3 font-medium text-right">Amount</th>
-                    <th className="pb-3 pr-3 font-medium">Category</th>
-                    <th className="pb-3 pr-3 font-medium">Suggestion</th>
-                    <th className="pb-3 font-medium text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stagedTransactions.map((txn) => (
-                    <tr key={txn.tempId} className="border-b border-white/[0.04]">
-                      <td className="py-3 pr-3 text-slate-300 whitespace-nowrap">
-                        {new Date(txn.transaction_date + "T12:00:00").toLocaleDateString()}
-                      </td>
-                      <td className="py-3 pr-3 text-slate-200 max-w-[200px] truncate">{txn.description ?? "—"}</td>
-                      <td className={clsx("py-3 pr-3 text-right font-semibold tabular-nums", txn.amount < 0 ? "text-red-400" : "text-green-400")}>
-                        {fmtDollar(txn.amount)}
-                      </td>
-                      <td className="py-3 pr-3">
-                        <select
-                          value={txn.category}
-                          onChange={(e) =>
-                            setStagedTransactions((prev) =>
-                              prev.map((t) =>
-                                t.tempId === txn.tempId
-                                  ? { ...t, category: e.target.value as PlCategoryField }
-                                  : t
-                              )
-                            )
-                          }
-                          className={clsx(INPUT_CLASS, "w-40 py-1.5 text-[12px]")}
-                        >
-                          {PL_CATEGORY_FIELDS.map((f) => (
-                            <option key={f} value={f}>
-                              {CATEGORY_LABELS[f]}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-3 pr-3">
-                        <span className="badge badge-blue text-[10px]">{CATEGORY_LABELS[txn.suggested]}</span>
-                      </td>
-                      <td className="py-3 text-right whitespace-nowrap">
-                        <button type="button" className="btn-primary text-[11px] mr-1.5" onClick={() => postTransactionToPL(txn, true)}>
-                          Post to P&L
-                        </button>
-                        <button type="button" className="btn-outline text-[11px]" onClick={() => ignoreTransaction(txn, true)}>
-                          Ignore
-                        </button>
-                      </td>
+                <table className="w-full text-[12px]">
+                  <thead>
+                    <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+                      <th className="pb-3 pr-3 font-medium">Description</th>
+                      <th className="pb-3 pr-3 font-medium">Type</th>
+                      <th className="pb-3 pr-3 font-medium">Count</th>
+                      <th className="pb-3 pr-3 font-medium text-right">Total</th>
+                      <th className="pb-3 pr-3 font-medium">Category</th>
+                      <th className="pb-3 pr-3 font-medium">Suggestion</th>
+                      <th className="pb-3 font-medium text-right">Actions</th>
                     </tr>
-                  ))}
-                  {bankTransactions.map((txn) => {
-                    const suggested = suggestTransactionCategory(txn.description);
-                    return (
-                      <tr key={txn.id} className="border-b border-white/[0.04]">
-                        <td className="py-3 pr-3 text-slate-300 whitespace-nowrap">
-                          {new Date(txn.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
+                  </thead>
+                  <tbody>
+                    {transactionGroups.map((group) => (
+                      <tr key={group.groupKey} className="border-b border-white/[0.04]">
+                        <td className="py-3 pr-3 text-slate-200 max-w-[240px] truncate" title={group.description}>
+                          {group.description}
                         </td>
-                        <td className="py-3 pr-3 text-slate-200 max-w-[200px] truncate">{txn.description ?? "—"}</td>
-                        <td className={clsx("py-3 pr-3 text-right font-semibold tabular-nums", txn.amount < 0 ? "text-red-400" : "text-green-400")}>
-                          {fmtDollar(txn.amount)}
+                        <td className="py-3 pr-3">
+                          <TypeBadge type={group.type} />
+                        </td>
+                        <td className="py-3 pr-3 text-slate-400">
+                          {group.count} transaction{group.count === 1 ? "" : "s"}
+                        </td>
+                        <td className="py-3 pr-3 text-right font-semibold tabular-nums text-slate-100">
+                          {fmtDollar(group.totalAmount)}
                         </td>
                         <td className="py-3 pr-3">
                           <select
-                            value={txn.category ?? suggested}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setBankTransactions((prev) =>
-                                prev.map((t) => (t.id === txn.id ? { ...t, category: val } : t))
-                              );
-                              supabase.from("bank_transactions").update({ category: val }).eq("id", txn.id);
-                            }}
+                            value={group.category}
+                            onChange={(e) =>
+                              updateGroupCategory(group.groupKey, e.target.value as PlCategoryField)
+                            }
                             className={clsx(INPUT_CLASS, "w-40 py-1.5 text-[12px]")}
                           >
                             {PL_CATEGORY_FIELDS.map((f) => (
@@ -1337,27 +1521,112 @@ export default function FinancialsPage() {
                           </select>
                         </td>
                         <td className="py-3 pr-3">
-                          <span className="badge badge-blue text-[10px]">{CATEGORY_LABELS[suggested]}</span>
+                          <span className="badge badge-blue text-[10px]">{CATEGORY_LABELS[group.suggested]}</span>
                         </td>
                         <td className="py-3 text-right whitespace-nowrap">
                           <button
                             type="button"
                             className="btn-primary text-[11px] mr-1.5"
-                            onClick={() =>
-                              postTransactionToPL({ ...txn, category: txn.category ?? suggested }, false)
+                            onClick={() => postGroupTransactions(group)}
+                          >
+                            Post All to P&L
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-outline text-[11px]"
+                            onClick={() => ignoreGroupTransactions(group)}
+                          >
+                            Ignore All
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="table-scroll">
+                <table className="w-full text-[12px]">
+                  <thead>
+                    <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+                      <th className="pb-3 pr-2 font-medium w-8">
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          onChange={(e) => toggleSelectAll(e.target.checked)}
+                          className="rounded border-white/20"
+                          aria-label="Select all transactions"
+                        />
+                      </th>
+                      <th className="pb-3 pr-3 font-medium">Date</th>
+                      <th className="pb-3 pr-3 font-medium">Description</th>
+                      <th className="pb-3 pr-3 font-medium">Type</th>
+                      <th className="pb-3 pr-3 font-medium text-right">Amount</th>
+                      <th className="pb-3 pr-3 font-medium">Category</th>
+                      <th className="pb-3 pr-3 font-medium">Suggestion</th>
+                      <th className="pb-3 font-medium text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reviewTransactions.map((txn) => (
+                      <tr key={txn.key} className="border-b border-white/[0.04]">
+                        <td className="py-3 pr-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedTxnKeys.has(txn.key)}
+                            onChange={(e) => toggleSelectKey(txn.key, e.target.checked)}
+                            className="rounded border-white/20"
+                            aria-label={`Select ${txn.description ?? "transaction"}`}
+                          />
+                        </td>
+                        <td className="py-3 pr-3 text-slate-300 whitespace-nowrap">
+                          {new Date(txn.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
+                        </td>
+                        <td className="py-3 pr-3 text-slate-200 max-w-[200px] truncate">{txn.description ?? "—"}</td>
+                        <td className="py-3 pr-3">
+                          <TypeBadge type={txn.type} />
+                        </td>
+                        <td className="py-3 pr-3 text-right font-semibold tabular-nums text-slate-100">
+                          {fmtDollar(txn.amount)}
+                        </td>
+                        <td className="py-3 pr-3">
+                          <select
+                            value={txn.category}
+                            onChange={(e) =>
+                              updateReviewCategory(txn.key, e.target.value as PlCategoryField)
                             }
+                            className={clsx(INPUT_CLASS, "w-40 py-1.5 text-[12px]")}
+                          >
+                            {PL_CATEGORY_FIELDS.map((f) => (
+                              <option key={f} value={f}>
+                                {CATEGORY_LABELS[f]}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-3 pr-3">
+                          <span className="badge badge-blue text-[10px]">{CATEGORY_LABELS[txn.suggested]}</span>
+                        </td>
+                        <td className="py-3 text-right whitespace-nowrap">
+                          <button
+                            type="button"
+                            className="btn-primary text-[11px] mr-1.5"
+                            onClick={() => postReviewTransaction(txn)}
                           >
                             Post to P&L
                           </button>
-                          <button type="button" className="btn-outline text-[11px]" onClick={() => ignoreTransaction(txn, false)}>
+                          <button
+                            type="button"
+                            className="btn-outline text-[11px]"
+                            onClick={() => ignoreReviewTransaction(txn)}
+                          >
                             Ignore
                           </button>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

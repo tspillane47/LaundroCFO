@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
+import { toNullableDate, toNullableNum, toNullableText } from "@/lib/formHelpers";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { preventEnterSubmit } from "@/components/occupancy/shared";
@@ -94,18 +95,18 @@ function EditStoreForm() {
       const { error: updateError } = await supabase
         .from("stores")
         .update({
-          name: form.name,
-          address: form.address,
-          square_footage: Number(form.square_footage),
-          monthly_revenue: Number(form.monthly_revenue),
-          monthly_expenses: Number(form.monthly_expenses),
-          monthly_rent: Number(form.monthly_rent),
-          annual_debt_service: Number(form.annual_debt_service),
-          loan_balance: Number(form.loan_balance),
-          lease_expiration: form.lease_expiration,
-          washers: Number(form.washers),
-          dryers: Number(form.dryers),
-          avg_machine_age: Number(form.avg_machine_age),
+          name: toNullableText(form.name),
+          address: toNullableText(form.address),
+          square_footage: toNullableNum(form.square_footage),
+          monthly_revenue: toNullableNum(form.monthly_revenue),
+          monthly_expenses: toNullableNum(form.monthly_expenses),
+          monthly_rent: toNullableNum(form.monthly_rent),
+          annual_debt_service: toNullableNum(form.annual_debt_service),
+          loan_balance: toNullableNum(form.loan_balance),
+          lease_expiration: toNullableDate(form.lease_expiration),
+          washers: toNullableNum(form.washers),
+          dryers: toNullableNum(form.dryers),
+          avg_machine_age: toNullableNum(form.avg_machine_age),
         })
         .eq("id", storeId);
 

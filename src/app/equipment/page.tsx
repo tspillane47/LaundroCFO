@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
+import { toBool, toNum, toNullableText } from "@/lib/formHelpers";
 import { useStores } from "@/lib/store-context";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
@@ -213,10 +214,10 @@ export default function EquipmentPage() {
   async function handleSave() {
     if (!store || !userId || saving || saveStatus === "success") return;
 
-    const quantity = parseInt(form.quantity, 10);
-    const installationYear = parseInt(form.installation_year, 10);
+    const quantity = toNum(form.quantity);
+    const installationYear = toNum(form.installation_year);
 
-    if (!quantity || quantity < 1) {
+    if (quantity < 1) {
       setMessage({ type: "error", text: "Quantity must be at least 1." });
       return;
     }
@@ -238,9 +239,9 @@ export default function EquipmentPage() {
         machine_size: form.machine_size,
         quantity,
         installation_year: installationYear,
-        high_speed_extract: form.machine_type === "Washer" ? form.high_speed_extract : false,
+        high_speed_extract: form.machine_type === "Washer" ? toBool(form.high_speed_extract) : false,
         condition: form.condition,
-        notes: form.notes.trim() || null,
+        notes: toNullableText(form.notes),
       };
 
       const { error: saveError } = editingId

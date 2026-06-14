@@ -381,35 +381,258 @@ export const PL_CATEGORY_FIELDS = [
 
 export type PlCategoryField = (typeof PL_CATEGORY_FIELDS)[number];
 
+export type TransactionType = "income" | "expense";
+
 export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
-  revenue: ["coin", "card", "fascard", "laundrynet", "payment", "deposit", "sales", "income", "revenue"],
-  utilities: ["pge", "pg&e", "edison", "electric", "gas", "water", "utility", "utilities", "power"],
-  rent: ["rent", "lease", "landlord", "cam", "property mgmt"],
-  payroll: ["payroll", "gusto", "adp", "paychex", "salary", "wages", "employee"],
-  repairs_maintenance: ["repair", "maintenance", "hvac", "plumb", "service call", "dexter", "speed queen"],
-  insurance_expense: ["insurance", "premium", "liability", "policy"],
-  supplies: ["supply", "supplies", "detergent", "chemical", "vending", "soap"],
-  marketing: ["marketing", "advert", "google ads", "facebook", "promo"],
-  professional_fees: ["accountant", "attorney", "legal", "cpa", "consult"],
-  other_expenses: ["bank fee", "misc", "other", "office"],
-  debt_service: ["loan", "mortgage", "debt", "sba", "principal", "interest"],
+  revenue: [
+    "deposit",
+    "cash deposit",
+    "mobile deposit",
+    "cknet deposit",
+    "merchant deposit",
+    "card payment received",
+    "ckcarbus",
+    "card business",
+    "merchant services",
+    "cardpayment",
+    "coin",
+    "card",
+    "fascard",
+    "laundrynet",
+    "payment",
+    "sales",
+    "income",
+    "revenue",
+  ],
+  utilities: [
+    "electric",
+    "power",
+    "pg&e",
+    "pge",
+    "national grid",
+    "eversource",
+    "green mountain power",
+    "gmp",
+    "water",
+    "sewer",
+    "gas company",
+    "utility",
+    "utilities",
+    "edison",
+    "gas",
+  ],
+  rent: ["rent", "lease payment", "landlord", "property management", "lease", "cam"],
+  payroll: ["payroll", "adp", "gusto", "paychex", "employee pay", "wages", "salary", "employee"],
+  repairs_maintenance: [
+    "repair",
+    "maintenance",
+    "hvac",
+    "plumb",
+    "electrician",
+    "parts",
+    "speed queen",
+    "alliance laundry",
+    "continental girbau",
+    "wascomat",
+    "huebsch",
+    "dexter",
+    "service call",
+  ],
+  insurance_expense: [
+    "insurance",
+    "geico",
+    "progressive",
+    "state farm",
+    "liberty mutual",
+    "travelers",
+    "hartford",
+    "premium",
+    "liability",
+    "policy",
+  ],
+  supplies: ["supplies", "detergent", "soap", "sams club", "costco", "office depot", "staples", "supply", "chemical", "vending"],
+  marketing: ["marketing", "advertising", "facebook ads", "google ads", "yelp", "flyers", "advert", "facebook", "promo"],
+  professional_fees: ["accountant", "cpa", "legal", "attorney", "bookkeeping", "quickbooks", "consult"],
+  other_expenses: ["misc", "other", "office"],
+  debt_service: ["loan payment", "eastern funding", "sba loan", "principal", "note payment", "loan", "mortgage", "debt", "sba", "interest"],
 };
 
-export function suggestTransactionCategory(description: string | null): PlCategoryField {
-  const text = (description ?? "").toLowerCase();
-  let best: PlCategoryField = "other_expenses";
-  let bestScore = 0;
+/** Bank fee keywords map to other_expenses (no dedicated P&L field). Checked before generic fallback. */
+const BANK_FEE_KEYWORDS = [
+  "service charge",
+  "monthly fee",
+  "overdraft",
+  "maintenance fee",
+  "atm fee",
+  "bank fee",
+];
 
-  for (const field of PL_CATEGORY_FIELDS) {
+const EXPENSE_CATEGORY_ORDER: PlCategoryField[] = [
+  "utilities",
+  "rent",
+  "payroll",
+  "repairs_maintenance",
+  "insurance_expense",
+  "supplies",
+  "marketing",
+  "professional_fees",
+  "debt_service",
+];
+
+export function suggestTransactionCategory(
+  description: string | null,
+  type?: TransactionType
+): PlCategoryField {
+  if (type === "income") return "revenue";
+
+  const text = (description ?? "").toLowerCase();
+
+  for (const field of EXPENSE_CATEGORY_ORDER) {
     for (const keyword of CATEGORY_KEYWORDS[field]) {
-      if (text.includes(keyword) && keyword.length > bestScore) {
-        best = field;
-        bestScore = keyword.length;
-      }
+      if (text.includes(keyword.toLowerCase())) return field;
     }
   }
 
-  return best;
+  for (const keyword of BANK_FEE_KEYWORDS) {
+    if (text.includes(keyword)) return "other_expenses";
+  }
+
+  return "other_expenses";
+}
+
+export function inferTransactionType(
+  amount: number,
+  category?: string | null
+): TransactionType {
+  if (category === "revenue") return "income";
+  if (amount < 0) return "expense";
+  if (amount > 0) return "income";
+  return "expense";
+}
+
+export function normalizeDescriptionForGrouping(description: string | null): string {
+  if (!description?.trim()) return "(no description)";
+  return description
+    .toLowerCase()
+    .replace(/\s+\d{1,2}\/\d{1,2}(\/\d{2,4})?\s*$/i, "")
+    .replace(/\s+#?\d{4,}\s*$/i, "")
+    .replace(/\s+\d+\s*$/i, "")
+    .trim();
+}
+
+function parseCsvAmount(raw: string): number {
+  const cleaned = raw.replace(/[$,()]/g, "").trim();
+  if (!cleaned) return 0;
+  const parenNegative = /^\(.*\)$/.test(raw.trim());
+  const n = parseFloat(cleaned);
+  if (Number.isNaN(n)) return 0;
+  return parenNegative ? -Math.abs(n) : n;
+}
+
+function parseCsvTypeIndicator(raw: string): TransactionType | null {
+  const t = raw.trim().toLowerCase();
+  if (["debit", "dr", "withdrawal", "expense", "payment", "check"].includes(t)) return "expense";
+  if (["credit", "cr", "deposit", "income"].includes(t)) return "income";
+  return null;
+}
+
+function splitCsvLine(line: string): string[] {
+  return line.match(/(".*?"|[^,]+)/g)?.map((c) => c.trim().replace(/^"|"$/g, "")) ?? line.split(",");
+}
+
+export type ParsedCsvTransaction = {
+  date: string;
+  description: string | null;
+  amount: number;
+  type: TransactionType;
+};
+
+export function parseBankCsv(text: string): ParsedCsvTransaction[] {
+  const lines = text.trim().split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
+  const dateIdx = headers.findIndex((h) => /date|posted|posting/.test(h));
+  const descIdx = headers.findIndex((h) => /desc|memo|name|payee|detail/.test(h));
+
+  const debitIdx = headers.findIndex((h) => /^(debit|withdrawal|dr)$/.test(h) || h === "debit amount");
+  const creditIdx = headers.findIndex((h) => /^(credit|deposit|cr)$/.test(h) || h === "credit amount");
+  const amountIdx = headers.findIndex((h) => /^amount$|^value$|transaction amount/.test(h));
+  const typeIdx = headers.findIndex((h) =>
+    /^(type|transaction type|dr\/cr|debit\/credit|dc)$/.test(h)
+  );
+
+  if (dateIdx === -1) return [];
+  const hasDebitCredit = debitIdx >= 0 && creditIdx >= 0;
+  if (!hasDebitCredit && amountIdx === -1) return [];
+
+  const results: ParsedCsvTransaction[] = [];
+
+  for (const line of lines.slice(1)) {
+    const cols = splitCsvLine(line);
+    const rawDate = cols[dateIdx] ?? "";
+    const description = descIdx >= 0 ? cols[descIdx] ?? null : null;
+
+    const parsed = new Date(rawDate);
+    const date = Number.isNaN(parsed.getTime())
+      ? new Date().toISOString().slice(0, 10)
+      : parsed.toISOString().slice(0, 10);
+
+    let amount = 0;
+    let type: TransactionType = "expense";
+
+    if (hasDebitCredit) {
+      const debitRaw = cols[debitIdx] ?? "";
+      const creditRaw = cols[creditIdx] ?? "";
+      const debitVal = parseCsvAmount(debitRaw);
+      const creditVal = parseCsvAmount(creditRaw);
+
+      if (Math.abs(debitVal) > 0 && Math.abs(creditVal) === 0) {
+        amount = Math.abs(debitVal);
+        type = "expense";
+      } else if (Math.abs(creditVal) > 0 && Math.abs(debitVal) === 0) {
+        amount = Math.abs(creditVal);
+        type = "income";
+      } else if (Math.abs(creditVal) > 0) {
+        amount = Math.abs(creditVal);
+        type = "income";
+      } else if (Math.abs(debitVal) > 0) {
+        amount = Math.abs(debitVal);
+        type = "expense";
+      } else {
+        continue;
+      }
+    } else {
+      const rawAmount = parseCsvAmount(cols[amountIdx] ?? "0");
+      if (rawAmount === 0) continue;
+
+      if (typeIdx >= 0) {
+        const typeHint = parseCsvTypeIndicator(cols[typeIdx] ?? "");
+        if (typeHint) {
+          type = typeHint;
+          amount = Math.abs(rawAmount);
+        } else if (rawAmount < 0) {
+          type = "expense";
+          amount = Math.abs(rawAmount);
+        } else {
+          type = "income";
+          amount = rawAmount;
+        }
+      } else if (rawAmount < 0) {
+        type = "expense";
+        amount = Math.abs(rawAmount);
+      } else {
+        type = "income";
+        amount = rawAmount;
+      }
+    }
+
+    if (amount === 0) continue;
+
+    results.push({ date, description, amount, type });
+  }
+
+  return results;
 }
 
 export type RatioBenchmark = {

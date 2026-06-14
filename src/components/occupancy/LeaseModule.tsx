@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
+import { toBool, toNum, toNullableDate, toNullableText } from "@/lib/formHelpers";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { SmallMetric } from "@/components/ui/MetricCard";
 import clsx from "clsx";
@@ -79,17 +80,6 @@ type OptionForm = {
 const ASSIGNMENT_OPTIONS = ["Allowed", "With Consent", "Not Allowed"];
 const OPTION_STATUSES = ["Available", "Exercised", "Expired", "Declined"];
 
-/** Coerce lease booleans; legacy sublease dropdown values must never reach the DB as text. */
-function toLeaseBoolean(value: unknown): boolean {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (["true", "yes", "1", "allowed", "with consent"].includes(normalized)) return true;
-    return false;
-  }
-  return Boolean(value);
-}
-
 function emptyLeaseForm(): LeaseForm {
   return {
     landlord: "",
@@ -121,10 +111,10 @@ function leaseToForm(lease: Lease): LeaseForm {
     cam_charges: lease.cam_charges != null ? String(lease.cam_charges) : "",
     square_footage: lease.square_footage != null ? String(lease.square_footage) : "",
     security_deposit: lease.security_deposit != null ? String(lease.security_deposit) : "",
-    personal_guaranty: toLeaseBoolean(lease.personal_guaranty),
+    personal_guaranty: toBool(lease.personal_guaranty),
     assignment_rights: lease.assignment_rights ?? "With Consent",
-    sublease_rights: toLeaseBoolean(lease.sublease_rights),
-    exclusivity_clause: toLeaseBoolean(lease.exclusivity_clause),
+    sublease_rights: toBool(lease.sublease_rights),
+    exclusivity_clause: toBool(lease.exclusivity_clause),
     use_restrictions: lease.use_restrictions ?? "",
   };
 }
@@ -394,20 +384,20 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
           {
             store_id: store.id,
             user_id: user.id,
-            landlord_name: leaseForm.landlord || null,
-            tenant_entity: leaseForm.tenant_entity || null,
-            lease_start_date: leaseForm.lease_start_date || null,
-            lease_end_date: leaseForm.lease_end_date || null,
-            monthly_rent: Number(leaseForm.monthly_rent) || 0,
-            annual_escalation_pct: Number(leaseForm.annual_escalation_pct) || 0,
-            cam_charges: Number(leaseForm.cam_charges) || 0,
-            security_deposit: Number(leaseForm.security_deposit) || 0,
-            square_footage: Number(leaseForm.square_footage) || 0,
-            personal_guaranty: toLeaseBoolean(leaseForm.personal_guaranty),
-            assignment_rights: leaseForm.assignment_rights || null,
-            sublease_rights: toLeaseBoolean(leaseForm.sublease_rights),
-            exclusivity_clause: toLeaseBoolean(leaseForm.exclusivity_clause),
-            use_restrictions: leaseForm.use_restrictions || null,
+            landlord_name: toNullableText(leaseForm.landlord),
+            tenant_entity: toNullableText(leaseForm.tenant_entity),
+            lease_start_date: toNullableDate(leaseForm.lease_start_date),
+            lease_end_date: toNullableDate(leaseForm.lease_end_date),
+            monthly_rent: toNum(leaseForm.monthly_rent),
+            annual_escalation_pct: toNum(leaseForm.annual_escalation_pct),
+            cam_charges: toNum(leaseForm.cam_charges),
+            security_deposit: toNum(leaseForm.security_deposit),
+            square_footage: toNum(leaseForm.square_footage),
+            personal_guaranty: toBool(leaseForm.personal_guaranty),
+            assignment_rights: toNullableText(leaseForm.assignment_rights),
+            sublease_rights: toBool(leaseForm.sublease_rights),
+            exclusivity_clause: toBool(leaseForm.exclusivity_clause),
+            use_restrictions: toNullableText(leaseForm.use_restrictions),
             updated_at: new Date().toISOString(),
           },
           { onConflict: "store_id" }
@@ -445,10 +435,10 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
           lease_id: leaseId,
           store_id: store.id,
           user_id: user.id,
-          option_number: Number(form.option_number) || 0,
-          option_years: Number(form.option_years) || 0,
-          status: form.status || "Available",
-          notice_days: Number(form.notice_days) || 0,
+          option_number: toNum(form.option_number),
+          option_years: toNum(form.option_years),
+          status: toNullableText(form.status) ?? "Available",
+          notice_days: toNum(form.notice_days),
         };
 
         if (form.id) {

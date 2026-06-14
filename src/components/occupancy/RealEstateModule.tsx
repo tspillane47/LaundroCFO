@@ -16,6 +16,12 @@ import {
   parseDate,
 } from "./shared";
 import {
+  toBool,
+  toNullableDate,
+  toNullableNum,
+  toNullableText,
+} from "@/lib/formHelpers";
+import {
   calcBuildingEquity,
   calcCombinedValueEstimate,
   calcMarketRentDifference,
@@ -365,45 +371,38 @@ export function RealEstateModule({ store }: Props) {
       return;
     }
 
+    const balloonPayment = toBool(form.balloon_payment);
     const payload = {
       store_id: store.id,
       user_id: user.id,
-      property_owner_entity: form.property_owner_entity || null,
-      same_entity_as_laundromat: form.same_entity_as_laundromat,
-      related_landlord_entity: form.same_entity_as_laundromat
+      property_owner_entity: toNullableText(form.property_owner_entity),
+      same_entity_as_laundromat: toBool(form.same_entity_as_laundromat),
+      related_landlord_entity: toBool(form.same_entity_as_laundromat)
         ? null
-        : form.related_landlord_entity || null,
-      ownership_percentage: form.ownership_percentage ? Number(form.ownership_percentage) : null,
-      date_purchased: form.date_purchased || null,
-      purchase_price: form.purchase_price ? Number(form.purchase_price) : null,
-      estimated_value: form.estimated_value ? Number(form.estimated_value) : null,
-      property_address: form.property_address || null,
-      parcel_id: form.parcel_id || null,
-      total_square_footage: form.total_square_footage ? Number(form.total_square_footage) : null,
-      laundromat_square_footage: form.laundromat_square_footage
-        ? Number(form.laundromat_square_footage)
-        : null,
-      other_tenants: form.other_tenants,
-      ownership_notes: form.ownership_notes || null,
-      mortgage_lender: form.mortgage_lender || null,
-      original_loan_amount: form.original_loan_amount ? Number(form.original_loan_amount) : null,
-      current_loan_balance: form.current_loan_balance ? Number(form.current_loan_balance) : null,
-      interest_rate: form.interest_rate ? Number(form.interest_rate) : null,
-      monthly_mortgage_payment: form.monthly_mortgage_payment
-        ? Number(form.monthly_mortgage_payment)
-        : null,
-      annual_debt_service: form.annual_debt_service ? Number(form.annual_debt_service) : null,
-      maturity_date: form.maturity_date || null,
-      amortization_term: form.amortization_term ? Number(form.amortization_term) : null,
-      balloon_payment: form.balloon_payment,
-      balloon_date: form.balloon_payment ? form.balloon_date || null : null,
-      mortgage_notes: form.mortgage_notes || null,
-      monthly_rent_charged: form.monthly_rent_charged
-        ? Number(form.monthly_rent_charged)
-        : null,
-      market_rent_estimate: form.market_rent_estimate
-        ? Number(form.market_rent_estimate)
-        : null,
+        : toNullableText(form.related_landlord_entity),
+      ownership_percentage: toNullableNum(form.ownership_percentage),
+      date_purchased: toNullableDate(form.date_purchased),
+      purchase_price: toNullableNum(form.purchase_price),
+      estimated_value: toNullableNum(form.estimated_value),
+      property_address: toNullableText(form.property_address),
+      parcel_id: toNullableText(form.parcel_id),
+      total_square_footage: toNullableNum(form.total_square_footage),
+      laundromat_square_footage: toNullableNum(form.laundromat_square_footage),
+      other_tenants: toBool(form.other_tenants),
+      ownership_notes: toNullableText(form.ownership_notes),
+      mortgage_lender: toNullableText(form.mortgage_lender),
+      original_loan_amount: toNullableNum(form.original_loan_amount),
+      current_loan_balance: toNullableNum(form.current_loan_balance),
+      interest_rate: toNullableNum(form.interest_rate),
+      monthly_mortgage_payment: toNullableNum(form.monthly_mortgage_payment),
+      annual_debt_service: toNullableNum(form.annual_debt_service),
+      maturity_date: toNullableDate(form.maturity_date),
+      amortization_term: toNullableNum(form.amortization_term),
+      balloon_payment: balloonPayment,
+      balloon_date: balloonPayment ? toNullableDate(form.balloon_date) : null,
+      mortgage_notes: toNullableText(form.mortgage_notes),
+      monthly_rent_charged: toNullableNum(form.monthly_rent_charged),
+      market_rent_estimate: toNullableNum(form.market_rent_estimate),
     };
 
     const { error: upsertError } = await supabase

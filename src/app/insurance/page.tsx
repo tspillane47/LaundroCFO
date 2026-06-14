@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
+import { toBool, toNullableDate, toNullableNum, toNullableText } from "@/lib/formHelpers";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -273,12 +274,6 @@ function policyToForm(policy: InsurancePolicy): PolicyForm {
       policy.equipment_deductible != null ? String(policy.equipment_deductible) : "",
     notes: policy.notes ?? "",
   };
-}
-
-function parseNum(value: string): number | null {
-  if (!value.trim()) return null;
-  const n = parseFloat(value.replace(/,/g, ""));
-  return Number.isNaN(n) ? null : n;
 }
 
 function calcDaysRemaining(expirationDate: string | null): number | null {
@@ -657,42 +652,42 @@ export default function InsurancePage() {
         user_id: userId,
         store_id: store.id,
         is_active: true,
-        policy_type: policyForm.policy_type || null,
-        carrier: policyForm.carrier || null,
-        policy_number: policyForm.policy_number || null,
-        agent_name: policyForm.agent_name || null,
-        agency_name: policyForm.agency_name || null,
-        agent_email: policyForm.agent_email || null,
-        agent_phone: policyForm.agent_phone || null,
-        effective_date: policyForm.effective_date || null,
-        expiration_date: policyForm.expiration_date || null,
-        auto_renewal: policyForm.auto_renewal,
-        annual_premium: parseNum(policyForm.annual_premium),
-        monthly_premium: parseNum(policyForm.monthly_premium),
-        payment_frequency: policyForm.payment_frequency || null,
-        building_coverage: parseNum(policyForm.building_coverage),
-        contents_coverage: parseNum(policyForm.contents_coverage),
-        equipment_coverage: parseNum(policyForm.equipment_coverage),
-        replacement_cost: policyForm.replacement_cost,
-        liability_per_occurrence: parseNum(policyForm.liability_per_occurrence),
-        liability_aggregate: parseNum(policyForm.liability_aggregate),
-        business_interruption: policyForm.business_interruption,
-        business_interruption_amount: parseNum(policyForm.business_interruption_amount),
-        flood_coverage: policyForm.flood_coverage,
-        flood_amount: parseNum(policyForm.flood_amount),
-        equipment_breakdown: policyForm.equipment_breakdown,
-        equipment_breakdown_amount: parseNum(policyForm.equipment_breakdown_amount),
-        sewer_backup: policyForm.sewer_backup,
-        water_damage: policyForm.water_damage,
-        employee_theft: policyForm.employee_theft,
-        cyber_coverage: policyForm.cyber_coverage,
-        utility_interruption: policyForm.utility_interruption,
-        ordinance_law: policyForm.ordinance_law,
-        property_deductible: parseNum(policyForm.property_deductible),
-        wind_deductible: parseNum(policyForm.wind_deductible),
-        flood_deductible: parseNum(policyForm.flood_deductible),
-        equipment_deductible: parseNum(policyForm.equipment_deductible),
-        notes: policyForm.notes || null,
+        policy_type: toNullableText(policyForm.policy_type),
+        carrier: toNullableText(policyForm.carrier),
+        policy_number: toNullableText(policyForm.policy_number),
+        agent_name: toNullableText(policyForm.agent_name),
+        agency_name: toNullableText(policyForm.agency_name),
+        agent_email: toNullableText(policyForm.agent_email),
+        agent_phone: toNullableText(policyForm.agent_phone),
+        effective_date: toNullableDate(policyForm.effective_date),
+        expiration_date: toNullableDate(policyForm.expiration_date),
+        auto_renewal: toBool(policyForm.auto_renewal),
+        annual_premium: toNullableNum(policyForm.annual_premium),
+        monthly_premium: toNullableNum(policyForm.monthly_premium),
+        payment_frequency: toNullableText(policyForm.payment_frequency),
+        building_coverage: toNullableNum(policyForm.building_coverage),
+        contents_coverage: toNullableNum(policyForm.contents_coverage),
+        equipment_coverage: toNullableNum(policyForm.equipment_coverage),
+        replacement_cost: toBool(policyForm.replacement_cost),
+        liability_per_occurrence: toNullableNum(policyForm.liability_per_occurrence),
+        liability_aggregate: toNullableNum(policyForm.liability_aggregate),
+        business_interruption: toBool(policyForm.business_interruption),
+        business_interruption_amount: toNullableNum(policyForm.business_interruption_amount),
+        flood_coverage: toBool(policyForm.flood_coverage),
+        flood_amount: toNullableNum(policyForm.flood_amount),
+        equipment_breakdown: toBool(policyForm.equipment_breakdown),
+        equipment_breakdown_amount: toNullableNum(policyForm.equipment_breakdown_amount),
+        sewer_backup: toBool(policyForm.sewer_backup),
+        water_damage: toBool(policyForm.water_damage),
+        employee_theft: toBool(policyForm.employee_theft),
+        cyber_coverage: toBool(policyForm.cyber_coverage),
+        utility_interruption: toBool(policyForm.utility_interruption),
+        ordinance_law: toBool(policyForm.ordinance_law),
+        property_deductible: toNullableNum(policyForm.property_deductible),
+        wind_deductible: toNullableNum(policyForm.wind_deductible),
+        flood_deductible: toNullableNum(policyForm.flood_deductible),
+        equipment_deductible: toNullableNum(policyForm.equipment_deductible),
+        notes: toNullableText(policyForm.notes),
       };
 
       if (editingPolicyId) {
@@ -754,11 +749,11 @@ export default function InsurancePage() {
 
     const payload = {
       policy_id: claimForm.policy_id,
-      claim_date: claimForm.claim_date || null,
-      claim_type: claimForm.claim_type || null,
-      description: claimForm.description || null,
-      amount: parseNum(claimForm.amount),
-      status: claimForm.status || "Open",
+      claim_date: toNullableDate(claimForm.claim_date),
+      claim_type: toNullableText(claimForm.claim_type),
+      description: toNullableText(claimForm.description),
+      amount: toNullableNum(claimForm.amount),
+      status: toNullableText(claimForm.status) ?? "Open",
     };
 
     const { error: insertError } = await supabase.from("insurance_claims").insert(payload);

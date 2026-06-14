@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
+import { toBool, toNullableDate, toNullableNum, toNullableText } from "@/lib/formHelpers";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { preventEnterSubmit } from "@/components/occupancy/shared";
@@ -222,23 +223,23 @@ export default function OnboardingPage() {
         user_id: user.id,
         name,
         address,
-        square_footage: data.square_footage ? Number(data.square_footage) : null,
+        square_footage: toNullableNum(data.square_footage),
         store_type: data.store_type,
-        year_opened: data.year_opened ? Number(data.year_opened) : null,
+        year_opened: toNullableNum(data.year_opened),
         market_density: MARKET_MAP[data.market_type] ?? "suburban",
-        monthly_revenue: data.monthly_revenue ? Number(data.monthly_revenue) : null,
-        monthly_expenses: data.monthly_expenses ? Number(data.monthly_expenses) : null,
-        monthly_rent: data.monthly_rent ? Number(data.monthly_rent) : null,
-        annual_debt_service: data.annual_debt_service ? Number(data.annual_debt_service) : null,
-        loan_balance: data.loan_balance ? Number(data.loan_balance) : null,
-        washers: data.washers ? Number(data.washers) : null,
-        dryers: data.dryers ? Number(data.dryers) : null,
-        avg_machine_age: data.avg_machine_age ? Number(data.avg_machine_age) : null,
+        monthly_revenue: toNullableNum(data.monthly_revenue),
+        monthly_expenses: toNullableNum(data.monthly_expenses),
+        monthly_rent: toNullableNum(data.monthly_rent),
+        annual_debt_service: toNullableNum(data.annual_debt_service),
+        loan_balance: toNullableNum(data.loan_balance),
+        washers: toNullableNum(data.washers),
+        dryers: toNullableNum(data.dryers),
+        avg_machine_age: toNullableNum(data.avg_machine_age),
       };
 
       if (includeLease) {
         storePayload.occupancy_type = "leased";
-        storePayload.lease_expiration = data.lease_expiration || null;
+        storePayload.lease_expiration = toNullableDate(data.lease_expiration);
       }
 
       const { data: newStore, error: storeError } = await supabase
@@ -269,10 +270,10 @@ export default function OnboardingPage() {
             {
               store_id: newStore.id,
               user_id: user.id,
-              lease_end_date: data.lease_expiration,
-              monthly_rent: data.monthly_rent ? Number(data.monthly_rent) : null,
-              personal_guaranty: data.personal_guaranty,
-              assignment_rights: data.assignment_rights,
+              lease_end_date: toNullableDate(data.lease_expiration),
+              monthly_rent: toNullableNum(data.monthly_rent),
+              personal_guaranty: toBool(data.personal_guaranty),
+              assignment_rights: toNullableText(data.assignment_rights),
             },
             { onConflict: "store_id" }
           )
