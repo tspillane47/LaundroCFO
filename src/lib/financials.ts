@@ -383,6 +383,59 @@ export type PlCategoryField = (typeof PL_CATEGORY_FIELDS)[number];
 
 export type TransactionType = "income" | "expense";
 
+/** Categories shown in bank import review (extends P&L fields with import-only options). */
+export type BankImportCategory =
+  | PlCategoryField
+  | "other_income"
+  | "bank_fees"
+  | "needs_review";
+
+export const INCOME_IMPORT_CATEGORIES: BankImportCategory[] = [
+  "revenue",
+  "other_income",
+  "needs_review",
+];
+
+export const EXPENSE_IMPORT_CATEGORIES: BankImportCategory[] = [
+  "utilities",
+  "rent",
+  "payroll",
+  "repairs_maintenance",
+  "insurance_expense",
+  "supplies",
+  "marketing",
+  "professional_fees",
+  "debt_service",
+  "bank_fees",
+  "other_expenses",
+  "needs_review",
+];
+
+export const BANK_IMPORT_CATEGORY_LABELS: Record<BankImportCategory, string> = {
+  revenue: "Revenue",
+  other_income: "Other Income",
+  utilities: "Utilities",
+  rent: "Rent",
+  payroll: "Payroll",
+  repairs_maintenance: "Repairs & Maintenance",
+  insurance_expense: "Insurance",
+  supplies: "Supplies",
+  marketing: "Marketing",
+  professional_fees: "Professional Fees",
+  debt_service: "Debt Service",
+  bank_fees: "Bank Fees",
+  other_expenses: "Other Expenses",
+  needs_review: "Needs Review",
+};
+
+export type CategorizationRule = {
+  id: string;
+  user_id: string;
+  vendor_pattern: string;
+  category: string;
+  created_at?: string;
+};
+
 export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
   revenue: [
     "deposit",
@@ -399,10 +452,19 @@ export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
     "card",
     "fascard",
     "laundrynet",
+    "laundryworks",
+    "laundroworks",
+    "cardconnect",
+    "square",
+    "clover",
+    "cents",
+    "spyn",
     "payment",
     "sales",
     "income",
     "revenue",
+    "ach credit",
+    "remote deposit",
   ],
   utilities: [
     "electric",
@@ -420,6 +482,8 @@ export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
     "utilities",
     "edison",
     "gas",
+    "culligan",
+    "water softener",
   ],
   rent: ["rent", "lease payment", "landlord", "property management", "lease", "cam"],
   payroll: ["payroll", "adp", "gusto", "paychex", "employee pay", "wages", "salary", "employee"],
@@ -437,6 +501,11 @@ export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
     "huebsch",
     "dexter",
     "service call",
+    "wss",
+    "western state design",
+    "mat classic",
+    "unitex",
+    "ecolab",
   ],
   insurance_expense: [
     "insurance",
@@ -450,21 +519,54 @@ export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
     "liability",
     "policy",
   ],
-  supplies: ["supplies", "detergent", "soap", "sams club", "costco", "office depot", "staples", "supply", "chemical", "vending"],
+  supplies: [
+    "supplies",
+    "detergent",
+    "soap",
+    "sams club",
+    "costco",
+    "office depot",
+    "staples",
+    "supply",
+    "chemical",
+    "vending",
+    "unitex",
+  ],
   marketing: ["marketing", "advertising", "facebook ads", "google ads", "yelp", "flyers", "advert", "facebook", "promo"],
   professional_fees: ["accountant", "cpa", "legal", "attorney", "bookkeeping", "quickbooks", "consult"],
   other_expenses: ["misc", "other", "office"],
   debt_service: ["loan payment", "eastern funding", "sba loan", "principal", "note payment", "loan", "mortgage", "debt", "sba", "interest"],
 };
 
-/** Bank fee keywords map to other_expenses (no dedicated P&L field). Checked before generic fallback. */
+const OTHER_INCOME_KEYWORDS = ["interest earned", "refund", "rebate", "insurance proceeds", "grant"];
+
 const BANK_FEE_KEYWORDS = [
   "service charge",
+  "service fee",
   "monthly fee",
-  "overdraft",
   "maintenance fee",
+  "overdraft",
+  "od fee",
+  "nsf",
+  "wire fee",
   "atm fee",
   "bank fee",
+  "analysis fee",
+  "returned item",
+];
+
+const NEEDS_REVIEW_KEYWORDS = [
+  "transfer",
+  "zelle",
+  "venmo",
+  "paypal transfer",
+  "ach transfer",
+  "wire transfer",
+  "internal transfer",
+  "atm withdraw",
+  "atm withdrawal",
+  "cash withdraw",
+  "cash withdrawal",
 ];
 
 const EXPENSE_CATEGORY_ORDER: PlCategoryField[] = [
@@ -479,13 +581,45 @@ const EXPENSE_CATEGORY_ORDER: PlCategoryField[] = [
   "debt_service",
 ];
 
+export function isCategoryReadyToPost(category: BankImportCategory): boolean {
+  return category !== "needs_review";
+}
+
+export function mapBankCategoryToPlField(category: BankImportCategory): PlCategoryField | null {
+  if (category === "needs_review") return null;
+  if (category === "other_income") return "revenue";
+  if (category === "bank_fees") return "other_expenses";
+  return category;
+}
+
+export function getImportCategoriesForType(type: TransactionType): BankImportCategory[] {
+  return type === "income" ? INCOME_IMPORT_CATEGORIES : EXPENSE_IMPORT_CATEGORIES;
+}
+
 export function suggestTransactionCategory(
   description: string | null,
   type?: TransactionType
-): PlCategoryField {
-  if (type === "income") return "revenue";
-
+): BankImportCategory {
   const text = (description ?? "").toLowerCase();
+  const trimmed = (description ?? "").trim();
+
+  if (!trimmed || /^check\s*#?\d*$/i.test(trimmed) || trimmed.toLowerCase() === "check") {
+    return "needs_review";
+  }
+
+  for (const keyword of NEEDS_REVIEW_KEYWORDS) {
+    if (text.includes(keyword)) return "needs_review";
+  }
+
+  if (type === "income") {
+    for (const keyword of OTHER_INCOME_KEYWORDS) {
+      if (text.includes(keyword)) return "other_income";
+    }
+    for (const keyword of CATEGORY_KEYWORDS.revenue) {
+      if (text.includes(keyword.toLowerCase())) return "revenue";
+    }
+    return "revenue";
+  }
 
   for (const field of EXPENSE_CATEGORY_ORDER) {
     for (const keyword of CATEGORY_KEYWORDS[field]) {
@@ -494,10 +628,38 @@ export function suggestTransactionCategory(
   }
 
   for (const keyword of BANK_FEE_KEYWORDS) {
-    if (text.includes(keyword)) return "other_expenses";
+    if (text.includes(keyword)) return "bank_fees";
   }
 
-  return "other_expenses";
+  return "needs_review";
+}
+
+export function findMatchingRule(
+  rules: CategorizationRule[],
+  description: string | null
+): CategorizationRule | null {
+  const normalized = normalizeVendorPattern(description);
+  if (!normalized) return null;
+
+  for (const rule of rules) {
+    const pattern = rule.vendor_pattern.trim().toUpperCase();
+    if (pattern && normalized.includes(pattern)) return rule;
+  }
+  return null;
+}
+
+export function categorizeWithRules(
+  description: string | null,
+  type: TransactionType,
+  rules: CategorizationRule[]
+): { category: BankImportCategory; suggested: BankImportCategory; ruleApplied: boolean } {
+  const rule = findMatchingRule(rules, description);
+  if (rule) {
+    const category = rule.category as BankImportCategory;
+    return { category, suggested: category, ruleApplied: true };
+  }
+  const suggested = suggestTransactionCategory(description, type);
+  return { category: suggested, suggested, ruleApplied: false };
 }
 
 export function inferTransactionType(
@@ -510,14 +672,22 @@ export function inferTransactionType(
   return "expense";
 }
 
-export function normalizeDescriptionForGrouping(description: string | null): string {
-  if (!description?.trim()) return "(no description)";
-  return description
-    .toLowerCase()
+export function normalizeVendorPattern(description: string | null): string {
+  if (!description?.trim()) return "";
+  let s = description.trim();
+  const starIdx = s.indexOf("*");
+  if (starIdx > 0) s = s.slice(0, starIdx);
+  s = s
     .replace(/\s+\d{1,2}\/\d{1,2}(\/\d{2,4})?\s*$/i, "")
     .replace(/\s+#?\d{4,}\s*$/i, "")
     .replace(/\s+\d+\s*$/i, "")
     .trim();
+  return s.toUpperCase();
+}
+
+export function normalizeDescriptionForGrouping(description: string | null): string {
+  const pattern = normalizeVendorPattern(description);
+  return pattern || "(no description)";
 }
 
 function parseCsvAmount(raw: string): number {
@@ -547,31 +717,85 @@ export type ParsedCsvTransaction = {
   type: TransactionType;
 };
 
+export type CsvParseFormat = {
+  headers: string[];
+  dateIdx: number;
+  descIdx: number;
+  debitIdx: number;
+  creditIdx: number;
+  amountIdx: number;
+  typeIdx: number;
+  hasDebitCredit: boolean;
+  format: "debit_credit" | "signed_amount" | "amount_with_type";
+};
+
+function detectCsvFormat(headers: string[]): Omit<CsvParseFormat, "format"> & { format?: CsvParseFormat["format"] } {
+  const dateIdx = headers.findIndex((h) => /date|posted|posting|transaction date/.test(h));
+  const descIdx = headers.findIndex((h) =>
+    /desc|memo|name|payee|detail|transaction description|description/.test(h)
+  );
+  const debitIdx = headers.findIndex(
+    (h) => /^(debit|withdrawal|dr|debits)$/.test(h) || h === "debit amount" || h === "withdrawals"
+  );
+  const creditIdx = headers.findIndex(
+    (h) => /^(credit|deposit|cr|credits)$/.test(h) || h === "credit amount" || h === "deposits"
+  );
+  const amountIdx = headers.findIndex((h) =>
+    /^amount$|^value$|transaction amount|trans amount/.test(h)
+  );
+  const typeIdx = headers.findIndex((h) =>
+    /^(type|transaction type|dr\/cr|debit\/credit|dc|tran type)$/.test(h)
+  );
+  const hasDebitCredit = debitIdx >= 0 && creditIdx >= 0;
+
+  let format: CsvParseFormat["format"] | undefined;
+  if (hasDebitCredit) format = "debit_credit";
+  else if (amountIdx >= 0 && typeIdx >= 0) format = "amount_with_type";
+  else if (amountIdx >= 0) format = "signed_amount";
+
+  return { headers, dateIdx, descIdx, debitIdx, creditIdx, amountIdx, typeIdx, hasDebitCredit, format };
+}
+
 export function parseBankCsv(text: string): ParsedCsvTransaction[] {
   const lines = text.trim().split(/\r?\n/).filter(Boolean);
   if (lines.length < 2) return [];
 
   const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
-  const dateIdx = headers.findIndex((h) => /date|posted|posting/.test(h));
-  const descIdx = headers.findIndex((h) => /desc|memo|name|payee|detail/.test(h));
+  const fmt = detectCsvFormat(headers);
 
-  const debitIdx = headers.findIndex((h) => /^(debit|withdrawal|dr)$/.test(h) || h === "debit amount");
-  const creditIdx = headers.findIndex((h) => /^(credit|deposit|cr)$/.test(h) || h === "credit amount");
-  const amountIdx = headers.findIndex((h) => /^amount$|^value$|transaction amount/.test(h));
-  const typeIdx = headers.findIndex((h) =>
-    /^(type|transaction type|dr\/cr|debit\/credit|dc)$/.test(h)
-  );
+  if (fmt.dateIdx === -1) {
+    console.warn("[Bank CSV] No date column found. Headers:", headers);
+    return [];
+  }
+  if (!fmt.hasDebitCredit && fmt.amountIdx === -1) {
+    console.warn("[Bank CSV] No amount or debit/credit columns found. Headers:", headers);
+    return [];
+  }
 
-  if (dateIdx === -1) return [];
-  const hasDebitCredit = debitIdx >= 0 && creditIdx >= 0;
-  if (!hasDebitCredit && amountIdx === -1) return [];
+  const rawRows = lines.slice(1, 6).map((line) => {
+    const cols = splitCsvLine(line);
+    return Object.fromEntries(headers.map((h, i) => [h, cols[i] ?? ""]));
+  });
+
+  console.log("[Bank CSV] Detected format:", {
+    format: fmt.format,
+    headers: fmt.headers,
+    dateIdx: fmt.dateIdx,
+    descIdx: fmt.descIdx,
+    debitIdx: fmt.debitIdx,
+    creditIdx: fmt.creditIdx,
+    amountIdx: fmt.amountIdx,
+    typeIdx: fmt.typeIdx,
+    hasDebitCredit: fmt.hasDebitCredit,
+  });
+  console.log("[Bank CSV] First 5 raw rows:", rawRows);
 
   const results: ParsedCsvTransaction[] = [];
 
   for (const line of lines.slice(1)) {
     const cols = splitCsvLine(line);
-    const rawDate = cols[dateIdx] ?? "";
-    const description = descIdx >= 0 ? cols[descIdx] ?? null : null;
+    const rawDate = cols[fmt.dateIdx] ?? "";
+    const description = fmt.descIdx >= 0 ? cols[fmt.descIdx] ?? null : null;
 
     const parsed = new Date(rawDate);
     const date = Number.isNaN(parsed.getTime())
@@ -581,9 +805,9 @@ export function parseBankCsv(text: string): ParsedCsvTransaction[] {
     let amount = 0;
     let type: TransactionType = "expense";
 
-    if (hasDebitCredit) {
-      const debitRaw = cols[debitIdx] ?? "";
-      const creditRaw = cols[creditIdx] ?? "";
+    if (fmt.hasDebitCredit) {
+      const debitRaw = cols[fmt.debitIdx] ?? "";
+      const creditRaw = cols[fmt.creditIdx] ?? "";
       const debitVal = parseCsvAmount(debitRaw);
       const creditVal = parseCsvAmount(creditRaw);
 
@@ -603,11 +827,11 @@ export function parseBankCsv(text: string): ParsedCsvTransaction[] {
         continue;
       }
     } else {
-      const rawAmount = parseCsvAmount(cols[amountIdx] ?? "0");
+      const rawAmount = parseCsvAmount(cols[fmt.amountIdx] ?? "0");
       if (rawAmount === 0) continue;
 
-      if (typeIdx >= 0) {
-        const typeHint = parseCsvTypeIndicator(cols[typeIdx] ?? "");
+      if (fmt.typeIdx >= 0) {
+        const typeHint = parseCsvTypeIndicator(cols[fmt.typeIdx] ?? "");
         if (typeHint) {
           type = typeHint;
           amount = Math.abs(rawAmount);
@@ -630,6 +854,10 @@ export function parseBankCsv(text: string): ParsedCsvTransaction[] {
     if (amount === 0) continue;
 
     results.push({ date, description, amount, type });
+  }
+
+  if (results.length > 0) {
+    console.log("[Bank CSV] First 5 normalized transactions:", results.slice(0, 5));
   }
 
   return results;

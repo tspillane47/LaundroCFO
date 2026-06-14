@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, Fragment } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import {
@@ -58,8 +58,16 @@ import {
   suggestTransactionCategory,
   parseBankCsv,
   inferTransactionType,
-  normalizeDescriptionForGrouping,
+  normalizeVendorPattern,
+  categorizeWithRules,
+  findMatchingRule,
+  mapBankCategoryToPlField,
+  isCategoryReadyToPost,
+  getImportCategoriesForType,
+  BANK_IMPORT_CATEGORY_LABELS,
   type TransactionType,
+  type BankImportCategory,
+  type CategorizationRule,
 } from "@/lib/financials";
 
 type TabId = "pl" | "trends" | "ratios" | "bank" | "quickbooks";
@@ -72,8 +80,9 @@ type StagedTransaction = {
   description: string | null;
   amount: number;
   type: TransactionType;
-  category: PlCategoryField;
-  suggested: PlCategoryField;
+  category: BankImportCategory;
+  suggested: BankImportCategory;
+  ruleApplied?: boolean;
 };
 
 type ReviewTransaction = {
@@ -83,20 +92,23 @@ type ReviewTransaction = {
   description: string | null;
   amount: number;
   type: TransactionType;
-  category: PlCategoryField;
-  suggested: PlCategoryField;
+  category: BankImportCategory;
+  suggested: BankImportCategory;
+  ruleApplied?: boolean;
   staged?: StagedTransaction;
   bank?: BankTransaction;
 };
 
 type TransactionGroup = {
   groupKey: string;
+  vendorPattern: string;
   description: string;
   count: number;
   totalAmount: number;
   type: TransactionType;
-  category: PlCategoryField;
-  suggested: PlCategoryField;
+  category: BankImportCategory;
+  suggested: BankImportCategory;
+  ruleApplied: boolean;
   items: ReviewTransaction[];
 };
 
@@ -240,6 +252,13 @@ function normalizeTransactionAmount(amount: number): number {
   return Math.abs(amount);
 }
 
+function CategoryBadge({ category }: { category: BankImportCategory }) {
+  if (category === "needs_review") {
+    return <span className="badge badge-amber text-[10px]">{BANK_IMPORT_CATEGORY_LABELS[category]}</span>;
+  }
+  return <span className="badge badge-blue text-[10px]">{BANK_IMPORT_CATEGORY_LABELS[category]}</span>;
+}
+
 function TypeBadge({ type }: { type: TransactionType }) {
   return (
     <span
@@ -270,8 +289,12 @@ export default function FinancialsPage() {
   const [bankTransactions, setBankTransactions] = useState<BankTransaction[]>([]);
   const [stagedTransactions, setStagedTransactions] = useState<StagedTransaction[]>([]);
   const [selectedTxnKeys, setSelectedTxnKeys] = useState<Set<string>>(new Set());
-  const [bulkCategory, setBulkCategory] = useState<PlCategoryField>("revenue");
-  const [groupSimilar, setGroupSimilar] = useState(false);
+  const [bulkCategory, setBulkCategory] = useState<BankImportCategory>("revenue");
+  const [groupSimilar, setGroupSimilar] = useState(true);
+  const [categorizationRules, setCategorizationRules] = useState<CategorizationRule[]>([]);
+  const [ruleFormKey, setRuleFormKey] = useState<string | null>(null);
+  const [ruleFormCategory, setRuleFormCategory] = useState<BankImportCategory>("revenue");
+  const [showManageRules, setShowManageRules] = useState(false);
   const [qbMappings, setQbMappings] = useState<QBMappingRow[]>(DEFAULT_QB_MAPPINGS);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -309,6 +332,7 @@ export default function FinancialsPage() {
       { data: financialsData, error: financialsError },
       { data: bankData, error: bankError },
       { data: mappingData, error: mappingError },
+      { data: rulesData, error: rulesError },
     ] = await Promise.all([
       supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
       supabase
@@ -324,9 +348,14 @@ export default function FinancialsPage() {
         .eq("is_reviewed", false)
         .order("transaction_date", { ascending: false }),
       supabase.from("quickbooks_mapping").select("*").eq("store_id", selectedStore.id),
+      supabase
+        .from("categorization_rules")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
     ]);
 
-    const errors = [storeError, financialsError, bankError, mappingError]
+    const errors = [storeError, financialsError, bankError, mappingError, rulesError]
       .filter(Boolean)
       .map((e) => e!.message);
     if (errors.length > 0) setError(errors.join(" · "));
@@ -335,6 +364,7 @@ export default function FinancialsPage() {
     const sorted = enrichMonthlyRecords(sortRecordsDesc((financialsData ?? []) as MonthlyFinancialRecord[]));
     setRecords(sorted);
     setBankTransactions((bankData ?? []) as BankTransaction[]);
+    setCategorizationRules((rulesData ?? []) as CategorizationRule[]);
 
     if ((mappingData ?? []).length > 0) {
       setQbMappings(
@@ -448,53 +478,74 @@ export default function FinancialsPage() {
       type: txn.type,
       category: txn.category,
       suggested: txn.suggested,
+      ruleApplied: txn.ruleApplied,
       staged: txn,
     }));
 
     const bank: ReviewTransaction[] = bankTransactions.map((txn) => {
       const type = inferTransactionType(txn.amount, txn.category);
+      const amount = Math.abs(txn.amount);
+      const storedCategory = txn.category as BankImportCategory | null;
+      const rule = findMatchingRule(categorizationRules, txn.description);
+      if (rule) {
+        const category = rule.category as BankImportCategory;
+        return {
+          key: txn.id,
+          isStaged: false,
+          transaction_date: txn.transaction_date,
+          description: txn.description,
+          amount,
+          type,
+          category,
+          suggested: category,
+          ruleApplied: true,
+          bank: txn,
+        };
+      }
       const suggested = suggestTransactionCategory(txn.description, type);
       return {
         key: txn.id,
         isStaged: false,
         transaction_date: txn.transaction_date,
         description: txn.description,
-        amount: Math.abs(txn.amount),
+        amount,
         type,
-        category: (txn.category ?? suggested) as PlCategoryField,
+        category: storedCategory ?? suggested,
         suggested,
+        ruleApplied: false,
         bank: txn,
       };
     });
 
     return [...staged, ...bank];
-  }, [stagedTransactions, bankTransactions]);
+  }, [stagedTransactions, bankTransactions, categorizationRules]);
 
   const transactionGroups = useMemo((): TransactionGroup[] => {
     const map = new Map<string, TransactionGroup>();
 
     for (const txn of reviewTransactions) {
-      const normalized = normalizeDescriptionForGrouping(txn.description);
-      const groupKey = `${normalized}::${txn.type}`;
+      const vendorPattern = normalizeVendorPattern(txn.description);
+      const groupKey = `${vendorPattern || "(no description)"}::${txn.type}`;
 
       const existing = map.get(groupKey);
       if (existing) {
         existing.count += 1;
         existing.totalAmount += txn.amount;
         existing.items.push(txn);
-        if (txn.category !== existing.category) {
-          const categories = new Set(existing.items.map((i) => i.category));
-          if (categories.size === 1) existing.category = txn.category;
-        }
+        if (txn.ruleApplied) existing.ruleApplied = true;
+        const categories = new Set(existing.items.map((i) => i.category));
+        if (categories.size === 1) existing.category = txn.category;
       } else {
         map.set(groupKey, {
           groupKey,
-          description: txn.description ?? normalized,
+          vendorPattern: vendorPattern || "(no description)",
+          description: txn.description ?? vendorPattern ?? "(no description)",
           count: 1,
           totalAmount: txn.amount,
           type: txn.type,
           category: txn.category,
           suggested: txn.suggested,
+          ruleApplied: txn.ruleApplied ?? false,
           items: [txn],
         });
       }
@@ -593,24 +644,43 @@ export default function FinancialsPage() {
 
   function handleCSVUpload(file: File) {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const text = e.target?.result as string;
       const parsed = parseBankCsv(text);
       if (parsed.length === 0) {
         setError("Could not parse CSV. Include Date and Amount (or Debit/Credit) columns.");
         return;
       }
+
+      let rules = categorizationRules;
+      if (userId) {
+        const { data: freshRules } = await supabase
+          .from("categorization_rules")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false });
+        if (freshRules) {
+          rules = freshRules as CategorizationRule[];
+          setCategorizationRules(rules);
+        }
+      }
+
       const baseId = Date.now();
       const staged: StagedTransaction[] = parsed.map((row, i) => {
-        const suggested = suggestTransactionCategory(row.description, row.type);
+        const { category, suggested, ruleApplied } = categorizeWithRules(
+          row.description,
+          row.type,
+          rules
+        );
         return {
           tempId: `csv-${baseId}-${i}`,
           transaction_date: row.date,
           description: row.description,
           amount: row.amount,
           type: row.type,
-          category: suggested,
+          category,
           suggested,
+          ruleApplied,
         };
       });
       setStagedTransactions((prev) => [...staged, ...prev]);
@@ -632,7 +702,7 @@ export default function FinancialsPage() {
     });
   }
 
-  function updateReviewCategory(key: string, category: PlCategoryField) {
+  function updateReviewCategory(key: string, category: BankImportCategory) {
     setStagedTransactions((prev) =>
       prev.map((t) => (t.tempId === key ? { ...t, category } : t))
     );
@@ -658,10 +728,80 @@ export default function FinancialsPage() {
         supabase.from("bank_transactions").update({ category: bulkCategory }).eq("id", key);
       }
     });
-    setSuccess(`Applied ${CATEGORY_LABELS[bulkCategory]} to ${keys.length} transaction${keys.length === 1 ? "" : "s"}.`);
+    setSuccess(`Applied ${BANK_IMPORT_CATEGORY_LABELS[bulkCategory]} to ${keys.length} transaction${keys.length === 1 ? "" : "s"}.`);
+  }
+
+  async function ignoreAllTransactions() {
+    const count = reviewCount;
+    if (count === 0) return;
+    const confirmed = window.confirm(
+      `This will remove all ${count} pending transactions from this import. This cannot be undone. Continue?`
+    );
+    if (!confirmed) return;
+
+    setStagedTransactions([]);
+    for (const txn of bankTransactions) {
+      await supabase.from("bank_transactions").update({ is_reviewed: true }).eq("id", txn.id);
+    }
+    setBankTransactions([]);
+    setSelectedTxnKeys(new Set());
+    setSuccess(`Removed ${count} pending transaction${count === 1 ? "" : "s"}.`);
+  }
+
+  function openRuleForm(key: string, category: BankImportCategory, type: TransactionType) {
+    setRuleFormKey(key);
+    setRuleFormCategory(category === "needs_review" ? (type === "income" ? "revenue" : "utilities") : category);
+  }
+
+  async function saveCategorizationRule(vendorPattern: string, category: BankImportCategory) {
+    if (!userId || !vendorPattern.trim()) return;
+    const { data, error: insertError } = await supabase
+      .from("categorization_rules")
+      .insert({
+        user_id: userId,
+        vendor_pattern: vendorPattern.trim().toUpperCase(),
+        category,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      setError(insertError.message);
+      return;
+    }
+
+    const rule = data as CategorizationRule;
+    setCategorizationRules((prev) => [rule, ...prev]);
+
+    setStagedTransactions((prev) =>
+      prev.map((t) => {
+        const normalized = normalizeVendorPattern(t.description);
+        if (normalized.includes(rule.vendor_pattern.toUpperCase())) {
+          return { ...t, category, suggested: category, ruleApplied: true };
+        }
+        return t;
+      })
+    );
+
+    setRuleFormKey(null);
+    setSuccess(`Rule saved: "${rule.vendor_pattern}" → ${BANK_IMPORT_CATEGORY_LABELS[category]}`);
+  }
+
+  async function deleteCategorizationRule(ruleId: string) {
+    const { error: deleteError } = await supabase.from("categorization_rules").delete().eq("id", ruleId);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    setCategorizationRules((prev) => prev.filter((r) => r.id !== ruleId));
+    setSuccess("Rule deleted.");
   }
 
   async function postReviewTransaction(txn: ReviewTransaction) {
+    if (!isCategoryReadyToPost(txn.category)) {
+      setError("Assign a category before posting. Transactions marked Needs Review cannot be posted.");
+      return;
+    }
     if (txn.isStaged && txn.staged) {
       await postTransactionToPL(txn.staged, true);
     } else if (txn.bank) {
@@ -694,6 +834,10 @@ export default function FinancialsPage() {
   }
 
   async function postGroupTransactions(group: TransactionGroup) {
+    if (!isCategoryReadyToPost(group.category)) {
+      setError("Assign a category before posting. Transactions marked Needs Review cannot be posted.");
+      return;
+    }
     for (const txn of group.items) {
       await postReviewTransaction({ ...txn, category: group.category });
     }
@@ -705,7 +849,7 @@ export default function FinancialsPage() {
     }
   }
 
-  function updateGroupCategory(groupKey: string, category: PlCategoryField) {
+  function updateGroupCategory(groupKey: string, category: BankImportCategory) {
     const group = transactionGroups.find((g) => g.groupKey === groupKey);
     if (!group) return;
     for (const txn of group.items) {
@@ -742,7 +886,13 @@ export default function FinancialsPage() {
     isStaged: boolean
   ) {
     if (!store?.id || !userId) return;
-    const category = (txn.category ?? "other_expenses") as PlCategoryField;
+    const importCategory = (txn.category ?? "needs_review") as BankImportCategory;
+    if (!isCategoryReadyToPost(importCategory)) {
+      setError("Assign a category before posting. Transactions marked Needs Review cannot be posted.");
+      return;
+    }
+    const category = mapBankCategoryToPlField(importCategory);
+    if (!category) return;
     const date = new Date(txn.transaction_date.split("T")[0] + "T12:00:00");
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
@@ -790,7 +940,7 @@ export default function FinancialsPage() {
       await supabase.from("bank_transactions").update({ is_reviewed: true }).eq("id", (txn as BankTransaction).id);
     }
 
-    setSuccess(`Posted to ${MONTH_NAMES[month - 1]} ${year} P&L (${CATEGORY_LABELS[category]}).`);
+    setSuccess(`Posted to ${MONTH_NAMES[month - 1]} ${year} P&L (${BANK_IMPORT_CATEGORY_LABELS[importCategory]}).`);
     await loadData();
   }
 
@@ -1432,16 +1582,68 @@ export default function FinancialsPage() {
               <span className="text-[11px] text-slate-600 font-normal">
                 {reviewCount} pending
               </span>
-              <label className="ml-auto flex items-center gap-2 text-[12px] text-slate-400 cursor-pointer">
+              {reviewCount > 0 && (
+                <button
+                  type="button"
+                  className="btn-outline text-[11px] text-red-400 border-red-500/30 hover:bg-red-500/10"
+                  onClick={ignoreAllTransactions}
+                >
+                  Ignore All {reviewCount} Transactions
+                </button>
+              )}
+              <button
+                type="button"
+                className="ml-auto text-[12px] text-blue-400 hover:text-blue-300"
+                onClick={() => setShowManageRules((v) => !v)}
+              >
+                {showManageRules ? "Hide Rules" : "Manage Rules"}
+                {categorizationRules.length > 0 && (
+                  <span className="ml-1.5 badge badge-blue text-[10px]">{categorizationRules.length}</span>
+                )}
+              </button>
+              <label className="flex items-center gap-2 text-[12px] text-slate-400 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={groupSimilar}
                   onChange={(e) => setGroupSimilar(e.target.checked)}
                   className="rounded border-white/20"
                 />
-                Group similar transactions
+                Show individual rows
               </label>
             </div>
+
+            {showManageRules && (
+              <div className="mb-4 p-4 rounded-lg bg-[#243347]/50 border border-white/[0.06]">
+                <div className="text-[13px] font-medium text-slate-200 mb-3">Categorization Rules</div>
+                {categorizationRules.length === 0 ? (
+                  <p className="text-[12px] text-slate-500">
+                    No rules yet. Use &quot;Set as Rule&quot; on a transaction group to auto-categorize future imports.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {categorizationRules.map((rule) => (
+                      <div
+                        key={rule.id}
+                        className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-white/[0.04] last:border-b-0"
+                      >
+                        <div className="text-[12px] text-slate-300">
+                          <span className="font-mono text-slate-100">{rule.vendor_pattern}</span>
+                          <span className="text-slate-500 mx-2">→</span>
+                          <CategoryBadge category={rule.category as BankImportCategory} />
+                        </div>
+                        <button
+                          type="button"
+                          className="text-[11px] text-red-400 hover:text-red-300"
+                          onClick={() => deleteCategorizationRule(rule.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {someSelected && !groupSimilar && (
               <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
@@ -1451,14 +1653,24 @@ export default function FinancialsPage() {
                 <span className="text-[12px] text-slate-500">Apply category to selected:</span>
                 <select
                   value={bulkCategory}
-                  onChange={(e) => setBulkCategory(e.target.value as PlCategoryField)}
+                  onChange={(e) => setBulkCategory(e.target.value as BankImportCategory)}
                   className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
                 >
-                  {PL_CATEGORY_FIELDS.map((f) => (
-                    <option key={f} value={f}>
-                      {CATEGORY_LABELS[f]}
-                    </option>
-                  ))}
+                  {Array.from(
+                    new Set(reviewTransactions.filter((t) => selectedTxnKeys.has(t.key)).map((t) => t.type))
+                  ).length === 1
+                    ? getImportCategoriesForType(
+                        reviewTransactions.find((t) => selectedTxnKeys.has(t.key))!.type
+                      ).map((f) => (
+                        <option key={f} value={f}>
+                          {BANK_IMPORT_CATEGORY_LABELS[f]}
+                        </option>
+                      ))
+                    : (["revenue", "utilities", "needs_review"] as BankImportCategory[]).map((f) => (
+                        <option key={f} value={f}>
+                          {BANK_IMPORT_CATEGORY_LABELS[f]}
+                        </option>
+                      ))}
                 </select>
                 <button type="button" className="btn-outline text-[11px]" onClick={applyBulkCategory}>
                   Apply Category
@@ -1481,7 +1693,7 @@ export default function FinancialsPage() {
                 <table className="w-full text-[12px]">
                   <thead>
                     <tr className="text-left text-slate-500 border-b border-white/[0.06]">
-                      <th className="pb-3 pr-3 font-medium">Description</th>
+                      <th className="pb-3 pr-3 font-medium">Vendor</th>
                       <th className="pb-3 pr-3 font-medium">Type</th>
                       <th className="pb-3 pr-3 font-medium">Count</th>
                       <th className="pb-3 pr-3 font-medium text-right">Total</th>
@@ -1492,54 +1704,117 @@ export default function FinancialsPage() {
                   </thead>
                   <tbody>
                     {transactionGroups.map((group) => (
-                      <tr key={group.groupKey} className="border-b border-white/[0.04]">
-                        <td className="py-3 pr-3 text-slate-200 max-w-[240px] truncate" title={group.description}>
-                          {group.description}
-                        </td>
-                        <td className="py-3 pr-3">
-                          <TypeBadge type={group.type} />
-                        </td>
-                        <td className="py-3 pr-3 text-slate-400">
-                          {group.count} transaction{group.count === 1 ? "" : "s"}
-                        </td>
-                        <td className="py-3 pr-3 text-right font-semibold tabular-nums text-slate-100">
-                          {fmtDollar(group.totalAmount)}
-                        </td>
-                        <td className="py-3 pr-3">
-                          <select
-                            value={group.category}
-                            onChange={(e) =>
-                              updateGroupCategory(group.groupKey, e.target.value as PlCategoryField)
-                            }
-                            className={clsx(INPUT_CLASS, "w-40 py-1.5 text-[12px]")}
-                          >
-                            {PL_CATEGORY_FIELDS.map((f) => (
-                              <option key={f} value={f}>
-                                {CATEGORY_LABELS[f]}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-3 pr-3">
-                          <span className="badge badge-blue text-[10px]">{CATEGORY_LABELS[group.suggested]}</span>
-                        </td>
-                        <td className="py-3 text-right whitespace-nowrap">
-                          <button
-                            type="button"
-                            className="btn-primary text-[11px] mr-1.5"
-                            onClick={() => postGroupTransactions(group)}
-                          >
-                            Post All to P&L
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-outline text-[11px]"
-                            onClick={() => ignoreGroupTransactions(group)}
-                          >
-                            Ignore All
-                          </button>
-                        </td>
-                      </tr>
+                      <Fragment key={group.groupKey}>
+                        <tr className="border-b border-white/[0.04]">
+                          <td className="py-3 pr-3 text-slate-200 max-w-[240px]">
+                            <div className="truncate font-medium" title={group.description}>
+                              {group.vendorPattern}
+                            </div>
+                            {group.count > 1 && (
+                              <div className="text-[10px] text-slate-500 truncate" title={group.description}>
+                                e.g. {group.description}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 pr-3">
+                            <TypeBadge type={group.type} />
+                          </td>
+                          <td className="py-3 pr-3 text-slate-400">
+                            {group.count} transaction{group.count === 1 ? "" : "s"}
+                          </td>
+                          <td className="py-3 pr-3 text-right font-semibold tabular-nums text-slate-100">
+                            {fmtDollar(group.totalAmount)}
+                          </td>
+                          <td className="py-3 pr-3">
+                            <select
+                              value={group.category}
+                              onChange={(e) =>
+                                updateGroupCategory(group.groupKey, e.target.value as BankImportCategory)
+                              }
+                              className={clsx(
+                                INPUT_CLASS,
+                                "w-40 py-1.5 text-[12px]",
+                                group.category === "needs_review" && "border-amber-500/40"
+                              )}
+                            >
+                              {getImportCategoriesForType(group.type).map((f) => (
+                                <option key={f} value={f}>
+                                  {BANK_IMPORT_CATEGORY_LABELS[f]}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-3 pr-3">
+                            <div className="flex flex-wrap items-center gap-1">
+                              <CategoryBadge category={group.suggested} />
+                              {group.ruleApplied && (
+                                <span className="badge badge-green text-[10px]">Rule Applied</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              className="btn-primary text-[11px] mr-1.5"
+                              onClick={() => postGroupTransactions(group)}
+                              disabled={!isCategoryReadyToPost(group.category)}
+                            >
+                              Post All to P&L
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-outline text-[11px] mr-1.5"
+                              onClick={() => ignoreGroupTransactions(group)}
+                            >
+                              Ignore All
+                            </button>
+                            <button
+                              type="button"
+                              className="text-[11px] text-blue-400 hover:text-blue-300"
+                              onClick={() => openRuleForm(group.groupKey, group.category, group.type)}
+                            >
+                              Set as Rule
+                            </button>
+                          </td>
+                        </tr>
+                        {ruleFormKey === group.groupKey && (
+                          <tr key={`${group.groupKey}-rule`} className="border-b border-white/[0.04] bg-blue-500/5">
+                            <td colSpan={7} className="py-3 px-3">
+                              <div className="flex flex-wrap items-center gap-3 text-[12px]">
+                                <span className="text-slate-300">
+                                  Always categorize transactions from{" "}
+                                  <span className="font-mono text-slate-100">{group.vendorPattern}</span> as:
+                                </span>
+                                <select
+                                  value={ruleFormCategory}
+                                  onChange={(e) => setRuleFormCategory(e.target.value as BankImportCategory)}
+                                  className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
+                                >
+                                  {getImportCategoriesForType(group.type).map((f) => (
+                                    <option key={f} value={f}>
+                                      {BANK_IMPORT_CATEGORY_LABELS[f]}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  className="btn-primary text-[11px]"
+                                  onClick={() => saveCategorizationRule(group.vendorPattern, ruleFormCategory)}
+                                >
+                                  Save Rule
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-outline text-[11px]"
+                                  onClick={() => setRuleFormKey(null)}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -1569,61 +1844,125 @@ export default function FinancialsPage() {
                   </thead>
                   <tbody>
                     {reviewTransactions.map((txn) => (
-                      <tr key={txn.key} className="border-b border-white/[0.04]">
-                        <td className="py-3 pr-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedTxnKeys.has(txn.key)}
-                            onChange={(e) => toggleSelectKey(txn.key, e.target.checked)}
-                            className="rounded border-white/20"
-                            aria-label={`Select ${txn.description ?? "transaction"}`}
-                          />
-                        </td>
-                        <td className="py-3 pr-3 text-slate-300 whitespace-nowrap">
-                          {new Date(txn.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
-                        </td>
-                        <td className="py-3 pr-3 text-slate-200 max-w-[200px] truncate">{txn.description ?? "—"}</td>
-                        <td className="py-3 pr-3">
-                          <TypeBadge type={txn.type} />
-                        </td>
-                        <td className="py-3 pr-3 text-right font-semibold tabular-nums text-slate-100">
-                          {fmtDollar(txn.amount)}
-                        </td>
-                        <td className="py-3 pr-3">
-                          <select
-                            value={txn.category}
-                            onChange={(e) =>
-                              updateReviewCategory(txn.key, e.target.value as PlCategoryField)
-                            }
-                            className={clsx(INPUT_CLASS, "w-40 py-1.5 text-[12px]")}
-                          >
-                            {PL_CATEGORY_FIELDS.map((f) => (
-                              <option key={f} value={f}>
-                                {CATEGORY_LABELS[f]}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-3 pr-3">
-                          <span className="badge badge-blue text-[10px]">{CATEGORY_LABELS[txn.suggested]}</span>
-                        </td>
-                        <td className="py-3 text-right whitespace-nowrap">
-                          <button
-                            type="button"
-                            className="btn-primary text-[11px] mr-1.5"
-                            onClick={() => postReviewTransaction(txn)}
-                          >
-                            Post to P&L
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-outline text-[11px]"
-                            onClick={() => ignoreReviewTransaction(txn)}
-                          >
-                            Ignore
-                          </button>
-                        </td>
-                      </tr>
+                      <Fragment key={txn.key}>
+                        <tr className="border-b border-white/[0.04]">
+                          <td className="py-3 pr-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedTxnKeys.has(txn.key)}
+                              onChange={(e) => toggleSelectKey(txn.key, e.target.checked)}
+                              className="rounded border-white/20"
+                              aria-label={`Select ${txn.description ?? "transaction"}`}
+                            />
+                          </td>
+                          <td className="py-3 pr-3 text-slate-300 whitespace-nowrap">
+                            {new Date(txn.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
+                          </td>
+                          <td className="py-3 pr-3 text-slate-200 max-w-[200px] truncate">{txn.description ?? "—"}</td>
+                          <td className="py-3 pr-3">
+                            <TypeBadge type={txn.type} />
+                          </td>
+                          <td className="py-3 pr-3 text-right font-semibold tabular-nums text-slate-100">
+                            {fmtDollar(txn.amount)}
+                          </td>
+                          <td className="py-3 pr-3">
+                            <select
+                              value={txn.category}
+                              onChange={(e) =>
+                                updateReviewCategory(txn.key, e.target.value as BankImportCategory)
+                              }
+                              className={clsx(
+                                INPUT_CLASS,
+                                "w-40 py-1.5 text-[12px]",
+                                txn.category === "needs_review" && "border-amber-500/40"
+                              )}
+                            >
+                              {getImportCategoriesForType(txn.type).map((f) => (
+                                <option key={f} value={f}>
+                                  {BANK_IMPORT_CATEGORY_LABELS[f]}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-3 pr-3">
+                            <div className="flex flex-wrap items-center gap-1">
+                              <CategoryBadge category={txn.suggested} />
+                              {txn.ruleApplied && (
+                                <span className="badge badge-green text-[10px]">Rule Applied</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              className="btn-primary text-[11px] mr-1.5"
+                              onClick={() => postReviewTransaction(txn)}
+                              disabled={!isCategoryReadyToPost(txn.category)}
+                            >
+                              Post to P&L
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-outline text-[11px] mr-1.5"
+                              onClick={() => ignoreReviewTransaction(txn)}
+                            >
+                              Ignore
+                            </button>
+                            <button
+                              type="button"
+                              className="text-[11px] text-blue-400 hover:text-blue-300"
+                              onClick={() => openRuleForm(txn.key, txn.category, txn.type)}
+                            >
+                              Set as Rule
+                            </button>
+                          </td>
+                        </tr>
+                        {ruleFormKey === txn.key && (
+                          <tr className="border-b border-white/[0.04] bg-blue-500/5">
+                            <td colSpan={8} className="py-3 px-3">
+                              <div className="flex flex-wrap items-center gap-3 text-[12px]">
+                                <span className="text-slate-300">
+                                  Always categorize transactions from{" "}
+                                  <span className="font-mono text-slate-100">
+                                    {normalizeVendorPattern(txn.description) || "(no description)"}
+                                  </span>{" "}
+                                  as:
+                                </span>
+                                <select
+                                  value={ruleFormCategory}
+                                  onChange={(e) => setRuleFormCategory(e.target.value as BankImportCategory)}
+                                  className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
+                                >
+                                  {getImportCategoriesForType(txn.type).map((f) => (
+                                    <option key={f} value={f}>
+                                      {BANK_IMPORT_CATEGORY_LABELS[f]}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  className="btn-primary text-[11px]"
+                                  onClick={() =>
+                                    saveCategorizationRule(
+                                      normalizeVendorPattern(txn.description) || "(no description)",
+                                      ruleFormCategory
+                                    )
+                                  }
+                                >
+                                  Save Rule
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-outline text-[11px]"
+                                  onClick={() => setRuleFormKey(null)}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
