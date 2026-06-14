@@ -34,6 +34,7 @@ import {
   type BankTransaction,
   type CalculatedMonthly,
   type MonthlyFinancialRecord,
+  type MonthlyUtilityRecord,
   type PlCategoryField,
   type RatioBenchmark,
   type StoreFinancialProfile,
@@ -41,7 +42,8 @@ import {
   MONTH_SHORT,
   PL_CATEGORY_FIELDS,
   buildRatioBenchmarks,
-  calcMonthly,
+  buildUtilitiesLookup,
+  calcMonthlyWithUtilities,
   calcRatios,
   calcTtmMetrics,
   calcYoYMetrics,
@@ -135,14 +137,14 @@ const TABS: { id: TabId; label: string }[] = [
 
 const FORM_FIELDS: { key: NumericFormField; label: string }[] = [
   { key: "revenue", label: "Revenue" },
-  { key: "utilities", label: "Utilities" },
   { key: "supplies", label: "Supplies" },
   { key: "repairs_maintenance", label: "Repairs & Maintenance" },
   { key: "rent", label: "Rent" },
   { key: "payroll", label: "Payroll" },
   { key: "insurance_expense", label: "Insurance" },
-  { key: "marketing", label: "Marketing" },
+  { key: "marketing", label: "Advertising / Marketing" },
   { key: "professional_fees", label: "Professional Fees" },
+  { key: "bank_charges", label: "Bank Charges" },
   { key: "other_expenses", label: "Other Expenses" },
   { key: "debt_service", label: "Debt Service" },
 ];
@@ -155,8 +157,9 @@ const CATEGORY_LABELS: Record<PlCategoryField, string> = {
   repairs_maintenance: "Repairs & Maintenance",
   insurance_expense: "Insurance",
   supplies: "Supplies",
-  marketing: "Marketing",
+  marketing: "Advertising / Marketing",
   professional_fees: "Professional Fees",
+  bank_charges: "Bank Charges",
   other_expenses: "Other Expenses",
   debt_service: "Debt Service",
 };
@@ -423,6 +426,7 @@ export default function FinancialsPage() {
   const [store, setStore] = useState<StoreFinancialProfile | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [records, setRecords] = useState<CalculatedMonthly[]>([]);
+  const [utilityRecords, setUtilityRecords] = useState<MonthlyUtilityRecord[]>([]);
   const [bankTransactions, setBankTransactions] = useState<BankTransaction[]>([]);
   const [stagedTransactions, setStagedTransactions] = useState<StagedTransaction[]>([]);
   const [selectedTxnKeys, setSelectedTxnKeys] = useState<Set<string>>(new Set());
@@ -476,6 +480,7 @@ export default function FinancialsPage() {
     const [
       { data: storeData, error: storeError },
       { data: financialsData, error: financialsError },
+      { data: utilitiesData, error: utilitiesError },
       { data: bankData, error: bankError },
       { data: mappingData, error: mappingError },
       { data: rulesData, error: rulesError },
@@ -487,6 +492,10 @@ export default function FinancialsPage() {
         .eq("store_id", selectedStore.id)
         .order("year", { ascending: false })
         .order("month", { ascending: false }),
+      supabase
+        .from("monthly_utilities")
+        .select("year, month, water, gas, electric, sewer, trash, internet")
+        .eq("store_id", selectedStore.id),
       supabase
         .from("bank_transactions")
         .select("*")
@@ -501,13 +510,19 @@ export default function FinancialsPage() {
         .order("created_at", { ascending: false }),
     ]);
 
-    const errors = [storeError, financialsError, bankError, mappingError, rulesError]
+    const errors = [storeError, financialsError, utilitiesError, bankError, mappingError, rulesError]
       .filter(Boolean)
       .map((e) => e!.message);
     if (errors.length > 0) setError(errors.join(" · "));
 
     setStore(storeData as StoreFinancialProfile);
-    const sorted = enrichMonthlyRecords(sortRecordsDesc((financialsData ?? []) as MonthlyFinancialRecord[]));
+    const utilityRows = (utilitiesData ?? []) as MonthlyUtilityRecord[];
+    setUtilityRecords(utilityRows);
+    const utilitiesLookup = buildUtilitiesLookup(utilityRows);
+    const sorted = enrichMonthlyRecords(
+      sortRecordsDesc((financialsData ?? []) as MonthlyFinancialRecord[]),
+      utilitiesLookup
+    );
     setRecords(sorted);
     setBankTransactions((bankData ?? []) as BankTransaction[]);
     setCategorizationRules((rulesData ?? []) as CategorizationRule[]);
@@ -597,16 +612,22 @@ export default function FinancialsPage() {
     }));
   }, [records]);
 
+  const utilitiesLookup = useMemo(() => buildUtilitiesLookup(utilityRecords), [utilityRecords]);
+
   const liveCalc = useMemo(
     () =>
-      calcMonthly({
-        id: selectedRecord?.id ?? "",
-        store_id: store?.id ?? "",
-        ...form,
-        year: selectedYear,
-        month: selectedMonth,
-      }),
-    [form, selectedRecord?.id, store?.id, selectedYear, selectedMonth]
+      calcMonthlyWithUtilities(
+        {
+          id: selectedRecord?.id ?? "",
+          store_id: store?.id ?? "",
+          ...form,
+          utilities: selectedRecord?.utilities ?? 0,
+          year: selectedYear,
+          month: selectedMonth,
+        },
+        utilitiesLookup.get(monthKey(selectedYear, selectedMonth))
+      ),
+    [form, selectedRecord?.id, selectedRecord?.utilities, store?.id, selectedYear, selectedMonth, utilitiesLookup]
   );
 
   const monthsWithData = useMemo(
@@ -750,7 +771,7 @@ export default function FinancialsPage() {
         year: toNum(selectedYear),
         month: toNum(selectedMonth),
         revenue: toNum(form.revenue),
-        utilities: toNum(form.utilities),
+        utilities: selectedRecord?.utilities ?? 0,
         rent: toNum(form.rent),
         payroll: toNum(form.payroll),
         repairs_maintenance: toNum(form.repairs_maintenance),
@@ -758,6 +779,7 @@ export default function FinancialsPage() {
         supplies: toNum(form.supplies),
         marketing: toNum(form.marketing),
         professional_fees: toNum(form.professional_fees),
+        bank_charges: toNum(form.bank_charges),
         other_expenses: toNum(form.other_expenses),
         debt_service: toNum(form.debt_service),
         notes: toNullableText(form.notes),
@@ -1237,7 +1259,7 @@ export default function FinancialsPage() {
       year: toNum(year),
       month: toNum(month),
       revenue: toNum(updated.revenue),
-      utilities: toNum(updated.utilities),
+      utilities: existing?.utilities ?? 0,
       rent: toNum(updated.rent),
       payroll: toNum(updated.payroll),
       repairs_maintenance: toNum(updated.repairs_maintenance),
@@ -1245,6 +1267,7 @@ export default function FinancialsPage() {
       supplies: toNum(updated.supplies),
       marketing: toNum(updated.marketing),
       professional_fees: toNum(updated.professional_fees),
+      bank_charges: toNum(updated.bank_charges),
       other_expenses: toNum(updated.other_expenses),
       debt_service: toNum(updated.debt_service),
       notes: toNullableText(updated.notes),
@@ -1600,6 +1623,14 @@ export default function FinancialsPage() {
                     />
                   </div>
                 ))}
+                <div className="flex items-end">
+                  <p className="text-[13px] pb-2" style={{ color: "var(--text-secondary)" }}>
+                    Utilities are now tracked in the{" "}
+                    <Link href="/utilities" className="text-blue-400 hover:underline">
+                      Utilities section →
+                    </Link>
+                  </p>
+                </div>
               </div>
               <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="card2">

@@ -389,6 +389,29 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
         <Text style={[styles.bodyText, { fontSize: 8, marginTop: -4 }]}>
           Total debt relative to annual EBITDA — lower is better.
         </Text>
+        <SectionHeader>Utility Summary</SectionHeader>
+        <Text style={styles.bodyText}>
+          Most recent monthly utility costs per store. Portfolio total: {fmtCurrency(totals.portfolioTotalUtilities)} (
+          {fmtPercent(totals.portfolioUtilityPctOfRevenue)} of monthly revenue).
+        </Text>
+        <View style={styles.tableHeader}>
+          <Text style={[styles.tableHeaderCell, { width: "22%" }]}>Store</Text>
+          <Text style={[styles.tableHeaderCell, { width: "13%", textAlign: "right" }]}>Water</Text>
+          <Text style={[styles.tableHeaderCell, { width: "13%", textAlign: "right" }]}>Gas</Text>
+          <Text style={[styles.tableHeaderCell, { width: "13%", textAlign: "right" }]}>Electric</Text>
+          <Text style={[styles.tableHeaderCell, { width: "13%", textAlign: "right" }]}>Total</Text>
+          <Text style={[styles.tableHeaderCell, { width: "13%", textAlign: "right" }]}>% Rev</Text>
+        </View>
+        {storeDetails.map((d) => (
+          <View key={`util-${d.store.id}`} style={styles.tableRow}>
+            <Text style={[styles.tableCellBold, { width: "22%" }]}>{d.store.name ?? "Store"}</Text>
+            <Text style={[styles.tableCellRight, { width: "13%" }]}>{fmtCurrency(d.utilityWater)}</Text>
+            <Text style={[styles.tableCellRight, { width: "13%" }]}>{fmtCurrency(d.utilityGas)}</Text>
+            <Text style={[styles.tableCellRight, { width: "13%" }]}>{fmtCurrency(d.utilityElectric)}</Text>
+            <Text style={[styles.tableCellRight, { width: "13%" }]}>{fmtCurrency(d.utilityTotal)}</Text>
+            <Text style={[styles.tableCellRight, { width: "13%" }]}>{fmtPercent(d.utilityPctOfRevenue)}</Text>
+          </View>
+        ))}
         <PageChrome />
       </Page>
 

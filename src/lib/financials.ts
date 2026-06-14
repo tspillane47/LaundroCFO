@@ -13,9 +13,21 @@ export type MonthlyFinancialRecord = {
   supplies: number;
   marketing: number;
   professional_fees: number;
+  bank_charges: number;
   other_expenses: number;
   debt_service: number;
   notes?: string | null;
+};
+
+export type MonthlyUtilityRecord = {
+  year: number;
+  month: number;
+  water: number;
+  gas: number;
+  electric: number;
+  sewer: number;
+  trash: number;
+  internet: number;
 };
 
 export type CalculatedMonthly = MonthlyFinancialRecord & {
@@ -119,6 +131,7 @@ export function calcMonthly(record: MonthlyFinancialRecord): CalculatedMonthly {
   const supplies = num(record.supplies);
   const marketing = num(record.marketing);
   const professional_fees = num(record.professional_fees);
+  const bank_charges = num(record.bank_charges);
   const other_expenses = num(record.other_expenses);
   const debt_service = num(record.debt_service);
 
@@ -131,6 +144,7 @@ export function calcMonthly(record: MonthlyFinancialRecord): CalculatedMonthly {
     supplies +
     marketing +
     professional_fees +
+    bank_charges +
     other_expenses;
 
   const grossProfit = revenue - utilities - supplies - repairs_maintenance;
@@ -149,6 +163,7 @@ export function calcMonthly(record: MonthlyFinancialRecord): CalculatedMonthly {
     supplies,
     marketing,
     professional_fees,
+    bank_charges,
     other_expenses,
     debt_service,
     totalExpenses,
@@ -160,8 +175,50 @@ export function calcMonthly(record: MonthlyFinancialRecord): CalculatedMonthly {
   };
 }
 
-export function enrichMonthlyRecords(records: MonthlyFinancialRecord[]): CalculatedMonthly[] {
-  return records.map(calcMonthly);
+export function utilityRecordTotal(rec: MonthlyUtilityRecord): number {
+  return (
+    num(rec.water) +
+    num(rec.gas) +
+    num(rec.electric) +
+    num(rec.sewer) +
+    num(rec.trash) +
+    num(rec.internet)
+  );
+}
+
+export function resolveUtilitiesAmount(
+  record: MonthlyFinancialRecord,
+  utilityRecord?: MonthlyUtilityRecord | null
+): number {
+  if (utilityRecord) return utilityRecordTotal(utilityRecord);
+  return num(record.utilities);
+}
+
+export function calcMonthlyWithUtilities(
+  record: MonthlyFinancialRecord,
+  utilityRecord?: MonthlyUtilityRecord | null
+): CalculatedMonthly {
+  return calcMonthly({ ...record, utilities: resolveUtilitiesAmount(record, utilityRecord) });
+}
+
+export function buildUtilitiesLookup(
+  records: MonthlyUtilityRecord[]
+): Map<string, MonthlyUtilityRecord> {
+  const map = new Map<string, MonthlyUtilityRecord>();
+  for (const r of records) {
+    map.set(monthKey(r.year, r.month), r);
+  }
+  return map;
+}
+
+export function enrichMonthlyRecords(
+  records: MonthlyFinancialRecord[],
+  utilitiesLookup?: Map<string, MonthlyUtilityRecord>
+): CalculatedMonthly[] {
+  if (!utilitiesLookup) return records.map(calcMonthly);
+  return records.map((r) =>
+    calcMonthlyWithUtilities(r, utilitiesLookup.get(monthKey(r.year, r.month)))
+  );
 }
 
 export function sortRecordsDesc(records: MonthlyFinancialRecord[]): MonthlyFinancialRecord[] {
@@ -300,6 +357,7 @@ export function emptyMonthlyForm(
     supplies: 0,
     marketing: 0,
     professional_fees: 0,
+    bank_charges: 0,
     other_expenses: 0,
     debt_service: monthlyDebt,
     notes: null,
@@ -319,6 +377,7 @@ export function recordToForm(record: CalculatedMonthly): Omit<MonthlyFinancialRe
     supplies: record.supplies,
     marketing: record.marketing,
     professional_fees: record.professional_fees,
+    bank_charges: record.bank_charges,
     other_expenses: record.other_expenses,
     debt_service: record.debt_service,
     notes: record.notes ?? null,
@@ -375,6 +434,7 @@ export const PL_CATEGORY_FIELDS = [
   "supplies",
   "marketing",
   "professional_fees",
+  "bank_charges",
   "other_expenses",
   "debt_service",
 ] as const;
@@ -420,8 +480,9 @@ export const BANK_IMPORT_CATEGORY_LABELS: Record<BankImportCategory, string> = {
   repairs_maintenance: "Repairs & Maintenance",
   insurance_expense: "Insurance",
   supplies: "Supplies",
-  marketing: "Marketing",
+  marketing: "Advertising / Marketing",
   professional_fees: "Professional Fees",
+  bank_charges: "Bank Charges",
   debt_service: "Debt Service",
   bank_fees: "Bank Fees",
   other_expenses: "Other Expenses",
@@ -545,6 +606,7 @@ export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
   ],
   marketing: ["marketing", "advertising", "facebook ads", "google ads", "yelp", "flyers", "advert", "facebook", "promo"],
   professional_fees: ["accountant", "cpa", "legal", "attorney", "bookkeeping", "quickbooks", "consult"],
+  bank_charges: ["bank fee", "bank charge", "service charge", "overdraft", "nsf", "wire fee", "monthly fee"],
   other_expenses: ["misc", "other", "office"],
   debt_service: [
     "loan payment",
@@ -611,7 +673,7 @@ export function isCategoryReadyToPost(category: BankImportCategory): boolean {
 export function mapBankCategoryToPlField(category: BankImportCategory): PlCategoryField | null {
   if (category === "needs_review") return null;
   if (category === "other_income") return "revenue";
-  if (category === "bank_fees") return "other_expenses";
+  if (category === "bank_fees") return "bank_charges";
   return category;
 }
 

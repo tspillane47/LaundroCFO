@@ -18,6 +18,7 @@ import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
+import { totalUtilities, type MonthlyUtilityRow } from "@/lib/utilities";
 import {
   financials as demoFinancials,
   DEMO_MONTHLY_REVENUE,
@@ -110,6 +111,13 @@ export default function PortfolioPage() {
   >([]);
   const [totalDebt, setTotalDebt] = useState(0);
   const [totalAnnualDebtServiceFromLoans, setTotalAnnualDebtServiceFromLoans] = useState(0);
+  const [portfolioUtilities, setPortfolioUtilities] = useState({
+    portfolioWater: 0,
+    portfolioGas: 0,
+    portfolioElectric: 0,
+    portfolioTotalUtilities: 0,
+    portfolioUtilityPctOfRevenue: 0,
+  });
 
   useEffect(() => {
     if (localStorage.getItem("laundrocfo_show_welcome") === "true") {
@@ -156,15 +164,17 @@ export default function PortfolioPage() {
         { data: equipmentData, error: equipmentError },
         { data: insuranceData, error: insuranceError },
         { data: loansData, error: loansError },
+        { data: utilitiesData, error: utilitiesError },
       ] = await Promise.all([
         supabase.from("leases").select("id, store_id, lease_end_date, monthly_rent").in("store_id", storeIds),
         supabase.from("real_estate").select("store_id, estimated_value").in("store_id", storeIds),
         supabase.from("equipment_inventory").select("*").in("store_id", storeIds),
         supabase.from("insurance_policies").select("*").in("store_id", storeIds).eq("is_active", true),
         supabase.from("store_loans").select("store_id, monthly_payment").in("store_id", storeIds).eq("is_active", true),
+        supabase.from("monthly_utilities").select("*").in("store_id", storeIds),
       ]);
 
-      const errors = [leasesError, reError, equipmentError, insuranceError, loansError].filter(Boolean);
+      const errors = [leasesError, reError, equipmentError, insuranceError, loansError, utilitiesError].filter(Boolean);
       if (errors.length > 0) throw errors[0];
 
       setLeases((leasesData ?? []) as Lease[]);
@@ -202,6 +212,35 @@ export default function PortfolioPage() {
         0
       );
       setTotalAnnualDebtServiceFromLoans(annualDebtServiceFromLoans);
+
+      const latestByStore = new Map<string, MonthlyUtilityRow & { store_id: string }>();
+      for (const row of utilitiesData ?? []) {
+        const util = row as MonthlyUtilityRow & { store_id: string };
+        const existing = latestByStore.get(util.store_id);
+        if (!existing || util.year > existing.year || (util.year === existing.year && util.month > existing.month)) {
+          latestByStore.set(util.store_id, util);
+        }
+      }
+
+      let portfolioWater = 0;
+      let portfolioGas = 0;
+      let portfolioElectric = 0;
+      let portfolioTotalUtilities = 0;
+      for (const util of Array.from(latestByStore.values())) {
+        portfolioWater += util.water ?? 0;
+        portfolioGas += util.gas ?? 0;
+        portfolioElectric += util.electric ?? 0;
+        portfolioTotalUtilities += totalUtilities(util);
+      }
+      const totalMonthlyRevenue = (stores as Store[]).reduce((s, store) => s + (store.monthly_revenue ?? 0), 0);
+      setPortfolioUtilities({
+        portfolioWater,
+        portfolioGas,
+        portfolioElectric,
+        portfolioTotalUtilities,
+        portfolioUtilityPctOfRevenue:
+          totalMonthlyRevenue > 0 ? (portfolioTotalUtilities / totalMonthlyRevenue) * 100 : 0,
+      });
 
       const totalPortfolioValue = valuations.reduce((s, sv) => s + sv.valuation.businessValue, 0);
       if (stores.length === 1 && valuations.length === 1) {
@@ -637,6 +676,44 @@ export default function PortfolioPage() {
           sub={aggregates.hasDebtData ? undefined : "Add debt data"}
           valueColor={aggregates.hasDebtData ? undefined : "var(--text-muted)"}
         />
+      </div>
+
+      {/* Portfolio Utilities */}
+      <div className="card">
+        <h3 className="text-[14px] font-semibold mb-4" style={{ color: "var(--text-primary)" }}>
+          Portfolio Utilities
+        </h3>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: "16px",
+          }}
+        >
+          <KpiCard
+            label="Total Utilities"
+            value={<AnimatedNumber value={portfolioUtilities.portfolioTotalUtilities} prefix="$" duration={900} />}
+            sub={`${portfolioUtilities.portfolioUtilityPctOfRevenue.toFixed(1)}% of revenue`}
+          />
+          <KpiCard
+            label="Water"
+            value={<AnimatedNumber value={portfolioUtilities.portfolioWater} prefix="$" duration={900} />}
+            sub="most recent month"
+          />
+          <KpiCard
+            label="Gas"
+            value={<AnimatedNumber value={portfolioUtilities.portfolioGas} prefix="$" duration={900} />}
+            sub="most recent month"
+          />
+          <KpiCard
+            label="Electric"
+            value={<AnimatedNumber value={portfolioUtilities.portfolioElectric} prefix="$" duration={900} />}
+            sub="most recent month"
+          />
+        </div>
+        <p className="text-[11px] mt-3" style={{ color: "var(--text-muted)" }}>
+          Aggregated from each store&apos;s most recent monthly_utilities entry.
+        </p>
       </div>
 
       {/* Store Cards */}
