@@ -70,6 +70,7 @@ import {
   isCategoryReadyToPost,
   getImportCategoriesForType,
   markDuplicateTransactions,
+  UTILITY_IMPORT_CATEGORIES,
   BANK_IMPORT_CATEGORY_LABELS,
   type TransactionType,
   type BankImportCategory,
@@ -2163,7 +2164,7 @@ export default function FinancialsPage() {
                           {BANK_IMPORT_CATEGORY_LABELS[f]}
                         </option>
                       ))
-                    : (["revenue", "water", "gas", "electric", "trash", "needs_review"] as BankImportCategory[]).map((f) => (
+                    : (["revenue", ...UTILITY_IMPORT_CATEGORIES, "needs_review"] as BankImportCategory[]).map((f) => (
                         <option key={f} value={f}>
                           {BANK_IMPORT_CATEGORY_LABELS[f]}
                         </option>
