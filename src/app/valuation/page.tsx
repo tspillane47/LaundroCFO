@@ -10,8 +10,9 @@ import {
   getStoreValuation,
   invalidateValuationCache,
   type StoreValuationContext,
+  type StoreValuationResult,
 } from "@/lib/getStoreValuation";
-import type { ValuationResult } from "@/lib/valuation";
+import type { ValuationInputs, ValuationResult } from "@/lib/valuation";
 import {
   computeEquipmentMetrics,
   formatAdjustment,
@@ -115,7 +116,69 @@ const RETOOL_TYPES = [
   "Other",
 ];
 
-const EMPTY_VALUATION: ValuationResult = {
+type ValuationOverrides = {
+  marketDensity: MarketDensity;
+  storeCondition: StoreCondition;
+  revenueTrend: RevenueTrend;
+  competitionLevel: CompetitionLevel;
+  selfServicePct: number;
+  wdfPct: number;
+  commercialPct: number;
+  pickupDeliveryPct: number;
+  lastRetoolYear: string;
+  retoolInvestment: string;
+  retoolType: string;
+  realEstateValue: number;
+};
+
+function buildValuationOverrides(params: {
+  marketDensity: MarketDensity;
+  storeCondition: StoreCondition;
+  revenueTrend: RevenueTrend;
+  competitionLevel: CompetitionLevel;
+  selfServicePct: number;
+  wdfPct: number;
+  commercialPct: number;
+  pickupDeliveryPct: number;
+  lastRetoolYear: string;
+  retoolInvestment: string;
+  retoolType: string;
+  isOwnerOccupied: boolean;
+  realEstateValue: number;
+}): Partial<ValuationInputs> {
+  return {
+    marketDensity: params.marketDensity,
+    storeCondition: params.storeCondition,
+    revenueTrend: params.revenueTrend,
+    competitionLevel: params.competitionLevel,
+    selfServicePct: params.selfServicePct,
+    wdfPct: params.wdfPct,
+    commercialPct: params.commercialPct,
+    pickupDeliveryPct: params.pickupDeliveryPct,
+    lastRetoolYear: params.lastRetoolYear ? parseInt(params.lastRetoolYear, 10) : undefined,
+    retoolInvestment: params.retoolInvestment ? parseFloat(params.retoolInvestment) : undefined,
+    retoolType: params.retoolType || undefined,
+    realEstateValue: params.isOwnerOccupied ? params.realEstateValue : undefined,
+  };
+}
+
+function overridesMatchSaved(current: ValuationOverrides, saved: ValuationOverrides): boolean {
+  return (
+    current.marketDensity === saved.marketDensity &&
+    current.storeCondition === saved.storeCondition &&
+    current.revenueTrend === saved.revenueTrend &&
+    current.competitionLevel === saved.competitionLevel &&
+    current.selfServicePct === saved.selfServicePct &&
+    current.wdfPct === saved.wdfPct &&
+    current.commercialPct === saved.commercialPct &&
+    current.pickupDeliveryPct === saved.pickupDeliveryPct &&
+    current.lastRetoolYear === saved.lastRetoolYear &&
+    current.retoolInvestment === saved.retoolInvestment &&
+    current.retoolType === saved.retoolType &&
+    current.realEstateValue === saved.realEstateValue
+  );
+}
+const EMPTY_VALUATION: StoreValuationResult = {
   baseMultiple: 4,
   adjustments: [],
   finalMultiple: 4,
@@ -125,6 +188,14 @@ const EMPTY_VALUATION: ValuationResult = {
   valueDrivers: [],
   valueRisks: [],
   improvements: [],
+  store: {},
+  context: {
+    store: {},
+    equipment: [],
+    lease: null,
+    leaseOptions: [],
+    realEstate: null,
+  },
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -368,6 +439,8 @@ export default function ValuationPage() {
   const [totalLeaseControl, setTotalLeaseControl] = useState(0);
   const [calcExpanded, setCalcExpanded] = useState(false);
   const [valuationContext, setValuationContext] = useState<StoreValuationContext | null>(null);
+  const [fetchedValuation, setFetchedValuation] = useState<StoreValuationResult | null>(null);
+  const [savedOverrides, setSavedOverrides] = useState<ValuationOverrides | null>(null);
 
   const loadValuationData = useCallback(async () => {
     if (!selectedStore?.id) {
@@ -383,42 +456,65 @@ export default function ValuationPage() {
       const valuationResult = await getStoreValuation(selectedStore.id);
       const store = valuationResult.store as StoreRow;
       if (!store?.id) throw new Error("Store not found");
+
+      const ctx = valuationResult.context;
+      const ownerOccupied = store.occupancy_type === "owner_occupied";
+      const loadedMarketDensity = normalizeMarketDensity(store.market_density ?? store.location_type);
+      const loadedStoreCondition = normalizeStoreCondition(store.store_condition);
+      const loadedRevenueTrend = (store.revenue_trend as RevenueTrend) ?? "stable";
+      const loadedCompetitionLevel = (store.competition_level as CompetitionLevel) ?? "normal";
+      const loadedWdfPct = store.wdf_pct ?? 18;
+      const loadedCommercialPct = store.commercial_pct ?? 12;
+      const loadedPickupDeliveryPct = store.pickup_delivery_pct ?? 0;
+      const loadedSelfServicePct =
+        store.self_service_pct ??
+        Math.max(0, 100 - loadedWdfPct - loadedCommercialPct - loadedPickupDeliveryPct);
+      const loadedLastRetoolYear = store.last_retool_year ? String(store.last_retool_year) : "";
+      const loadedRetoolInvestment = store.retool_investment ? String(store.retool_investment) : "";
+      const loadedRetoolType = store.retool_type ?? "";
+      const loadedRealEstateValue = ownerOccupied
+        ? Number(ctx.realEstate?.estimated_value) || 0
+        : 0;
+
+      setFetchedValuation(valuationResult);
+      setValuationContext(ctx);
       setStore(store);
       setStoreId(store.id);
       setStoreName(store.name ?? "Your Store");
       setSquareFootage(store.square_footage ?? 3500);
-
-      setMarketDensity(
-        normalizeMarketDensity(store.market_density ?? store.location_type)
-      );
-      setRevenueTrend((store.revenue_trend as RevenueTrend) ?? "stable");
-      setStoreCondition(normalizeStoreCondition(store.store_condition));
-      setCompetitionLevel((store.competition_level as CompetitionLevel) ?? "normal");
-
-      setSelfServicePct(store.self_service_pct ?? 70);
-      setWdfPct(store.wdf_pct ?? 18);
-      setCommercialPct(store.commercial_pct ?? 12);
-      setPickupDeliveryPct(store.pickup_delivery_pct ?? 0);
-
-      if (store.last_retool_year) setLastRetoolYear(String(store.last_retool_year));
-      if (store.retool_investment) setRetoolInvestment(String(store.retool_investment));
-      if (store.retool_type) setRetoolType(store.retool_type);
+      setMarketDensity(loadedMarketDensity);
+      setRevenueTrend(loadedRevenueTrend);
+      setStoreCondition(loadedStoreCondition);
+      setCompetitionLevel(loadedCompetitionLevel);
+      setSelfServicePct(loadedSelfServicePct);
+      setWdfPct(loadedWdfPct);
+      setCommercialPct(loadedCommercialPct);
+      setPickupDeliveryPct(loadedPickupDeliveryPct);
+      setLastRetoolYear(loadedLastRetoolYear);
+      setRetoolInvestment(loadedRetoolInvestment);
+      setRetoolType(loadedRetoolType);
+      setSavedOverrides({
+        marketDensity: loadedMarketDensity,
+        storeCondition: loadedStoreCondition,
+        revenueTrend: loadedRevenueTrend,
+        competitionLevel: loadedCompetitionLevel,
+        selfServicePct: loadedSelfServicePct,
+        wdfPct: loadedWdfPct,
+        commercialPct: loadedCommercialPct,
+        pickupDeliveryPct: loadedPickupDeliveryPct,
+        lastRetoolYear: loadedLastRetoolYear,
+        retoolInvestment: loadedRetoolInvestment,
+        retoolType: loadedRetoolType,
+        realEstateValue: loadedRealEstateValue,
+      });
 
       const revenue = store.monthly_revenue ?? DEMO_MONTHLY_REVENUE;
       const expenses = store.monthly_expenses ?? DEMO_MONTHLY_EXPENSES;
       setMonthlyRevenue(revenue);
       setAnnualEbitda((revenue - expenses) * 12);
-
-      const ownerOccupied = store.occupancy_type === "owner_occupied";
       setIsOwnerOccupied(ownerOccupied);
-
-      const { data: equipmentData, error: equipmentError } = await supabase
-        .from("equipment_inventory")
-        .select("id, user_id, store_id, machine_type, manufacturer, machine_size, quantity, installation_year, high_speed_extract, condition, notes")
-        .eq("store_id", store.id);
-
-      if (equipmentError) throw equipmentError;
-      setEquipment((equipmentData ?? []) as EquipmentRecord[]);
+      setRealEstateValue(loadedRealEstateValue);
+      setEquipment(ctx.equipment);
 
       const { count: insCount } = await supabase
         .from("insurance_policies")
@@ -428,78 +524,34 @@ export default function ValuationPage() {
       setInsuranceCount(insCount ?? 0);
 
       if (ownerOccupied) {
-        const { data: reData } = await supabase
-          .from("real_estate")
-          .select("estimated_value")
-          .eq("store_id", store.id)
-          .limit(1)
-          .maybeSingle();
-        setRealEstateValue(reData?.estimated_value ?? 0);
         setTotalLeaseControl(15);
         setYearsRemaining(15);
         setHasLease(false);
         setLeaseScore(85);
+      } else if (ctx.lease) {
+        setHasLease(true);
+        const remaining = calcYearsRemaining(ctx.lease.lease_end_date as string);
+        setYearsRemaining(remaining);
+        const available = ctx.leaseOptions.filter((o) => o.status === "Available");
+        const optionYears = available.reduce((s, o) => s + (Number(o.option_years) || 0), 0);
+        setTotalLeaseControl(remaining + optionYears);
+        setLeaseScore(
+          calcLeaseScore({
+            yearsRemaining: remaining,
+            availableOptions: available.length,
+            exclusivityClause: Boolean(ctx.lease.exclusivity_clause),
+            personalGuaranty: Boolean(ctx.lease.personal_guaranty),
+            assignmentRights: (ctx.lease.assignment_rights as string) ?? null,
+            monthlyRent: Number(ctx.lease.monthly_rent) || null,
+            monthlyRevenue: store.monthly_revenue ?? null,
+          })
+        );
       } else {
-        const { data: leaseData } = await supabase
-          .from("leases")
-          .select("id, lease_end_date, monthly_rent, exclusivity_clause, personal_guaranty, assignment_rights")
-          .eq("store_id", store.id)
-          .limit(1)
-          .maybeSingle();
-
-        if (leaseData) {
-          setHasLease(true);
-          const remaining = calcYearsRemaining(leaseData.lease_end_date);
-          setYearsRemaining(remaining);
-
-          const { data: optionsData } = await supabase
-            .from("lease_options")
-            .select("option_years, status")
-            .eq("lease_id", leaseData.id)
-            .order("option_number", { ascending: true });
-
-          const available = (optionsData ?? []).filter((o) => o.status === "Available");
-          const optionYears = available.reduce((s, o) => s + (o.option_years ?? 0), 0);
-          setTotalLeaseControl(remaining + optionYears);
-          setLeaseScore(
-            calcLeaseScore({
-              yearsRemaining: remaining,
-              availableOptions: available.length,
-              exclusivityClause: leaseData.exclusivity_clause ?? false,
-              personalGuaranty: leaseData.personal_guaranty ?? false,
-              assignmentRights: leaseData.assignment_rights ?? null,
-              monthlyRent: leaseData.monthly_rent ?? null,
-              monthlyRevenue: store.monthly_revenue ?? null,
-            })
-          );
-        } else {
-          setHasLease(false);
-          setYearsRemaining(0);
-          setTotalLeaseControl(0);
-          setLeaseScore(50);
-        }
-        setRealEstateValue(0);
+        setHasLease(false);
+        setYearsRemaining(0);
+        setTotalLeaseControl(0);
+        setLeaseScore(50);
       }
-
-      const { data: leaseRow } = await supabase
-        .from("leases")
-        .select("*")
-        .eq("store_id", store.id)
-        .maybeSingle();
-      const { data: leaseOpts } = leaseRow
-        ? await supabase.from("lease_options").select("*").eq("lease_id", leaseRow.id)
-        : { data: [] };
-      const { data: reRow } = ownerOccupied
-        ? await supabase.from("real_estate").select("*").eq("store_id", store.id).maybeSingle()
-        : { data: null };
-
-      setValuationContext({
-        store: store as unknown as Record<string, unknown>,
-        equipment: (equipmentData ?? []) as EquipmentRecord[],
-        lease: leaseRow ?? null,
-        leaseOptions: leaseOpts ?? [],
-        realEstate: reRow ?? null,
-      });
 
     } catch {
       setLoadError(true);
@@ -517,10 +569,8 @@ export default function ValuationPage() {
     [equipment]
   );
 
-  const valuation = useMemo(() => {
-    if (!valuationContext) return EMPTY_VALUATION;
-
-    return computeStoreValuation(valuationContext, {
+  const currentOverrides = useMemo<ValuationOverrides>(
+    () => ({
       marketDensity,
       storeCondition,
       revenueTrend,
@@ -529,26 +579,51 @@ export default function ValuationPage() {
       wdfPct,
       commercialPct,
       pickupDeliveryPct,
-      lastRetoolYear: lastRetoolYear ? parseInt(lastRetoolYear, 10) : undefined,
-      retoolInvestment: retoolInvestment ? parseFloat(retoolInvestment) : undefined,
-      retoolType: retoolType || undefined,
-      realEstateValue: isOwnerOccupied ? realEstateValue : undefined,
-    });
+      lastRetoolYear,
+      retoolInvestment,
+      retoolType,
+      realEstateValue,
+    }),
+    [
+      marketDensity,
+      storeCondition,
+      revenueTrend,
+      competitionLevel,
+      selfServicePct,
+      wdfPct,
+      commercialPct,
+      pickupDeliveryPct,
+      lastRetoolYear,
+      retoolInvestment,
+      retoolType,
+      realEstateValue,
+    ]
+  );
+
+  const hasUnsavedOverrides = useMemo(
+    () => savedOverrides != null && !overridesMatchSaved(currentOverrides, savedOverrides),
+    [currentOverrides, savedOverrides]
+  );
+
+  const valuation = useMemo(() => {
+    if (!valuationContext) return EMPTY_VALUATION;
+
+    if (!hasUnsavedOverrides && fetchedValuation) {
+      return fetchedValuation;
+    }
+
+    const computed = computeStoreValuation(
+      valuationContext,
+      buildValuationOverrides({ ...currentOverrides, isOwnerOccupied })
+    );
+
+    return computed;
   }, [
     valuationContext,
-    marketDensity,
-    storeCondition,
-    revenueTrend,
-    competitionLevel,
-    selfServicePct,
-    wdfPct,
-    commercialPct,
-    pickupDeliveryPct,
-    lastRetoolYear,
-    retoolInvestment,
-    retoolType,
+    fetchedValuation,
+    hasUnsavedOverrides,
+    currentOverrides,
     isOwnerOccupied,
-    realEstateValue,
   ]);
 
   const equipmentValAdj = sumCategoryAdj(valuation, "equipment");
@@ -606,27 +681,37 @@ export default function ValuationPage() {
       setError(updateError.message);
     } else {
       invalidateValuationCache(storeId);
-      setValuationContext((prev) =>
-        prev
-          ? {
-              ...prev,
-              store: {
-                ...prev.store,
-                market_density: marketDensity,
-                revenue_trend: revenueTrend,
-                store_condition: storeCondition,
-                competition_level: competitionLevel,
-                self_service_pct: selfServicePct,
-                wdf_pct: wdfPct,
-                commercial_pct: commercialPct,
-                pickup_delivery_pct: pickupDeliveryPct,
-                last_retool_year: lastRetoolYear ? parseInt(lastRetoolYear, 10) : null,
-                retool_investment: retoolInvestment ? parseFloat(retoolInvestment) : null,
-                retool_type: retoolType || null,
-              },
-            }
-          : prev
-      );
+      const updatedContext = valuationContext
+        ? {
+            ...valuationContext,
+            store: {
+              ...valuationContext.store,
+              market_density: marketDensity,
+              revenue_trend: revenueTrend,
+              store_condition: storeCondition,
+              competition_level: competitionLevel,
+              self_service_pct: selfServicePct,
+              wdf_pct: wdfPct,
+              commercial_pct: commercialPct,
+              pickup_delivery_pct: pickupDeliveryPct,
+              last_retool_year: lastRetoolYear ? parseInt(lastRetoolYear, 10) : null,
+              retool_investment: retoolInvestment ? parseFloat(retoolInvestment) : null,
+              retool_type: retoolType || null,
+            },
+          }
+        : null;
+      if (updatedContext) {
+        setValuationContext(updatedContext);
+        setFetchedValuation({
+          ...computeStoreValuation(
+            updatedContext,
+            buildValuationOverrides({ ...currentOverrides, isOwnerOccupied })
+          ),
+          store: updatedContext.store,
+          context: updatedContext,
+        });
+      }
+      setSavedOverrides(currentOverrides);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     }

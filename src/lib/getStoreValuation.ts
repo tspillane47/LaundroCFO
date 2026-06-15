@@ -2,7 +2,20 @@ import { createClient } from "@/lib/supabase";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import { calcValuation, type ValuationInputs, type ValuationResult } from "@/lib/valuation";
 
-const valuationCache = new Map<string, { result: ValuationResult & { store: Record<string, unknown> }; timestamp: number }>();
+export type StoreValuationContext = {
+  store: Record<string, unknown>;
+  equipment: EquipmentRecord[];
+  lease: Record<string, unknown> | null;
+  leaseOptions: Record<string, unknown>[];
+  realEstate: Record<string, unknown> | null;
+};
+
+export type StoreValuationResult = ValuationResult & {
+  store: Record<string, unknown>;
+  context: StoreValuationContext;
+};
+
+const valuationCache = new Map<string, { result: StoreValuationResult; timestamp: number }>();
 const CACHE_TTL = 30000;
 
 function parseDate(value: string | null | undefined): Date | null {
@@ -33,13 +46,6 @@ function normalizeStoreCondition(raw: string | null | undefined): string {
   return "fair";
 }
 
-export type StoreValuationContext = {
-  store: Record<string, unknown>;
-  equipment: EquipmentRecord[];
-  lease: Record<string, unknown> | null;
-  leaseOptions: Record<string, unknown>[];
-  realEstate: Record<string, unknown> | null;
-};
 
 export function buildStoreValuationInputs(
   ctx: StoreValuationContext,
@@ -112,9 +118,10 @@ export function invalidateValuationCache(storeId: string) {
   valuationCache.delete(storeId);
 }
 
+
 export async function getStoreValuation(
   storeId: string
-): Promise<ValuationResult & { store: Record<string, unknown> }> {
+): Promise<StoreValuationResult> {
   const cached = valuationCache.get(storeId);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.result;
@@ -150,9 +157,10 @@ export async function getStoreValuation(
     realEstate: realEstate ?? null,
   };
 
-  const result = {
+  const result: StoreValuationResult = {
     ...computeStoreValuation(ctx),
     store: store ?? {},
+    context: ctx,
   };
 
   valuationCache.set(storeId, { result, timestamp: Date.now() });

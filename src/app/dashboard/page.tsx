@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
-import { getStoreValuation, getStoreDebt } from "@/lib/getStoreValuation";
-import type { ValuationResult } from "@/lib/valuation";
+import { getStoreValuation, getStoreDebt, type StoreValuationResult } from "@/lib/getStoreValuation";
 import {
   calcBuildingEquity,
   calcOccupancyCostRatioFromRent,
@@ -154,7 +153,7 @@ export default function DashboardPage() {
   const [insurancePolicies, setInsurancePolicies] = useState<any[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [valuation, setValuation] = useState<(ValuationResult & { store: Record<string, unknown> }) | null>(null);
+  const [valuation, setValuation] = useState<StoreValuationResult | null>(null);
   const [totalDebt, setTotalDebt] = useState(0);
   const supabase = createClient();
 
@@ -168,13 +167,14 @@ export default function DashboardPage() {
     }
 
     const loadedStore = selectedStore;
-    setStore(loadedStore);
-    setStoreData(loadedStore);
     setDetailLoading(true);
     setLoadError(false);
 
     try {
       const storeValuation = await getStoreValuation(loadedStore.id);
+      const freshStore = storeValuation.store;
+      setStore(freshStore);
+      setStoreData(freshStore);
       setValuation(storeValuation);
 
       const debt = await getStoreDebt(loadedStore.id);
@@ -325,7 +325,7 @@ export default function DashboardPage() {
   const machines = (store?.washers ?? 28) + (store?.dryers ?? 32);
 
   const estimatedValue = store?.monthly_revenue != null && valuation
-    ? Math.round(valuation.businessValue)
+    ? valuation.businessValue
     : demoFinancials.estimatedValue;
   const finalMultiple = store?.monthly_revenue != null && valuation
     ? valuation.finalMultiple
@@ -333,7 +333,7 @@ export default function DashboardPage() {
 
   const totalCash = (storeData?.operating_account_balance ?? 0) + (storeData?.reserve_account_balance ?? 0) + (storeData?.petty_cash ?? 0);
   const businessValue = store?.monthly_revenue != null && valuation
-    ? Math.round(valuation.businessValue)
+    ? valuation.businessValue
     : demoFinancials.estimatedValue;
   const equity = businessValue + totalCash - totalDebt;
 
