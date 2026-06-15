@@ -66,6 +66,7 @@ import {
   findMatchingAmountRule,
   isGenericTransactionDescription,
   mapBankCategoryToPlField,
+  mapBankCategoryToUtilityField,
   isCategoryReadyToPost,
   getImportCategoriesForType,
   markDuplicateTransactions,
@@ -984,7 +985,7 @@ export default function FinancialsPage() {
     amount: number
   ) {
     setRuleFormKey(key);
-    setRuleFormCategory(category === "needs_review" ? (type === "income" ? "revenue" : "utilities") : category);
+    setRuleFormCategory(category === "needs_review" ? (type === "income" ? "revenue" : "water") : category);
     setRuleFormType("vendor");
     setRuleFormAmount(amount.toFixed(2));
     setRuleFormTolerance("0.01");
@@ -1235,12 +1236,64 @@ export default function FinancialsPage() {
       setError("Assign a category before posting. Transactions marked Needs Review cannot be posted.");
       return;
     }
-    const category = mapBankCategoryToPlField(importCategory);
-    if (!category) return;
+
     const date = new Date(txn.transaction_date.split("T")[0] + "T12:00:00");
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
     const amount = normalizeTransactionAmount(txn.amount);
+
+    const utilityField = mapBankCategoryToUtilityField(importCategory);
+    if (utilityField) {
+      const { data: existingUtility } = await supabase
+        .from("monthly_utilities")
+        .select("*")
+        .eq("store_id", store.id)
+        .eq("year", year)
+        .eq("month", month)
+        .maybeSingle();
+
+      const existing = (existingUtility ?? null) as MonthlyUtilityRecord | null;
+      const payload = {
+        store_id: store.id,
+        user_id: userId,
+        year: toNum(year),
+        month: toNum(month),
+        water: toNum((existing?.water ?? 0) + (utilityField === "water" ? amount : 0)),
+        gas: toNum((existing?.gas ?? 0) + (utilityField === "gas" ? amount : 0)),
+        electric: toNum((existing?.electric ?? 0) + (utilityField === "electric" ? amount : 0)),
+        sewer: toNum((existing?.sewer ?? 0) + (utilityField === "sewer" ? amount : 0)),
+        trash: toNum((existing?.trash ?? 0) + (utilityField === "trash" ? amount : 0)),
+        internet: toNum((existing?.internet ?? 0) + (utilityField === "internet" ? amount : 0)),
+        notes: (existingUtility as { notes?: string | null } | null)?.notes ?? null,
+      };
+
+      const { error: upsertError } = await supabase
+        .from("monthly_utilities")
+        .upsert(payload, { onConflict: "store_id,year,month" });
+
+      if (upsertError) {
+        setError(upsertError.message);
+        return;
+      }
+
+      if (isStaged) {
+        setStagedTransactions((prev) => prev.filter((t) => t.tempId !== (txn as StagedTransaction).tempId));
+      } else {
+        await supabase.from("bank_transactions").update({ is_reviewed: true }).eq("id", (txn as BankTransaction).id);
+      }
+
+      setSuccess(
+        `Posted to ${MONTH_NAMES[month - 1]} ${year} Utilities (${BANK_IMPORT_CATEGORY_LABELS[importCategory]}).`
+      );
+      await loadData();
+      return;
+    }
+
+    const category = mapBankCategoryToPlField(importCategory);
+    if (!category) {
+      setError("This category cannot be posted. Re-categorize the transaction and try again.");
+      return;
+    }
 
     const existing = records.find((r) => r.year === year && r.month === month);
     const base = existing
@@ -2110,7 +2163,7 @@ export default function FinancialsPage() {
                           {BANK_IMPORT_CATEGORY_LABELS[f]}
                         </option>
                       ))
-                    : (["revenue", "utilities", "needs_review"] as BankImportCategory[]).map((f) => (
+                    : (["revenue", "water", "gas", "electric", "trash", "needs_review"] as BankImportCategory[]).map((f) => (
                         <option key={f} value={f}>
                           {BANK_IMPORT_CATEGORY_LABELS[f]}
                         </option>

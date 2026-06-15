@@ -443,12 +443,35 @@ export type PlCategoryField = (typeof PL_CATEGORY_FIELDS)[number];
 
 export type TransactionType = "income" | "expense";
 
+/** Granular utility categories for bank import (posted to monthly_utilities, not monthly_financials). */
+export const UTILITY_IMPORT_FIELDS = [
+  "water",
+  "gas",
+  "electric",
+  "trash",
+  "sewer",
+  "internet",
+] as const;
+
+export type UtilityImportField = (typeof UTILITY_IMPORT_FIELDS)[number];
+
 /** Categories shown in bank import review (extends P&L fields with import-only options). */
 export type BankImportCategory =
-  | PlCategoryField
+  | Exclude<PlCategoryField, "utilities">
+  | UtilityImportField
   | "other_income"
   | "bank_fees"
-  | "needs_review";
+  | "needs_review"
+  | "utilities";
+
+export const UTILITY_IMPORT_CATEGORIES: UtilityImportField[] = [
+  "water",
+  "gas",
+  "electric",
+  "trash",
+  "sewer",
+  "internet",
+];
 
 export const INCOME_IMPORT_CATEGORIES: BankImportCategory[] = [
   "revenue",
@@ -457,7 +480,7 @@ export const INCOME_IMPORT_CATEGORIES: BankImportCategory[] = [
 ];
 
 export const EXPENSE_IMPORT_CATEGORIES: BankImportCategory[] = [
-  "utilities",
+  ...UTILITY_IMPORT_CATEGORIES,
   "rent",
   "payroll",
   "repairs_maintenance",
@@ -474,7 +497,13 @@ export const EXPENSE_IMPORT_CATEGORIES: BankImportCategory[] = [
 export const BANK_IMPORT_CATEGORY_LABELS: Record<BankImportCategory, string> = {
   revenue: "Revenue",
   other_income: "Other Income",
-  utilities: "Utilities",
+  water: "Water",
+  gas: "Gas",
+  electric: "Electric",
+  trash: "Trash",
+  sewer: "Sewer",
+  internet: "Internet",
+  utilities: "Utilities (legacy)",
   rent: "Rent",
   payroll: "Payroll",
   repairs_maintenance: "Repairs & Maintenance",
@@ -537,25 +566,7 @@ export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
     "ach credit",
     "remote deposit",
   ],
-  utilities: [
-    "electric",
-    "power",
-    "pg&e",
-    "pge",
-    "national grid",
-    "eversource",
-    "green mountain power",
-    "gmp",
-    "water",
-    "sewer",
-    "gas company",
-    "utility",
-    "utilities",
-    "edison",
-    "gas",
-    "culligan",
-    "water softener",
-  ],
+  utilities: [],
   rent: ["rent", "lease payment", "landlord", "property management", "lease", "cam"],
   payroll: ["payroll", "adp", "gusto", "paychex", "employee pay", "wages", "salary", "employee"],
   repairs_maintenance: [
@@ -655,7 +666,6 @@ const NEEDS_REVIEW_KEYWORDS = [
 ];
 
 const EXPENSE_CATEGORY_ORDER: PlCategoryField[] = [
-  "utilities",
   "rent",
   "payroll",
   "repairs_maintenance",
@@ -666,15 +676,82 @@ const EXPENSE_CATEGORY_ORDER: PlCategoryField[] = [
   "debt_service",
 ];
 
+export const UTILITY_CATEGORY_KEYWORDS: Record<UtilityImportField, string[]> = {
+  water: [
+    "water",
+    "h2o",
+    "aqua",
+    "city water",
+    "water dept",
+    "water department",
+    "water utility",
+    "municipal water",
+    "public works water",
+    "culligan",
+    "water softener",
+  ],
+  gas: ["gas company", "natural gas", "propane", "national grid gas", "nicor", "spire", "atmos energy", "peoples gas"],
+  electric: [
+    "electric",
+    "electricity",
+    "power",
+    "pg&e",
+    "pge",
+    "eversource",
+    "green mountain power",
+    "gmp",
+    "edison",
+    "duke energy",
+    "dominion energy",
+  ],
+  trash: ["trash", "waste management", "republic services", "rubbish", "dumpster", "recycling", "waste disposal"],
+  sewer: ["sewer", "wastewater", "sewage"],
+  internet: ["internet", "comcast", "xfinity", "spectrum", "fios", "broadband", "wifi", "frontier", "centurylink"],
+};
+
+export function isUtilityImportCategory(category: BankImportCategory): category is UtilityImportField {
+  return (UTILITY_IMPORT_FIELDS as readonly string[]).includes(category);
+}
+
+export function mapBankCategoryToUtilityField(category: BankImportCategory): UtilityImportField | null {
+  if (isUtilityImportCategory(category)) return category;
+  return null;
+}
+
 export function isCategoryReadyToPost(category: BankImportCategory): boolean {
-  return category !== "needs_review";
+  return category !== "needs_review" && category !== "utilities";
 }
 
 export function mapBankCategoryToPlField(category: BankImportCategory): PlCategoryField | null {
-  if (category === "needs_review") return null;
+  if (category === "needs_review" || category === "utilities" || isUtilityImportCategory(category)) {
+    return null;
+  }
   if (category === "other_income") return "revenue";
   if (category === "bank_fees") return "bank_charges";
   return category;
+}
+
+function suggestUtilityCategory(text: string): BankImportCategory | null {
+  if (text.includes("national grid gas")) return "gas";
+  if (text.includes("national grid electric") || text.includes("national grid elec")) return "electric";
+  if (/\bnational\s+grid\b/.test(text)) return "needs_review";
+
+  const matches: UtilityImportField[] = [];
+  for (const field of UTILITY_IMPORT_FIELDS) {
+    for (const keyword of UTILITY_CATEGORY_KEYWORDS[field]) {
+      if (text.includes(keyword.toLowerCase())) {
+        if (!matches.includes(field)) matches.push(field);
+        break;
+      }
+    }
+  }
+
+  if (matches.length > 1) return "needs_review";
+  if (matches.length === 1) return matches[0];
+
+  if (/\b(utilities?|energy\s+bill)\b/.test(text)) return "needs_review";
+
+  return null;
 }
 
 export function getImportCategoriesForType(type: TransactionType): BankImportCategory[] {
@@ -705,6 +782,9 @@ export function suggestTransactionCategory(
     }
     return "revenue";
   }
+
+  const utilityCategory = suggestUtilityCategory(text);
+  if (utilityCategory) return utilityCategory;
 
   for (const field of EXPENSE_CATEGORY_ORDER) {
     for (const keyword of CATEGORY_KEYWORDS[field]) {

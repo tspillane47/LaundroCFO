@@ -480,6 +480,10 @@ export default function UtilitiesPage() {
 
       {/* Section 2 — Add/Edit form */}
       <div className="card">
+        <p className="text-[12px] mb-4" style={{ color: "var(--text-muted)" }}>
+          Utility costs are also tracked automatically when you categorize bank transactions as Water, Gas, Electric,
+          etc. in Financials → Bank Import. Manual entry here will be combined with imported transactions.
+        </p>
         <div className="flex flex-wrap items-center gap-4 justify-between">
           <div className="flex flex-wrap items-center gap-4">
             <div>
