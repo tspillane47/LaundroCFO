@@ -77,6 +77,7 @@ import {
   type CategorizationRule,
   type RuleType,
   type RuleMatchKind,
+  type UtilityImportField,
 } from "@/lib/financials";
 
 type TabId = "pl" | "trends" | "ratios" | "bank" | "quickbooks";
@@ -262,6 +263,19 @@ function RatioCard({ item }: { item: RatioBenchmark }) {
 
 function normalizeTransactionAmount(amount: number): number {
   return Math.abs(amount);
+}
+
+function emptyUtilityDelta(): Record<UtilityImportField, number> {
+  return { water: 0, gas: 0, electric: 0, sewer: 0, trash: 0, internet: 0 };
+}
+
+function monthPeriodKey(year: number, month: number): string {
+  return `${year}-${month}`;
+}
+
+function parseMonthPeriodKey(key: string): { year: number; month: number } {
+  const [year, month] = key.split("-").map(Number);
+  return { year, month };
 }
 
 function CategoryBadge({ category }: { category: BankImportCategory }) {
@@ -452,6 +466,8 @@ export default function FinancialsPage() {
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
   const [clearAllStoreNameInput, setClearAllStoreNameInput] = useState("");
   const [duplicateImportCount, setDuplicateImportCount] = useState(0);
+  const [posting, setPosting] = useState(false);
+  const [postingCount, setPostingCount] = useState(0);
 
   const currentYear = new Date().getFullYear();
   const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
@@ -1103,22 +1119,13 @@ export default function FinancialsPage() {
   }
 
   async function postReviewTransaction(txn: ReviewTransaction) {
-    if (!isCategoryReadyToPost(txn.category)) {
-      setError("Assign a category before posting. Transactions marked Needs Review cannot be posted.");
-      return;
-    }
-    if (txn.isStaged && txn.staged) {
-      await postTransactionToPL(txn.staged, true);
-    } else if (txn.bank) {
-      await postTransactionToPL({ ...txn.bank, category: txn.category }, false);
-    }
+    await postTransactionsBatch([txn]);
   }
 
   async function postSelectedTransactions() {
     const selected = reviewTransactions.filter((t) => selectedTxnKeys.has(t.key));
-    for (const txn of selected) {
-      await postReviewTransaction(txn);
-    }
+    if (selected.length === 0) return;
+    await postTransactionsBatch(selected);
     setSelectedTxnKeys(new Set());
   }
 
@@ -1143,9 +1150,8 @@ export default function FinancialsPage() {
       setError("Assign a category before posting. Transactions marked Needs Review cannot be posted.");
       return;
     }
-    for (const txn of group.items) {
-      await postReviewTransaction({ ...txn, category: group.category });
-    }
+    const txns = group.items.map((txn) => ({ ...txn, category: group.category }));
+    await postTransactionsBatch(txns);
   }
 
   async function ignoreGroupTransactions(group: TransactionGroup) {
@@ -1236,120 +1242,260 @@ export default function FinancialsPage() {
     await loadData();
   }
 
-  async function postTransactionToPL(
-    txn: BankTransaction | StagedTransaction,
-    isStaged: boolean
-  ) {
-    if (!store?.id || !userId) return;
-    const importCategory = (txn.category ?? "needs_review") as BankImportCategory;
-    if (!isCategoryReadyToPost(importCategory)) {
-      setError("Assign a category before posting. Transactions marked Needs Review cannot be posted.");
-      return;
+  async function postTransactionsBatch(transactions: ReviewTransaction[]) {
+    if (!store?.id || !userId || transactions.length === 0) return;
+
+    for (const txn of transactions) {
+      if (!isCategoryReadyToPost(txn.category)) {
+        setError("Assign a category before posting. Transactions marked Needs Review cannot be posted.");
+        return;
+      }
     }
 
-    const date = new Date(txn.transaction_date.split("T")[0] + "T12:00:00");
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const amount = normalizeTransactionAmount(txn.amount);
+    setPosting(true);
+    setPostingCount(transactions.length);
+    setError("");
 
-    const utilityField = mapBankCategoryToUtilityField(importCategory);
-    if (utilityField) {
-      const { data: existingUtility } = await supabase
-        .from("monthly_utilities")
-        .select("*")
-        .eq("store_id", store.id)
-        .eq("year", year)
-        .eq("month", month)
-        .maybeSingle();
+    type BatchItem = {
+      txn: ReviewTransaction;
+      year: number;
+      month: number;
+      amount: number;
+      importCategory: BankImportCategory;
+    };
 
-      const existing = (existingUtility ?? null) as MonthlyUtilityRecord | null;
-      const payload = {
-        store_id: store.id,
-        user_id: userId,
-        year: toNum(year),
-        month: toNum(month),
-        water: toNum((existing?.water ?? 0) + (utilityField === "water" ? amount : 0)),
-        gas: toNum((existing?.gas ?? 0) + (utilityField === "gas" ? amount : 0)),
-        electric: toNum((existing?.electric ?? 0) + (utilityField === "electric" ? amount : 0)),
-        sewer: toNum((existing?.sewer ?? 0) + (utilityField === "sewer" ? amount : 0)),
-        trash: toNum((existing?.trash ?? 0) + (utilityField === "trash" ? amount : 0)),
-        internet: toNum((existing?.internet ?? 0) + (utilityField === "internet" ? amount : 0)),
-        notes: (existingUtility as { notes?: string | null } | null)?.notes ?? null,
+    const items: BatchItem[] = transactions.map((txn) => {
+      const dateSource = txn.isStaged ? txn.staged! : txn.bank!;
+      const date = new Date(dateSource.transaction_date.split("T")[0] + "T12:00:00");
+      return {
+        txn,
+        year: date.getFullYear(),
+        month: date.getMonth() + 1,
+        amount: normalizeTransactionAmount(dateSource.amount),
+        importCategory: txn.category,
       };
+    });
 
-      const { error: upsertError } = await supabase
-        .from("monthly_utilities")
-        .upsert(payload, { onConflict: "store_id,year,month" });
+    const utilityDeltaMap = new Map<string, Record<UtilityImportField, number>>();
+    const financialDeltaMap = new Map<string, Partial<Record<PlCategoryField, number>>>();
+    const stagedIdsToRemove = new Set<string>();
+    const bankIdsToReview: string[] = [];
 
-      if (upsertError) {
-        setError(upsertError.message);
+    for (const item of items) {
+      const periodKey = monthPeriodKey(item.year, item.month);
+      const utilityField = mapBankCategoryToUtilityField(item.importCategory);
+
+      if (utilityField) {
+        const deltas = utilityDeltaMap.get(periodKey) ?? emptyUtilityDelta();
+        deltas[utilityField] += item.amount;
+        utilityDeltaMap.set(periodKey, deltas);
+      } else {
+        const plField = mapBankCategoryToPlField(item.importCategory);
+        if (!plField) {
+          setPosting(false);
+          setPostingCount(0);
+          setError("This category cannot be posted. Re-categorize the transaction and try again.");
+          return;
+        }
+        const fieldDeltas = financialDeltaMap.get(periodKey) ?? {};
+        fieldDeltas[plField] = (fieldDeltas[plField] ?? 0) + item.amount;
+        financialDeltaMap.set(periodKey, fieldDeltas);
+      }
+
+      if (item.txn.isStaged && item.txn.staged) {
+        stagedIdsToRemove.add(item.txn.staged.tempId);
+      } else if (item.txn.bank) {
+        bankIdsToReview.push(item.txn.bank.id);
+      }
+    }
+
+    try {
+      const dbOps: PromiseLike<{ error: { message: string } | null }>[] = [];
+      let existingUtilityRows: (MonthlyUtilityRecord & { notes?: string | null })[] = [];
+
+      if (utilityDeltaMap.size > 0) {
+        const { data: utilityData, error: utilityFetchError } = await supabase
+          .from("monthly_utilities")
+          .select("*")
+          .eq("store_id", store.id);
+
+        if (utilityFetchError) {
+          setError(utilityFetchError.message);
+          return;
+        }
+
+        existingUtilityRows = (utilityData ?? []) as (MonthlyUtilityRecord & { notes?: string | null })[];
+
+        const utilityUpserts = Array.from(utilityDeltaMap.entries()).map(([periodKey, deltas]) => {
+          const { year, month } = parseMonthPeriodKey(periodKey);
+          const existing = existingUtilityRows.find((r) => r.year === year && r.month === month);
+          return {
+            store_id: store.id,
+            user_id: userId,
+            year: toNum(year),
+            month: toNum(month),
+            water: toNum((existing?.water ?? 0) + deltas.water),
+            gas: toNum((existing?.gas ?? 0) + deltas.gas),
+            electric: toNum((existing?.electric ?? 0) + deltas.electric),
+            sewer: toNum((existing?.sewer ?? 0) + deltas.sewer),
+            trash: toNum((existing?.trash ?? 0) + deltas.trash),
+            internet: toNum((existing?.internet ?? 0) + deltas.internet),
+            notes: existing?.notes ?? null,
+          };
+        });
+
+        dbOps.push(
+          supabase
+            .from("monthly_utilities")
+            .upsert(utilityUpserts, { onConflict: "store_id,year,month" })
+        );
+      }
+
+      const financialResults: {
+        year: number;
+        month: number;
+        payload: MonthlyFinancialRecord;
+        error: { message: string } | null;
+      }[] = [];
+
+      for (const [periodKey, fieldDeltas] of Array.from(financialDeltaMap.entries())) {
+        const { year, month } = parseMonthPeriodKey(periodKey);
+        const existing = records.find((r) => r.year === year && r.month === month);
+        const base = existing
+          ? recordToForm(existing)
+          : { ...emptyMonthlyForm(store), year, month };
+
+        let updated = { ...base };
+        for (const [field, delta] of Object.entries(fieldDeltas) as [PlCategoryField, number][]) {
+          const currentFieldValue = (updated[field as NumericFormField] as number) ?? 0;
+          updated = { ...updated, [field]: currentFieldValue + delta };
+        }
+
+        const payload = {
+          store_id: store.id,
+          user_id: userId,
+          year: toNum(year),
+          month: toNum(month),
+          revenue: toNum(updated.revenue),
+          utilities: existing?.utilities ?? 0,
+          rent: toNum(updated.rent),
+          payroll: toNum(updated.payroll),
+          repairs_maintenance: toNum(updated.repairs_maintenance),
+          insurance_expense: toNum(updated.insurance_expense),
+          supplies: toNum(updated.supplies),
+          marketing: toNum(updated.marketing),
+          professional_fees: toNum(updated.professional_fees),
+          bank_charges: toNum(updated.bank_charges),
+          other_expenses: toNum(updated.other_expenses),
+          debt_service: toNum(updated.debt_service),
+          notes: toNullableText(updated.notes),
+        };
+
+        if (existing?.id) {
+          const { error } = await supabase
+            .from("monthly_financials")
+            .update(payload)
+            .eq("id", existing.id);
+          financialResults.push({
+            year,
+            month,
+            payload: { ...payload, id: existing.id },
+            error,
+          });
+        } else {
+          const { data, error } = await supabase
+            .from("monthly_financials")
+            .insert(payload)
+            .select()
+            .single();
+          financialResults.push({
+            year,
+            month,
+            payload: (data ?? { ...payload, id: "" }) as MonthlyFinancialRecord,
+            error,
+          });
+        }
+      }
+
+      if (bankIdsToReview.length > 0) {
+        dbOps.push(
+          supabase
+            .from("bank_transactions")
+            .update({ is_reviewed: true })
+            .in("id", bankIdsToReview)
+        );
+      }
+
+      const parallelResults = await Promise.all(dbOps);
+      const firstDbError =
+        parallelResults.find((r) => r.error)?.error ??
+        financialResults.find((r) => r.error)?.error;
+
+      if (firstDbError) {
+        setError(firstDbError.message);
         return;
       }
 
-      if (isStaged) {
-        setStagedTransactions((prev) => prev.filter((t) => t.tempId !== (txn as StagedTransaction).tempId));
-      } else {
-        await supabase.from("bank_transactions").update({ is_reviewed: true }).eq("id", (txn as BankTransaction).id);
+      const nextUtilityRecords = [...utilityRecords];
+      for (const [periodKey, deltas] of Array.from(utilityDeltaMap.entries())) {
+        const { year, month } = parseMonthPeriodKey(periodKey);
+        const idx = nextUtilityRecords.findIndex((r) => r.year === year && r.month === month);
+        if (idx >= 0) {
+          const row = nextUtilityRecords[idx];
+          nextUtilityRecords[idx] = {
+            ...row,
+            water: row.water + deltas.water,
+            gas: row.gas + deltas.gas,
+            electric: row.electric + deltas.electric,
+            sewer: row.sewer + deltas.sewer,
+            trash: row.trash + deltas.trash,
+            internet: row.internet + deltas.internet,
+          };
+        } else {
+          nextUtilityRecords.push({
+            year,
+            month,
+            water: deltas.water,
+            gas: deltas.gas,
+            electric: deltas.electric,
+            sewer: deltas.sewer,
+            trash: deltas.trash,
+            internet: deltas.internet,
+          });
+        }
       }
 
+      const nextRawRecords = [...records] as MonthlyFinancialRecord[];
+      for (const result of financialResults) {
+        const idx = nextRawRecords.findIndex(
+          (r) => r.year === result.year && r.month === result.month
+        );
+        if (idx >= 0) {
+          nextRawRecords[idx] = { ...nextRawRecords[idx], ...result.payload };
+        } else {
+          nextRawRecords.push(result.payload);
+        }
+      }
+
+      const utilitiesLookup = buildUtilitiesLookup(nextUtilityRecords);
+      const nextRecords = enrichMonthlyRecords(sortRecordsDesc(nextRawRecords), utilitiesLookup);
+      const bankIdsSet = new Set(bankIdsToReview);
+
+      setUtilityRecords(nextUtilityRecords);
+      setRecords(nextRecords);
+      setStagedTransactions((prev) => prev.filter((t) => !stagedIdsToRemove.has(t.tempId)));
+      setBankTransactions((prev) => prev.filter((t) => !bankIdsSet.has(t.id)));
       setSuccess(
-        `Posted to ${MONTH_NAMES[month - 1]} ${year} Utilities (${BANK_IMPORT_CATEGORY_LABELS[importCategory]}).`
+        transactions.length === 1
+          ? "Posted 1 transaction to P&L."
+          : `Posted ${transactions.length} transactions to P&L.`
       );
-      await loadData();
-      return;
+    } catch {
+      setError("Failed to post transactions. Please try again.");
+    } finally {
+      setPosting(false);
+      setPostingCount(0);
     }
-
-    const category = mapBankCategoryToPlField(importCategory);
-    if (!category) {
-      setError("This category cannot be posted. Re-categorize the transaction and try again.");
-      return;
-    }
-
-    const existing = records.find((r) => r.year === year && r.month === month);
-    const base = existing
-      ? recordToForm(existing)
-      : { ...emptyMonthlyForm(store), year, month };
-
-    const currentFieldValue = (base[category as NumericFormField] as number) ?? 0;
-    const updated = {
-      ...base,
-      [category]: currentFieldValue + amount,
-    };
-
-    const payload = {
-      store_id: store.id,
-      user_id: userId,
-      year: toNum(year),
-      month: toNum(month),
-      revenue: toNum(updated.revenue),
-      utilities: existing?.utilities ?? 0,
-      rent: toNum(updated.rent),
-      payroll: toNum(updated.payroll),
-      repairs_maintenance: toNum(updated.repairs_maintenance),
-      insurance_expense: toNum(updated.insurance_expense),
-      supplies: toNum(updated.supplies),
-      marketing: toNum(updated.marketing),
-      professional_fees: toNum(updated.professional_fees),
-      bank_charges: toNum(updated.bank_charges),
-      other_expenses: toNum(updated.other_expenses),
-      debt_service: toNum(updated.debt_service),
-      notes: toNullableText(updated.notes),
-    };
-
-    if (existing?.id) {
-      await supabase.from("monthly_financials").update(payload).eq("id", existing.id);
-    } else {
-      await supabase.from("monthly_financials").insert(payload);
-    }
-
-    if (isStaged) {
-      setStagedTransactions((prev) => prev.filter((t) => t.tempId !== (txn as StagedTransaction).tempId));
-    } else {
-      await supabase.from("bank_transactions").update({ is_reviewed: true }).eq("id", (txn as BankTransaction).id);
-    }
-
-    setSuccess(`Posted to ${MONTH_NAMES[month - 1]} ${year} P&L (${BANK_IMPORT_CATEGORY_LABELS[importCategory]}).`);
-    await loadData();
   }
 
   async function ignoreTransaction(txn: BankTransaction | StagedTransaction, isStaged: boolean) {
@@ -2182,8 +2328,13 @@ export default function FinancialsPage() {
                 <button type="button" className="btn-outline text-[11px]" onClick={applyBulkCategory}>
                   Apply Category
                 </button>
-                <button type="button" className="btn-primary text-[11px]" onClick={postSelectedTransactions}>
-                  Post Selected to P&L
+                <button
+                  type="button"
+                  className="btn-primary text-[11px]"
+                  onClick={postSelectedTransactions}
+                  disabled={posting}
+                >
+                  {posting ? `Posting ${postingCount} transaction${postingCount === 1 ? "" : "s"}…` : "Post Selected to P&L"}
                 </button>
                 <button type="button" className="btn-outline text-[11px]" onClick={ignoreSelectedTransactions}>
                   Ignore Selected
@@ -2265,9 +2416,11 @@ export default function FinancialsPage() {
                               type="button"
                               className="btn-primary text-[11px] mr-1.5"
                               onClick={() => postGroupTransactions(group)}
-                              disabled={!isCategoryReadyToPost(group.category)}
+                              disabled={!isCategoryReadyToPost(group.category) || posting}
                             >
-                              Post All to P&L
+                              {posting
+                                ? `Posting ${postingCount} transaction${postingCount === 1 ? "" : "s"}…`
+                                : "Post All to P&L"}
                             </button>
                             <button
                               type="button"
@@ -2403,9 +2556,9 @@ export default function FinancialsPage() {
                               type="button"
                               className="btn-primary text-[11px] mr-1.5"
                               onClick={() => postReviewTransaction(txn)}
-                              disabled={!isCategoryReadyToPost(txn.category)}
+                              disabled={!isCategoryReadyToPost(txn.category) || posting}
                             >
-                              Post to P&L
+                              {posting ? "Posting…" : "Post to P&L"}
                             </button>
                             <button
                               type="button"
