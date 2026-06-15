@@ -5,6 +5,11 @@ export type MonthlyFinancialRecord = {
   year: number;
   month: number;
   revenue: number;
+  self_service_revenue: number;
+  wdf_revenue: number;
+  commercial_revenue: number;
+  vending_revenue: number;
+  other_revenue: number;
   utilities: number;
   rent: number;
   payroll: number;
@@ -123,6 +128,11 @@ function num(value: number | null | undefined): number {
 
 export function calcMonthly(record: MonthlyFinancialRecord): CalculatedMonthly {
   const revenue = num(record.revenue);
+  const self_service_revenue = num(record.self_service_revenue);
+  const wdf_revenue = num(record.wdf_revenue);
+  const commercial_revenue = num(record.commercial_revenue);
+  const vending_revenue = num(record.vending_revenue);
+  const other_revenue = num(record.other_revenue);
   const utilities = num(record.utilities);
   const rent = num(record.rent);
   const payroll = num(record.payroll);
@@ -155,6 +165,11 @@ export function calcMonthly(record: MonthlyFinancialRecord): CalculatedMonthly {
   return {
     ...record,
     revenue,
+    self_service_revenue,
+    wdf_revenue,
+    commercial_revenue,
+    vending_revenue,
+    other_revenue,
     utilities,
     rent,
     payroll,
@@ -349,6 +364,11 @@ export function emptyMonthlyForm(
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
     revenue: num(store?.monthly_revenue),
+    self_service_revenue: 0,
+    wdf_revenue: 0,
+    commercial_revenue: 0,
+    vending_revenue: 0,
+    other_revenue: 0,
     utilities: 0,
     rent: num(store?.monthly_rent),
     payroll: 0,
@@ -369,6 +389,11 @@ export function recordToForm(record: CalculatedMonthly): Omit<MonthlyFinancialRe
     year: record.year,
     month: record.month,
     revenue: record.revenue,
+    self_service_revenue: num(record.self_service_revenue),
+    wdf_revenue: num(record.wdf_revenue),
+    commercial_revenue: num(record.commercial_revenue),
+    vending_revenue: num(record.vending_revenue),
+    other_revenue: num(record.other_revenue),
     utilities: record.utilities,
     rent: record.rent,
     payroll: record.payroll,
@@ -455,14 +480,27 @@ export const UTILITY_IMPORT_FIELDS = [
 
 export type UtilityImportField = (typeof UTILITY_IMPORT_FIELDS)[number];
 
+/** Granular revenue breakdown columns in monthly_financials (bank import income categories). */
+export const REVENUE_BREAKDOWN_FIELDS = [
+  "self_service_revenue",
+  "wdf_revenue",
+  "commercial_revenue",
+  "vending_revenue",
+  "other_revenue",
+] as const;
+
+export type RevenueBreakdownField = (typeof REVENUE_BREAKDOWN_FIELDS)[number];
+
 /** Categories shown in bank import review (extends P&L fields with import-only options). */
 export type BankImportCategory =
-  | Exclude<PlCategoryField, "utilities">
+  | Exclude<PlCategoryField, "utilities" | "revenue">
+  | RevenueBreakdownField
   | UtilityImportField
-  | "other_income"
   | "bank_fees"
   | "needs_review"
-  | "utilities";
+  | "utilities"
+  | "revenue"
+  | "other_income";
 
 export const UTILITY_IMPORT_CATEGORIES: UtilityImportField[] = [
   "water",
@@ -474,8 +512,11 @@ export const UTILITY_IMPORT_CATEGORIES: UtilityImportField[] = [
 ];
 
 export const INCOME_IMPORT_CATEGORIES: BankImportCategory[] = [
-  "revenue",
-  "other_income",
+  "self_service_revenue",
+  "wdf_revenue",
+  "commercial_revenue",
+  "vending_revenue",
+  "other_revenue",
   "needs_review",
 ];
 
@@ -495,8 +536,13 @@ export const EXPENSE_IMPORT_CATEGORIES: BankImportCategory[] = [
 ];
 
 export const BANK_IMPORT_CATEGORY_LABELS: Record<BankImportCategory, string> = {
-  revenue: "Revenue",
-  other_income: "Other Income",
+  self_service_revenue: "Self-Service / Coin Revenue",
+  wdf_revenue: "Wash Dry Fold Revenue",
+  commercial_revenue: "Commercial Laundry Revenue",
+  vending_revenue: "Vending Revenue",
+  other_revenue: "Other Revenue",
+  revenue: "Revenue (legacy)",
+  other_income: "Other Income (legacy)",
   water: "Water",
   gas: "Gas",
   electric: "Electric",
@@ -539,32 +585,8 @@ export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
     "deposit",
     "cash deposit",
     "mobile deposit",
-    "cknet deposit",
-    "merchant deposit",
-    "merchant bankcd",
-    "card payment received",
-    "merchant services",
-    "cardpayment",
-    "coin",
-    "card",
-    "fascard",
-    "laundrynet",
-    "laundryworks",
-    "laundroworks",
-    "cardconnect",
-    "square inc",
-    "square",
-    "sq2",
-    "clover",
-    "worldpay",
-    "tsys",
-    "cents",
-    "spyn",
     "sales",
     "income",
-    "revenue",
-    "ach credit",
-    "remote deposit",
   ],
   utilities: [],
   rent: ["rent", "lease payment", "landlord", "property management", "lease", "cam"],
@@ -633,7 +655,41 @@ export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
   ],
 };
 
-const OTHER_INCOME_KEYWORDS = ["interest earned", "refund", "rebate", "insurance proceeds", "grant"];
+export const SELF_SERVICE_REVENUE_KEYWORDS = [
+  "deposit",
+  "cash deposit",
+  "mobile deposit",
+  "cknet deposit",
+  "merchant deposit",
+  "merchant bankcd",
+  "card payment received",
+  "merchant services",
+  "cardpayment",
+  "coin",
+  "card",
+  "fascard",
+  "laundrynet",
+  "laundryworks",
+  "laundroworks",
+  "cardconnect",
+  "square inc",
+  "square",
+  "sq2",
+  "clover",
+  "worldpay",
+  "tsys",
+  "cents",
+  "spyn",
+  "ach credit",
+  "remote deposit",
+  "revenue",
+];
+
+export const WDF_REVENUE_KEYWORDS = ["wdf", "wash dry fold"];
+
+export const VENDING_REVENUE_KEYWORDS = ["vending", "vend"];
+
+const OTHER_REVENUE_KEYWORDS = ["interest earned", "refund", "rebate", "insurance proceeds", "grant"];
 
 const BANK_FEE_KEYWORDS = [
   "service charge",
@@ -709,6 +765,10 @@ export const UTILITY_CATEGORY_KEYWORDS: Record<UtilityImportField, string[]> = {
   internet: ["internet", "comcast", "xfinity", "spectrum", "fios", "broadband", "wifi", "frontier", "centurylink"],
 };
 
+export function isRevenueBreakdownCategory(category: BankImportCategory): category is RevenueBreakdownField {
+  return (REVENUE_BREAKDOWN_FIELDS as readonly string[]).includes(category);
+}
+
 export function isUtilityImportCategory(category: BankImportCategory): category is UtilityImportField {
   return (UTILITY_IMPORT_FIELDS as readonly string[]).includes(category);
 }
@@ -718,15 +778,34 @@ export function mapBankCategoryToUtilityField(category: BankImportCategory): Uti
   return null;
 }
 
+export function mapBankCategoryToRevenueField(category: BankImportCategory): RevenueBreakdownField | null {
+  if (isRevenueBreakdownCategory(category)) return category;
+  if (category === "revenue") return "self_service_revenue";
+  if (category === "other_income") return "other_revenue";
+  return null;
+}
+
+export function sumRevenueBreakdown(
+  record: Partial<Pick<MonthlyFinancialRecord, RevenueBreakdownField>>
+): number {
+  return REVENUE_BREAKDOWN_FIELDS.reduce((sum, field) => sum + num(record[field]), 0);
+}
+
 export function isCategoryReadyToPost(category: BankImportCategory): boolean {
   return category !== "needs_review" && category !== "utilities";
 }
 
 export function mapBankCategoryToPlField(category: BankImportCategory): PlCategoryField | null {
-  if (category === "needs_review" || category === "utilities" || isUtilityImportCategory(category)) {
+  if (
+    category === "needs_review" ||
+    category === "utilities" ||
+    isUtilityImportCategory(category) ||
+    isRevenueBreakdownCategory(category) ||
+    category === "revenue" ||
+    category === "other_income"
+  ) {
     return null;
   }
-  if (category === "other_income") return "revenue";
   if (category === "bank_fees") return "bank_charges";
   return category;
 }
@@ -774,13 +853,19 @@ export function suggestTransactionCategory(
   }
 
   if (type === "income") {
-    for (const keyword of OTHER_INCOME_KEYWORDS) {
-      if (text.includes(keyword)) return "other_income";
+    for (const keyword of WDF_REVENUE_KEYWORDS) {
+      if (text.includes(keyword)) return "wdf_revenue";
     }
-    for (const keyword of CATEGORY_KEYWORDS.revenue) {
-      if (text.includes(keyword.toLowerCase())) return "revenue";
+    for (const keyword of VENDING_REVENUE_KEYWORDS) {
+      if (text.includes(keyword)) return "vending_revenue";
     }
-    return "revenue";
+    for (const keyword of OTHER_REVENUE_KEYWORDS) {
+      if (text.includes(keyword)) return "other_revenue";
+    }
+    for (const keyword of SELF_SERVICE_REVENUE_KEYWORDS) {
+      if (text.includes(keyword.toLowerCase())) return "self_service_revenue";
+    }
+    return "self_service_revenue";
   }
 
   const utilityCategory = suggestUtilityCategory(text);
@@ -887,7 +972,14 @@ export function inferTransactionType(
   amount: number,
   category?: string | null
 ): TransactionType {
-  if (category === "revenue") return "income";
+  if (
+    category &&
+    ((REVENUE_BREAKDOWN_FIELDS as readonly string[]).includes(category) ||
+      category === "revenue" ||
+      category === "other_income")
+  ) {
+    return "income";
+  }
   if (amount < 0) return "expense";
   if (amount > 0) return "income";
   return "expense";

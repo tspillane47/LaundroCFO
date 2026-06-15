@@ -67,10 +67,13 @@ import {
   isGenericTransactionDescription,
   mapBankCategoryToPlField,
   mapBankCategoryToUtilityField,
+  mapBankCategoryToRevenueField,
+  sumRevenueBreakdown,
   isCategoryReadyToPost,
   getImportCategoriesForType,
   markDuplicateTransactions,
   UTILITY_IMPORT_CATEGORIES,
+  INCOME_IMPORT_CATEGORIES,
   BANK_IMPORT_CATEGORY_LABELS,
   type TransactionType,
   type BankImportCategory,
@@ -78,6 +81,7 @@ import {
   type RuleType,
   type RuleMatchKind,
   type UtilityImportField,
+  type RevenueBreakdownField,
 } from "@/lib/financials";
 
 type TabId = "pl" | "trends" | "ratios" | "bank" | "quickbooks";
@@ -446,11 +450,11 @@ export default function FinancialsPage() {
   const [bankTransactions, setBankTransactions] = useState<BankTransaction[]>([]);
   const [stagedTransactions, setStagedTransactions] = useState<StagedTransaction[]>([]);
   const [selectedTxnKeys, setSelectedTxnKeys] = useState<Set<string>>(new Set());
-  const [bulkCategory, setBulkCategory] = useState<BankImportCategory>("revenue");
+  const [bulkCategory, setBulkCategory] = useState<BankImportCategory>("self_service_revenue");
   const [groupSimilar, setGroupSimilar] = useState(true);
   const [categorizationRules, setCategorizationRules] = useState<CategorizationRule[]>([]);
   const [ruleFormKey, setRuleFormKey] = useState<string | null>(null);
-  const [ruleFormCategory, setRuleFormCategory] = useState<BankImportCategory>("revenue");
+  const [ruleFormCategory, setRuleFormCategory] = useState<BankImportCategory>("self_service_revenue");
   const [ruleFormType, setRuleFormType] = useState<RuleType>("vendor");
   const [ruleFormAmount, setRuleFormAmount] = useState("");
   const [ruleFormTolerance, setRuleFormTolerance] = useState("0.01");
@@ -796,6 +800,11 @@ export default function FinancialsPage() {
         user_id: userId,
         year: toNum(selectedYear),
         month: toNum(selectedMonth),
+        self_service_revenue: toNum(selectedRecord?.self_service_revenue ?? 0),
+        wdf_revenue: toNum(selectedRecord?.wdf_revenue ?? 0),
+        commercial_revenue: toNum(selectedRecord?.commercial_revenue ?? 0),
+        vending_revenue: toNum(selectedRecord?.vending_revenue ?? 0),
+        other_revenue: toNum(selectedRecord?.other_revenue ?? 0),
         revenue: toNum(form.revenue),
         utilities: selectedRecord?.utilities ?? 0,
         rent: toNum(form.rent),
@@ -1011,7 +1020,7 @@ export default function FinancialsPage() {
     amount: number
   ) {
     setRuleFormKey(key);
-    setRuleFormCategory(category === "needs_review" ? (type === "income" ? "revenue" : "water") : category);
+    setRuleFormCategory(category === "needs_review" ? (type === "income" ? "self_service_revenue" : "water") : category);
     setRuleFormType("vendor");
     setRuleFormAmount(amount.toFixed(2));
     setRuleFormTolerance("0.01");
@@ -1277,15 +1286,21 @@ export default function FinancialsPage() {
     });
 
     const utilityDeltaMap = new Map<string, Record<UtilityImportField, number>>();
+    const revenueDeltaMap = new Map<string, Partial<Record<RevenueBreakdownField, number>>>();
     const financialDeltaMap = new Map<string, Partial<Record<PlCategoryField, number>>>();
     const stagedIdsToRemove = new Set<string>();
     const bankIdsToReview: string[] = [];
 
     for (const item of items) {
       const periodKey = monthPeriodKey(item.year, item.month);
+      const revenueField = mapBankCategoryToRevenueField(item.importCategory);
       const utilityField = mapBankCategoryToUtilityField(item.importCategory);
 
-      if (utilityField) {
+      if (revenueField) {
+        const deltas = revenueDeltaMap.get(periodKey) ?? {};
+        deltas[revenueField] = (deltas[revenueField] ?? 0) + item.amount;
+        revenueDeltaMap.set(periodKey, deltas);
+      } else if (utilityField) {
         const deltas = utilityDeltaMap.get(periodKey) ?? emptyUtilityDelta();
         deltas[utilityField] += item.amount;
         utilityDeltaMap.set(periodKey, deltas);
@@ -1358,12 +1373,16 @@ export default function FinancialsPage() {
         error: { message: string } | null;
       }[] = [];
 
-      for (const [periodKey, fieldDeltas] of Array.from(financialDeltaMap.entries())) {
+      for (const periodKey of Array.from(
+        new Set([...Array.from(revenueDeltaMap.keys()), ...Array.from(financialDeltaMap.keys())])
+      )) {
         const { year, month } = parseMonthPeriodKey(periodKey);
         const existing = records.find((r) => r.year === year && r.month === month);
         const base = existing
           ? recordToForm(existing)
           : { ...emptyMonthlyForm(store), year, month };
+        const revenueDeltas = revenueDeltaMap.get(periodKey) ?? {};
+        const fieldDeltas = financialDeltaMap.get(periodKey) ?? {};
 
         let updated = { ...base };
         for (const [field, delta] of Object.entries(fieldDeltas) as [PlCategoryField, number][]) {
@@ -1371,12 +1390,29 @@ export default function FinancialsPage() {
           updated = { ...updated, [field]: currentFieldValue + delta };
         }
 
+        const breakdown = {
+          self_service_revenue: toNum(
+            (base.self_service_revenue ?? 0) + (revenueDeltas.self_service_revenue ?? 0)
+          ),
+          wdf_revenue: toNum((base.wdf_revenue ?? 0) + (revenueDeltas.wdf_revenue ?? 0)),
+          commercial_revenue: toNum(
+            (base.commercial_revenue ?? 0) + (revenueDeltas.commercial_revenue ?? 0)
+          ),
+          vending_revenue: toNum((base.vending_revenue ?? 0) + (revenueDeltas.vending_revenue ?? 0)),
+          other_revenue: toNum((base.other_revenue ?? 0) + (revenueDeltas.other_revenue ?? 0)),
+        };
+
         const payload = {
           store_id: store.id,
           user_id: userId,
           year: toNum(year),
           month: toNum(month),
-          revenue: toNum(updated.revenue),
+          self_service_revenue: breakdown.self_service_revenue,
+          wdf_revenue: breakdown.wdf_revenue,
+          commercial_revenue: breakdown.commercial_revenue,
+          vending_revenue: breakdown.vending_revenue,
+          other_revenue: breakdown.other_revenue,
+          revenue: sumRevenueBreakdown(breakdown),
           utilities: existing?.utilities ?? 0,
           rent: toNum(updated.rent),
           payroll: toNum(updated.payroll),
@@ -2319,7 +2355,7 @@ export default function FinancialsPage() {
                           {BANK_IMPORT_CATEGORY_LABELS[f]}
                         </option>
                       ))
-                    : (["revenue", ...UTILITY_IMPORT_CATEGORIES, "needs_review"] as BankImportCategory[]).map((f) => (
+                    : ([...INCOME_IMPORT_CATEGORIES, ...UTILITY_IMPORT_CATEGORIES] as BankImportCategory[]).map((f) => (
                         <option key={f} value={f}>
                           {BANK_IMPORT_CATEGORY_LABELS[f]}
                         </option>
