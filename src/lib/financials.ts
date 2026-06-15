@@ -1012,7 +1012,31 @@ function parseCsvDate(raw: string): string {
 }
 
 function splitCsvLine(line: string): string[] {
-  return line.match(/(".*?"|[^,]+)/g)?.map((c) => c.trim().replace(/^"|"$/g, "")) ?? line.split(",");
+  const fields: string[] = [];
+  let field = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (ch === "," && !inQuotes) {
+      fields.push(field.trim().replace(/^"|"$/g, ""));
+      field = "";
+      continue;
+    }
+    field += ch;
+  }
+
+  fields.push(field.trim().replace(/^"|"$/g, ""));
+  return fields;
 }
 
 export type ParsedCsvTransaction = {
@@ -1167,6 +1191,8 @@ export function parseBankCsv(text: string): ParsedCsvTransaction[] {
 
     results.push({ date, description, amount, type });
   }
+
+  console.log("[Bank CSV] Total rows parsed:", results.length, "of", lines.length - 1, "data rows");
 
   if (results.length > 0) {
     console.log("[Bank CSV] First 5 normalized transactions:", results.slice(0, 5));

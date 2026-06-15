@@ -727,7 +727,15 @@ export default function FinancialsPage() {
       }
     }
 
-    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+    const groups = Array.from(map.values()).sort((a, b) => b.count - a.count);
+    console.log(
+      "[Bank Import] Grouping:",
+      reviewTransactions.length,
+      "transactions ->",
+      groups.length,
+      "groups"
+    );
+    return groups;
   }, [reviewTransactions]);
 
   const selectableReviewKeys = useMemo(
@@ -832,6 +840,7 @@ export default function FinancialsPage() {
     reader.onload = async (e) => {
       const text = e.target?.result as string;
       const parsed = parseBankCsv(text);
+      console.log("[Bank Import] CSV parsed:", parsed.length, "transactions");
       if (parsed.length === 0) {
         setError(
           "Could not parse CSV. Expected columns: Processed Date, Description, Credit or Debit, Amount."
