@@ -188,6 +188,8 @@ const EMPTY_VALUATION: StoreValuationResult = {
   valueDrivers: [],
   valueRisks: [],
   improvements: [],
+  annualEbitda: 0,
+  ttmMonthsUsed: 0,
   store: {},
   context: {
     store: {},
@@ -429,6 +431,7 @@ export default function ValuationPage() {
   const [retoolType, setRetoolType] = useState("");
 
   const [annualEbitda, setAnnualEbitda] = useState(0);
+  const [ttmMonthsUsed, setTtmMonthsUsed] = useState(0);
   const [monthlyRevenue, setMonthlyRevenue] = useState(0);
   const [squareFootage, setSquareFootage] = useState(3500);
   const [isOwnerOccupied, setIsOwnerOccupied] = useState(false);
@@ -509,9 +512,9 @@ export default function ValuationPage() {
       });
 
       const revenue = store.monthly_revenue ?? DEMO_MONTHLY_REVENUE;
-      const expenses = store.monthly_expenses ?? DEMO_MONTHLY_EXPENSES;
       setMonthlyRevenue(revenue);
-      setAnnualEbitda((revenue - expenses) * 12);
+      setAnnualEbitda(valuationResult.annualEbitda);
+      setTtmMonthsUsed(valuationResult.ttmMonthsUsed);
       setIsOwnerOccupied(ownerOccupied);
       setRealEstateValue(loadedRealEstateValue);
       setEquipment(ctx.equipment);
@@ -614,7 +617,10 @@ export default function ValuationPage() {
 
     const computed = computeStoreValuation(
       valuationContext,
-      buildValuationOverrides({ ...currentOverrides, isOwnerOccupied })
+      {
+        ebitda: annualEbitda,
+        ...buildValuationOverrides({ ...currentOverrides, isOwnerOccupied }),
+      }
     );
 
     return computed;
@@ -624,6 +630,7 @@ export default function ValuationPage() {
     hasUnsavedOverrides,
     currentOverrides,
     isOwnerOccupied,
+    annualEbitda,
   ]);
 
   const equipmentValAdj = sumCategoryAdj(valuation, "equipment");
@@ -705,10 +712,15 @@ export default function ValuationPage() {
         setFetchedValuation({
           ...computeStoreValuation(
             updatedContext,
-            buildValuationOverrides({ ...currentOverrides, isOwnerOccupied })
+            {
+              ebitda: annualEbitda,
+              ...buildValuationOverrides({ ...currentOverrides, isOwnerOccupied }),
+            }
           ),
           store: updatedContext.store,
           context: updatedContext,
+          annualEbitda,
+          ttmMonthsUsed,
         });
       }
       setSavedOverrides(currentOverrides);

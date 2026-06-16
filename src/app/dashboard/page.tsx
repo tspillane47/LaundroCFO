@@ -307,7 +307,10 @@ export default function DashboardPage() {
   const revenue = store?.monthly_revenue ?? DEMO_MONTHLY_REVENUE;
   const expenses = store?.monthly_expenses ?? DEMO_MONTHLY_EXPENSES;
   const ebitda = revenue - expenses;
-  const annualEbitda = ebitda * 12;
+  const annualEbitda =
+    store?.monthly_revenue != null && valuation
+      ? valuation.annualEbitda
+      : ebitda * 12;
   const debtService = store?.annual_debt_service ?? DEMO_ANNUAL_DEBT_SERVICE;
   const annualCashFlow = store?.monthly_revenue != null
     ? annualEbitda - debtService

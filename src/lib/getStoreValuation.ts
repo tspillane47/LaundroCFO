@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
+import { fetchStoreTtmMetrics, resolveAnnualEbitda } from "@/lib/financials";
 import { calcValuation, type ValuationInputs, type ValuationResult } from "@/lib/valuation";
 
 export type StoreValuationContext = {
@@ -13,6 +14,10 @@ export type StoreValuationContext = {
 export type StoreValuationResult = ValuationResult & {
   store: Record<string, unknown>;
   context: StoreValuationContext;
+  /** Trailing-12-month EBITDA from monthly_financials, or annualized store fields when no history exists */
+  annualEbitda: number;
+  /** Number of monthly_financials months summed (0 when using store field fallback) */
+  ttmMonthsUsed: number;
 };
 
 const valuationCache = new Map<string, { result: StoreValuationResult; timestamp: number }>();
@@ -77,7 +82,7 @@ export function buildStoreValuationInputs(
       : Math.max(0, 100 - wdfPct - commercialPct - pickupDeliveryPct);
 
   const base: ValuationInputs = {
-    ebitda: (monthlyRevenue - monthlyExpenses) * 12,
+    ebitda: overrides.ebitda ?? (monthlyRevenue - monthlyExpenses) * 12,
     monthlyRevenue,
     squareFootage: Number(store.square_footage) || 3500,
     avgEquipmentAge:
@@ -157,10 +162,15 @@ export async function getStoreValuation(
     realEstate: realEstate ?? null,
   };
 
+  const ttm = await fetchStoreTtmMetrics(supabase, storeId);
+  const { annualEbitda, ttmMonthsUsed } = resolveAnnualEbitda(ttm, store ?? {});
+
   const result: StoreValuationResult = {
-    ...computeStoreValuation(ctx),
+    ...computeStoreValuation(ctx, { ebitda: annualEbitda }),
     store: store ?? {},
     context: ctx,
+    annualEbitda,
+    ttmMonthsUsed,
   };
 
   valuationCache.set(storeId, { result, timestamp: Date.now() });

@@ -157,7 +157,7 @@ export async function getPortfolioReport(userId: string): Promise<PortfolioRepor
         .eq("is_active", true);
 
       const annualRevenue = (store.monthly_revenue ?? 0) * 12;
-      const annualEbitda = ((store.monthly_revenue ?? 0) - (store.monthly_expenses ?? 0)) * 12;
+      const annualEbitda = valuation.annualEbitda;
       const annualDebtService = (loans ?? []).reduce((s, l) => s + (l.monthly_payment ?? 0) * 12, 0);
       const dscr = annualDebtService > 0 ? annualEbitda / annualDebtService : 0;
 

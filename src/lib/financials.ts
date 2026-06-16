@@ -270,6 +270,50 @@ export function calcTtmMetrics(records: CalculatedMonthly[]): TtmMetrics {
   };
 }
 
+import type { createClient } from "@/lib/supabase";
+
+type FinancialsSupabaseClient = ReturnType<typeof createClient>;
+
+export async function fetchStoreTtmMetrics(
+  supabase: FinancialsSupabaseClient,
+  storeId: string
+): Promise<TtmMetrics | null> {
+  const [{ data: financialsData }, { data: utilitiesData }] = await Promise.all([
+    supabase
+      .from("monthly_financials")
+      .select("*")
+      .eq("store_id", storeId)
+      .order("year", { ascending: false })
+      .order("month", { ascending: false }),
+    supabase
+      .from("monthly_utilities")
+      .select("year, month, water, gas, electric, sewer, trash, internet")
+      .eq("store_id", storeId),
+  ]);
+
+  if (!financialsData || financialsData.length === 0) return null;
+
+  const utilitiesLookup = buildUtilitiesLookup((utilitiesData ?? []) as MonthlyUtilityRecord[]);
+  const records = enrichMonthlyRecords(
+    sortRecordsDesc(financialsData as MonthlyFinancialRecord[]),
+    utilitiesLookup
+  );
+
+  return calcTtmMetrics(records);
+}
+
+export function resolveAnnualEbitda(
+  ttm: TtmMetrics | null,
+  store: { monthly_revenue?: number | null; monthly_expenses?: number | null }
+): { annualEbitda: number; ttmMonthsUsed: number } {
+  if (ttm && ttm.monthsUsed > 0) {
+    return { annualEbitda: ttm.ttmEbitda, ttmMonthsUsed: ttm.monthsUsed };
+  }
+  const monthlyRevenue = Number(store.monthly_revenue) || 0;
+  const monthlyExpenses = Number(store.monthly_expenses) || 0;
+  return { annualEbitda: (monthlyRevenue - monthlyExpenses) * 12, ttmMonthsUsed: 0 };
+}
+
 function annualizeExpense(
   records: CalculatedMonthly[],
   field: keyof Pick<

@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
-import { getStoreValuation, getStoreDebt } from "@/lib/getStoreValuation";
-import type { ValuationResult } from "@/lib/valuation";
+import { getStoreValuation, getStoreDebt, type StoreValuationResult } from "@/lib/getStoreValuation";
 import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
@@ -107,7 +106,7 @@ export default function PortfolioPage() {
   const [deleting, setDeleting] = useState(false);
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [storeValuations, setStoreValuations] = useState<
-    { store: Store; valuation: ValuationResult & { store: Record<string, unknown> } }[]
+    { store: Store; valuation: StoreValuationResult }[]
   >([]);
   const [totalDebt, setTotalDebt] = useState(0);
   const [totalAnnualDebtServiceFromLoans, setTotalAnnualDebtServiceFromLoans] = useState(0);
@@ -264,7 +263,7 @@ export default function PortfolioPage() {
   }, [loadPortfolioData]);
 
   const valuationByStoreId = useMemo(() => {
-    const map = new Map<string, ValuationResult & { store: Record<string, unknown> }>();
+    const map = new Map<string, StoreValuationResult>();
     for (const sv of storeValuations) {
       map.set(sv.store.id, sv.valuation);
     }
@@ -279,13 +278,16 @@ export default function PortfolioPage() {
         ? (store.monthly_expenses ?? 0)
         : DEMO_MONTHLY_EXPENSES;
       const monthlyEbitda = monthlyRevenue - monthlyExpenses;
-      const annualEbitda = monthlyEbitda * 12;
+      const storeValuation = valuationByStoreId.get(store.id);
+      const annualEbitda =
+        hasRealData && storeValuation
+          ? storeValuation.annualEbitda
+          : monthlyEbitda * 12;
       const debtService = hasRealData
         ? (store.annual_debt_service ?? 0)
         : DEMO_ANNUAL_DEBT_SERVICE;
       const annualCashFlow = hasRealData ? annualEbitda - debtService : demoFinancials.cashFlow;
       const dscr = debtService > 0 ? annualCashFlow / debtService : 0;
-      const storeValuation = valuationByStoreId.get(store.id);
       const estimatedValue = hasRealData && storeValuation
         ? storeValuation.businessValue
         : demoFinancials.estimatedValue;
