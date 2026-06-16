@@ -18,6 +18,8 @@ export type MonthlyFinancialRecord = {
   supplies: number;
   marketing: number;
   professional_fees: number;
+  software_subscriptions: number;
+  cc_processing_fees: number;
   bank_charges: number;
   other_expenses: number;
   debt_service: number;
@@ -141,6 +143,8 @@ export function calcMonthly(record: MonthlyFinancialRecord): CalculatedMonthly {
   const supplies = num(record.supplies);
   const marketing = num(record.marketing);
   const professional_fees = num(record.professional_fees);
+  const software_subscriptions = num(record.software_subscriptions);
+  const cc_processing_fees = num(record.cc_processing_fees);
   const bank_charges = num(record.bank_charges);
   const other_expenses = num(record.other_expenses);
   const debt_service = num(record.debt_service);
@@ -154,6 +158,8 @@ export function calcMonthly(record: MonthlyFinancialRecord): CalculatedMonthly {
     supplies +
     marketing +
     professional_fees +
+    software_subscriptions +
+    cc_processing_fees +
     bank_charges +
     other_expenses;
 
@@ -178,6 +184,8 @@ export function calcMonthly(record: MonthlyFinancialRecord): CalculatedMonthly {
     supplies,
     marketing,
     professional_fees,
+    software_subscriptions,
+    cc_processing_fees,
     bank_charges,
     other_expenses,
     debt_service,
@@ -421,6 +429,8 @@ export function emptyMonthlyForm(
     supplies: 0,
     marketing: 0,
     professional_fees: 0,
+    software_subscriptions: 0,
+    cc_processing_fees: 0,
     bank_charges: 0,
     other_expenses: 0,
     debt_service: monthlyDebt,
@@ -446,6 +456,8 @@ export function recordToForm(record: CalculatedMonthly): Omit<MonthlyFinancialRe
     supplies: record.supplies,
     marketing: record.marketing,
     professional_fees: record.professional_fees,
+    software_subscriptions: num(record.software_subscriptions),
+    cc_processing_fees: num(record.cc_processing_fees),
     bank_charges: record.bank_charges,
     other_expenses: record.other_expenses,
     debt_service: record.debt_service,
@@ -503,6 +515,8 @@ export const PL_CATEGORY_FIELDS = [
   "supplies",
   "marketing",
   "professional_fees",
+  "software_subscriptions",
+  "cc_processing_fees",
   "bank_charges",
   "other_expenses",
   "debt_service",
@@ -573,7 +587,9 @@ export const EXPENSE_IMPORT_CATEGORIES: BankImportCategory[] = [
   "supplies",
   "marketing",
   "professional_fees",
+  "software_subscriptions",
   "debt_service",
+  "cc_processing_fees",
   "bank_fees",
   "other_expenses",
   "needs_review",
@@ -601,6 +617,8 @@ export const BANK_IMPORT_CATEGORY_LABELS: Record<BankImportCategory, string> = {
   supplies: "Supplies",
   marketing: "Advertising / Marketing",
   professional_fees: "Professional Fees",
+  software_subscriptions: "Software & Subscriptions",
+  cc_processing_fees: "Credit Card Processing Fees",
   bank_charges: "Bank Charges",
   debt_service: "Debt Service",
   bank_fees: "Bank Fees",
@@ -682,7 +700,33 @@ export const CATEGORY_KEYWORDS: Record<PlCategoryField, string[]> = {
     "unitex",
   ],
   marketing: ["marketing", "advertising", "facebook ads", "google ads", "yelp", "flyers", "advert", "facebook", "promo"],
-  professional_fees: ["accountant", "cpa", "legal", "attorney", "bookkeeping", "quickbooks", "consult"],
+  professional_fees: ["accountant", "cpa", "legal", "attorney", "bookkeeping", "consult"],
+  software_subscriptions: [
+    "adobe",
+    "microsoft",
+    "google workspace",
+    "quickbooks subscription",
+    "zoom",
+    "dropbox",
+    "canva",
+    "shopify",
+    "mailchimp",
+    "slack",
+    "notion",
+    "subscription",
+    "saas",
+  ],
+  cc_processing_fees: [
+    "merchant fee",
+    "processing fee",
+    "interchange fee",
+    "square fee",
+    "clover fee",
+    "card processing",
+    "discount fee",
+    "cardconnect fee",
+    "tsys fee",
+  ],
   bank_charges: ["bank fee", "bank charge", "service charge", "overdraft", "nsf", "wire fee", "monthly fee"],
   other_expenses: ["misc", "other", "office"],
   debt_service: [
@@ -773,6 +817,8 @@ const EXPENSE_CATEGORY_ORDER: PlCategoryField[] = [
   "supplies",
   "marketing",
   "professional_fees",
+  "software_subscriptions",
+  "cc_processing_fees",
   "debt_service",
 ];
 
