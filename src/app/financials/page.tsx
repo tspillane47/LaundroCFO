@@ -325,6 +325,8 @@ function RuleFormPanel({
   onToleranceChange,
   onSave,
   onCancel,
+  saving,
+  message,
 }: {
   type: TransactionType;
   vendorPattern: string;
@@ -339,6 +341,8 @@ function RuleFormPanel({
   onToleranceChange: (v: string) => void;
   onSave: () => void;
   onCancel: () => void;
+  saving: boolean;
+  message: { type: "error" | "success"; text: string } | null;
 }) {
   return (
     <div className="space-y-3 text-[12px]">
@@ -420,11 +424,23 @@ function RuleFormPanel({
           <span className="text-slate-500">(from ${amount.toFixed(2)})</span>
         </div>
       )}
+      {message && (
+        <div
+          className={clsx(
+            "rounded-lg px-3 py-2 text-[12px]",
+            message.type === "error"
+              ? "bg-red-500/10 border border-red-500/20 text-red-400"
+              : "bg-green-500/10 border border-green-500/20 text-green-400"
+          )}
+        >
+          {message.text}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="btn-primary text-[11px]" onClick={onSave}>
-          Save Rule
+        <button type="button" className="btn-primary text-[11px]" onClick={onSave} disabled={saving}>
+          {saving ? "Saving…" : "Save Rule"}
         </button>
-        <button type="button" className="btn-outline text-[11px]" onClick={onCancel}>
+        <button type="button" className="btn-outline text-[11px]" onClick={onCancel} disabled={saving}>
           Cancel
         </button>
       </div>
@@ -432,8 +448,12 @@ function RuleFormPanel({
   );
 }
 
+function amountRuleVendorPattern(type: TransactionType, amount: number): string {
+  return `__AMOUNT__:${type}:${amount.toFixed(2)}`;
+}
+
 export default function FinancialsPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
 
   const [activeTab, setActiveTab] = useState<TabId>("pl");
@@ -461,6 +481,10 @@ export default function FinancialsPage() {
   const [ruleFormTxnType, setRuleFormTxnType] = useState<TransactionType>("expense");
   const [ruleFormVendorPattern, setRuleFormVendorPattern] = useState("");
   const [ruleFormSourceAmount, setRuleFormSourceAmount] = useState(0);
+  const [ruleFormSaving, setRuleFormSaving] = useState(false);
+  const [ruleFormMessage, setRuleFormMessage] = useState<{ type: "error" | "success"; text: string } | null>(
+    null
+  );
   const [showManageRules, setShowManageRules] = useState(false);
   const [qbMappings, setQbMappings] = useState<QBMappingRow[]>(DEFAULT_QB_MAPPINGS);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -487,7 +511,6 @@ export default function FinancialsPage() {
 
     setLoading(true);
     setLoadError(false);
-    setError("");
 
     try {
     const {
@@ -1027,26 +1050,105 @@ export default function FinancialsPage() {
     setRuleFormTxnType(type);
     setRuleFormVendorPattern(vendorPattern);
     setRuleFormSourceAmount(amount);
+    setRuleFormMessage(null);
   }
 
   async function saveCategorizationRule() {
-    if (!userId) return;
+    setRuleFormMessage(null);
+
+    let activeUserId = userId;
+    if (!activeUserId) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setRuleFormMessage({ type: "error", text: "Couldn't save rule. Please sign in and try again." });
+        return;
+      }
+      activeUserId = user.id;
+      setUserId(user.id);
+    }
 
     if (ruleFormType === "vendor") {
-      if (!ruleFormVendorPattern.trim()) return;
+      if (!ruleFormVendorPattern.trim()) {
+        setRuleFormMessage({ type: "error", text: "Enter a vendor pattern for the rule." });
+        return;
+      }
+
+      setRuleFormSaving(true);
+      try {
+        const { data, error: insertError } = await supabase
+          .from("categorization_rules")
+          .insert({
+            user_id: activeUserId,
+            vendor_pattern: ruleFormVendorPattern.trim().toUpperCase(),
+            category: ruleFormCategory,
+            rule_type: "vendor",
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("[Bank Import] Failed to save vendor rule:", insertError);
+          setRuleFormMessage({ type: "error", text: "Couldn't save rule. Please try again." });
+          return;
+        }
+
+        const rule = data as CategorizationRule;
+        setCategorizationRules((prev) => [rule, ...prev]);
+
+        setStagedTransactions((prev) =>
+          prev.map((t) => {
+            if (findMatchingAmountRule([rule], t.amount, t.type)) return t;
+            const normalized = normalizeVendorPattern(t.description);
+            if (normalized.includes(rule.vendor_pattern.toUpperCase())) {
+              return { ...t, category: ruleFormCategory, suggested: ruleFormCategory, ruleApplied: "vendor" as const };
+            }
+            return t;
+          })
+        );
+
+        setRuleFormKey(null);
+        setSuccess(`Rule saved: "${rule.vendor_pattern}" → ${BANK_IMPORT_CATEGORY_LABELS[ruleFormCategory]}`);
+      } catch (err) {
+        console.error("[Bank Import] Failed to save vendor rule:", err);
+        setRuleFormMessage({ type: "error", text: "Couldn't save rule. Please try again." });
+      } finally {
+        setRuleFormSaving(false);
+      }
+      return;
+    }
+
+    const amount = Math.abs(parseFloat(ruleFormAmount));
+    const tolerance = parseFloat(ruleFormTolerance);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setRuleFormMessage({ type: "error", text: "Enter a valid amount for the rule." });
+      return;
+    }
+    if (!Number.isFinite(tolerance) || tolerance < 0) {
+      setRuleFormMessage({ type: "error", text: "Enter a valid tolerance (0 or greater)." });
+      return;
+    }
+
+    setRuleFormSaving(true);
+    try {
       const { data, error: insertError } = await supabase
         .from("categorization_rules")
         .insert({
-          user_id: userId,
-          vendor_pattern: ruleFormVendorPattern.trim().toUpperCase(),
+          user_id: activeUserId,
+          vendor_pattern: amountRuleVendorPattern(ruleFormTxnType, amount),
           category: ruleFormCategory,
-          rule_type: "vendor",
+          rule_type: "amount",
+          amount,
+          amount_tolerance: tolerance,
+          transaction_type: ruleFormTxnType,
         })
         .select()
         .single();
 
       if (insertError) {
-        setError(insertError.message);
+        console.error("[Bank Import] Failed to save amount rule:", insertError);
+        setRuleFormMessage({ type: "error", text: "Couldn't save rule. Please try again." });
         return;
       }
 
@@ -1055,66 +1157,22 @@ export default function FinancialsPage() {
 
       setStagedTransactions((prev) =>
         prev.map((t) => {
-          if (findMatchingAmountRule([rule], t.amount, t.type)) return t;
-          const normalized = normalizeVendorPattern(t.description);
-          if (normalized.includes(rule.vendor_pattern.toUpperCase())) {
-            return { ...t, category: ruleFormCategory, suggested: ruleFormCategory, ruleApplied: "vendor" as const };
+          if (findMatchingAmountRule([rule], t.amount, t.type)) {
+            return { ...t, category: ruleFormCategory, suggested: ruleFormCategory, ruleApplied: "amount" as const };
           }
           return t;
         })
       );
 
       setRuleFormKey(null);
-      setSuccess(`Rule saved: "${rule.vendor_pattern}" → ${BANK_IMPORT_CATEGORY_LABELS[ruleFormCategory]}`);
-      return;
+      setRuleFormMessage(null);
+      setSuccess("Rule saved");
+    } catch (err) {
+      console.error("[Bank Import] Failed to save amount rule:", err);
+      setRuleFormMessage({ type: "error", text: "Couldn't save rule. Please try again." });
+    } finally {
+      setRuleFormSaving(false);
     }
-
-    const amount = parseFloat(ruleFormAmount);
-    const tolerance = parseFloat(ruleFormTolerance);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setError("Enter a valid amount for the rule.");
-      return;
-    }
-    if (!Number.isFinite(tolerance) || tolerance < 0) {
-      setError("Enter a valid tolerance (0 or greater).");
-      return;
-    }
-
-    const { data, error: insertError } = await supabase
-      .from("categorization_rules")
-      .insert({
-        user_id: userId,
-        vendor_pattern: "",
-        category: ruleFormCategory,
-        rule_type: "amount",
-        amount,
-        amount_tolerance: tolerance,
-        transaction_type: ruleFormTxnType,
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      setError(insertError.message);
-      return;
-    }
-
-    const rule = data as CategorizationRule;
-    setCategorizationRules((prev) => [rule, ...prev]);
-
-    setStagedTransactions((prev) =>
-      prev.map((t) => {
-        if (findMatchingAmountRule([rule], t.amount, t.type)) {
-          return { ...t, category: ruleFormCategory, suggested: ruleFormCategory, ruleApplied: "amount" as const };
-        }
-        return t;
-      })
-    );
-
-    setRuleFormKey(null);
-    setSuccess(
-      `Rule saved: ${ruleFormTxnType === "income" ? "income" : "expense"} $${amount.toFixed(2)} (±$${tolerance.toFixed(2)}) → ${BANK_IMPORT_CATEGORY_LABELS[ruleFormCategory]}`
-    );
   }
 
   async function deleteCategorizationRule(ruleId: string) {
@@ -2498,7 +2556,12 @@ export default function FinancialsPage() {
                                 onAmountChange={setRuleFormAmount}
                                 onToleranceChange={setRuleFormTolerance}
                                 onSave={saveCategorizationRule}
-                                onCancel={() => setRuleFormKey(null)}
+                                onCancel={() => {
+                                  setRuleFormKey(null);
+                                  setRuleFormMessage(null);
+                                }}
+                                saving={ruleFormSaving}
+                                message={ruleFormMessage}
                               />
                             </td>
                           </tr>
@@ -2636,7 +2699,12 @@ export default function FinancialsPage() {
                                 onAmountChange={setRuleFormAmount}
                                 onToleranceChange={setRuleFormTolerance}
                                 onSave={saveCategorizationRule}
-                                onCancel={() => setRuleFormKey(null)}
+                                onCancel={() => {
+                                  setRuleFormKey(null);
+                                  setRuleFormMessage(null);
+                                }}
+                                saving={ruleFormSaving}
+                                message={ruleFormMessage}
                               />
                             </td>
                           </tr>
