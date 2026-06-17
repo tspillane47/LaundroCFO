@@ -25,6 +25,11 @@ import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple, fmtPct } from "@/lib/calculations";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
+import { CurrentMonthlyAveragesPanel } from "@/components/financials/CurrentMonthlyAveragesPanel";
+import {
+  getCurrentMonthlyAverages,
+  type CurrentMonthlyAverages,
+} from "@/lib/getCurrentMonthlyAverages";
 import {
   financials as demoFinancials,
 } from "@/lib/data";
@@ -502,6 +507,8 @@ export default function FinancialsPage() {
   const [duplicateImportCount, setDuplicateImportCount] = useState(0);
   const [posting, setPosting] = useState(false);
   const [postingCount, setPostingCount] = useState(0);
+  const [monthlyAverages, setMonthlyAverages] = useState<CurrentMonthlyAverages | null>(null);
+  const [monthlyAveragesLoading, setMonthlyAveragesLoading] = useState(false);
 
   const currentYear = new Date().getFullYear();
   const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
@@ -511,6 +518,7 @@ export default function FinancialsPage() {
       setStore(null);
       setRecords([]);
       setBankTransactions([]);
+      setMonthlyAverages(null);
       setLoading(false);
       return;
     }
@@ -606,6 +614,31 @@ export default function FinancialsPage() {
     if (storesLoading) return;
     loadData();
   }, [storesLoading, loadData]);
+
+  useEffect(() => {
+    if (!selectedStore?.id || loading) return;
+
+    if (records.length === 0) {
+      setMonthlyAverages(null);
+      setMonthlyAveragesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setMonthlyAveragesLoading(true);
+
+    void getCurrentMonthlyAverages(selectedStore.id)
+      .then((data) => {
+        if (!cancelled) setMonthlyAverages(data);
+      })
+      .finally(() => {
+        if (!cancelled) setMonthlyAveragesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStore?.id, records, utilityRecords, loading]);
 
   const ttm = useMemo(() => calcTtmMetrics(records), [records]);
   const yoy = useMemo(() => calcYoYMetrics(records), [records]);
@@ -1589,6 +1622,7 @@ export default function FinancialsPage() {
       setRecords(nextRecords);
       setStagedTransactions((prev) => prev.filter((t) => !stagedIdsToRemove.has(t.tempId)));
       setBankTransactions((prev) => prev.filter((t) => !bankIdsSet.has(t.id)));
+      invalidateValuationCache(store.id);
       setSuccess(
         transactions.length === 1
           ? "Posted 1 transaction to P&L."
@@ -1755,8 +1789,8 @@ export default function FinancialsPage() {
             <div className="card">
               <div className="metric-label">
                 <MetricTooltip
-                  label="DSCR"
-                  explanation="Debt Service Coverage Ratio. Measures ability to cover loan payments. Lenders require minimum 1.25x."
+                  label="TTM DSCR"
+                  explanation="Debt Service Coverage Ratio over the trailing 12 months, using actual debt payments from your P&L — not current loan terms. Lenders typically require minimum 1.25x."
                 />
               </div>
               <div className="metric-value">
@@ -1766,7 +1800,7 @@ export default function FinancialsPage() {
                     : demoFinancials.cashFlow / demoFinancials.annualDebtService
                 )}
               </div>
-              <div className="text-[12px] mt-1 text-slate-500">Net cash flow ÷ annual debt service</div>
+              <div className="text-[12px] mt-1 text-slate-500">TTM EBITDA ÷ trailing 12-month debt payments</div>
               <div
                 className={clsx(
                   "text-[12px] mt-1",
@@ -1796,6 +1830,8 @@ export default function FinancialsPage() {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] gap-4 items-start">
+            <div className="space-y-5 min-w-0">
           <div className="card">
             <div className="flex flex-wrap items-center gap-4 justify-between">
               <div className="flex flex-wrap items-center gap-4">
@@ -2041,6 +2077,16 @@ export default function FinancialsPage() {
                 )}
               </tbody>
             </table>
+            </div>
+          </div>
+            </div>
+
+            <div className="lg:sticky lg:top-4 self-start">
+              <CurrentMonthlyAveragesPanel
+                storeName={store?.name ?? selectedStore.name}
+                data={monthlyAverages}
+                loading={monthlyAveragesLoading}
+              />
             </div>
           </div>
 
