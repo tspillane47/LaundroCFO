@@ -5,17 +5,13 @@
  * 3. stores.annual_debt_service (store profile / Dashboard)
  *
  * Usage:
- *   # Add SUPABASE_SERVICE_ROLE_KEY to .env.local (or sign-in vars below), then:
- *   npx tsx scripts/compare-debt-service-sources.ts [storeId]
- *
- * Auth (required — tables use RLS; anon key alone returns no rows):
- *   SUPABASE_SERVICE_ROLE_KEY          recommended for local admin scripts
- *   SUPABASE_SCRIPT_EMAIL + PASSWORD   alternative: sign in as a real user
+ *   NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... \
+ *     npx tsx scripts/compare-debt-service-sources.ts [storeId]
  *
  * If storeId is omitted, lists stores with active loans and compares the first match.
  */
 
-import { createScriptSupabaseClient } from "./createScriptSupabaseClient";
+import { createClient } from "../src/lib/supabase";
 import {
   enrichMonthlyRecords,
   sortRecordsDesc,
@@ -34,13 +30,14 @@ function fmtDollar(n: number): string {
 }
 
 async function main() {
-  let supabase;
-  try {
-    supabase = await createScriptSupabaseClient();
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : error);
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    console.error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
     process.exit(1);
   }
+
+  const supabase = createClient(url, key);
   let storeId = process.argv[2];
 
   if (!storeId) {
@@ -90,14 +87,7 @@ async function main() {
   ]);
 
   if (storeError || !store) {
-    if (storeError?.code === "PGRST116") {
-      console.error(
-        `Store not found for id ${storeId}. No row returned — check the id, or verify ` +
-          "SUPABASE_SERVICE_ROLE_KEY / script sign-in credentials are set (RLS blocks unauthenticated reads)."
-      );
-    } else {
-      console.error("Store not found:", storeError?.message ?? storeId);
-    }
+    console.error("Store not found:", storeError?.message ?? storeId);
     process.exit(1);
   }
   if (financialsError) {
@@ -194,7 +184,7 @@ async function main() {
   if (uniquePlValues.size > 1) {
     console.log("  P&L debt_service varies month-to-month — may reflect actual bank payments, not flat loan schedule.");
   } else if (uniquePlValues.size === 1 && ttmRecords.length > 0) {
-    console.log(`  P&L debt_service is flat at ${fmtDollar([...uniquePlValues][0])}/mo — likely manual default, not bank-posted.`);
+    console.log(`  P&L debt_service is flat at ${fmtDollar(Array.from(uniquePlValues)[0])}/mo — likely manual default, not bank-posted.`);
   }
 }
 
