@@ -9,11 +9,16 @@ import { type EquipmentRecord } from "@/lib/equipment";
 import {
   calcYearsRemaining,
   computeScenarios,
+  getScenarioSliderDefaults,
+  type ScenarioId,
+  type ScenarioParams,
   type ScenarioResult,
   type StoreScenarioContext,
 } from "@/lib/scenarios";
+import { getCurrentMonthlyAverages } from "@/lib/getCurrentMonthlyAverages";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
+import { MetricTooltip } from "@/components/ui/MetricTooltip";
 
 export default function ScenariosPage() {
   const supabase = createClient();
@@ -21,7 +26,8 @@ export default function ScenariosPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [ctx, setCtx] = useState<StoreScenarioContext | null>(null);
-  const [selectedId, setSelectedId] = useState("retool");
+  const [selectedId, setSelectedId] = useState<ScenarioId>("retool");
+  const [sliderParams, setSliderParams] = useState<ScenarioParams>({});
 
   const loadData = useCallback(async () => {
     if (!selectedStore?.id) {
@@ -86,13 +92,25 @@ export default function ScenariosPage() {
         }
       }
 
-      setCtx({
+      const monthlyAverages = await getCurrentMonthlyAverages(selectedStore.id);
+
+      const nextCtx: StoreScenarioContext = {
         store: storeData,
         equipment: (equipmentData ?? []) as EquipmentRecord[],
         totalLeaseControl,
         isOwnerOccupied: ownerOccupied,
         realEstateValue,
-      });
+        financials: monthlyAverages
+          ? {
+              monthlyRevenue: monthlyAverages.revenue.total,
+              monthlyExpenses: monthlyAverages.expenses.total,
+              waterKpi: monthlyAverages.waterKPI,
+            }
+          : null,
+      };
+
+      setCtx(nextCtx);
+      setSliderParams(getScenarioSliderDefaults(nextCtx));
     } catch {
       setLoadError(true);
       setCtx(null);
@@ -107,14 +125,18 @@ export default function ScenariosPage() {
   }, [storesLoading, loadData]);
 
   const scenarios = useMemo(
-    () => (ctx ? computeScenarios(ctx) : []),
-    [ctx]
+    () => (ctx ? computeScenarios(ctx, sliderParams) : []),
+    [ctx, sliderParams]
   );
 
   const selected = useMemo(
     () => scenarios.find((s) => s.id === selectedId) ?? scenarios[0] ?? null,
     [scenarios, selectedId]
   );
+
+  const handleSliderChange = (id: ScenarioId, value: number) => {
+    setSliderParams((prev) => ({ ...prev, [id]: value }));
+  };
 
   if (storesLoading || loading) {
     return (
@@ -183,15 +205,29 @@ export default function ScenariosPage() {
               key={sc.id}
               scenario={sc}
               active={selected.id === sc.id}
+              sliderValue={sliderParams[sc.id] ?? sc.slider?.default}
               onSelect={() => setSelectedId(sc.id)}
+              onSliderChange={(v) => handleSliderChange(sc.id, v)}
             />
           ))}
         </div>
 
         <div className="card xl:sticky xl:top-0">
-          <div className="text-[13px] font-bold text-slate-100 mb-4">
-            {selected.emoji} {selected.title}
+          <div className="flex items-center gap-2 mb-4">
+            <div className="text-[13px] font-bold text-slate-100">
+              {selected.emoji} {selected.title}
+            </div>
+            <MetricTooltip label="How it works" explanation={selected.tip} />
           </div>
+
+          {selected.slider && (
+            <ScenarioSlider
+              config={selected.slider}
+              value={sliderParams[selected.id] ?? selected.slider.default}
+              onChange={(v) => handleSliderChange(selected.id, v)}
+              className="mb-4"
+            />
+          )}
 
           <div className="grid grid-cols-2 gap-2.5 mb-4">
             <div className="card2">
@@ -265,50 +301,129 @@ export default function ScenariosPage() {
   );
 }
 
+function ScenarioSlider({
+  config,
+  value,
+  onChange,
+  className,
+}: {
+  config: NonNullable<ScenarioResult["slider"]>;
+  value: number;
+  onChange: (value: number) => void;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[10px] text-slate-500 uppercase tracking-wider">{config.label}</span>
+        <span className="text-[12px] font-semibold text-blue-300 tabular-nums">
+          {config.format(value)}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={config.min}
+        max={config.max}
+        step={config.step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="scenario-slider w-full"
+        aria-label={config.label}
+      />
+      <div className="flex justify-between text-[10px] text-slate-600 mt-0.5">
+        <span>{config.format(config.min)}</span>
+        <span>{config.format(config.max)}</span>
+      </div>
+    </div>
+  );
+}
+
 function ScenarioCard({
   scenario,
   active,
+  sliderValue,
   onSelect,
+  onSliderChange,
 }: {
   scenario: ScenarioResult;
   active: boolean;
+  sliderValue: number | undefined;
   onSelect: () => void;
+  onSliderChange: (value: number) => void;
 }) {
   const neg = scenario.valueImpact < 0;
+  const hasSlider = scenario.slider != null;
+  const value = sliderValue ?? scenario.slider?.default ?? 0;
+
   return (
-    <button
-      type="button"
-      onClick={onSelect}
+    <div
       className={clsx(
-        "card text-left transition-all hover:border-blue-500/50",
+        "card text-left transition-all",
         active && "border-blue-500 bg-blue-500/5"
       )}
     >
-      <div className="text-[13px] font-semibold text-slate-100">
-        {scenario.emoji} {scenario.title}
-      </div>
-      <div className="text-[11px] text-slate-500 mt-1">{scenario.description}</div>
-      <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/[0.05]">
-        <div>
-          <div className="text-[10px] text-slate-600 uppercase tracking-wider">Value Impact</div>
-          <div className={clsx("text-[16px] font-bold mt-0.5", neg ? "text-red-400" : "text-green-400")}>
-            {neg ? "−" : "+"}
-            {fmtDollar(Math.abs(scenario.valueImpact))}
+      <button
+        type="button"
+        onClick={onSelect}
+        className="w-full text-left hover:opacity-90"
+      >
+        <div className="flex items-center gap-1">
+          <div className="text-[13px] font-semibold text-slate-100">
+            {scenario.emoji} {scenario.title}
+          </div>
+          <MetricTooltip label="How it works" explanation={scenario.tip} />
+        </div>
+        <div className="text-[11px] text-slate-500 mt-1">{scenario.description}</div>
+      </button>
+
+      {hasSlider && scenario.slider && (
+        <div
+          className="mt-3"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ScenarioSlider
+            config={scenario.slider}
+            value={value}
+            onChange={onSliderChange}
+          />
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={onSelect}
+        className="w-full text-left mt-3 pt-3 border-t border-white/[0.05] hover:opacity-90"
+      >
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="text-[10px] text-slate-600 uppercase tracking-wider">Value Impact</div>
+            <div className={clsx("text-[15px] font-bold mt-0.5", neg ? "text-red-400" : "text-green-400")}>
+              {neg ? "−" : "+"}
+              {fmtDollar(Math.abs(scenario.valueImpact))}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] text-slate-600 uppercase tracking-wider">% Change</div>
+            <div className={clsx("text-[15px] font-bold mt-0.5", neg ? "text-red-400" : "text-green-400")}>
+              {neg ? "−" : "+"}
+              {Math.abs(scenario.pctChange).toFixed(1)}%
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] text-slate-600 uppercase tracking-wider">New EBITDA</div>
+            <div className="text-[15px] font-bold text-slate-100 mt-0.5">
+              {fmtDollar(scenario.newEbitda)}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] text-slate-600 uppercase tracking-wider">Multiple</div>
+            <div className="text-[15px] font-bold text-blue-300 mt-0.5">
+              {fmtMultiple(scenario.newMultiple)}
+            </div>
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-[10px] text-slate-600 uppercase tracking-wider">
-            {scenario.id === "revenue" ? "New EBITDA" : scenario.id === "retool" ? "Multiple" : "% Change"}
-          </div>
-          <div className="text-[16px] font-bold text-blue-300 mt-0.5">
-            {scenario.id === "revenue"
-              ? fmtDollar(scenario.newEbitda)
-              : scenario.id === "retool"
-                ? fmtMultiple(scenario.newMultiple)
-                : `${neg ? "−" : "+"}${Math.abs(scenario.pctChange).toFixed(1)}%`}
-          </div>
-        </div>
-      </div>
-    </button>
+      </button>
+    </div>
   );
 }

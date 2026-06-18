@@ -56,6 +56,8 @@ export type CurrentMonthlyAverages = {
   waterKPI: {
     ratio: number;
     status: "Healthy" | "Watch" | "High";
+    waterMonthlyAverage: number;
+    selfServiceMonthlyAverage: number;
   };
   /** Trailing months included in averages (matches Financials TTM window). */
   monthsUsed: number;
@@ -114,6 +116,26 @@ function waterKpiStatus(ratio: number): "Healthy" | "Watch" | "High" {
   if (ratio < 0.15) return "Healthy";
   if (ratio <= 0.2) return "Watch";
   return "High";
+}
+
+/** Water KPI: trailing monthly water cost ÷ trailing monthly self-service revenue (same as Financials panel). */
+export function computeWaterKpi(
+  waterMonthlyAverage: number,
+  selfServiceMonthlyAverage: number
+): {
+  ratio: number;
+  status: "Healthy" | "Watch" | "High";
+  waterMonthlyAverage: number;
+  selfServiceMonthlyAverage: number;
+} {
+  const ratio =
+    selfServiceMonthlyAverage > 0 ? waterMonthlyAverage / selfServiceMonthlyAverage : 0;
+  return {
+    ratio,
+    status: waterKpiStatus(ratio),
+    waterMonthlyAverage,
+    selfServiceMonthlyAverage,
+  };
 }
 
 function buildRevenueByCategory(
@@ -244,8 +266,7 @@ function buildCurrentMonthlyAveragesFromContext(
     sumTtmField(ttmRecords, "self_service_revenue"),
     monthsUsed
   );
-  const waterRatio =
-    selfServiceMonthlyAverage > 0 ? waterMonthlyAverage / selfServiceMonthlyAverage : 0;
+  const waterKPI = computeWaterKpi(waterMonthlyAverage, selfServiceMonthlyAverage);
 
   const storeValue = valuation.businessValue;
   const equity =
@@ -281,10 +302,7 @@ function buildCurrentMonthlyAveragesFromContext(
         ? calcDSCR(ebitdaMonthly * 12, totalMonthlyDebtService * 12)
         : null,
     equity,
-    waterKPI: {
-      ratio: waterRatio,
-      status: waterKpiStatus(waterRatio),
-    },
+    waterKPI,
     monthsUsed,
   };
 }

@@ -226,6 +226,37 @@ html, body {
   .card-danger { background: var(--bg-danger-tint); border-color: rgba(185,28,28,0.15); }
 }
 
+/* Scenario planner sliders */
+.scenario-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  outline: none;
+  cursor: pointer;
+}
+
+.scenario-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #60a5fa;
+  border: 2px solid #1e293b;
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.4);
+}
+
+.scenario-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #60a5fa;
+  border: 2px solid #1e293b;
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.4);
+}
+
 /* ============ MARKETING HERO ============ */
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
