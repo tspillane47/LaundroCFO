@@ -106,6 +106,21 @@ function isNeedsReview(txn: Pick<BankTransaction, "status" | "excluded">): boole
   return !txn.excluded && !["posted", "excluded", "reviewed"].includes(status);
 }
 
+function formatLocalDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function getManualEntryCategories(type: TransactionType): BankImportCategory[] {
+  return getImportCategoriesForType(type).filter((c) => c !== "needs_review");
+}
+
+function defaultManualCategory(type: TransactionType): BankImportCategory {
+  return getManualEntryCategories(type)[0] ?? (type === "income" ? "self_service_revenue" : "water");
+}
+
 function formatPlLinkCategory(column: string): string {
   if (column in BANK_IMPORT_CATEGORY_LABELS) {
     return BANK_IMPORT_CATEGORY_LABELS[column as BankImportCategory];
@@ -354,6 +369,17 @@ export default function TransactionsPage() {
     row: ReviewRow;
     newCategory: BankImportCategory;
   } | null>(null);
+  const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [manualDraft, setManualDraft] = useState({
+    date: formatLocalDate(new Date()),
+    description: "",
+    amount: "",
+    type: "expense" as TransactionType,
+    category: defaultManualCategory("expense"),
+    note: "Manually entered",
+  });
 
   const [ruleFormKey, setRuleFormKey] = useState<string | null>(null);
   const [ruleFormCategory, setRuleFormCategory] = useState<BankImportCategory>("self_service_revenue");
@@ -793,6 +819,87 @@ export default function TransactionsPage() {
     await loadData();
   }
 
+  function openManualModal() {
+    const type: TransactionType = "expense";
+    setManualDraft({
+      date: formatLocalDate(new Date()),
+      description: "",
+      amount: "",
+      type,
+      category: defaultManualCategory(type),
+      note: "Manually entered",
+    });
+    setManualError(null);
+    setManualModalOpen(true);
+  }
+
+  const manualFormValid = useMemo(() => {
+    const amount = parseFloat(manualDraft.amount);
+    return (
+      manualDraft.description.trim().length > 0 &&
+      Number.isFinite(amount) &&
+      amount > 0 &&
+      manualDraft.category !== "needs_review" &&
+      getManualEntryCategories(manualDraft.type).includes(manualDraft.category)
+    );
+  }, [manualDraft]);
+
+  async function confirmManualTransaction() {
+    if (!manualFormValid || !store?.id || !userId) return;
+
+    setManualSaving(true);
+    setManualError(null);
+
+    const amount = parseFloat(manualDraft.amount);
+    const category = manualDraft.category;
+
+    const { data, error } = await supabase
+      .from("bank_transactions")
+      .insert({
+        store_id: store.id,
+        user_id: userId,
+        transaction_date: manualDraft.date,
+        description: manualDraft.description.trim(),
+        amount,
+        category,
+        transaction_type: manualDraft.type,
+        original_category: category,
+        status: "user_classified" as TransactionStatus,
+        is_reviewed: false,
+        excluded: false,
+        notes: manualDraft.note.trim() || null,
+      })
+      .select("id")
+      .single();
+
+    if (error || !data) {
+      setManualSaving(false);
+      setManualError(error?.message ?? "Could not add transaction. Please try again.");
+      return;
+    }
+
+    const { error: auditError } = await supabase.from("transaction_audit_log").insert({
+      transaction_id: data.id,
+      store_id: store.id,
+      user_id: userId,
+      field_changed: "category",
+      old_value: null,
+      new_value: category,
+      change_source: "user",
+    });
+
+    setManualSaving(false);
+
+    if (auditError) {
+      setManualError(auditError.message);
+      return;
+    }
+
+    setManualModalOpen(false);
+    setMessage({ type: "success", text: "Manual transaction added — review and post when ready" });
+    await loadData();
+  }
+
   async function confirmReclassify() {
     if (!reclassifyModal || !userId) return;
 
@@ -1198,6 +1305,9 @@ export default function TransactionsPage() {
               }}
             />
           </label>
+          <button type="button" className="btn-outline" onClick={openManualModal}>
+            Add Manual Transaction
+          </button>
           {stagedCsv.length > 0 && (
             <button type="button" className="btn-primary" onClick={() => void saveStagedToQueue()} disabled={saving}>
               Save {stagedCsv.length} to Queue
@@ -1743,6 +1853,140 @@ export default function TransactionsPage() {
               </button>
               <button type="button" className="btn-primary" onClick={() => void confirmReclassify()} disabled={saving}>
                 {saving ? "Reclassifying…" : "Reclassify"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {manualModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="card max-w-md w-full space-y-4">
+            <div className="text-[15px] font-semibold text-slate-100">Add Manual Transaction</div>
+            <p className="text-[12px] text-slate-400">
+              Enter a transaction manually. It will appear in the review queue for posting to P&L.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[12px] text-slate-400 block mb-1">Date</label>
+                <input
+                  type="date"
+                  value={manualDraft.date}
+                  onChange={(e) => setManualDraft((prev) => ({ ...prev, date: e.target.value }))}
+                  className={clsx(INPUT_CLASS, "w-full py-2 text-[12px]")}
+                />
+              </div>
+              <div>
+                <label className="text-[12px] text-slate-400 block mb-1">Description</label>
+                <input
+                  type="text"
+                  value={manualDraft.description}
+                  onChange={(e) => setManualDraft((prev) => ({ ...prev, description: e.target.value }))}
+                  className={clsx(INPUT_CLASS, "w-full py-2 text-[12px]")}
+                  placeholder="e.g. Cash deposit, vendor payment"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-[12px] text-slate-400 block mb-1">Amount</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={manualDraft.amount}
+                  onChange={(e) => setManualDraft((prev) => ({ ...prev, amount: e.target.value }))}
+                  className={clsx(INPUT_CLASS, "w-full py-2 text-[12px] tabular-nums")}
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="text-[12px] text-slate-400 block mb-1">Type</label>
+                <div className="flex flex-wrap items-center gap-4">
+                  <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="manual-txn-type"
+                      checked={manualDraft.type === "income"}
+                      onChange={() =>
+                        setManualDraft((prev) => ({
+                          ...prev,
+                          type: "income",
+                          category: getManualEntryCategories("income").includes(prev.category)
+                            ? prev.category
+                            : defaultManualCategory("income"),
+                        }))
+                      }
+                      className="border-white/20"
+                    />
+                    Income
+                  </label>
+                  <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="manual-txn-type"
+                      checked={manualDraft.type === "expense"}
+                      onChange={() =>
+                        setManualDraft((prev) => ({
+                          ...prev,
+                          type: "expense",
+                          category: getManualEntryCategories("expense").includes(prev.category)
+                            ? prev.category
+                            : defaultManualCategory("expense"),
+                        }))
+                      }
+                      className="border-white/20"
+                    />
+                    Expense
+                  </label>
+                </div>
+              </div>
+              <div>
+                <label className="text-[12px] text-slate-400 block mb-1">Category</label>
+                <select
+                  value={manualDraft.category}
+                  onChange={(e) =>
+                    setManualDraft((prev) => ({ ...prev, category: e.target.value as BankImportCategory }))
+                  }
+                  className={clsx(INPUT_CLASS, "w-full py-2 text-[12px]")}
+                >
+                  {getManualEntryCategories(manualDraft.type).map((f) => (
+                    <option key={f} value={f}>
+                      {BANK_IMPORT_CATEGORY_LABELS[f]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[12px] text-slate-400 block mb-1">Note (optional)</label>
+                <input
+                  type="text"
+                  value={manualDraft.note}
+                  onChange={(e) => setManualDraft((prev) => ({ ...prev, note: e.target.value }))}
+                  className={clsx(INPUT_CLASS, "w-full py-2 text-[12px]")}
+                />
+              </div>
+            </div>
+            {manualError && (
+              <div className="rounded-lg px-3 py-2 text-[12px] bg-red-500/10 border border-red-500/20 text-red-400">
+                {manualError}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => setManualModalOpen(false)}
+                disabled={manualSaving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => void confirmManualTransaction()}
+                disabled={!manualFormValid || manualSaving}
+              >
+                {manualSaving ? "Adding…" : "Add Transaction"}
               </button>
             </div>
           </div>
