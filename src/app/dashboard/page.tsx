@@ -12,6 +12,10 @@ import {
   calcRealEstateLTV,
 } from "@/lib/real-estate-calculations";
 import { calcEquipmentScore, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import { computeLaundroCfoScoreFromRaw } from "@/lib/laundroCfoScore";
+import type { MonthlyUtilityRecord } from "@/lib/financials";
+import type { EquipmentRecord } from "@/lib/equipment";
+import { LaundroCfoScoreCard } from "@/components/ui/LaundroCfoScoreGauge";
 import {
   AreaChart,
   Area,
@@ -149,7 +153,11 @@ export default function DashboardPage() {
   const [leaseOptions, setLeaseOptions] = useState<any[]>([]);
   const [realEstate, setRealEstate] = useState<any>(null);
   const [insuranceCount, setInsuranceCount] = useState(0);
-  const [equipment, setEquipment] = useState<any[]>([]);
+  const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
+  const [monthlyFinancials, setMonthlyFinancials] = useState<
+    { revenue?: number | null; utilities?: number | null }[]
+  >([]);
+  const [monthlyUtilities, setMonthlyUtilities] = useState<MonthlyUtilityRecord[]>([]);
   const [insurancePolicies, setInsurancePolicies] = useState<any[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -180,25 +188,44 @@ export default function DashboardPage() {
       const debt = await getStoreDebt(loadedStore.id);
       setTotalDebt(debt);
 
-      const [{ data: policiesData, error: policiesError }, { data: equipmentData, error: equipmentError }] =
-        await Promise.all([
-          supabase
-            .from("insurance_policies")
-            .select("*")
-            .eq("store_id", loadedStore.id)
-            .eq("is_active", true),
-          supabase
-            .from("equipment_inventory")
-            .select("*")
-            .eq("store_id", loadedStore.id),
-        ]);
+      const [
+        { data: policiesData, error: policiesError },
+        { data: equipmentData, error: equipmentError },
+        { data: financialsData, error: financialsError },
+        { data: utilitiesData, error: utilitiesError },
+      ] = await Promise.all([
+        supabase
+          .from("insurance_policies")
+          .select("*")
+          .eq("store_id", loadedStore.id)
+          .eq("is_active", true),
+        supabase
+          .from("equipment_inventory")
+          .select("*")
+          .eq("store_id", loadedStore.id),
+        supabase
+          .from("monthly_financials")
+          .select("revenue, utilities")
+          .eq("store_id", loadedStore.id)
+          .order("year", { ascending: false })
+          .order("month", { ascending: false })
+          .limit(12),
+        supabase
+          .from("monthly_utilities")
+          .select("year, month, water, gas, electric, sewer, trash, internet")
+          .eq("store_id", loadedStore.id),
+      ]);
 
       if (policiesError) throw policiesError;
       if (equipmentError) throw equipmentError;
+      if (financialsError) throw financialsError;
+      if (utilitiesError) throw utilitiesError;
 
       setInsurancePolicies(policiesData ?? []);
       setInsuranceCount(policiesData?.length ?? 0);
-      setEquipment(equipmentData ?? []);
+      setEquipment((equipmentData ?? []) as EquipmentRecord[]);
+      setMonthlyFinancials(financialsData ?? []);
+      setMonthlyUtilities((utilitiesData ?? []) as MonthlyUtilityRecord[]);
 
       if (loadedStore.occupancy_type === "owner_occupied") {
         const { data: reData, error: reError } = await supabase
@@ -355,12 +382,18 @@ export default function DashboardPage() {
       ? ((estimatedValue - valuationTrend[0].value) / valuationTrend[0].value) * 100
       : 0;
 
-  const leaseScore = leaseMetrics?.score ?? demoScores.lease;
-  const insuranceScore = insuranceCount > 0 ? demoScores.insurance : demoScores.insurance;
-  const financialScore = demoScores.financial;
-  const laundrocfoScore = Math.round(
-    (leaseScore + equipmentScore + financialScore + insuranceScore) / 4
-  );
+  const laundroCfoScoreResult = useMemo(() => {
+    if (!store) return null;
+    return computeLaundroCfoScoreFromRaw({
+      store,
+      equipment,
+      lease,
+      realEstate,
+      monthlyFinancials,
+      monthlyUtilities,
+    });
+  }, [store, equipment, lease, realEstate, monthlyFinancials, monthlyUtilities]);
+
   const leaseYearsDisplay = leaseMetrics?.yearsRemaining ?? 7.3;
   const totalLeaseControl = leaseMetrics?.totalControl ?? 17.3;
 
@@ -646,19 +679,15 @@ export default function DashboardPage() {
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.1s" }}
-          label="LaundroCFO Score"
-          value={<AnimatedNumber value={laundrocfoScore} duration={1000} />}
-          sub={`Lease ${leaseScore} · Equipment ${equipmentScore} · Financial ${financialScore} · Insurance ${insuranceScore}`}
-        />
-
-        <KpiCard
-          className="kpi-fade-in kpi-glow-card"
-          style={{ animationDelay: "0.15s" }}
           label="Monthly Cash Flow"
           value={<AnimatedNumber value={monthlyCashFlow} prefix="$" duration={1000} />}
           sub={`${fmtDollar(annualCashFlow)}/yr after debt service`}
         />
       </div>
+
+      {laundroCfoScoreResult ? (
+        <LaundroCfoScoreCard result={laundroCfoScoreResult} className="kpi-fade-in" />
+      ) : null}
 
       {/* Financial Position */}
       <div

@@ -6,8 +6,11 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { benchmarks as industryBenchmarks } from "@/lib/data";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
+import { computeLaundroCfoScoreFromRaw } from "@/lib/laundroCfoScore";
+import type { MonthlyUtilityRecord } from "@/lib/financials";
 import { fmtMultiple, fmtPct } from "@/lib/calculations";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { LaundroCfoScoreCard } from "@/components/ui/LaundroCfoScoreGauge";
 import { PageError } from "@/components/ui/PageError";
 
 const NETWORK_BENCHMARK_THRESHOLD = 15;
@@ -156,6 +159,37 @@ function ScoresCalculationGuide() {
 
       {open ? (
         <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-5">
+          <div>
+            <h3 className="text-[13px] font-semibold text-slate-100 mb-2">LaundroCFO Score</h3>
+            <p className="text-[12px] text-slate-400 mb-2">
+              A 0–100 composite score with letter grades (A+ through F), shown on the Dashboard and
+              Benchmarking pages. Four categories, 100 points total:
+            </p>
+            <ul className="space-y-1.5 text-[12px] text-slate-400 list-disc pl-4">
+              <li>
+                <span className="text-slate-300">Financial Performance (40 pts):</span> EBITDA margin,
+                utility ratio, and revenue per machine — each compared to industry quartiles.
+              </li>
+              <li>
+                <span className="text-slate-300">Debt &amp; Coverage (20 pts):</span> DSCR tiers (debt-free
+                stores receive 13 pts) and rent-to-revenue.
+              </li>
+              <li>
+                <span className="text-slate-300">Asset Quality (20 pts):</span> equipment age, lease years
+                remaining, and equipment quality grade.
+              </li>
+              <li>
+                <span className="text-slate-300">Profile Completeness (20 pts):</span> awards points for
+                entering financials (6+ months TTM), equipment, lease, square footage, debt data, and
+                utility breakdown.
+              </li>
+            </ul>
+            <p className="mt-2 text-[12px] text-slate-500">
+              An A grade requires real financial data — stores without TTM financials cannot score above
+              the completeness cap. Improvement tips target your lowest-scoring categories.
+            </p>
+          </div>
+
           <div>
             <h3 className="text-[13px] font-semibold text-slate-100 mb-2">Performance Rating</h3>
             <ul className="space-y-1.5 text-[12px] text-slate-400 list-disc pl-4">
@@ -330,6 +364,12 @@ export default function BenchmarkingPage() {
   const [loadError, setLoadError] = useState(false);
   const [store, setStore] = useState<Record<string, unknown> | null>(null);
   const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
+  const [lease, setLease] = useState<Record<string, unknown> | null>(null);
+  const [realEstate, setRealEstate] = useState<Record<string, unknown> | null>(null);
+  const [monthlyFinancials, setMonthlyFinancials] = useState<
+    { revenue?: number | null; utilities?: number | null }[]
+  >([]);
+  const [monthlyUtilities, setMonthlyUtilities] = useState<MonthlyUtilityRecord[]>([]);
   const [utilityRatio, setUtilityRatio] = useState<number | null>(null);
 
   const loadData = useCallback(async () => {
@@ -343,25 +383,52 @@ export default function BenchmarkingPage() {
     setLoadError(false);
 
     try {
-      const [{ data: storeData, error: storeError }, { data: equipmentData, error: equipError }, { data: financialsData, error: finError }] =
-        await Promise.all([
-          supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
-          supabase.from("equipment_inventory").select("*").eq("store_id", selectedStore.id),
-          supabase
-            .from("monthly_financials")
-            .select("revenue, utilities")
-            .eq("store_id", selectedStore.id)
-            .order("year", { ascending: false })
-            .order("month", { ascending: false })
-            .limit(12),
-        ]);
+      const [
+        { data: storeData, error: storeError },
+        { data: equipmentData, error: equipError },
+        { data: financialsData, error: finError },
+        { data: leaseData, error: leaseError },
+        { data: utilitiesData, error: utilitiesError },
+        { data: realEstateData, error: realEstateError },
+      ] = await Promise.all([
+        supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
+        supabase.from("equipment_inventory").select("*").eq("store_id", selectedStore.id),
+        supabase
+          .from("monthly_financials")
+          .select("revenue, utilities")
+          .eq("store_id", selectedStore.id)
+          .order("year", { ascending: false })
+          .order("month", { ascending: false })
+          .limit(12),
+        supabase
+          .from("leases")
+          .select("lease_end_date, monthly_rent")
+          .eq("store_id", selectedStore.id)
+          .maybeSingle(),
+        supabase
+          .from("monthly_utilities")
+          .select("year, month, water, gas, electric, sewer, trash, internet")
+          .eq("store_id", selectedStore.id),
+        supabase
+          .from("real_estate")
+          .select("monthly_rent_charged")
+          .eq("store_id", selectedStore.id)
+          .maybeSingle(),
+      ]);
 
       if (storeError) throw storeError;
       if (equipError) throw equipError;
       if (finError) throw finError;
+      if (leaseError) throw leaseError;
+      if (utilitiesError) throw utilitiesError;
+      if (realEstateError) throw realEstateError;
 
       setStore(storeData);
       setEquipment((equipmentData ?? []) as EquipmentRecord[]);
+      setLease(leaseData ?? null);
+      setRealEstate(realEstateData ?? null);
+      setMonthlyFinancials(financialsData ?? []);
+      setMonthlyUtilities((utilitiesData ?? []) as MonthlyUtilityRecord[]);
 
       const records = financialsData ?? [];
       const ttmRevenue = records.reduce((s, r) => s + (r.revenue ?? 0), 0);
@@ -501,6 +568,18 @@ export default function BenchmarkingPage() {
     return { strengths, watch, opportunities };
   }, [metrics]);
 
+  const laundroCfoScoreResult = useMemo(() => {
+    if (!store) return null;
+    return computeLaundroCfoScoreFromRaw({
+      store,
+      equipment,
+      lease,
+      realEstate,
+      monthlyFinancials,
+      monthlyUtilities,
+    });
+  }, [store, equipment, lease, realEstate, monthlyFinancials, monthlyUtilities]);
+
   if (storesLoading || loading) {
     return (
       <div className="space-y-5">
@@ -546,7 +625,10 @@ export default function BenchmarkingPage() {
             </h1>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            {laundroCfoScoreResult ? (
+              <LaundroCfoScoreCard result={laundroCfoScoreResult} compact className="lg:row-span-2" />
+            ) : null}
             <div className="card">
               <div className="metric-label">Performance Rating</div>
               <div className="metric-value text-green-400">{summary.performanceRating}</div>
