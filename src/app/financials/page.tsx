@@ -31,9 +31,6 @@ import {
   getCurrentMonthlyAverages,
   type CurrentMonthlyAverages,
 } from "@/lib/getCurrentMonthlyAverages";
-import {
-  financials as demoFinancials,
-} from "@/lib/data";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import { PageError } from "@/components/ui/PageError";
 import {
@@ -550,7 +547,7 @@ export default function FinancialsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<MonthlyForm>(() => emptyMonthlyForm());
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
-  const [clearAllStoreNameInput, setClearAllStoreNameInput] = useState("");
+  const [clearingAllFinancialData, setClearingAllFinancialData] = useState(false);
   const [duplicateImportCount, setDuplicateImportCount] = useState(0);
   const [posting, setPosting] = useState(false);
   const [postingCount, setPostingCount] = useState(0);
@@ -1358,29 +1355,54 @@ export default function FinancialsPage() {
   }
 
   async function clearAllFinancialData() {
-    if (!store?.id) return;
+    if (!store?.id || clearingAllFinancialData) return;
     const storeName = (store.name ?? "").trim();
-    if (clearAllStoreNameInput.trim() !== storeName) {
-      setError("Store name does not match. Type the exact store name to confirm.");
-      return;
+    const storeId = store.id;
+
+    setClearingAllFinancialData(true);
+    setError("");
+
+    const deleteSteps: { table: string; run: () => PromiseLike<{ error: { message: string } | null }> }[] = [
+      {
+        table: "transaction_pl_links",
+        run: () => supabase.from("transaction_pl_links").delete().eq("store_id", storeId),
+      },
+      {
+        table: "transaction_audit_log",
+        run: () => supabase.from("transaction_audit_log").delete().eq("store_id", storeId),
+      },
+      {
+        table: "bank_transactions",
+        run: () => supabase.from("bank_transactions").delete().eq("store_id", storeId),
+      },
+      {
+        table: "monthly_utilities",
+        run: () => supabase.from("monthly_utilities").delete().eq("store_id", storeId),
+      },
+      {
+        table: "monthly_financials",
+        run: () => supabase.from("monthly_financials").delete().eq("store_id", storeId),
+      },
+    ];
+
+    for (const step of deleteSteps) {
+      const { error: deleteError } = await step.run();
+      if (deleteError) {
+        setError(`Failed to clear ${step.table}: ${deleteError.message}`);
+        setClearingAllFinancialData(false);
+        return;
+      }
     }
 
-    const { error: deleteError } = await supabase
-      .from("monthly_financials")
-      .delete()
-      .eq("store_id", store.id);
-
-    if (deleteError) {
-      setError(deleteError.message);
-      return;
-    }
-
-    invalidateValuationCache(store.id);
+    invalidateValuationCache(storeId);
     setShowClearAllConfirm(false);
-    setClearAllStoreNameInput("");
     setShowForm(false);
-    setSuccess(`Cleared all P&L data for ${storeName || "this store"}.`);
+    setStagedTransactions([]);
+    setBankTransactions([]);
+    setSelectedTxnKeys(new Set());
+    setSuccess(`Cleared all financial data for ${storeName || "this store"}.`);
     await loadData();
+    setClearingAllFinancialData(false);
   }
 
   async function saveStagedToBank() {
@@ -1766,6 +1788,7 @@ export default function FinancialsPage() {
   }
 
   const occupancyPct = ratios && ttm.ttmRevenue > 0 ? (ratios.annualRent / ttm.ttmRevenue) * 100 : 0;
+  const hasFinancialData = records.length > 0;
   const reviewCount = bankTransactions.length + stagedTransactions.length;
 
   return (
@@ -1826,8 +1849,14 @@ export default function FinancialsPage() {
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 grid-4">
             <MetricCard
               label="TTM Revenue"
-              value={fmtDollar(ttm.ttmRevenue || demoFinancials.annualRevenue)}
-              sub={ttm.monthsUsed < 12 ? `${ttm.monthsUsed} mo. of data` : "Trailing 12-month gross revenue"}
+              value={hasFinancialData ? fmtDollar(ttm.ttmRevenue) : "—"}
+              sub={
+                hasFinancialData
+                  ? ttm.monthsUsed < 12
+                    ? `${ttm.monthsUsed} mo. of data`
+                    : "Trailing 12-month gross revenue"
+                  : "No data"
+              }
               subColor="muted"
             />
             <div className="card">
@@ -1837,12 +1866,19 @@ export default function FinancialsPage() {
                   explanation="Earnings Before Interest, Taxes, Depreciation & Amortization. The primary profit metric for laundromat valuation."
                 />
               </div>
-              <div className="metric-value">{fmtDollar(ttm.ttmEbitda || demoFinancials.ebitda)}</div>
+              <div className="metric-value">{hasFinancialData ? fmtDollar(ttm.ttmEbitda) : "—"}</div>
               <div className="text-[12px] mt-1 text-slate-500">
-                Earnings before interest, taxes, depreciation, amortization
+                {hasFinancialData
+                  ? "Earnings before interest, taxes, depreciation, amortization"
+                  : "No financial data"}
               </div>
             </div>
-            <MetricCard label="EBITDA Margin" value={fmtPct(ttm.ttmEbitdaMargin || (demoFinancials.ebitda / demoFinancials.annualRevenue) * 100)} sub="TTM" subColor="muted" />
+            <MetricCard
+              label="EBITDA Margin"
+              value={hasFinancialData ? fmtPct(ttm.ttmEbitdaMargin) : "—"}
+              sub={hasFinancialData ? "TTM" : "No data"}
+              subColor="muted"
+            />
             <div className="card">
               <div className="metric-label">
                 <MetricTooltip
@@ -1851,29 +1887,27 @@ export default function FinancialsPage() {
                 />
               </div>
               <div className="metric-value">
-                {fmtMultiple(
-                  ttm.ttmDebtService > 0
-                    ? ttm.dscr
-                    : demoFinancials.cashFlow / demoFinancials.annualDebtService
-                )}
+                {hasFinancialData && ttm.ttmDebtService > 0 ? fmtMultiple(ttm.dscr) : "—"}
               </div>
-              <div className="text-[12px] mt-1 text-slate-500">TTM EBITDA ÷ trailing 12-month debt payments</div>
-              <div
-                className={clsx(
-                  "text-[12px] mt-1",
-                  (ttm.ttmDebtService > 0 ? ttm.dscr : demoFinancials.cashFlow / demoFinancials.annualDebtService) >= 1.5
-                    ? "text-green-400"
-                    : (ttm.ttmDebtService > 0 ? ttm.dscr : demoFinancials.cashFlow / demoFinancials.annualDebtService) >= 1.25
-                      ? "text-amber-400"
-                      : "text-red-400"
-                )}
-              >
-                {(ttm.ttmDebtService > 0 ? ttm.dscr : demoFinancials.cashFlow / demoFinancials.annualDebtService) >= 1.5
-                  ? "Strong"
-                  : (ttm.ttmDebtService > 0 ? ttm.dscr : demoFinancials.cashFlow / demoFinancials.annualDebtService) >= 1.25
-                    ? "Adequate"
-                    : "Below threshold"}
+              <div className="text-[12px] mt-1 text-slate-500">
+                {hasFinancialData
+                  ? "TTM EBITDA ÷ trailing 12-month debt payments"
+                  : "No financial data"}
               </div>
+              {hasFinancialData && ttm.ttmDebtService > 0 && (
+                <div
+                  className={clsx(
+                    "text-[12px] mt-1",
+                    ttm.dscr >= 1.5
+                      ? "text-green-400"
+                      : ttm.dscr >= 1.25
+                        ? "text-amber-400"
+                        : "text-red-400"
+                  )}
+                >
+                  {ttm.dscr >= 1.5 ? "Strong" : ttm.dscr >= 1.25 ? "Adequate" : "Below threshold"}
+                </div>
+              )}
             </div>
             <div className="card">
               <div className="metric-label">
@@ -1882,8 +1916,12 @@ export default function FinancialsPage() {
                   explanation="Net Operating Income. Revenue minus all operating expenses including rent but before debt service."
                 />
               </div>
-              <div className="metric-value">{fmtDollar(ttm.ttmNoi || demoFinancials.noi)}</div>
-              <div className="text-[12px] mt-1 text-slate-500">Net operating income after rent and operating expenses</div>
+              <div className="metric-value">{hasFinancialData ? fmtDollar(ttm.ttmNoi) : "—"}</div>
+              <div className="text-[12px] mt-1 text-slate-500">
+                {hasFinancialData
+                  ? "Net operating income after rent and operating expenses"
+                  : "No financial data"}
+              </div>
             </div>
           </div>
 
@@ -1953,59 +1991,12 @@ export default function FinancialsPage() {
               <button
                 type="button"
                 className="btn-outline text-red-400 border-red-500/30 hover:bg-red-500/10"
-                onClick={() => {
-                  setClearAllStoreNameInput("");
-                  setShowClearAllConfirm(true);
-                }}
+                onClick={() => setShowClearAllConfirm(true)}
               >
                 Clear All Financial Data
               </button>
             </div>
           </div>
-
-          {showClearAllConfirm && (
-            <div className="card border border-red-500/30 bg-red-500/5">
-              <div className="section-title text-red-300">Clear All Financial Data</div>
-              <p className="text-[13px] text-slate-300 mb-4">
-                This will permanently delete <strong>all</strong> P&L records for{" "}
-                <span className="text-slate-100">{store?.name ?? "this store"}</span>. This cannot be
-                undone.
-              </p>
-              <p className="text-[12px] text-slate-400 mb-2">
-                Type the store name to confirm:{" "}
-                <span className="font-mono text-slate-200">{store?.name ?? ""}</span>
-              </p>
-              <input
-                type="text"
-                value={clearAllStoreNameInput}
-                onChange={(e) => setClearAllStoreNameInput(e.target.value)}
-                onKeyDown={preventEnterSubmit}
-                className={clsx(INPUT_CLASS, "max-w-md mb-4")}
-                placeholder="Store name"
-                aria-label="Confirm store name"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="btn-outline text-red-400 border-red-500/30 hover:bg-red-500/10"
-                  onClick={clearAllFinancialData}
-                  disabled={clearAllStoreNameInput.trim() !== (store?.name ?? "").trim()}
-                >
-                  Permanently Delete All P&L Data
-                </button>
-                <button
-                  type="button"
-                  className="btn-outline"
-                  onClick={() => {
-                    setShowClearAllConfirm(false);
-                    setClearAllStoreNameInput("");
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
 
           {showForm && (
             <div className="card">
@@ -2973,6 +2964,35 @@ export default function FinancialsPage() {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {showClearAllConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="card max-w-md w-full space-y-4 border border-red-500/30">
+            <div className="text-[15px] font-semibold text-red-300">Clear All Financial Data</div>
+            <p className="text-[13px] text-slate-300 leading-relaxed">
+              This will permanently delete all financial data for {store?.name ?? "this store"}, including
+              all P&L records, utility data, and transaction history. This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => setShowClearAllConfirm(false)}
+                disabled={clearingAllFinancialData}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-outline text-red-400 border-red-500/30 hover:bg-red-500/10"
+                onClick={() => void clearAllFinancialData()}
+                disabled={clearingAllFinancialData}
+              >
+                {clearingAllFinancialData ? "Deleting…" : "Delete All Data"}
+              </button>
             </div>
           </div>
         </div>

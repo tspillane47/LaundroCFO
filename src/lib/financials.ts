@@ -353,15 +353,12 @@ export async function fetchStoreTtmMetrics(
 }
 
 export function resolveAnnualEbitda(
-  ttm: TtmMetrics | null,
-  store: { monthly_revenue?: number | null; monthly_expenses?: number | null }
+  ttm: TtmMetrics | null
 ): { annualEbitda: number; ttmMonthsUsed: number } {
   if (ttm && ttm.monthsUsed > 0) {
     return { annualEbitda: ttm.ttmEbitda, ttmMonthsUsed: ttm.monthsUsed };
   }
-  const monthlyRevenue = Number(store.monthly_revenue) || 0;
-  const monthlyExpenses = Number(store.monthly_expenses) || 0;
-  return { annualEbitda: (monthlyRevenue - monthlyExpenses) * 12, ttmMonthsUsed: 0 };
+  return { annualEbitda: 0, ttmMonthsUsed: 0 };
 }
 
 function annualizeExpense(

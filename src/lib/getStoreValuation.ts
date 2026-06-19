@@ -14,7 +14,7 @@ export type StoreValuationContext = {
 export type StoreValuationResult = ValuationResult & {
   store: Record<string, unknown>;
   context: StoreValuationContext;
-  /** Trailing-12-month EBITDA from monthly_financials, or annualized store fields when no history exists */
+  /** Trailing-12-month EBITDA from monthly_financials (0 when no P&L history exists) */
   annualEbitda: number;
   /** Number of monthly_financials months summed (0 when using store field fallback) */
   ttmMonthsUsed: number;
@@ -163,7 +163,7 @@ export async function getStoreValuation(
   };
 
   const ttm = await fetchStoreTtmMetrics(supabase, storeId);
-  const { annualEbitda, ttmMonthsUsed } = resolveAnnualEbitda(ttm, store ?? {});
+  const { annualEbitda, ttmMonthsUsed } = resolveAnnualEbitda(ttm);
 
   const result: StoreValuationResult = {
     ...computeStoreValuation(ctx, { ebitda: annualEbitda }),
