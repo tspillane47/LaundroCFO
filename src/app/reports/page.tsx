@@ -27,8 +27,16 @@ import { ReportDocument, type ReportProps } from "@/components/reports/ReportDoc
 import {
   PortfolioReportDocument,
 } from "@/components/reports/PortfolioReportDocument";
+import { MonthlyOperatingReport } from "@/components/reports/MonthlyOperatingReport";
 import { generateExecutiveSummary } from "@/components/reports/generateExecutiveSummary";
 import { getPortfolioReport, type PortfolioReportData } from "@/lib/getPortfolioReport";
+import { getStoreReportData, type StoreReportData } from "@/lib/getStoreReportData";
+import {
+  getMonthlyOperatingReportData,
+  getLatestFinancialMonth,
+  monthSelectLabel,
+  type MonthlyOperatingReportData,
+} from "@/lib/getMonthlyOperatingReportData";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
@@ -87,7 +95,7 @@ function PreviewRow({ label, value, className }: { label: string; value: string;
   );
 }
 
-type ReportMode = "store" | "portfolio";
+type ReportMode = "store" | "portfolio" | "monthly";
 
 function parseMachineCapacity(size: string): number {
   const match = size.match(/(\d+)/);
@@ -141,6 +149,11 @@ export default function ReportsPage() {
   const [portfolioData, setPortfolioData] = useState<PortfolioReportData | null>(null);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [storeReportData, setStoreReportData] = useState<StoreReportData | null>(null);
+  const [monthlyReportData, setMonthlyReportData] = useState<MonthlyOperatingReportData | null>(null);
+  const [monthlyReportLoading, setMonthlyReportLoading] = useState(false);
+  const [selectedReportMonth, setSelectedReportMonth] = useState<{ year: number; month: number } | null>(null);
+  const [availableMonths, setAvailableMonths] = useState<{ year: number; month: number }[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -188,25 +201,29 @@ export default function ReportsPage() {
 
       const ownerOccupied = storeData.occupancy_type === "owner_occupied";
 
+      let leaseData: any = null;
+      let reData: any = null;
       if (ownerOccupied) {
-        const { data: reData } = await supabase
+        const { data: fetchedRe } = await supabase
           .from("real_estate")
           .select("*")
           .eq("store_id", storeData.id)
           .limit(1)
           .maybeSingle();
+        reData = fetchedRe;
         setRealEstate(reData);
         setLease(null);
         setLeaseOptions([]);
         setTotalLeaseControl(15);
       } else {
         setRealEstate(null);
-        const { data: leaseData } = await supabase
+        const { data: fetchedLease } = await supabase
           .from("leases")
           .select("*")
           .eq("store_id", storeData.id)
           .limit(1)
           .maybeSingle();
+        leaseData = fetchedLease;
 
         if (leaseData) {
           setLease(leaseData);
@@ -226,6 +243,23 @@ export default function ReportsPage() {
           setLeaseOptions([]);
           setTotalLeaseControl(0);
         }
+      }
+
+      try {
+        const reportData = await getStoreReportData({
+          storeId: storeData.id,
+          store: storeData,
+          equipment: (equipmentData ?? []) as EquipmentRecord[],
+          lease: leaseData,
+          realEstate: ownerOccupied ? reData : null,
+        });
+        setStoreReportData(reportData);
+        setAvailableMonths(reportData.financial.availableMonths);
+        const latest = getLatestFinancialMonth(reportData.financial.availableMonths);
+        setSelectedReportMonth(latest);
+      } catch {
+        setStoreReportData(null);
+        setAvailableMonths([]);
       }
 
       setLoading(false);
@@ -266,6 +300,36 @@ export default function ReportsPage() {
     ensureUser();
   }, [reportMode, supabase]);
 
+  useEffect(() => {
+    async function loadMonthlyReport() {
+      if (reportMode !== "monthly" || !selectedStore?.id || !selectedReportMonth || !store) {
+        setMonthlyReportData(null);
+        return;
+      }
+
+      setMonthlyReportLoading(true);
+      setError("");
+      try {
+        const data = await getMonthlyOperatingReportData({
+          storeId: selectedStore.id,
+          year: selectedReportMonth.year,
+          month: selectedReportMonth.month,
+          store,
+          equipment,
+          lease,
+        });
+        setMonthlyReportData(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load monthly report");
+        setMonthlyReportData(null);
+      } finally {
+        setMonthlyReportLoading(false);
+      }
+    }
+
+    loadMonthlyReport();
+  }, [reportMode, selectedStore?.id, selectedReportMonth, store, equipment, lease]);
+
   const equipMetrics = useMemo(() => computeEquipmentMetrics(equipment), [equipment]);
 
   const generatedDate = useMemo(
@@ -279,25 +343,34 @@ export default function ReportsPage() {
   );
 
   const executiveSummary = useMemo(() => {
-    if (!store || !valuation) return "";
-    return generateExecutiveSummary({ store, lease, leaseOptions, equipment, valuation });
-  }, [store, lease, leaseOptions, equipment, valuation]);
+    if (!store || !valuation || !storeReportData) return "";
+    return generateExecutiveSummary({
+      store,
+      lease,
+      leaseOptions,
+      equipment,
+      valuation,
+      financial: storeReportData.financial,
+    });
+  }, [store, lease, leaseOptions, equipment, valuation, storeReportData]);
+
+  const financial = storeReportData?.financial;
 
   const metrics = useMemo(() => {
-    if (!store || !valuation) return null;
+    if (!store || !valuation || !financial) return null;
 
-    const monthlyRevenue = store.monthly_revenue ?? 0;
-    const monthlyExpenses = store.monthly_expenses ?? 0;
-    const monthlyEbitda = monthlyRevenue - monthlyExpenses;
-    const annualRevenue = monthlyRevenue * 12;
-    const annualEbitda = monthlyEbitda * 12;
-    const annualDebtService = store.annual_debt_service ?? 0;
+    const monthlyRevenue = financial.monthlyAverages.revenue;
+    const monthlyExpenses = financial.monthlyAverages.expenses;
+    const monthlyEbitda = financial.monthlyAverages.ebitda;
+    const annualRevenue = financial.revenueTtmTotal;
+    const annualEbitda = financial.ebitdaTtmTotal;
+    const annualDebtService = financial.annualDebtService;
     const monthlyUtilities = store.monthly_utilities ?? 0;
-    const loanBalance = store.loan_balance ?? 0;
+    const loanBalance = financial.totalOutstandingDebt;
     const sqft = store.square_footage ?? 3500;
     const isOwnerOccupied = store.occupancy_type === "owner_occupied";
 
-    const dscr = annualDebtService > 0 ? calcDSCR(annualEbitda, annualDebtService) : 0;
+    const dscr = financial.dscr ?? 0;
     const portfolioEbitda = stores.reduce(
       (s, st) => s + ((st.monthly_revenue ?? 0) - (st.monthly_expenses ?? 0)) * 12,
       0
@@ -307,7 +380,10 @@ export default function ReportsPage() {
       portfolioDebtService > 0 ? calcGlobalDSCR(portfolioEbitda, portfolioDebtService) : dscr;
 
     const ebitdaMargin = calcEbitdaMargin(annualEbitda, annualRevenue);
-    const utilityRatio = calcUtilityRatio(monthlyUtilities * 12, annualRevenue);
+    const utilityRow = financial.benchmarkRows.find((r) => r.metric === "Utility Ratio");
+    const utilityRatio =
+      utilityRow?.store ??
+      (monthlyRevenue > 0 ? calcUtilityRatio(monthlyUtilities * 12, annualRevenue) : 0);
     const rentToRevenue = calcRentToRevenue((lease?.monthly_rent ?? 0) * 12, annualRevenue);
     const revenuePerSF = calcRevenuePerSF(annualRevenue, sqft);
     const ebitdaPerSF = calcEbitdaPerSF(annualEbitda, sqft);
@@ -358,10 +434,10 @@ export default function ReportsPage() {
       financeRating: financeabilityRating(dscr, globalDscr),
       isOwnerOccupied,
     };
-  }, [store, valuation, stores, lease, leaseOptions, totalLeaseControl]);
+  }, [store, valuation, stores, lease, leaseOptions, totalLeaseControl, financial]);
 
   const reportProps: ReportProps | null = useMemo(() => {
-    if (!store || !valuation) return null;
+    if (!store || !valuation || !storeReportData) return null;
     return {
       store,
       lease,
@@ -373,6 +449,8 @@ export default function ReportsPage() {
       portfolioStores: stores,
       generatedDate,
       executiveSummary,
+      financial: storeReportData.financial,
+      laundroCfoScore: storeReportData.laundroCfoScore,
     };
   }, [
     store,
@@ -385,6 +463,7 @@ export default function ReportsPage() {
     stores,
     generatedDate,
     executiveSummary,
+    storeReportData,
   ]);
 
   const buildPdfBlob = useCallback(async () => {
@@ -398,13 +477,25 @@ export default function ReportsPage() {
         />
       ).toBlob();
     }
+    if (reportMode === "monthly") {
+      if (!monthlyReportData) throw new Error("Monthly report data not ready");
+      return pdf(
+        <MonthlyOperatingReport
+          data={monthlyReportData}
+          storeName={store?.name ?? "Store"}
+          generatedDate={generatedDate}
+        />
+      ).toBlob();
+    }
     if (!reportProps) throw new Error("Report data not ready");
     return pdf(<ReportDocument {...reportProps} />).toBlob();
-  }, [reportMode, portfolioData, generatedDate, userEmail, reportProps]);
+  }, [reportMode, portfolioData, monthlyReportData, store, generatedDate, userEmail, reportProps]);
 
   async function handleGeneratePdf() {
     if (reportMode === "portfolio") {
       if (!portfolioData) return;
+    } else if (reportMode === "monthly") {
+      if (!monthlyReportData) return;
     } else if (!reportProps || !store) {
       return;
     }
@@ -419,7 +510,9 @@ export default function ReportsPage() {
       a.download =
         reportMode === "portfolio"
           ? "portfolio-underwriting-report.pdf"
-          : `${(store!.name ?? "store").replace(/\s+/g, "-").toLowerCase()}-underwriting-report.pdf`;
+          : reportMode === "monthly"
+            ? `${(store!.name ?? "store").replace(/\s+/g, "-").toLowerCase()}-monthly-operating-${selectedReportMonth?.year}-${String(selectedReportMonth?.month).padStart(2, "0")}.pdf`
+            : `${(store!.name ?? "store").replace(/\s+/g, "-").toLowerCase()}-underwriting-report.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -437,6 +530,7 @@ export default function ReportsPage() {
       return;
     }
     if (reportMode === "portfolio" && !portfolioData) return;
+    if (reportMode === "monthly" && !monthlyReportData) return;
     if (reportMode === "store" && (!reportProps || !store)) return;
 
     setSharing(true);
@@ -506,7 +600,8 @@ export default function ReportsPage() {
   }
 
   const storeName = store?.name ?? "Your Store";
-  const isStoreReady = Boolean(store && valuation && metrics);
+  const isStoreReady = Boolean(store && valuation && metrics && storeReportData);
+  const monthlyReady = Boolean(monthlyReportData && selectedReportMonth);
   const portfolioReady = Boolean(portfolioData && portfolioData.totals.storeCount > 0);
   const totals = portfolioData?.totals;
   const cashFlow = portfolioData?.cashFlow;
@@ -515,12 +610,16 @@ export default function ReportsPage() {
   const pdfDisabled =
     generatingPdf ||
     sharing ||
-    (reportMode === "portfolio" ? !portfolioReady : !isStoreReady);
+    (reportMode === "portfolio"
+      ? !portfolioReady
+      : reportMode === "monthly"
+        ? !monthlyReady || monthlyReportLoading
+        : !isStoreReady);
 
   return (
     <div className="space-y-4 max-w-4xl">
       <div className="flex gap-1 p-1 rounded-full w-fit" style={{ background: "var(--bg-card2)", border: "1px solid var(--border)" }}>
-        {(["store", "portfolio"] as ReportMode[]).map((mode) => (
+        {(["store", "portfolio", "monthly"] as ReportMode[]).map((mode) => (
           <button
             key={mode}
             type="button"
@@ -531,22 +630,55 @@ export default function ReportsPage() {
             )}
             style={reportMode === mode ? { background: "var(--accent)" } : undefined}
           >
-            {mode === "store" ? "Store Report" : "Portfolio Report"}
+            {mode === "store"
+              ? "Store Report"
+              : mode === "portfolio"
+                ? "Portfolio Report"
+                : "Monthly Operating Report"}
           </button>
         ))}
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-[15px] font-semibold text-slate-100">
-            {reportMode === "portfolio" ? "Portfolio Underwriting Report" : "Underwriting Report"}
+            {reportMode === "portfolio"
+              ? "Portfolio Underwriting Report"
+              : reportMode === "monthly"
+                ? "Monthly Operating Report"
+                : "Underwriting Report"}
           </h1>
           <p className="text-slate-500 text-[12px] mt-0.5">
             {reportMode === "portfolio"
               ? `${totals?.storeCount ?? stores.length} store${(totals?.storeCount ?? stores.length) !== 1 ? "s" : ""} — ${generatedDate}`
-              : `${storeName} — ${generatedDate}`}
+              : reportMode === "monthly"
+                ? `${storeName} — ${monthlyReportData?.reportMonthLabel ?? "Select month"} — ${generatedDate}`
+                : `${storeName} — ${generatedDate}`}
           </p>
         </div>
+        <div className="flex items-center gap-2.5 ml-auto">
+        {reportMode === "monthly" && availableMonths.length > 0 && (
+          <select
+            className="bg-[#1e2a3a] border border-white/[0.08] rounded-lg px-3 py-1.5 text-[12px] text-slate-300"
+            value={
+              selectedReportMonth
+                ? `${selectedReportMonth.year}-${selectedReportMonth.month}`
+                : ""
+            }
+            onChange={(e) => {
+              const [year, month] = e.target.value.split("-").map(Number);
+              setSelectedReportMonth({ year, month });
+            }}
+          >
+            {[...availableMonths]
+              .sort((a, b) => (a.year !== b.year ? b.year - a.year : b.month - a.month))
+              .map((m) => (
+                <option key={`${m.year}-${m.month}`} value={`${m.year}-${m.month}`}>
+                  {monthSelectLabel(m.year, m.month)}
+                </option>
+              ))}
+          </select>
+        )}
         <div className="flex gap-2.5">
           <button
             type="button"
@@ -564,6 +696,7 @@ export default function ReportsPage() {
           >
             {sharing ? "Sharing..." : "Share with Lender"}
           </button>
+        </div>
         </div>
       </div>
 
@@ -865,8 +998,75 @@ export default function ReportsPage() {
         </>
       )}
 
-      {reportMode === "store" && isStoreReady && store && valuation && metrics && (
+      {reportMode === "monthly" && (storesLoading || loading || monthlyReportLoading) && (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-slate-500 text-[13px]">Loading monthly report...</div>
+        </div>
+      )}
+
+      {reportMode === "monthly" && !storesLoading && !loading && !monthlyReportLoading && availableMonths.length === 0 && (
+        <div className="card text-center py-10">
+          <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
+            Add monthly financials to generate a Monthly Operating Report.
+          </p>
+        </div>
+      )}
+
+      {reportMode === "monthly" && monthlyReady && monthlyReportData && (
         <>
+          <div className="card">
+            <SectionHeading>{monthlyReportData.reportMonthLabel} Summary</SectionHeading>
+            <div className="grid grid-cols-3 gap-4 text-[13px]">
+              <PreviewRow label="Revenue" value={fmtDollar(monthlyReportData.summary.revenue.current)} />
+              <PreviewRow label="EBITDA" value={fmtDollar(monthlyReportData.summary.ebitda.current)} className="text-green-400" />
+              <PreviewRow label="EBITDA Margin" value={fmtPct(monthlyReportData.summary.ebitdaMargin)} />
+              <PreviewRow
+                label="MoM Revenue Change"
+                value={
+                  monthlyReportData.summary.revenue.changePct != null
+                    ? `${monthlyReportData.summary.revenue.changeDollar >= 0 ? "+" : "−"}${fmtDollar(Math.abs(monthlyReportData.summary.revenue.changeDollar)).replace("$", "")} (${monthlyReportData.summary.revenue.changePct.toFixed(1)}%)`
+                    : "—"
+                }
+              />
+              <PreviewRow label="YTD Revenue" value={fmtDollar(monthlyReportData.ytdTotals.revenue)} />
+              <PreviewRow label="YTD EBITDA" value={fmtDollar(monthlyReportData.ytdTotals.ebitda)} className="text-green-400" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="card">
+              <SectionHeading>Utilities</SectionHeading>
+              {monthlyReportData.utilityLines.map((u) => (
+                <PreviewRow key={u.label} label={u.label} value={`${fmtDollar(u.amount)} (${fmtPct(u.pctOfRevenue)})`} />
+              ))}
+              <PreviewRow
+                label="Water KPI"
+                value={`${fmtPct(monthlyReportData.financial.waterKPI.ratio * 100)} — ${monthlyReportData.financial.waterKPI.status}`}
+              />
+            </div>
+            <div className="card">
+              <SectionHeading>Key Metrics</SectionHeading>
+              <PreviewRow label="DSCR" value={monthlyReportData.keyMetrics.dscr != null ? fmtMultiple(monthlyReportData.keyMetrics.dscr) : "N/A"} />
+              <PreviewRow label="Rent / Revenue" value={monthlyReportData.keyMetrics.rentToRevenue != null ? fmtPct(monthlyReportData.keyMetrics.rentToRevenue) : "N/A"} />
+              <PreviewRow label="Utility Ratio" value={monthlyReportData.keyMetrics.utilityRatio != null ? fmtPct(monthlyReportData.keyMetrics.utilityRatio) : "N/A"} />
+              <PreviewRow label="Rev / Machine" value={monthlyReportData.keyMetrics.revenuePerMachine != null ? fmtDollar(monthlyReportData.keyMetrics.revenuePerMachine) : "N/A"} />
+              <PreviewRow label="Surplus Cash Flow" value={fmtDollar(monthlyReportData.financial.surplusCashFlow)} className={monthlyReportData.financial.surplusCashFlow >= 0 ? "text-green-400" : "text-red-400"} />
+            </div>
+          </div>
+          <div className="text-[11px] text-slate-600 pb-4">
+            Report generated by LaundroCFO — {storeName} — {monthlyReportData.reportMonthLabel} — {generatedDate}
+          </div>
+        </>
+      )}
+
+      {reportMode === "store" && isStoreReady && store && valuation && metrics && storeReportData && (
+        <>
+      {storeReportData.financial.limitedData && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-[12px] text-amber-300">
+          {storeReportData.financial.hasMonthlyFinancials
+            ? "Limited trailing financial history — report uses available monthly_financials data."
+            : "No monthly financials on file — report falls back to owner-reported profile fields."}
+        </div>
+      )}
       <div className="card">
         <SectionHeading>Executive Summary</SectionHeading>
         <p className="text-[13px] text-slate-300 leading-relaxed">{executiveSummary}</p>
@@ -887,7 +1087,7 @@ export default function ReportsPage() {
           <div className="divide-y divide-white/[0.04] text-[13px]">
             <PreviewRow
               label="DSCR"
-              value={store.annual_debt_service ? `${fmtMultiple(metrics.dscr)} ✓` : "N/A"}
+              value={financial && financial.annualDebtService > 0 ? `${fmtMultiple(metrics.dscr)} ✓` : "N/A"}
               className={ratioColorClass(metrics.dscr, 1.25, 1.0)}
             />
             <PreviewRow
@@ -1018,14 +1218,14 @@ export default function ReportsPage() {
         <SectionHeading>Financial Ratios</SectionHeading>
         <div className="grid grid-cols-4 gap-3">
           {[
-            ["DSCR", store.annual_debt_service ? fmtMultiple(metrics.dscr) : "N/A", ratioColorClass(metrics.dscr, 1.25, 1.0)],
+            ["DSCR", financial && financial.annualDebtService > 0 ? fmtMultiple(metrics.dscr) : "N/A", ratioColorClass(metrics.dscr, 1.25, 1.0)],
             ["Global DSCR", stores.some((s) => s.annual_debt_service) ? fmtMultiple(metrics.globalDscr) : "N/A", ratioColorClass(metrics.globalDscr, 1.25, 1.0)],
             ["EBITDA Margin", fmtPct(metrics.ebitdaMargin), ratioColorClass(metrics.ebitdaMargin, 25, 20)],
             ["Rent / Revenue", fmtPct(metrics.rentToRevenue), ratioColorClass(metrics.rentToRevenue, 0, 15, true)],
             ["Utility / Revenue", fmtPct(metrics.utilityRatio), ratioColorClass(metrics.utilityRatio, 0, 17, true)],
             ["Revenue / SF", `$${metrics.revenuePerSF.toFixed(2)}`, "text-slate-100"],
             ["EBITDA / SF", `$${metrics.ebitdaPerSF.toFixed(2)}`, "text-slate-100"],
-            ["Debt Yield", store.loan_balance ? fmtPct(metrics.debtYield) : "N/A", ratioColorClass(metrics.debtYield, 12, 8)],
+            ["Debt Yield", financial && financial.totalOutstandingDebt > 0 ? fmtPct(metrics.debtYield) : "N/A", ratioColorClass(metrics.debtYield, 12, 8)],
           ].map(([label, val, color]) => (
             <div key={label as string} className="card2">
               <div className="metric-label">{label}</div>
@@ -1034,6 +1234,29 @@ export default function ReportsPage() {
           ))}
         </div>
       </div>
+
+      {storeReportData && (
+        <div className="card">
+          <SectionHeading>LaundroCFO Score — {storeReportData.laundroCfoScore.grade}</SectionHeading>
+          <div className="grid grid-cols-4 gap-3 text-[13px]">
+            {(
+              [
+                ["Financial", storeReportData.laundroCfoScore.categories.financialPerformance],
+                ["Debt", storeReportData.laundroCfoScore.categories.debtCoverage],
+                ["Assets", storeReportData.laundroCfoScore.categories.assetQuality],
+                ["Profile", storeReportData.laundroCfoScore.categories.profileCompleteness],
+              ] as const
+            ).map(([label, cat]) => (
+              <div key={label} className="card2 p-3">
+                <div className="metric-label">{label}</div>
+                <div className="text-[16px] font-bold text-slate-100">
+                  {cat.score}/{cat.max}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Value Drivers & Risks */}
       <div className="grid grid-cols-2 gap-4">

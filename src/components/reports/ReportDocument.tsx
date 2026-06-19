@@ -1,7 +1,6 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import {
-  calcDSCR,
   calcGlobalDSCR,
   calcDebtYield,
   calcEbitdaPerSF,
@@ -17,6 +16,17 @@ import {
   fmtPct,
 } from "@/lib/calculations";
 import type { ValuationResult } from "@/lib/valuation";
+import type { ReportFinancialContext } from "@/lib/reportFinancials";
+import type { LaundroCfoScoreResult } from "@/lib/laundroCfoScore";
+import { buildEquitySnapshot } from "@/lib/getStoreReportData";
+import {
+  RevenueExpenseBarChart,
+  CategoryBreakdownBar,
+  BenchmarkBar,
+  StatusIndicator,
+  waterKpiStatusColor,
+  benchmarkStatusColor,
+} from "@/components/reports/charts";
 
 export interface ReportProps {
   store: any;
@@ -29,6 +39,8 @@ export interface ReportProps {
   portfolioStores: any[];
   generatedDate: string;
   executiveSummary: string;
+  financial: ReportFinancialContext;
+  laundroCfoScore: LaundroCfoScoreResult;
 }
 
 const styles = StyleSheet.create({
@@ -260,21 +272,20 @@ function MetricTile({
 }
 
 function computeReportMetrics(props: ReportProps) {
-  const { store, lease, leaseOptions, equipment, valuation, portfolioStores } = props;
+  const { store, lease, leaseOptions, equipment, valuation, portfolioStores, financial } = props;
   const storeName = store?.name ?? "Store";
   const address = store?.address ?? "";
   const sqft = store?.square_footage ?? 3500;
-  const monthlyRevenue = store?.monthly_revenue ?? 0;
-  const monthlyExpenses = store?.monthly_expenses ?? 0;
-  const monthlyEbitda = monthlyRevenue - monthlyExpenses;
-  const annualRevenue = monthlyRevenue * 12;
-  const annualEbitda = monthlyEbitda * 12;
-  const annualDebtService = store?.annual_debt_service ?? 0;
-  const monthlyUtilities = store?.monthly_utilities ?? 0;
-  const loanBalance = store?.loan_balance ?? 0;
+  const monthlyRevenue = financial.monthlyAverages.revenue;
+  const monthlyExpenses = financial.monthlyAverages.expenses;
+  const monthlyEbitda = financial.monthlyAverages.ebitda;
+  const annualRevenue = financial.revenueTtmTotal;
+  const annualEbitda = financial.ebitdaTtmTotal;
+  const annualDebtService = financial.annualDebtService;
+  const loanBalance = financial.totalOutstandingDebt;
   const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
 
-  const dscr = annualDebtService > 0 ? calcDSCR(annualEbitda, annualDebtService) : 0;
+  const dscr = financial.dscr ?? 0;
   const portfolioEbitda = portfolioStores.reduce(
     (s, st) => s + ((st.monthly_revenue ?? 0) - (st.monthly_expenses ?? 0)) * 12,
     0
@@ -286,11 +297,13 @@ function computeReportMetrics(props: ReportProps) {
   const globalDscr =
     portfolioDebtService > 0 ? calcGlobalDSCR(portfolioEbitda, portfolioDebtService) : dscr;
 
-  const ebitdaMargin = calcEbitdaMargin(annualEbitda, annualRevenue);
+  const ebitdaMargin = financial.ebitdaMargin;
   const revenuePerSF = calcRevenuePerSF(annualRevenue, sqft);
   const ebitdaPerSF = calcEbitdaPerSF(annualEbitda, sqft);
-  const utilityRatio = calcUtilityRatio(monthlyUtilities * 12, annualRevenue);
+  const utilityRow = financial.benchmarkRows.find((r) => r.metric === "Utility Ratio");
+  const utilityRatio = utilityRow?.store ?? calcUtilityRatio(store?.monthly_utilities ?? 0, monthlyRevenue);
   const debtYield = loanBalance > 0 ? calcDebtYield(annualEbitda, loanBalance) : 0;
+  const equitySnapshot = buildEquitySnapshot(valuation.businessValue, loanBalance);
 
   const equipRecords = (equipment ?? []) as EquipmentRecord[];
   const equipMetrics = computeEquipmentMetrics(equipRecords);
@@ -364,13 +377,64 @@ function computeReportMetrics(props: ReportProps) {
     totalInsurancePremium,
     financeRating: financeabilityRating(dscr, globalDscr),
     valuation,
+    equitySnapshot,
+    surplusCashFlow: financial.surplusCashFlow,
+    limitedData: financial.limitedData,
+    hasMonthlyFinancials: financial.hasMonthlyFinancials,
+    monthsUsed: financial.ttm.monthsUsed,
   };
+}
+
+function BreakdownTable({
+  lines,
+  totalLabel,
+  totalTtm,
+  totalMonthly,
+}: {
+  lines: { label: string; ttmTotal: number; monthlyAverage: number; pctOfTotal: number }[];
+  totalLabel: string;
+  totalTtm: number;
+  totalMonthly: number;
+}) {
+  return (
+    <>
+      <View style={styles.tableHeader}>
+        <Text style={[styles.tableCellBold, { width: "28%" }]}>Category</Text>
+        <Text style={[styles.tableCellBold, { width: "22%", textAlign: "right" }]}>TTM Total</Text>
+        <Text style={[styles.tableCellBold, { width: "22%", textAlign: "right" }]}>Monthly Avg</Text>
+        <Text style={[styles.tableCellBold, { width: "14%", textAlign: "right" }]}>% Mix</Text>
+      </View>
+      {lines.map((line) => (
+        <View key={line.label} style={styles.tableRow}>
+          <Text style={[styles.tableCell, { width: "28%" }]}>{line.label}</Text>
+          <Text style={[styles.tableCell, { width: "22%", textAlign: "right" }]}>{fmtDollar(line.ttmTotal)}</Text>
+          <Text style={[styles.tableCell, { width: "22%", textAlign: "right" }]}>{fmtDollar(line.monthlyAverage)}</Text>
+          <Text style={[styles.tableCell, { width: "14%", textAlign: "right" }]}>{fmtPct(line.pctOfTotal, 0)}</Text>
+        </View>
+      ))}
+      <View style={[styles.tableRow, { backgroundColor: "#f8fafc" }]}>
+        <Text style={[styles.tableCellBold, { width: "28%" }]}>{totalLabel}</Text>
+        <Text style={[styles.tableCellBold, { width: "22%", textAlign: "right" }]}>{fmtDollar(totalTtm)}</Text>
+        <Text style={[styles.tableCellBold, { width: "22%", textAlign: "right" }]}>{fmtDollar(totalMonthly)}</Text>
+        <Text style={[styles.tableCellBold, { width: "14%", textAlign: "right" }]}>100%</Text>
+      </View>
+    </>
+  );
 }
 
 export function ReportDocument(props: ReportProps) {
   const m = computeReportMetrics(props);
-  const { executiveSummary, generatedDate, lease, realEstate, insurance, portfolioStores, store } =
-    props;
+  const {
+    executiveSummary,
+    generatedDate,
+    lease,
+    realEstate,
+    insurance,
+    portfolioStores,
+    store,
+    financial,
+    laundroCfoScore,
+  } = props;
 
   return (
     <Document
@@ -408,6 +472,7 @@ export function ReportDocument(props: ReportProps) {
             "Executive Summary",
             "Store Overview",
             "Financial Analysis",
+            "Benchmarking",
             "Lease Analysis",
             "Equipment Analysis",
             "Valuation Analysis",
@@ -507,16 +572,144 @@ export function ReportDocument(props: ReportProps) {
       {/* 4 — Financial Analysis */}
       <Page size="LETTER" style={styles.page}>
         <Text style={styles.sectionTitle}>Financial Analysis</Text>
-        <Text style={styles.bodyText}>Trailing twelve-month financial profile from reported store data.</Text>
-        <SectionHeader>Income Statement</SectionHeader>
-        <DataRow label="Annual Revenue" value={fmtDollar(m.annualRevenue)} />
-        <DataRow label="Annual Expenses" value={fmtDollar(m.monthlyExpenses * 12)} />
-        <DataRow label="Annual EBITDA" value={fmtDollar(m.annualEbitda)} positive />
+        <Text style={styles.bodyText}>
+          {m.hasMonthlyFinancials
+            ? `Trailing ${m.monthsUsed}-month financial profile from monthly P&L records.`
+            : "Limited data — figures below use owner-reported profile fields until monthly financials are entered."}
+        </Text>
+        {m.limitedData && (
+          <View style={styles.warningBox}>
+            <Text style={styles.boxText}>
+              ⚠ Limited financial history on file. Enter at least 6 months of monthly financials for full TTM accuracy.
+            </Text>
+          </View>
+        )}
+        <SectionHeader>Income Statement — TTM vs Monthly Average</SectionHeader>
+        <View style={styles.tableHeader}>
+          <Text style={[styles.tableCellBold, { width: "40%" }]}>Line Item</Text>
+          <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right" }]}>TTM Total</Text>
+          <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right" }]}>Monthly Avg</Text>
+        </View>
+        <View style={styles.tableRow}>
+          <Text style={[styles.tableCell, { width: "40%" }]}>Revenue</Text>
+          <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right" }]}>{fmtDollar(m.annualRevenue)}</Text>
+          <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right" }]}>{fmtDollar(m.monthlyRevenue)}</Text>
+        </View>
+        <View style={styles.tableRow}>
+          <Text style={[styles.tableCell, { width: "40%" }]}>Operating Expenses</Text>
+          <Text style={[styles.tableCell, { width: "30%", textAlign: "right" }]}>{fmtDollar(financial.expenseTtmTotal)}</Text>
+          <Text style={[styles.tableCell, { width: "30%", textAlign: "right" }]}>{fmtDollar(m.monthlyExpenses)}</Text>
+        </View>
+        <View style={styles.tableRow}>
+          <Text style={[styles.tableCellBold, { width: "40%" }]}>EBITDA</Text>
+          <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right", color: "#15803d" }]}>{fmtDollar(m.annualEbitda)}</Text>
+          <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right", color: "#15803d" }]}>{fmtDollar(m.monthlyEbitda)}</Text>
+        </View>
         <DataRow label="EBITDA Margin" value={fmtPct(m.ebitdaMargin)} valueColor={ratioColor(m.ebitdaMargin, 25, 20)} />
-        <DataRow label="Monthly Revenue" value={fmtDollar(m.monthlyRevenue)} />
-        <DataRow label="Monthly EBITDA" value={fmtDollar(m.monthlyEbitda)} />
+
+        {financial.revenueBreakdown.length > 0 && (
+          <>
+            <SectionHeader>Revenue Breakdown</SectionHeader>
+            <BreakdownTable
+              lines={financial.revenueBreakdown}
+              totalLabel="Total Revenue"
+              totalTtm={financial.revenueTtmTotal}
+              totalMonthly={m.monthlyRevenue}
+            />
+            <View style={{ marginTop: 8 }}>
+              <CategoryBreakdownBar
+                segments={financial.revenueBreakdown.map((l) => ({
+                  label: l.label,
+                  value: l.ttmTotal,
+                  pct: l.pctOfTotal,
+                }))}
+                title="Revenue Mix"
+                height={72}
+              />
+            </View>
+          </>
+        )}
+
+        {financial.expenseBreakdown.length > 0 && (
+          <>
+            <SectionHeader>Expense Breakdown</SectionHeader>
+            <BreakdownTable
+              lines={financial.expenseBreakdown}
+              totalLabel="Total Expenses"
+              totalTtm={financial.expenseTtmTotal}
+              totalMonthly={m.monthlyExpenses}
+            />
+            <View style={{ marginTop: 8 }}>
+              <CategoryBreakdownBar
+                segments={financial.expenseBreakdown.map((l) => ({
+                  label: l.label,
+                  value: l.ttmTotal,
+                  pct: l.pctOfTotal,
+                }))}
+                title="Expense Mix"
+                height={72}
+              />
+            </View>
+          </>
+        )}
+
+        <SectionHeader>Water KPI</SectionHeader>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <StatusIndicator status={waterKpiStatusColor(financial.waterKPI.status)} />
+          <Text style={styles.bodyText}>
+            Water cost is {fmtPct(financial.waterKPI.ratio * 100)} of Self-Service Revenue —{" "}
+            {financial.waterKPI.status} ({financial.waterKPI.status === "Healthy" ? "<15%" : financial.waterKPI.status === "Watch" ? "15–20%" : ">20%"})
+          </Text>
+        </View>
+        <DataRow label="Avg Monthly Water" value={fmtDollar(financial.waterKPI.waterMonthlyAverage)} />
+        <DataRow label="Avg Self-Service Revenue" value={fmtDollar(financial.waterKPI.selfServiceMonthlyAverage)} />
+
+        {financial.ttmChartData.length > 0 && (
+          <>
+            <SectionHeader>TTM Revenue Trend</SectionHeader>
+            <RevenueExpenseBarChart data={financial.ttmChartData} width={500} height={160} />
+          </>
+        )}
+        <PageChrome storeName={m.storeName} />
+      </Page>
+
+      {/* 4b — Debt & Underwriting Ratios */}
+      <Page size="LETTER" style={styles.page}>
+        <Text style={styles.sectionTitle}>Financial Analysis — Debt & Coverage</Text>
+        <SectionHeader>Loan Detail</SectionHeader>
+        {financial.loans.length === 0 ? (
+          <Text style={styles.bodyText}>No active loans on file.</Text>
+        ) : (
+          <>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableCellBold, { width: "18%" }]}>Lender</Text>
+              <Text style={[styles.tableCellBold, { width: "14%", textAlign: "right" }]}>Original</Text>
+              <Text style={[styles.tableCellBold, { width: "14%", textAlign: "right" }]}>Balance</Text>
+              <Text style={[styles.tableCellBold, { width: "10%", textAlign: "right" }]}>Rate</Text>
+              <Text style={[styles.tableCellBold, { width: "14%", textAlign: "right" }]}>Payment</Text>
+              <Text style={[styles.tableCellBold, { width: "14%", textAlign: "right" }]}>Term Left</Text>
+            </View>
+            {financial.loans.map((loan) => (
+              <View key={loan.id} style={styles.tableRow}>
+                <Text style={[styles.tableCell, { width: "18%" }]}>{loan.lenderName}</Text>
+                <Text style={[styles.tableCell, { width: "14%", textAlign: "right" }]}>{fmtDollar(loan.originalBalance)}</Text>
+                <Text style={[styles.tableCell, { width: "14%", textAlign: "right" }]}>{fmtDollar(loan.estimatedBalance)}</Text>
+                <Text style={[styles.tableCell, { width: "10%", textAlign: "right" }]}>{loan.interestRate.toFixed(2)}%</Text>
+                <Text style={[styles.tableCell, { width: "14%", textAlign: "right" }]}>{fmtDollar(loan.monthlyPayment)}/mo</Text>
+                <Text style={[styles.tableCell, { width: "14%", textAlign: "right" }]}>{loan.remainingMonths} mo</Text>
+              </View>
+            ))}
+          </>
+        )}
+        <DataRow label="Total Monthly Debt Service" value={fmtDollar(financial.totalMonthlyDebtService)} />
         <DataRow label="Annual Debt Service" value={m.annualDebtService > 0 ? fmtDollar(m.annualDebtService) : "Not reported"} />
-        <DataRow label="Loan Balance" value={m.loanBalance > 0 ? fmtDollar(m.loanBalance) : "Not reported"} />
+        <DataRow
+          label="DSCR"
+          value={m.annualDebtService > 0 ? fmtMultiple(m.dscr) : "N/A"}
+          valueColor={m.annualDebtService > 0 ? ratioColor(m.dscr, 1.5, 1.25) : undefined}
+        />
+        <DataRow label="Surplus Cash Flow" value={fmtDollar(m.surplusCashFlow)} positive={m.surplusCashFlow >= 0} negative={m.surplusCashFlow < 0} />
+
         <SectionHeader>Underwriting Ratios</SectionHeader>
         <View style={styles.grid2}>
           <MetricTile label="DSCR" value={m.annualDebtService > 0 ? fmtMultiple(m.dscr) : "N/A"} valueColor={m.annualDebtService > 0 ? ratioColor(m.dscr, 1.5, 1.25) : undefined} width="23%" />
@@ -538,7 +731,85 @@ export function ReportDocument(props: ReportProps) {
         <PageChrome storeName={m.storeName} />
       </Page>
 
-      {/* 5 — Lease Analysis */}
+      {/* 5 — Benchmarking */}
+      <Page size="LETTER" style={styles.page}>
+        <Text style={styles.sectionTitle}>Benchmarking</Text>
+        <Text style={styles.bodyText}>
+          Store performance vs industry benchmarks (median and top quartile).
+        </Text>
+        <SectionHeader>LaundroCFO Score</SectionHeader>
+        <View style={{ flexDirection: "row", gap: 16, marginBottom: 12 }}>
+          <View style={[styles.metricCard, { width: "30%" }]}>
+            <Text style={styles.metricLabel}>Overall Grade</Text>
+            <Text style={[styles.metricValue, { color: "#1d4ed8", fontSize: 28 }]}>{laundroCfoScore.grade}</Text>
+            <Text style={[styles.boxText, { marginTop: 4 }]}>{laundroCfoScore.total}/100</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            {(
+              [
+                ["Financial Performance", laundroCfoScore.categories.financialPerformance],
+                ["Debt & Coverage", laundroCfoScore.categories.debtCoverage],
+                ["Asset Quality", laundroCfoScore.categories.assetQuality],
+                ["Profile Completeness", laundroCfoScore.categories.profileCompleteness],
+              ] as const
+            ).map(([label, cat]) => (
+              <DataRow key={label} label={label} value={`${cat.score}/${cat.max}`} />
+            ))}
+          </View>
+        </View>
+        <SectionHeader>Industry Benchmarks</SectionHeader>
+        {financial.benchmarkRows.map((row) =>
+          row.store != null ? (
+            <View key={row.metric} style={{ marginBottom: 6 }}>
+              <BenchmarkBar
+                metric={row.metric}
+                store={row.store}
+                unit={row.unit}
+                median={row.median}
+                top25={row.top25}
+                bottom25={row.bottom25}
+                lowerIsBetter={row.lowerIsBetter}
+                width={500}
+              />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+                <StatusIndicator
+                  status={
+                    benchmarkStatusColor(row.store, row.top25, row.bottom25, row.lowerIsBetter) ===
+                    "#15803d"
+                      ? "green"
+                      : benchmarkStatusColor(row.store, row.top25, row.bottom25, row.lowerIsBetter) ===
+                          "#ef4444"
+                        ? "red"
+                        : "amber"
+                  }
+                />
+                <Text style={[styles.boxText, { fontSize: 8 }]}>
+                  {row.lowerIsBetter
+                    ? row.store <= row.top25
+                      ? "Top quartile"
+                      : row.store <= row.median
+                        ? "Above median"
+                        : row.store <= row.bottom25
+                          ? "Below median"
+                          : "Bottom quartile"
+                    : row.store >= row.top25
+                      ? "Top quartile"
+                      : row.store >= row.median
+                        ? "Above median"
+                        : row.store >= row.bottom25
+                          ? "Below median"
+                          : "Bottom quartile"}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <DataRow key={row.metric} label={row.metric} value="Insufficient data" />
+          )
+        )}
+        <PageChrome storeName={m.storeName} />
+      </Page>
+
+      {/* 6 — Lease Analysis */}
       <Page size="LETTER" style={styles.page}>
         <Text style={styles.sectionTitle}>Lease Analysis</Text>
         {m.isOwnerOccupied ? (
@@ -672,6 +943,13 @@ export function ReportDocument(props: ReportProps) {
         <DataRow label="Final Multiple" value={fmtMultiple(m.valuation.finalMultiple)} valueColor="#1d4ed8" />
         <DataRow label="× Annual EBITDA" value={fmtDollar(m.annualEbitda)} />
         <DataRow label="= Business Value" value={fmtDollar(m.valuation.businessValue)} positive />
+        <SectionHeader>Equity Snapshot</SectionHeader>
+        <DataRow label="Store Value" value={fmtDollar(m.equitySnapshot.storeValue)} />
+        <DataRow label="Total Debt" value={fmtDollar(m.equitySnapshot.debt)} />
+        <DataRow label="Equity (Value − Debt)" value={fmtDollar(m.equitySnapshot.equity)} positive={m.equitySnapshot.equity >= 0} />
+        <DataRow label="Monthly EBITDA" value={fmtDollar(m.monthlyEbitda)} />
+        <DataRow label="Monthly Debt Service" value={fmtDollar(financial.totalMonthlyDebtService)} />
+        <DataRow label="Surplus Cash Flow" value={fmtDollar(m.surplusCashFlow)} positive={m.surplusCashFlow >= 0} negative={m.surplusCashFlow < 0} />
         {m.isOwnerOccupied && m.valuation.realEstateValue > 0 && (
           <>
             <DataRow label="Real Estate Value" value={fmtDollar(m.valuation.realEstateValue)} />
@@ -786,7 +1064,10 @@ export function ReportDocument(props: ReportProps) {
               <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right" }]}>Est. Value</Text>
             </View>
             {portfolioStores.map((ps: any) => {
-              const psEbitda = ((ps.monthly_revenue ?? 0) - (ps.monthly_expenses ?? 0)) * 12;
+              const psEbitda =
+                ps.id === store?.id
+                  ? m.annualEbitda
+                  : ((ps.monthly_revenue ?? 0) - (ps.monthly_expenses ?? 0)) * 12;
               const psDscr = (ps.annual_debt_service ?? 0) > 0 ? psEbitda / ps.annual_debt_service : 0;
               return (
                 <View key={ps.id} style={styles.tableRow}>
@@ -821,7 +1102,7 @@ export function ReportDocument(props: ReportProps) {
         </Text>
         <SectionHeader>Data Sources</SectionHeader>
         <Text style={styles.bodyText}>
-          Financial data: owner-reported monthly revenue, expenses, utilities, and debt service from LaundroCFO store settings. Lease data: Occupancy module. Equipment: equipment inventory records. Insurance: active policy records. All figures should be independently verified during lender due diligence.
+          Financial data: monthly_financials P&L records and monthly_utilities breakdown from LaundroCFO, with TTM aggregation where available. Debt: active store_loans records. Lease data: Occupancy module. Equipment: equipment inventory records. Insurance: active policy records. All figures should be independently verified during lender due diligence.
         </Text>
         <SectionHeader>Glossary</SectionHeader>
         <DataRow label="EBITDA" value="Earnings before interest, taxes, depreciation, and amortization" />
