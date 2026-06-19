@@ -1833,7 +1833,29 @@ export async function postTransactionsBatch(
     return { postedCount: 0, error: null };
   }
 
-  for (const txn of transactions) {
+  const txnIds = transactions.map((t) => t.id);
+  const { data: existingLinks, error: linksFetchError } = await supabase
+    .from("transaction_pl_links")
+    .select("transaction_id")
+    .in("transaction_id", txnIds);
+
+  if (linksFetchError) {
+    return { postedCount: 0, error: linksFetchError.message };
+  }
+
+  const linkedIds = new Set(
+    (existingLinks ?? []).map((l: { transaction_id: string }) => l.transaction_id)
+  );
+
+  const postableTransactions = transactions.filter(
+    (txn) => (txn.status ?? "needs_review") !== "posted" && !linkedIds.has(txn.id)
+  );
+
+  if (postableTransactions.length === 0) {
+    return { postedCount: 0, error: null };
+  }
+
+  for (const txn of postableTransactions) {
     if (!txn.id) {
       return { postedCount: 0, error: "Each transaction must have an id before posting." };
     }
@@ -1860,7 +1882,7 @@ export async function postTransactionsBatch(
     postingTarget: PostingTarget;
   };
 
-  const items: BatchItem[] = transactions.map((txn) => {
+  const items: BatchItem[] = postableTransactions.map((txn) => {
     const date = new Date(txn.transaction_date.split("T")[0] + "T12:00:00");
     const importCategory = txn.category;
     const postingTarget = resolvePostingTarget(importCategory)!;
@@ -2051,7 +2073,7 @@ export async function postTransactionsBatch(
       if (auditError) return { postedCount: 0, error: auditError };
     }
 
-    return { postedCount: transactions.length, error: null };
+    return { postedCount: postableTransactions.length, error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to post transactions.";
     return { postedCount: 0, error: message };

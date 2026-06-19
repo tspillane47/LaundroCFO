@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
@@ -80,6 +80,7 @@ type TransactionGroup = {
   groupKey: string;
   vendorPattern: string;
   description: string;
+  sampleDescription: string;
   count: number;
   totalAmount: number;
   type: TransactionType;
@@ -88,6 +89,23 @@ type TransactionGroup = {
   ruleApplied: RuleMatchKind;
   items: ReviewRow[];
 };
+
+function mostCommonDescription(items: ReviewRow[]): string {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const desc = item.description?.trim() || "(no description)";
+    counts.set(desc, (counts.get(desc) ?? 0) + 1);
+  }
+  let best = items[0]?.description?.trim() || "(no description)";
+  let bestCount = 0;
+  for (const [desc, count] of Array.from(counts.entries())) {
+    if (count > bestCount) {
+      best = desc;
+      bestCount = count;
+    }
+  }
+  return best;
+}
 
 function isPostedRow(row: ReviewRow): boolean {
   return row.status === "posted" && !row.excluded;
@@ -354,10 +372,12 @@ export default function TransactionsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkCategory, setBulkCategory] = useState<BankImportCategory>("self_service_revenue");
   const [groupByVendor, setGroupByVendor] = useState(true);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showManageRules, setShowManageRules] = useState(false);
   const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
   const [postingCount, setPostingCount] = useState(0);
+  const postingRef = useRef(false);
   const [duplicateImportCount, setDuplicateImportCount] = useState(0);
 
   const [expandedHistory, setExpandedHistory] = useState<Set<string>>(new Set());
@@ -604,6 +624,7 @@ export default function TransactionsPage() {
           groupKey,
           vendorPattern: vendorPattern || "(no description)",
           description: txn.description ?? vendorPattern ?? "(no description)",
+          sampleDescription: txn.description?.trim() || "(no description)",
           count: 1,
           totalAmount: txn.amount,
           type: txn.type,
@@ -614,7 +635,12 @@ export default function TransactionsPage() {
         });
       }
     }
-    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+    return Array.from(map.values())
+      .map((group) => ({
+        ...group,
+        sampleDescription: mostCommonDescription(group.items),
+      }))
+      .sort((a, b) => b.count - a.count);
   }, [reviewRows]);
 
   const selectableIds = useMemo(
@@ -724,10 +750,25 @@ export default function TransactionsPage() {
     }
   }
 
-  async function handlePostRows(rows: ReviewRow[]) {
-    if (!store?.id || !userId || rows.length === 0) return;
+  function toggleGroupExpanded(groupKey: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  }
 
-    for (const row of rows) {
+  async function handlePostRows(rows: ReviewRow[]) {
+    if (!store?.id || !userId || rows.length === 0 || postingRef.current) return;
+
+    const postableRows = rows.filter((row) => row.status !== "posted" && !row.excluded);
+    if (postableRows.length === 0) {
+      setMessage({ type: "error", text: "These transactions are already posted." });
+      return;
+    }
+
+    for (const row of postableRows) {
       if (!isCategoryReadyToPost(row.category)) {
         setMessage({
           type: "error",
@@ -737,52 +778,58 @@ export default function TransactionsPage() {
       }
     }
 
+    postingRef.current = true;
     setPosting(true);
-    setPostingCount(rows.length);
+    setPostingCount(postableRows.length);
     setMessage(null);
 
-    const batch: BatchPostTransaction[] = rows.map((row) => {
-      const txn = transactions.find((t) => t.id === row.id);
-      return {
-        id: row.id,
-        transaction_date: row.transaction_date,
-        amount: row.amount,
-        category: row.category,
-        status: txn?.status ?? "needs_review",
-        original_category: txn?.original_category ?? null,
-      };
-    });
+    try {
+      const batch: BatchPostTransaction[] = postableRows.map((row) => {
+        const txn = transactions.find((t) => t.id === row.id);
+        return {
+          id: row.id,
+          transaction_date: row.transaction_date,
+          amount: row.amount,
+          category: row.category,
+          status: txn?.status ?? "needs_review",
+          original_category: txn?.original_category ?? null,
+        };
+      });
 
-    const utilitiesLookup = buildUtilitiesLookup(utilityRecords);
-    const enrichedRecords = enrichMonthlyRecords(sortRecordsDesc(financialRecords), utilitiesLookup);
+      const utilitiesLookup = buildUtilitiesLookup(utilityRecords);
+      const enrichedRecords = enrichMonthlyRecords(sortRecordsDesc(financialRecords), utilitiesLookup);
 
-    const result = await postTransactionsBatch(supabase, {
-      storeId: store.id,
-      userId,
-      transactions: batch,
-      existingRecords: enrichedRecords,
-      existingUtilityRecords: utilityRecords,
-      store,
-      changeSource: "user",
-    });
+      const result = await postTransactionsBatch(supabase, {
+        storeId: store.id,
+        userId,
+        transactions: batch,
+        existingRecords: enrichedRecords,
+        existingUtilityRecords: utilityRecords,
+        store,
+        changeSource: "user",
+      });
 
-    setPosting(false);
-    setPostingCount(0);
+      if (result.error) {
+        setMessage({ type: "error", text: result.error });
+        return;
+      }
 
-    if (result.error) {
-      setMessage({ type: "error", text: result.error });
-      return;
+      invalidateValuationCache(store.id);
+      setMessage({
+        type: "success",
+        text:
+          result.postedCount === 1
+            ? "Posted 1 transaction to P&L."
+            : result.postedCount === 0
+              ? "No new transactions were posted (already posted)."
+              : `Posted ${result.postedCount} transactions to P&L.`,
+      });
+      await loadData();
+    } finally {
+      postingRef.current = false;
+      setPosting(false);
+      setPostingCount(0);
     }
-
-    invalidateValuationCache(store.id);
-    setMessage({
-      type: "success",
-      text:
-        result.postedCount === 1
-          ? "Posted 1 transaction to P&L."
-          : `Posted ${result.postedCount} transactions to P&L.`,
-    });
-    await loadData();
   }
 
   async function confirmExclude() {
@@ -1184,6 +1231,82 @@ export default function TransactionsPage() {
     }
   }
 
+  function renderVendorDescription(vendorPattern: string, rawDescription: string, prefixSample = false) {
+    const sample = rawDescription || "(no description)";
+    return (
+      <div className="min-w-0">
+        <div className="text-slate-200 truncate" title={vendorPattern}>
+          {vendorPattern}
+        </div>
+        <div className="text-[10px] text-slate-500 truncate mt-0.5" title={sample}>
+          {prefixSample && sample !== "(no description)" ? `e.g. ${sample}` : sample}
+        </div>
+      </div>
+    );
+  }
+
+  function renderGroupSubRow(item: ReviewRow) {
+    const storedCategory = transactions.find((t) => t.id === item.id)?.category ?? null;
+    return (
+      <tr key={`sub-${item.id}`} className="border-b border-white/[0.02] bg-white/[0.015]">
+        <td className="py-2 pr-3 pl-8">
+          <div className="min-w-0">
+            <div className="text-slate-400 whitespace-nowrap text-[11px]">
+              {new Date(item.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
+            </div>
+            <div className="text-[11px] text-slate-300 truncate mt-0.5" title={item.description ?? undefined}>
+              {item.description ?? "—"}
+            </div>
+          </div>
+        </td>
+        <td className="py-2 pr-3">
+          <TypeBadge type={item.type} />
+        </td>
+        <td className="py-2 pr-3" />
+        <td className="py-2 pr-3 text-right font-semibold tabular-nums text-[11px]">{fmtDollar(item.amount)}</td>
+        <td className="py-2 pr-3">
+          <select
+            value={item.category}
+            onChange={(e) => void updateCategory(item.id, e.target.value as BankImportCategory, storedCategory, true)}
+            className={clsx(
+              INPUT_CLASS,
+              "w-40 py-1.5 text-[11px]",
+              item.category === "needs_review" && "border-amber-500/40"
+            )}
+          >
+            {getImportCategoriesForType(item.type).map((f) => (
+              <option key={f} value={f}>
+                {BANK_IMPORT_CATEGORY_LABELS[f]}
+              </option>
+            ))}
+          </select>
+        </td>
+        <td className="py-2 pr-3">{renderNotesInput(item)}</td>
+        <td className="py-2 text-right whitespace-nowrap">
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <StatusBadge status={item.status} excluded={item.excluded} />
+            <button
+              type="button"
+              className="btn-primary text-[11px]"
+              onClick={() => void handlePostRows([item])}
+              disabled={!isCategoryReadyToPost(item.category) || posting || item.status === "posted"}
+            >
+              {posting ? "Posting…" : "Post"}
+            </button>
+            <button
+              type="button"
+              className="btn-outline text-[11px] text-red-400 border-red-500/30"
+              onClick={() => setExcludeModal({ ids: [item.id], reason: "" })}
+              disabled={posting}
+            >
+              Exclude
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
   function renderNotesInput(row: ReviewRow, readOnly = false) {
     return (
       <input
@@ -1369,15 +1492,39 @@ export default function TransactionsPage() {
             )}
           </button>
           {activeTab === "needs_review" && (
-            <label className="flex items-center gap-2 text-[12px] text-slate-400 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={groupByVendor}
-                onChange={(e) => setGroupByVendor(e.target.checked)}
-                className="rounded border-white/20"
-              />
-              Group similar vendors
-            </label>
+            <>
+              <label className="flex items-center gap-2 text-[12px] text-slate-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={groupByVendor}
+                  onChange={(e) => {
+                    setGroupByVendor(e.target.checked);
+                    if (!e.target.checked) setExpandedGroups(new Set());
+                  }}
+                  className="rounded border-white/20"
+                />
+                Group similar vendors
+              </label>
+              {groupByVendor && transactionGroups.some((g) => g.count > 1) && (
+                <button
+                  type="button"
+                  className="text-[12px] text-blue-400 hover:text-blue-300"
+                  onClick={() => {
+                    const multiGroups = transactionGroups.filter((g) => g.count > 1);
+                    const allExpanded = multiGroups.every((g) => expandedGroups.has(g.groupKey));
+                    if (allExpanded) {
+                      setExpandedGroups(new Set());
+                    } else {
+                      setExpandedGroups(new Set(multiGroups.map((g) => g.groupKey)));
+                    }
+                  }}
+                >
+                  {transactionGroups.filter((g) => g.count > 1).every((g) => expandedGroups.has(g.groupKey))
+                    ? "Collapse All"
+                    : "Expand All"}
+                </button>
+              )}
+            </>
           )}
         </div>
 
@@ -1496,10 +1643,33 @@ export default function TransactionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {transactionGroups.map((group) => (
+                {transactionGroups.map((group) => {
+                  const isExpanded = expandedGroups.has(group.groupKey);
+                  const canExpand = group.count > 1;
+                  return (
                   <Fragment key={group.groupKey}>
                     <tr className="border-b border-white/[0.04]">
-                      <td className="py-3 pr-3 text-slate-200 max-w-[200px] truncate">{group.vendorPattern}</td>
+                      <td className="py-3 pr-3 max-w-[240px]">
+                        <div className="flex items-start gap-1.5">
+                          {canExpand ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleGroupExpanded(group.groupKey)}
+                              className="text-slate-500 hover:text-slate-300 w-5 shrink-0 mt-0.5 text-[13px] leading-none"
+                              aria-label={isExpanded ? "Collapse group" : "Expand group"}
+                            >
+                              {isExpanded ? "▾" : "▸"}
+                            </button>
+                          ) : (
+                            <span className="w-5 shrink-0" />
+                          )}
+                          {renderVendorDescription(
+                            group.vendorPattern,
+                            group.sampleDescription,
+                            canExpand
+                          )}
+                        </div>
+                      </td>
                       <td className="py-3 pr-3">
                         <TypeBadge type={group.type} />
                       </td>
@@ -1528,7 +1698,7 @@ export default function TransactionsPage() {
                           onClick={() => void handlePostRows(group.items)}
                           disabled={!isCategoryReadyToPost(group.category) || posting}
                         >
-                          Post All
+                          {posting ? "Posting…" : "Post All"}
                         </button>
                         <button
                           type="button"
@@ -1536,6 +1706,7 @@ export default function TransactionsPage() {
                           onClick={() =>
                             setExcludeModal({ ids: group.items.map((i) => i.id), reason: "" })
                           }
+                          disabled={posting}
                         >
                           Exclude All
                         </button>
@@ -1556,6 +1727,9 @@ export default function TransactionsPage() {
                         </button>
                       </td>
                     </tr>
+                    {isExpanded &&
+                      canExpand &&
+                      group.items.map((item) => renderGroupSubRow(item))}
                     {group.count === 1 && renderHistoryToggle(group.items[0], 7)}
                     {ruleFormKey === group.groupKey && (
                       <tr className="border-b border-white/[0.04] bg-blue-500/5">
@@ -1581,7 +1755,8 @@ export default function TransactionsPage() {
                       </tr>
                     )}
                   </Fragment>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1636,9 +1811,10 @@ export default function TransactionsPage() {
                           {new Date(row.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
                         </td>
                         <td className="py-3 pr-3 text-slate-200 max-w-[180px]">
-                          <div className="truncate" title={row.description ?? undefined}>
-                            {row.description ?? "—"}
-                          </div>
+                          {renderVendorDescription(
+                            normalizeVendorPattern(row.description) || "—",
+                            row.description ?? "—"
+                          )}
                           {posted && renderPostedLink(row)}
                           {excluded && row.exclusion_reason && (
                             <div className="text-[10px] text-red-400/80 mt-0.5 truncate" title={row.exclusion_reason}>
@@ -1702,9 +1878,11 @@ export default function TransactionsPage() {
                                 type="button"
                                 className="btn-primary text-[11px] mr-1.5"
                                 onClick={() => void handlePostRows([row])}
-                                disabled={!isCategoryReadyToPost(row.category) || posting}
+                                disabled={
+                                  !isCategoryReadyToPost(row.category) || posting || row.status === "posted"
+                                }
                               >
-                                Post
+                                {posting ? "Posting…" : "Post"}
                               </button>
                               <button
                                 type="button"
