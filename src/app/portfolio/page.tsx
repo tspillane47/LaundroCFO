@@ -20,8 +20,6 @@ import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
 import { totalUtilities, type MonthlyUtilityRow } from "@/lib/utilities";
 import {
   financials as demoFinancials,
-  DEMO_MONTHLY_REVENUE,
-  DEMO_MONTHLY_EXPENSES,
   DEMO_ANNUAL_DEBT_SERVICE,
 } from "@/lib/data";
 
@@ -272,25 +270,20 @@ export default function PortfolioPage() {
 
   const storeMetrics = useMemo(() => {
     return (stores as Store[]).map((store) => {
-      const hasRealData = (store.monthly_revenue ?? 0) > 0;
-      const monthlyRevenue = hasRealData ? (store.monthly_revenue ?? 0) : DEMO_MONTHLY_REVENUE;
-      const monthlyExpenses = hasRealData
-        ? (store.monthly_expenses ?? 0)
-        : DEMO_MONTHLY_EXPENSES;
-      const monthlyEbitda = monthlyRevenue - monthlyExpenses;
       const storeValuation = valuationByStoreId.get(store.id);
-      const annualEbitda =
-        hasRealData && storeValuation
-          ? storeValuation.annualEbitda
-          : monthlyEbitda * 12;
-      const debtService = hasRealData
+      const hasFinancials = (storeValuation?.ttmMonthsUsed ?? 0) > 0;
+      const monthlyRevenue = hasFinancials ? (storeValuation!.ttmRevenue ?? 0) / 12 : 0;
+      const monthlyEbitda = hasFinancials ? (storeValuation!.ttmEbitda ?? 0) / 12 : 0;
+      const annualEbitda = hasFinancials ? (storeValuation!.annualEbitda ?? 0) : 0;
+      const debtService = hasFinancials
         ? (store.annual_debt_service ?? 0)
         : DEMO_ANNUAL_DEBT_SERVICE;
-      const annualCashFlow = hasRealData ? annualEbitda - debtService : demoFinancials.cashFlow;
-      const dscr = debtService > 0 ? annualCashFlow / debtService : 0;
-      const estimatedValue = hasRealData && storeValuation
-        ? storeValuation.businessValue
-        : demoFinancials.estimatedValue;
+      const dscr = hasFinancials
+        ? (storeValuation!.ttmDscr ?? 0)
+        : debtService > 0
+          ? demoFinancials.cashFlow / debtService
+          : 0;
+      const estimatedValue = storeValuation?.businessValue ?? demoFinancials.estimatedValue;
       const loanBalance = store.loan_balance ?? 0;
       const storeCash =
         (store.operating_account_balance ?? 0) +
@@ -310,7 +303,7 @@ export default function PortfolioPage() {
 
       return {
         store,
-        hasRealData,
+        hasFinancials,
         estimatedValue,
         monthlyRevenue,
         monthlyEbitda,
@@ -320,12 +313,12 @@ export default function PortfolioPage() {
         leaseYearsRemaining,
         avgMachineAge,
         storeCash,
-        hasDscrWarning: debtService > 0 && dscr < 1.25,
+        hasDscrWarning: hasFinancials && dscr > 0 && dscr < 1.25,
       };
     });
   }, [stores, leases, valuationByStoreId]);
 
-  const usingDemoData = storeMetrics.some((m) => !m.hasRealData);
+  const usingDemoData = !storeMetrics.some((m) => m.hasFinancials);
 
   const aggregates = useMemo(() => {
     const totalPortfolioValue = storeMetrics.reduce((s, m) => s + m.estimatedValue, 0);
@@ -402,6 +395,12 @@ export default function PortfolioPage() {
     setSelectedStore(store);
     setIsAllStores(false);
     router.push("/dashboard");
+  }
+
+  function openStoreFinancials(store: Store) {
+    setSelectedStore(store);
+    setIsAllStores(false);
+    router.push("/financials");
   }
 
   async function handleArchive(store: Store) {
@@ -747,28 +746,48 @@ export default function PortfolioPage() {
                 {m.store.address ?? "No address"}
               </div>
 
-              <div className="grid grid-cols-4 gap-3 mb-4 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
-                {[
-                  { label: "Value", value: fmtDollar(m.estimatedValue) },
-                  { label: "Revenue", value: fmtDollar(m.monthlyRevenue) },
-                  { label: "EBITDA", value: fmtDollar(m.monthlyEbitda) },
-                  {
-                    label: "DSCR",
-                    value: m.store.annual_debt_service || !m.hasRealData ? fmtMultiple(m.dscr) : "—",
-                    color: m.store.annual_debt_service || !m.hasRealData ? dscrColorClass(m.dscr) : undefined,
-                  },
-                ].map((metric) => (
-                  <div key={metric.label}>
-                    <div className="metric-label mb-1">{metric.label}</div>
-                    <div
-                      className={clsx("text-[14px] font-semibold tabular-nums", metric.color)}
-                      style={metric.color ? undefined : { color: "var(--text-primary)" }}
-                    >
-                      {metric.value}
-                    </div>
-                  </div>
-                ))}
+              <div className="pt-2 border-t mb-4" style={{ borderColor: "var(--border)" }}>
+                <div className="metric-label mb-1">Value</div>
+                <div
+                  className="text-[14px] font-semibold tabular-nums"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {fmtDollar(m.estimatedValue)}
+                </div>
               </div>
+
+              {m.hasFinancials ? (
+                <div className="grid grid-cols-3 gap-3 mb-4" style={{ borderColor: "var(--border)" }}>
+                  {[
+                    { label: "Revenue", value: fmtDollar(m.monthlyRevenue) },
+                    { label: "EBITDA", value: fmtDollar(m.monthlyEbitda) },
+                    {
+                      label: "DSCR",
+                      value: m.dscr > 0 ? fmtMultiple(m.dscr) : "—",
+                      color: m.dscr > 0 ? dscrColorClass(m.dscr) : undefined,
+                    },
+                  ].map((metric) => (
+                    <div key={metric.label}>
+                      <div className="metric-label mb-1">{metric.label}</div>
+                      <div
+                        className={clsx("text-[14px] font-semibold tabular-nums", metric.color)}
+                        style={metric.color ? undefined : { color: "var(--text-primary)" }}
+                      >
+                        {metric.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openStoreFinancials(m.store)}
+                  className="text-[12px] font-medium mb-4 hover:opacity-80"
+                  style={{ color: "var(--accent)", background: "none", border: "none", padding: 0 }}
+                >
+                  Add financials →
+                </button>
+              )}
 
               <div className="text-[11px] mb-4" style={{ color: "var(--text-muted)" }}>
                 Cash: {fmtDollar(m.storeCash)}

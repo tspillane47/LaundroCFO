@@ -18,6 +18,12 @@ export type StoreValuationResult = ValuationResult & {
   annualEbitda: number;
   /** Number of monthly_financials months summed (0 when using store field fallback) */
   ttmMonthsUsed: number;
+  /** Trailing-12-month revenue from monthly_financials (0 when no P&L history exists) */
+  ttmRevenue: number;
+  /** Trailing-12-month EBITDA from monthly_financials (0 when no P&L history exists) */
+  ttmEbitda: number;
+  /** Trailing-12-month DSCR from monthly_financials (0 when no P&L history exists) */
+  ttmDscr: number;
 };
 
 const valuationCache = new Map<string, { result: StoreValuationResult; timestamp: number }>();
@@ -171,6 +177,9 @@ export async function getStoreValuation(
     context: ctx,
     annualEbitda,
     ttmMonthsUsed,
+    ttmRevenue: ttm?.ttmRevenue ?? 0,
+    ttmEbitda: ttm?.ttmEbitda ?? 0,
+    ttmDscr: ttm?.dscr ?? 0,
   };
 
   valuationCache.set(storeId, { result, timestamp: Date.now() });

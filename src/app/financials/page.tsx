@@ -509,7 +509,7 @@ function amountRuleVendorPattern(type: TransactionType, amount: number): string 
 
 export default function FinancialsPage() {
   const supabase = useMemo(() => createClient(), []);
-  const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
+  const { selectedStore, isAllStores, stores, loading: storesLoading, refreshStores } = useStores();
 
   const [activeTab, setActiveTab] = useState<TabId>("pl");
   const [loading, setLoading] = useState(true);
@@ -1394,7 +1394,19 @@ export default function FinancialsPage() {
       }
     }
 
+    const { error: storeUpdateError } = await supabase
+      .from("stores")
+      .update({ monthly_revenue: 0, monthly_expenses: 0 })
+      .eq("id", storeId);
+
+    if (storeUpdateError) {
+      setError(`Failed to clear store estimates: ${storeUpdateError.message}`);
+      setClearingAllFinancialData(false);
+      return;
+    }
+
     invalidateValuationCache(storeId);
+    await refreshStores();
     setShowClearAllConfirm(false);
     setShowForm(false);
     setStagedTransactions([]);
@@ -2974,7 +2986,8 @@ export default function FinancialsPage() {
             <div className="text-[15px] font-semibold text-red-300">Clear All Financial Data</div>
             <p className="text-[13px] text-slate-300 leading-relaxed">
               This will permanently delete all financial data for {store?.name ?? "this store"}, including
-              all P&L records, utility data, and transaction history. This cannot be undone.
+              all P&L records, utility data, transaction history, and revenue/expense estimates. This cannot be
+              undone.
             </p>
             <div className="flex justify-end gap-2">
               <button
