@@ -9,6 +9,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  ComposedChart,
   Legend,
   Line,
   LineChart,
@@ -230,6 +231,52 @@ function ChartTooltip({
           <span className="text-slate-100 font-semibold">{fmt(entry.value)}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+type YearChartPoint = {
+  label: string;
+  revenue: number;
+  totalExpenses: number;
+  ebitda: number;
+};
+
+function RevenueVsEbitdaTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: { payload: YearChartPoint }[];
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  const data = payload[0].payload;
+  return (
+    <div className="bg-[#1e2a3a] border border-white/10 rounded-lg px-3.5 py-3 text-[13px] shadow-xl">
+      <div className="text-slate-400 mb-2 font-medium">{label}</div>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-8">
+          <span className="text-slate-400">Revenue</span>
+          <span className="text-slate-100 font-semibold tabular-nums">{fmtDollar(data.revenue)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-8">
+          <span className="text-slate-400">Expenses</span>
+          <span className="text-red-400/90 font-semibold tabular-nums">{fmtDollar(data.totalExpenses)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-8">
+          <span className="text-slate-400">EBITDA</span>
+          <span
+            className={clsx(
+              "font-semibold tabular-nums",
+              data.ebitda >= 0 ? "text-green-400" : "text-red-400"
+            )}
+          >
+            {fmtDollar(data.ebitda)}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -678,14 +725,24 @@ export default function FinancialsPage() {
   }, [yearRecords]);
 
   const yearChartData = useMemo(
-    () =>
+    (): YearChartPoint[] =>
       yearRecords.map((r, i) => ({
         label: MONTH_SHORT[i],
         revenue: r?.revenue ?? 0,
+        totalExpenses: r?.totalExpenses ?? 0,
         ebitda: r?.ebitda ?? 0,
       })),
     [yearRecords]
   );
+
+  const yearChartYDomain = useMemo((): [number, number] => {
+    const values = yearChartData.flatMap((d) => [d.revenue, d.ebitda]);
+    const max = Math.max(...values, 0);
+    const min = Math.min(...values, 0);
+    const span = max - min || max || 1;
+    const pad = span * 0.08;
+    return [min - pad, max + pad];
+  }, [yearChartData]);
 
   const trendChartData = useMemo(() => {
     return getChartRecords(records, 24).map((r) => ({
@@ -2079,6 +2136,59 @@ export default function FinancialsPage() {
             </table>
             </div>
           </div>
+
+          <div className="card pb-4">
+            <div className="flex items-center justify-between gap-4 mb-3">
+              <div className="section-title mb-0">Revenue vs EBITDA — {selectedYear}</div>
+              <div className="flex items-center gap-4 text-[12px] text-slate-400 shrink-0">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-2.5 rounded-sm bg-blue-500" />
+                  Revenue
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="relative flex items-center">
+                    <span className="w-4 h-0.5 bg-green-500 rounded-full" />
+                    <span className="absolute left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-green-500 border border-[var(--bg-card)]" />
+                  </span>
+                  EBITDA
+                </span>
+              </div>
+            </div>
+            <div className="h-[240px] -mx-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={yearChartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                  <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.08)" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: "#94a3b8", fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                    dy={4}
+                  />
+                  <YAxis
+                    tick={{ fill: "#94a3b8", fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={52}
+                    domain={yearChartYDomain}
+                    tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip content={<RevenueVsEbitdaTooltip />} cursor={{ fill: "rgba(148,163,184,0.06)" }} />
+                  <ReferenceLine y={0} stroke="rgba(148,163,184,0.35)" strokeWidth={1} />
+                  <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                  <Line
+                    type="monotone"
+                    dataKey="ebitda"
+                    name="EBITDA"
+                    stroke="#22c55e"
+                    strokeWidth={2.5}
+                    dot={{ fill: "#22c55e", stroke: "#22c55e", strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 5, fill: "#22c55e", stroke: "#14532d", strokeWidth: 2 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
             </div>
 
             <div className="lg:sticky lg:top-4 self-start">
@@ -2087,28 +2197,6 @@ export default function FinancialsPage() {
                 data={monthlyAverages}
                 loading={monthlyAveragesLoading}
               />
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="section-title">Revenue vs EBITDA — {selectedYear}</div>
-            <div className="h-[220px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={yearChartData} barGap={4}>
-                  <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.06)" />
-                  <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis
-                    tick={{ fill: "#64748b", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="ebitda" name="EBITDA" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
             </div>
           </div>
         </div>
