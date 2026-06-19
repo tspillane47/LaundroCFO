@@ -64,6 +64,27 @@ export type BenchmarkMetricRow = {
   lowerIsBetter: boolean;
 };
 
+export type UtilityTtmPoint = { month: string; value: number };
+
+export type UtilityChartSeries = {
+  field: UtilityImportField;
+  label: string;
+  data: UtilityTtmPoint[];
+};
+
+export type UtilitySummaryRow = {
+  label: string;
+  ttmTotal: number;
+  monthlyAverage: number;
+  pctOfRevenue: number;
+  status: string;
+};
+
+export type UtilityReportData = {
+  chartSeries: UtilityChartSeries[];
+  summaryRows: UtilitySummaryRow[];
+};
+
 export type ReportFinancialContext = {
   hasMonthlyFinancials: boolean;
   limitedData: boolean;
@@ -91,6 +112,7 @@ export type ReportFinancialContext = {
   monthlyFinancialsForScore: { revenue?: number | null; utilities?: number | null }[];
   monthlyUtilities: MonthlyUtilityRecord[];
   availableMonths: { year: number; month: number }[];
+  utilityReport: UtilityReportData;
 };
 
 function num(value: number | null | undefined): number {
@@ -136,6 +158,26 @@ const UTILITY_EXPENSE_LABELS: Partial<Record<UtilityImportField, string>> = {
 };
 
 const EXPENSE_UTILITY_FIELDS: UtilityImportField[] = ["water", "gas", "electric", "trash"];
+
+const UTILITY_TABLE_FIELDS: { field: UtilityImportField; label: string }[] = [
+  { field: "water", label: "Water" },
+  { field: "gas", label: "Gas" },
+  { field: "electric", label: "Electric" },
+  { field: "sewer", label: "Sewer" },
+  { field: "trash", label: "Trash" },
+];
+
+const UTILITY_CHART_FIELDS: UtilityImportField[] = ["water", "gas", "electric"];
+
+/** Typical share of total utility spend used for per-utility industry comparison. */
+const UTILITY_INDUSTRY_SHARE: Partial<Record<UtilityImportField, number>> = {
+  gas: 0.3,
+  electric: 0.25,
+  sewer: 0.05,
+  trash: 0.05,
+};
+
+const UTILITY_RATIO_BENCHMARK = industryBenchmarks.find((b) => b.metric === "Utility Ratio")!;
 
 export function enrichStoreLoans(loans: StoreLoanRecord[]): EnrichedStoreLoan[] {
   return loans.map((loan) => {
@@ -272,6 +314,74 @@ export function buildTtmChartData(records: CalculatedMonthly[]): ReportFinancial
     year: r.year,
     month: r.month,
   }));
+}
+
+function utilityIndustryStatus(
+  pctOfRevenue: number,
+  field: UtilityImportField | "total"
+): string {
+  const share = field === "total" ? 1 : (UTILITY_INDUSTRY_SHARE[field] ?? 0.15);
+  const top25 = UTILITY_RATIO_BENCHMARK.top25 * share;
+  const bottom25 = UTILITY_RATIO_BENCHMARK.bottom25 * share;
+  if (pctOfRevenue <= top25) return "Top Quartile";
+  if (pctOfRevenue >= bottom25) return "Above Median";
+  return "Median Range";
+}
+
+export function buildUtilityTtmSeries(
+  ttmRecords: CalculatedMonthly[],
+  utilitiesLookup: Map<string, MonthlyUtilityRecord>,
+  field: UtilityImportField
+): UtilityTtmPoint[] {
+  const ttm = sortRecordsAsc(ttmRecords.slice(0, 12));
+  return ttm.map((r) => ({
+    month: MONTH_SHORT[r.month - 1],
+    value: num(utilitiesLookup.get(monthKey(r.year, r.month))?.[field]),
+  }));
+}
+
+export function buildUtilityReportData(args: {
+  ttmRecords: CalculatedMonthly[];
+  utilitiesLookup: Map<string, MonthlyUtilityRecord>;
+  monthsUsed: number;
+  revenueTtmTotal: number;
+  waterKPI: ReturnType<typeof computeWaterKpi>;
+}): UtilityReportData {
+  const { ttmRecords, utilitiesLookup, monthsUsed, revenueTtmTotal, waterKPI } = args;
+
+  const chartSeries = UTILITY_CHART_FIELDS.map((field) => ({
+    field,
+    label: UTILITY_EXPENSE_LABELS[field] ?? field,
+    data: buildUtilityTtmSeries(ttmRecords, utilitiesLookup, field),
+  })).filter((series) => series.data.some((point) => point.value > 0));
+
+  const summaryRows: UtilitySummaryRow[] = [];
+  let totalUtilitiesTtm = 0;
+
+  for (const { field, label } of UTILITY_TABLE_FIELDS) {
+    const ttmTotal = sumTtmUtilityField(ttmRecords, utilitiesLookup, field);
+    if (ttmTotal <= 0) continue;
+    totalUtilitiesTtm += ttmTotal;
+    const monthlyAverage = toMonthlyAverage(ttmTotal, monthsUsed);
+    const pctOfRevenue = revenueTtmTotal > 0 ? (ttmTotal / revenueTtmTotal) * 100 : 0;
+    const status =
+      field === "water" ? waterKPI.status : utilityIndustryStatus(pctOfRevenue, field);
+    summaryRows.push({ label, ttmTotal, monthlyAverage, pctOfRevenue, status });
+  }
+
+  if (totalUtilitiesTtm > 0) {
+    const monthlyAverage = toMonthlyAverage(totalUtilitiesTtm, monthsUsed);
+    const pctOfRevenue = revenueTtmTotal > 0 ? (totalUtilitiesTtm / revenueTtmTotal) * 100 : 0;
+    summaryRows.push({
+      label: "Total",
+      ttmTotal: totalUtilitiesTtm,
+      monthlyAverage,
+      pctOfRevenue,
+      status: utilityIndustryStatus(pctOfRevenue, "total"),
+    });
+  }
+
+  return { chartSeries, summaryRows };
 }
 
 function resolveAnnualRent(
@@ -437,6 +547,13 @@ export async function fetchReportFinancialContext(
       monthlyFinancialsForScore: [],
       monthlyUtilities,
       availableMonths: [],
+      utilityReport: buildUtilityReportData({
+        ttmRecords: [],
+        utilitiesLookup,
+        monthsUsed: 0,
+        revenueTtmTotal: emptyTtm.ttmRevenue,
+        waterKPI: computeWaterKpi(0, 0),
+      }),
     };
   }
 
@@ -563,6 +680,13 @@ export async function fetchReportFinancialContext(
     monthlyFinancialsForScore,
     monthlyUtilities,
     availableMonths,
+    utilityReport: buildUtilityReportData({
+      ttmRecords,
+      utilitiesLookup,
+      monthsUsed,
+      revenueTtmTotal: ttm.ttmRevenue,
+      waterKPI,
+    }),
   };
 }
 

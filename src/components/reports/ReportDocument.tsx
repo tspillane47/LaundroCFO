@@ -26,6 +26,8 @@ import {
   StatusIndicator,
   waterKpiStatusColor,
   benchmarkStatusColor,
+  UtilityLineChart,
+  PDF_CHART,
 } from "@/components/reports/charts";
 
 export interface ReportProps {
@@ -573,6 +575,7 @@ export function ReportDocument(props: ReportProps) {
             "Executive Summary",
             "Store Overview",
             "Financial Analysis",
+            "Utility Analysis",
             "Benchmarking",
             "Lease Analysis",
             "Equipment Analysis",
@@ -865,7 +868,72 @@ export function ReportDocument(props: ReportProps) {
         <PageChrome storeName={m.storeName} />
       </Page>
 
-      {/* 5 — Benchmarking */}
+      {/* 5 — Utility Analysis */}
+      <Page size="LETTER" style={styles.page}>
+        <Text style={styles.sectionTitle}>Utility Analysis</Text>
+        <Text style={styles.bodyText}>
+          Trailing twelve-month utility costs from monthly utility records, with industry comparison.
+        </Text>
+
+        <SectionHeader>Water KPI</SectionHeader>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <StatusIndicator status={waterKpiStatusColor(financial.waterKPI.status)} />
+          <Text style={styles.bodyText}>
+            Water ÷ Self-Service Revenue = {fmtPct(financial.waterKPI.ratio * 100)} —{" "}
+            {financial.waterKPI.status}
+          </Text>
+        </View>
+
+        {financial.utilityReport.chartSeries.length > 0 ? (
+          <>
+            <SectionHeader>TTM Utility Costs</SectionHeader>
+            {financial.utilityReport.chartSeries.map((series) => (
+              <View key={series.field} style={styles.chartContainer} wrap={false}>
+                <UtilityLineChart
+                  data={series.data}
+                  label={`${series.label} Cost TTM`}
+                  color={
+                    series.field === "water"
+                      ? PDF_CHART.blue
+                      : series.field === "gas"
+                        ? PDF_CHART.amber
+                        : PDF_CHART.greenDark
+                  }
+                  width={500}
+                  height={100}
+                />
+              </View>
+            ))}
+          </>
+        ) : (
+          <Text style={styles.bodyText}>No utility cost data on file for the trailing twelve months.</Text>
+        )}
+
+        {financial.utilityReport.summaryRows.length > 0 && (
+          <>
+            <SectionHeader>Utility Summary</SectionHeader>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableCellBold, { width: "18%" }]}>Utility</Text>
+              <Text style={[styles.tableCellBold, { width: "20%", textAlign: "right" }]}>TTM Total</Text>
+              <Text style={[styles.tableCellBold, { width: "18%", textAlign: "right" }]}>Monthly Avg</Text>
+              <Text style={[styles.tableCellBold, { width: "16%", textAlign: "right" }]}>% Revenue</Text>
+              <Text style={[styles.tableCellBold, { width: "28%", textAlign: "right" }]}>Status</Text>
+            </View>
+            {financial.utilityReport.summaryRows.map((row) => (
+              <View key={row.label} style={styles.tableRow}>
+                <Text style={[styles.tableCell, { width: "18%" }]}>{row.label}</Text>
+                <Text style={[styles.tableCell, { width: "20%", textAlign: "right" }]}>{fmtDollar(row.ttmTotal)}</Text>
+                <Text style={[styles.tableCell, { width: "18%", textAlign: "right" }]}>{fmtDollar(row.monthlyAverage)}</Text>
+                <Text style={[styles.tableCell, { width: "16%", textAlign: "right" }]}>{fmtPct(row.pctOfRevenue)}</Text>
+                <Text style={[styles.tableCell, { width: "28%", textAlign: "right" }]}>{row.status}</Text>
+              </View>
+            ))}
+          </>
+        )}
+        <PageChrome storeName={m.storeName} />
+      </Page>
+
+      {/* 6 — Benchmarking */}
       <Page size="LETTER" style={styles.page}>
         <Text style={styles.sectionTitle}>Benchmarking</Text>
         <Text style={styles.bodyText}>
@@ -1013,18 +1081,26 @@ export function ReportDocument(props: ReportProps) {
         <PageChrome storeName={m.storeName} />
       </Page>
 
-      {/* 6 — Equipment Analysis */}
+      {/* 7 — Equipment Analysis */}
       <Page size="LETTER" style={styles.page}>
         <Text style={styles.sectionTitle}>Equipment Analysis</Text>
         <Text style={styles.bodyText}>Fleet composition and replacement risk for collateral review.</Text>
-        <View style={styles.grid2}>
-          <MetricTile label="Total Machines" value={String(m.equipMetrics.totalMachines)} width="23%" />
-          <MetricTile label="Avg Age" value={`${m.equipMetrics.weightedAvgAge.toFixed(1)} yrs`} width="23%" />
-          <MetricTile label="Equipment Score" value={`${m.equipMetrics.qualityScore}/100`} valueColor={m.equipMetrics.qualityScore >= 75 ? "#15803d" : "#b45309"} width="23%" />
-          <MetricTile label="Quality Grade" value={m.equipMetrics.grade} width="23%" />
-          <MetricTile label="Under 10yr" value={fmtPct(m.equipMetrics.pctUnder10Years, 0)} width="23%" />
-          <MetricTile label="200G Washers" value={fmtPct(m.equipMetrics.pct200GWashers, 0)} width="23%" />
-          <MetricTile label="Replacement Est." value={fmtDollar(m.equipMetrics.estimatedReplacementValue)} width="48%" />
+        <View style={styles.ratioGrid}>
+          <RatioMetricTile label="Machines" value={String(m.equipMetrics.totalMachines)} />
+          <RatioMetricTile label="Avg Age" value={`${m.equipMetrics.weightedAvgAge.toFixed(1)} yrs`} />
+          <RatioMetricTile
+            label="Equip Score"
+            value={`${m.equipMetrics.qualityScore}/100`}
+            valueColor={m.equipMetrics.qualityScore >= 75 ? "#15803d" : "#b45309"}
+          />
+          <RatioMetricTile label="Grade" value={m.equipMetrics.grade} />
+          <RatioMetricTile label="Under 10yr" value={fmtPct(m.equipMetrics.pctUnder10Years, 0)} />
+          <RatioMetricTile label="200G" value={fmtPct(m.equipMetrics.pct200GWashers, 0)} />
+          <RatioMetricTile label="Replacement" value={fmtDollar(m.equipMetrics.estimatedReplacementValue)} />
+          <RatioMetricTile
+            label="W/D"
+            value={`${m.equipMetrics.totalWashers}/${m.equipMetrics.totalDryers}`}
+          />
         </View>
         <SectionHeader>Fleet Detail</SectionHeader>
         {m.equipRecords.length === 0 ? (

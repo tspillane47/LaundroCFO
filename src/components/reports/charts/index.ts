@@ -5,4 +5,6 @@ export type { CategorySegment } from "./CategoryBreakdownBar";
 export { BenchmarkBar, StatusIndicator, waterKpiStatusColor } from "./BenchmarkBar";
 export { DSCRGauge } from "./DSCRGauge";
 export { DebtAmortizationBar } from "./DebtAmortizationBar";
+export { UtilityLineChart } from "./UtilityLineChart";
+export type { UtilityChartPoint } from "./UtilityLineChart";
 export * from "./chartUtils";
