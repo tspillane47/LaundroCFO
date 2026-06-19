@@ -14,11 +14,13 @@ type Props = {
 };
 
 export function RevenueExpenseBarChart({ data, width = 480, height = 180 }: Props) {
-  if (data.length === 0) {
+  const hasValues = data.some((d) => d.revenue > 0 || d.ebitda !== 0);
+
+  if (data.length === 0 || !hasValues) {
     return (
       <Svg width={width} height={height}>
-        <Text x={width / 2 - 60} y={height / 2} fill={PDF_CHART.slate400} style={{ fontSize: 9 }}>
-          No chart data available
+        <Text x={width / 2 - 72} y={height / 2} fill={PDF_CHART.slate400} style={{ fontSize: 9 }}>
+          No monthly data available
         </Text>
       </Svg>
     );

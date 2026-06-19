@@ -274,6 +274,18 @@ export function buildTtmChartData(records: CalculatedMonthly[]): ReportFinancial
   }));
 }
 
+function resolveAnnualRent(
+  ttmRecords: CalculatedMonthly[],
+  monthsUsed: number,
+  leaseMonthlyRent: number,
+  storeMonthlyRent: number
+): number {
+  const ttmRent = sumTtmField(ttmRecords, "rent");
+  if (ttmRent > 0) return ttmRent;
+  const monthlyRent = leaseMonthlyRent || storeMonthlyRent;
+  return monthlyRent > 0 ? monthlyRent * Math.max(monthsUsed, 1) : 0;
+}
+
 export function recordsThroughMonth(
   records: CalculatedMonthly[],
   year: number,
@@ -503,8 +515,16 @@ export async function fetchReportFinancialContext(
   const utilityRatio = ttm.ttmRevenue > 0 ? (ttmUtilitiesTotal / ttm.ttmRevenue) * 100 : null;
 
   const monthlyRent = num(options?.lease?.monthly_rent as number) || num(store.monthly_rent as number);
+  const annualRent = resolveAnnualRent(ttmRecords, monthsUsed, monthlyRent, num(store.monthly_rent as number));
   const rentToRevenue =
-    ttm.ttmRevenue > 0 && monthlyRent > 0 ? ((monthlyRent * 12) / ttm.ttmRevenue) * 100 : null;
+    ttm.ttmRevenue > 0 && annualRent > 0 ? (annualRent / ttm.ttmRevenue) * 100 : null;
+
+  const ttmChartData = buildTtmChartData(ttmRecords);
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[fetchReportFinancialContext] TTM records:", ttmRecords.length, "monthsUsed:", monthsUsed);
+    console.log("[fetchReportFinancialContext] TTM revenue total:", ttm.ttmRevenue);
+    console.log("[fetchReportFinancialContext] chartData points:", ttmChartData.length, ttmChartData);
+  }
 
   return {
     hasMonthlyFinancials: true,
@@ -520,7 +540,7 @@ export async function fetchReportFinancialContext(
     ebitdaTtmTotal: ttm.ttmEbitda,
     ebitdaMargin: ttm.ttmEbitdaMargin,
     monthlyAverages,
-    ttmChartData: buildTtmChartData(ttmRecords),
+    ttmChartData,
     loans,
     totalMonthlyDebtService,
     totalOutstandingDebt,

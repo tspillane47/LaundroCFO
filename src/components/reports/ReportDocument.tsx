@@ -60,20 +60,20 @@ const styles = StyleSheet.create({
   sectionHeader: {
     backgroundColor: "#0f1e3d",
     color: "white",
-    padding: "8 12",
+    padding: "10 14",
     fontSize: 11,
     fontWeight: "bold",
     textTransform: "uppercase",
     letterSpacing: 1,
-    marginBottom: 12,
-    marginTop: 20,
+    marginBottom: 14,
+    marginTop: 28,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "bold", color: "#1e293b", marginBottom: 4 },
+  sectionTitle: { fontSize: 16, fontWeight: "bold", color: "#1e293b", marginBottom: 8, marginTop: 4 },
   bodyText: { fontSize: 10, color: "#475569", lineHeight: 1.6, marginBottom: 8 },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderBottom: "1 solid #e2e8f0",
   },
   rowLabel: { fontSize: 10, color: "#64748b", flex: 1 },
@@ -86,12 +86,32 @@ const styles = StyleSheet.create({
     margin: 4,
     flex: 1,
   },
+  ratioCard: {
+    backgroundColor: "white",
+    border: "1 solid #e2e8f0",
+    borderRadius: 6,
+    padding: "10 8",
+    width: "23%",
+    minWidth: 120,
+    marginBottom: 8,
+  },
+  ratioGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
   metricValue: { fontSize: 18, fontWeight: "bold", color: "#1e293b", marginBottom: 2 },
+  ratioValue: { fontSize: 20, fontWeight: "bold", color: "#1e293b", marginTop: 4 },
   metricLabel: {
     fontSize: 8,
     color: "#94a3b8",
     textTransform: "uppercase",
     letterSpacing: 0.5,
+  },
+  ratioLabel: {
+    fontSize: 8,
+    color: "#64748b",
+    letterSpacing: 0.3,
   },
   grid2: { flexDirection: "row", flexWrap: "wrap" },
   positiveText: { color: "#15803d" },
@@ -117,8 +137,8 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 8,
   },
-  pageNumber: { position: "absolute", bottom: 30, right: 40, fontSize: 9, color: "#94a3b8" },
-  footer: { position: "absolute", bottom: 30, left: 40, fontSize: 9, color: "#94a3b8" },
+  pageNumber: { position: "absolute", bottom: 24, right: 40, fontSize: 9, color: "#94a3b8" },
+  footer: { position: "absolute", bottom: 24, left: 40, fontSize: 9, color: "#94a3b8" },
   divider: { borderBottom: "1 solid #e2e8f0", marginVertical: 12 },
   badge: {
     backgroundColor: "#dbeafe",
@@ -142,13 +162,13 @@ const styles = StyleSheet.create({
   tableHeader: {
     flexDirection: "row",
     backgroundColor: "#f1f5f9",
-    paddingVertical: 6,
+    paddingVertical: 7,
     paddingHorizontal: 8,
     borderBottom: "1 solid #e2e8f0",
   },
   tableRow: {
     flexDirection: "row",
-    paddingVertical: 5,
+    paddingVertical: 6,
     paddingHorizontal: 8,
     borderBottom: "1 solid #f1f5f9",
   },
@@ -156,6 +176,9 @@ const styles = StyleSheet.create({
   tableCellBold: { fontSize: 9, color: "#1e293b", fontWeight: "bold" },
   boxText: { fontSize: 9, color: "#475569", lineHeight: 1.5 },
   tocItem: { fontSize: 11, color: "#475569", marginBottom: 6, flexDirection: "row", justifyContent: "space-between" },
+  scoreHeroGrade: { fontSize: 56, fontWeight: "bold", color: "#1d4ed8", lineHeight: 1 },
+  scoreHeroValue: { fontSize: 22, fontWeight: "bold", color: "#1e293b", marginTop: 6 },
+  chartContainer: { marginTop: 8, marginBottom: 4 },
 });
 
 function parseDate(value: string | null | undefined): Date | null {
@@ -203,6 +226,52 @@ function ratioColor(value: number, good: number, warn: number, invert = false): 
 function labelize(value: string | null | undefined): string {
   if (!value) return "—";
   return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+type ServiceMixPct = {
+  selfService: number;
+  wdf: number;
+  commercial: number;
+  pickupDelivery: number;
+};
+
+function resolveServiceMix(
+  store: any,
+  revenueBreakdown: ReportProps["financial"]["revenueBreakdown"]
+): ServiceMixPct | null {
+  const storeMix = {
+    selfService: store?.self_service_pct,
+    wdf: store?.wdf_pct,
+    commercial: store?.commercial_pct,
+    pickupDelivery: store?.pickup_delivery_pct,
+  };
+  const hasStoreMix = Object.values(storeMix).some((v) => v != null && Number(v) > 0);
+  if (hasStoreMix) {
+    const wdf = Number(storeMix.wdf) || 0;
+    const commercial = Number(storeMix.commercial) || 0;
+    const pickupDelivery = Number(storeMix.pickupDelivery) || 0;
+    const selfService =
+      storeMix.selfService != null
+        ? Number(storeMix.selfService)
+        : Math.max(0, 100 - wdf - commercial - pickupDelivery);
+    return { selfService, wdf, commercial, pickupDelivery };
+  }
+
+  if (revenueBreakdown.length === 0) return null;
+
+  const lookup: Record<string, number> = {};
+  for (const line of revenueBreakdown) {
+    lookup[line.label] = line.pctOfTotal;
+  }
+
+  const selfService = lookup["Self-Service"] ?? 0;
+  const wdf = lookup["WDF"] ?? 0;
+  const commercial = lookup["Commercial"] ?? 0;
+  const pickupDelivery = lookup["Other"] ?? lookup["Vending"] ?? 0;
+  const total = selfService + wdf + commercial + pickupDelivery;
+  if (total <= 0) return null;
+
+  return { selfService, wdf, commercial, pickupDelivery };
 }
 
 function PageChrome({ storeName }: { storeName: string }) {
@@ -271,6 +340,30 @@ function MetricTile({
   );
 }
 
+function RatioMetricTile({
+  label,
+  value,
+  valueColor,
+}: {
+  label: string;
+  value: string;
+  valueColor?: string;
+}) {
+  return (
+    <View style={styles.ratioCard}>
+      <Text style={styles.ratioLabel} hyphenationCallback={(word) => [word]}>
+        {label}
+      </Text>
+      <Text
+        style={[styles.ratioValue, valueColor ? { color: valueColor } : {}]}
+        hyphenationCallback={(word) => [word]}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 function computeReportMetrics(props: ReportProps) {
   const { store, lease, leaseOptions, equipment, valuation, portfolioStores, financial } = props;
   const storeName = store?.name ?? "Store";
@@ -316,7 +409,15 @@ function computeReportMetrics(props: ReportProps) {
   const monthlyRent = lease?.monthly_rent ?? props.realEstate?.monthly_rent_charged ?? 0;
   const camCharges = lease?.cam_charges ?? 0;
   const annualOccupancyCost = (monthlyRent + camCharges) * 12;
-  const rentToRevenue = calcRentToRevenue(monthlyRent * 12, annualRevenue);
+  const rentRow = financial.benchmarkRows.find((r) => r.metric === "Rent to Revenue");
+  const ttmRentTotal = financial.expenseBreakdown.find((l) => l.label === "Rent")?.ttmTotal ?? 0;
+  const rentToRevenue =
+    rentRow?.store ??
+    (annualRevenue > 0 && ttmRentTotal > 0
+      ? calcRentToRevenue(ttmRentTotal, annualRevenue)
+      : monthlyRent > 0
+        ? calcRentToRevenue(monthlyRent * 12, annualRevenue)
+        : 0);
   const occupancyCostRatio = calcOccupancyCostRatio(annualOccupancyCost, annualRevenue);
 
   const leaseScore = lease
@@ -487,6 +588,7 @@ export function ReportDocument(props: ReportProps) {
             </View>
           ))}
         </View>
+        <PageChrome storeName={m.storeName} />
       </Page>
 
       {/* 2 — Executive Summary */}
@@ -555,11 +657,19 @@ export function ReportDocument(props: ReportProps) {
         {store?.last_retool_year && (
           <DataRow label="Last Retool" value={`${store.last_retool_year}${store.retool_type ? ` — ${store.retool_type}` : ""}`} />
         )}
-        <SectionHeader>Service Mix</SectionHeader>
-        <DataRow label="Self Service" value={fmtPct(store?.self_service_pct ?? 70, 0)} />
-        <DataRow label="Wash-Dry-Fold" value={fmtPct(store?.wdf_pct ?? 0, 0)} />
-        <DataRow label="Commercial" value={fmtPct(store?.commercial_pct ?? 0, 0)} />
-        <DataRow label="Pickup & Delivery" value={fmtPct(store?.pickup_delivery_pct ?? 0, 0)} />
+        {(() => {
+          const serviceMix = resolveServiceMix(store, financial.revenueBreakdown);
+          if (!serviceMix) return null;
+          return (
+            <>
+              <SectionHeader>Service Mix</SectionHeader>
+              <DataRow label="Self Service" value={fmtPct(serviceMix.selfService, 0)} />
+              <DataRow label="Wash-Dry-Fold" value={fmtPct(serviceMix.wdf, 0)} />
+              <DataRow label="Commercial" value={fmtPct(serviceMix.commercial, 0)} />
+              <DataRow label="Pickup & Delivery" value={fmtPct(serviceMix.pickupDelivery, 0)} />
+            </>
+          );
+        })()}
         <View style={styles.successBox}>
           <Text style={styles.boxText}>
             Revenue per SF of ${m.revenuePerSF.toFixed(2)} and EBITDA per SF of ${m.ebitdaPerSF.toFixed(2)}{" "}
@@ -616,7 +726,7 @@ export function ReportDocument(props: ReportProps) {
               totalTtm={financial.revenueTtmTotal}
               totalMonthly={m.monthlyRevenue}
             />
-            <View style={{ marginTop: 8 }}>
+            <View style={styles.chartContainer} wrap={false}>
               <CategoryBreakdownBar
                 segments={financial.revenueBreakdown.map((l) => ({
                   label: l.label,
@@ -624,7 +734,8 @@ export function ReportDocument(props: ReportProps) {
                   pct: l.pctOfTotal,
                 }))}
                 title="Revenue Mix"
-                height={72}
+                width={500}
+                height={88}
               />
             </View>
           </>
@@ -639,7 +750,7 @@ export function ReportDocument(props: ReportProps) {
               totalTtm={financial.expenseTtmTotal}
               totalMonthly={m.monthlyExpenses}
             />
-            <View style={{ marginTop: 8 }}>
+            <View style={styles.chartContainer} wrap={false}>
               <CategoryBreakdownBar
                 segments={financial.expenseBreakdown.map((l) => ({
                   label: l.label,
@@ -647,7 +758,8 @@ export function ReportDocument(props: ReportProps) {
                   pct: l.pctOfTotal,
                 }))}
                 title="Expense Mix"
-                height={72}
+                width={500}
+                height={88}
               />
             </View>
           </>
@@ -664,12 +776,10 @@ export function ReportDocument(props: ReportProps) {
         <DataRow label="Avg Monthly Water" value={fmtDollar(financial.waterKPI.waterMonthlyAverage)} />
         <DataRow label="Avg Self-Service Revenue" value={fmtDollar(financial.waterKPI.selfServiceMonthlyAverage)} />
 
-        {financial.ttmChartData.length > 0 && (
-          <>
-            <SectionHeader>TTM Revenue Trend</SectionHeader>
-            <RevenueExpenseBarChart data={financial.ttmChartData} width={500} height={160} />
-          </>
-        )}
+        <SectionHeader>TTM Revenue Trend</SectionHeader>
+        <View style={styles.chartContainer} wrap={false}>
+          <RevenueExpenseBarChart data={financial.ttmChartData} width={500} height={160} />
+        </View>
         <PageChrome storeName={m.storeName} />
       </Page>
 
@@ -711,15 +821,39 @@ export function ReportDocument(props: ReportProps) {
         <DataRow label="Surplus Cash Flow" value={fmtDollar(m.surplusCashFlow)} positive={m.surplusCashFlow >= 0} negative={m.surplusCashFlow < 0} />
 
         <SectionHeader>Underwriting Ratios</SectionHeader>
-        <View style={styles.grid2}>
-          <MetricTile label="DSCR" value={m.annualDebtService > 0 ? fmtMultiple(m.dscr) : "N/A"} valueColor={m.annualDebtService > 0 ? ratioColor(m.dscr, 1.5, 1.25) : undefined} width="23%" />
-          <MetricTile label="Global DSCR" value={m.portfolioDebtService > 0 ? fmtMultiple(m.globalDscr) : "N/A"} valueColor={m.portfolioDebtService > 0 ? ratioColor(m.globalDscr, 1.5, 1.25) : undefined} width="23%" />
-          <MetricTile label="EBITDA Margin" value={fmtPct(m.ebitdaMargin)} valueColor={ratioColor(m.ebitdaMargin, 25, 20)} width="23%" />
-          <MetricTile label="Rent / Revenue" value={fmtPct(m.rentToRevenue)} valueColor={ratioColor(m.rentToRevenue, 0, 15, true)} width="23%" />
-          <MetricTile label="Utility / Revenue" value={fmtPct(m.utilityRatio)} valueColor={ratioColor(m.utilityRatio, 0, 17, true)} width="23%" />
-          <MetricTile label="Revenue / SF" value={`$${m.revenuePerSF.toFixed(2)}`} width="23%" />
-          <MetricTile label="EBITDA / SF" value={`$${m.ebitdaPerSF.toFixed(2)}`} width="23%" />
-          <MetricTile label="Debt Yield" value={m.loanBalance > 0 ? fmtPct(m.debtYield) : "N/A"} valueColor={m.loanBalance > 0 ? ratioColor(m.debtYield, 12, 8) : undefined} width="23%" />
+        <View style={styles.ratioGrid}>
+          <RatioMetricTile
+            label="DSCR"
+            value={m.annualDebtService > 0 ? fmtMultiple(m.dscr) : "N/A"}
+            valueColor={m.annualDebtService > 0 ? ratioColor(m.dscr, 1.5, 1.25) : undefined}
+          />
+          <RatioMetricTile
+            label="Global DSCR"
+            value={m.portfolioDebtService > 0 ? fmtMultiple(m.globalDscr) : "N/A"}
+            valueColor={m.portfolioDebtService > 0 ? ratioColor(m.globalDscr, 1.5, 1.25) : undefined}
+          />
+          <RatioMetricTile
+            label="EBITDA Margin"
+            value={fmtPct(m.ebitdaMargin)}
+            valueColor={ratioColor(m.ebitdaMargin, 25, 20)}
+          />
+          <RatioMetricTile
+            label="Debt Yield"
+            value={m.loanBalance > 0 ? fmtPct(m.debtYield) : "N/A"}
+            valueColor={m.loanBalance > 0 ? ratioColor(m.debtYield, 12, 8) : undefined}
+          />
+          <RatioMetricTile
+            label="Rent/Rev"
+            value={fmtPct(m.rentToRevenue)}
+            valueColor={ratioColor(m.rentToRevenue, 0, 15, true)}
+          />
+          <RatioMetricTile
+            label="Util/Rev"
+            value={fmtPct(m.utilityRatio)}
+            valueColor={ratioColor(m.utilityRatio, 0, 17, true)}
+          />
+          <RatioMetricTile label="Rev/SF" value={`$${m.revenuePerSF.toFixed(2)}`} />
+          <RatioMetricTile label="EBITDA/SF" value={`$${m.ebitdaPerSF.toFixed(2)}`} />
         </View>
         {m.utilityRatio > 17 && (
           <View style={styles.warningBox}>
@@ -738,11 +872,11 @@ export function ReportDocument(props: ReportProps) {
           Store performance vs industry benchmarks (median and top quartile).
         </Text>
         <SectionHeader>LaundroCFO Score</SectionHeader>
-        <View style={{ flexDirection: "row", gap: 16, marginBottom: 12 }}>
-          <View style={[styles.metricCard, { width: "30%" }]}>
+        <View style={{ flexDirection: "row", gap: 16, marginBottom: 16, alignItems: "center" }}>
+          <View style={[styles.metricCard, { width: "34%", alignItems: "center", paddingVertical: 16 }]}>
             <Text style={styles.metricLabel}>Overall Grade</Text>
-            <Text style={[styles.metricValue, { color: "#1d4ed8", fontSize: 28 }]}>{laundroCfoScore.grade}</Text>
-            <Text style={[styles.boxText, { marginTop: 4 }]}>{laundroCfoScore.total}/100</Text>
+            <Text style={styles.scoreHeroGrade}>{laundroCfoScore.grade}</Text>
+            <Text style={styles.scoreHeroValue}>{laundroCfoScore.total}/100</Text>
           </View>
           <View style={{ flex: 1 }}>
             {(

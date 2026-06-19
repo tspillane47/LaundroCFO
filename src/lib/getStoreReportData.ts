@@ -40,6 +40,12 @@ export async function getStoreReportData(args: {
     loan_balance: financial.totalOutstandingDebt,
   };
 
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[getStoreReportData] TTM months used:", financial.ttm.monthsUsed);
+    console.log("[getStoreReportData] TTM revenue:", financial.revenueTtmTotal);
+    console.log("[getStoreReportData] chartData:", financial.ttmChartData);
+  }
+
   const laundroCfoScore = computeLaundroCfoScoreFromRaw({
     store: storeForScore,
     equipment: args.equipment ?? (valuation.context.equipment as EquipmentRecord[]),

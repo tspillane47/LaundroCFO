@@ -170,12 +170,18 @@ function num(value: number | null | undefined): number {
 }
 
 export function calcMonthly(record: MonthlyFinancialRecord): CalculatedMonthly {
-  const revenue = num(record.revenue);
   const self_service_revenue = num(record.self_service_revenue);
   const wdf_revenue = num(record.wdf_revenue);
   const commercial_revenue = num(record.commercial_revenue);
   const vending_revenue = num(record.vending_revenue);
   const other_revenue = num(record.other_revenue);
+  const revenue =
+    num(record.revenue) ||
+    self_service_revenue +
+      wdf_revenue +
+      commercial_revenue +
+      vending_revenue +
+      other_revenue;
   const utilities = num(record.utilities);
   const rent = num(record.rent);
   const payroll = num(record.payroll);

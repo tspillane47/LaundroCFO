@@ -170,9 +170,13 @@ export async function getStoreValuation(
 
   const ttm = await fetchStoreTtmMetrics(supabase, storeId);
   const { annualEbitda, ttmMonthsUsed } = resolveAnnualEbitda(ttm);
+  const valuationOverrides: Partial<ValuationInputs> = { ebitda: annualEbitda };
+  if (ttm && ttm.monthsUsed > 0 && ttm.ttmRevenue > 0) {
+    valuationOverrides.monthlyRevenue = ttm.ttmRevenue / ttm.monthsUsed;
+  }
 
   const result: StoreValuationResult = {
-    ...computeStoreValuation(ctx, { ebitda: annualEbitda }),
+    ...computeStoreValuation(ctx, valuationOverrides),
     store: store ?? {},
     context: ctx,
     annualEbitda,

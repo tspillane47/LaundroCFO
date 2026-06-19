@@ -14,13 +14,13 @@ type Props = {
   title?: string;
 };
 
-export function CategoryBreakdownBar({ segments, width = 480, height = 56, title }: Props) {
+export function CategoryBreakdownBar({ segments, width = 480, height = 88, title }: Props) {
   const active = segments.filter((s) => s.value > 0);
   const total = active.reduce((s, seg) => s + seg.value, 0);
 
   if (total <= 0) {
     return (
-      <Svg width={width} height={height}>
+      <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
         <Text x={0} y={14} fill={PDF_CHART.slate400} style={{ fontSize: 8 }}>
           {title ? `${title}: ` : ""}No category data
         </Text>
@@ -28,12 +28,14 @@ export function CategoryBreakdownBar({ segments, width = 480, height = 56, title
     );
   }
 
-  const barY = title ? 18 : 8;
-  const barH = 14;
+  const titleHeight = title ? 14 : 0;
+  const barY = titleHeight + 6;
+  const barH = 16;
+  const legendStartY = barY + barH + 10;
   let x = 0;
 
   return (
-    <Svg width={width} height={height}>
+    <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
       {title ? (
         <Text x={0} y={10} fill={PDF_CHART.navy} style={{ fontSize: 8, fontWeight: "bold" }}>
           {title}
@@ -41,11 +43,11 @@ export function CategoryBreakdownBar({ segments, width = 480, height = 56, title
       ) : null}
 
       {active.map((seg, i) => {
-        const segW = (seg.value / total) * width;
+        const segW = Math.max(2, (seg.value / total) * width);
         const color = CATEGORY_COLORS[i % CATEGORY_COLORS.length];
         const el = (
           <G key={`${seg.label}-${i}`}>
-            <Rect x={x} y={barY} width={segW} height={barH} fill={color} />
+            <Rect x={x} y={barY} width={segW} height={barH} fill={color} rx={1} />
           </G>
         );
         x += segW;
@@ -57,7 +59,7 @@ export function CategoryBreakdownBar({ segments, width = 480, height = 56, title
         const row = Math.floor(i / 3);
         const col = i % 3;
         const lx = col * 160;
-        const ly = barY + barH + 12 + row * 12;
+        const ly = legendStartY + row * 12;
         return (
           <G key={`legend-${seg.label}`}>
             <Rect x={lx} y={ly - 7} width={8} height={8} fill={color} />
