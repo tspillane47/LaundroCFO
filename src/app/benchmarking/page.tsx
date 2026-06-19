@@ -140,6 +140,117 @@ function NetworkLockedRow({ metric }: { metric: string }) {
   );
 }
 
+function ScoresCalculationGuide() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="card !py-3 !px-4">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full text-left text-[12px] text-slate-500 hover:text-slate-300 transition-colors"
+        aria-expanded={open}
+      >
+        How are these scores calculated? {open ? "↑" : "↓"}
+      </button>
+
+      {open ? (
+        <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-5">
+          <div>
+            <h3 className="text-[13px] font-semibold text-slate-100 mb-2">Performance Rating</h3>
+            <ul className="space-y-1.5 text-[12px] text-slate-400 list-disc pl-4">
+              <li>
+                Looks at up to 7 metrics: EBITDA Margin, Revenue per SF, Utility Ratio, Rent to Revenue,
+                DSCR, Revenue per Machine, and Avg Equipment Age.
+              </li>
+              <li>
+                Each metric is compared to industry benchmarks sourced from the Coin Laundry Association
+                and the LaundroCFO peer database.
+              </li>
+              <li>Rating is based on how many metrics beat the industry median:</li>
+            </ul>
+            <ul className="mt-2 space-y-1 text-[12px] text-slate-400 list-disc pl-8">
+              <li>
+                <span className="text-slate-300">Top 25%:</span> 4 or more metrics in the top quartile
+              </li>
+              <li>
+                <span className="text-slate-300">Above Median:</span> 4 or more metrics above median
+              </li>
+              <li>
+                <span className="text-slate-300">Average:</span> 2–3 metrics above median
+              </li>
+              <li>
+                <span className="text-slate-300">Below Median:</span> fewer than 2 metrics above median
+              </li>
+            </ul>
+            <p className="mt-2 text-[12px] text-slate-500">
+              Metrics with missing data are excluded. If your store is missing square footage, equipment
+              inventory, or debt service, fewer metrics are scored — which can cap your rating even if all
+              available metrics are excellent. Complete your store profile to unlock all 7 metrics.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-[13px] font-semibold text-slate-100 mb-2">Financeability Rating</h3>
+            <ul className="space-y-1.5 text-[12px] text-slate-400 list-disc pl-4">
+              <li>Based entirely on DSCR (Debt Service Coverage Ratio).</li>
+              <li>DSCR = Annual EBITDA ÷ Annual Debt Service</li>
+              <li>
+                <span className="text-slate-300">Strong:</span> DSCR ≥ 1.50× — lenders typically view
+                this as low risk
+              </li>
+              <li>
+                <span className="text-slate-300">Acceptable:</span> DSCR ≥ 1.25× — meets minimum
+                thresholds for most SBA and commercial loans
+              </li>
+              <li>
+                <span className="text-slate-300">Marginal:</span> DSCR &lt; 1.25× — may face difficulty
+                securing financing
+              </li>
+              <li>Shows &ldquo;—&rdquo; if no debt service is entered or EBITDA is zero/negative.</li>
+            </ul>
+            <p className="mt-2 text-[12px] text-slate-500">
+              Requires <span className="text-slate-400">annual_debt_service</span> to be set in store
+              settings to calculate.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-[13px] font-semibold text-slate-100 mb-2">Industry Benchmarks</h3>
+            <ul className="space-y-1.5 text-[12px] text-slate-400 list-disc pl-4">
+              <li>
+                The green/amber/red colors on each metric row show where your store falls relative to
+                industry quartiles.
+              </li>
+            </ul>
+            <ul className="mt-2 space-y-1.5 text-[12px] text-slate-400 pl-4">
+              <li className="flex items-center gap-2">
+                <span className="badge badge-green text-[10px]">Green</span>
+                <span>Top 25% of laundromats nationally</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="badge badge-amber text-[10px]">Amber</span>
+                <span>Between bottom and top quartile</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="badge badge-red text-[10px]">Red</span>
+                <span>Bottom 25% — needs attention</span>
+              </li>
+            </ul>
+            <p className="mt-2 text-[12px] text-slate-500">
+              Benchmark values are sourced from the Coin Laundry Association and the LaundroCFO peer
+              database (2024).
+            </p>
+            <p className="mt-1 text-[12px] text-slate-600 italic">
+              Network benchmarks comparing your store against other LaundroCFO operators are coming soon.
+            </p>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function NetworkBenchmarksSection({ optedIn }: { optedIn: boolean }) {
   const supabase = createClient();
   const [contributorCount, setContributorCount] = useState<number | null>(null);
@@ -458,6 +569,8 @@ export default function BenchmarkingPage() {
               <div className="text-[12px] text-slate-500 mt-1">Based on live DSCR</div>
             </div>
           </div>
+
+          <ScoresCalculationGuide />
 
           <div className="card">
             <div className="section-title">
