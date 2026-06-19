@@ -1,0 +1,1753 @@
+"use client";
+
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import clsx from "clsx";
+import { createClient } from "@/lib/supabase";
+import { useStores } from "@/lib/store-context";
+import { fmtDollar } from "@/lib/calculations";
+import { invalidateValuationCache } from "@/lib/getStoreValuation";
+import { INPUT_CLASS } from "@/components/occupancy/shared";
+import { FormBanner } from "@/components/ui/FormBanner";
+import { KpiCard } from "@/components/ui/KpiCard";
+import { PageError } from "@/components/ui/PageError";
+import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import {
+  BANK_IMPORT_CATEGORY_LABELS,
+  buildUtilitiesLookup,
+  categorizeWithRules,
+  enrichMonthlyRecords,
+  excludeTransaction,
+  findMatchingAmountRule,
+  getImportCategoriesForType,
+  inferTransactionType,
+  isCategoryReadyToPost,
+  isGenericTransactionDescription,
+  markDuplicateTransactions,
+  normalizeVendorPattern,
+  parseBankCsv,
+  postTransactionsBatch,
+  reclassifyPostedTransaction,
+  sortRecordsDesc,
+  suggestTransactionCategory,
+  MONTH_SHORT,
+  type BankImportCategory,
+  type BankTransaction,
+  type BatchPostTransaction,
+  type CategorizationRule,
+  type MonthlyFinancialRecord,
+  type MonthlyUtilityRecord,
+  type RuleMatchKind,
+  type RuleType,
+  type StoreFinancialProfile,
+  type TransactionAuditLogEntry,
+  type TransactionPlLink,
+  type TransactionStatus,
+  type TransactionType,
+} from "@/lib/financials";
+
+type StatusTab = "needs_review" | "posted" | "excluded" | "all";
+
+type StagedCsvRow = {
+  tempId: string;
+  transaction_date: string;
+  description: string | null;
+  amount: number;
+  type: TransactionType;
+  category: BankImportCategory;
+  suggested: BankImportCategory;
+  ruleApplied?: RuleMatchKind;
+  possibleDuplicate?: boolean;
+};
+
+type ReviewRow = {
+  id: string;
+  transaction_date: string;
+  description: string | null;
+  amount: number;
+  type: TransactionType;
+  category: BankImportCategory;
+  suggested: BankImportCategory;
+  ruleApplied: RuleMatchKind;
+  possibleDuplicate: boolean;
+  status: TransactionStatus;
+  excluded: boolean;
+  exclusion_reason: string | null;
+  notes: string | null;
+  original_category: string | null;
+};
+
+type TransactionGroup = {
+  groupKey: string;
+  vendorPattern: string;
+  description: string;
+  count: number;
+  totalAmount: number;
+  type: TransactionType;
+  category: BankImportCategory;
+  suggested: BankImportCategory;
+  ruleApplied: RuleMatchKind;
+  items: ReviewRow[];
+};
+
+function isPostedRow(row: ReviewRow): boolean {
+  return row.status === "posted" && !row.excluded;
+}
+
+function isExcludedRow(row: ReviewRow): boolean {
+  return row.excluded || row.status === "excluded";
+}
+
+function amountRuleVendorPattern(type: TransactionType, amount: number): string {
+  return `__AMOUNT__:${type}:${amount.toFixed(2)}`;
+}
+
+function isNeedsReview(txn: Pick<BankTransaction, "status" | "excluded">): boolean {
+  const status = txn.status ?? "needs_review";
+  return !txn.excluded && !["posted", "excluded", "reviewed"].includes(status);
+}
+
+function formatPlLinkCategory(column: string): string {
+  if (column in BANK_IMPORT_CATEGORY_LABELS) {
+    return BANK_IMPORT_CATEGORY_LABELS[column as BankImportCategory];
+  }
+  return column.replace(/_/g, " ");
+}
+
+function StatusBadge({ status, excluded }: { status: TransactionStatus; excluded: boolean }) {
+  if (excluded || status === "excluded") {
+    return <span className="badge badge-red text-[10px]">Excluded</span>;
+  }
+  if (status === "posted") return <span className="badge badge-green text-[10px]">Posted</span>;
+  if (status === "needs_review") return <span className="badge badge-amber text-[10px]">Needs Review</span>;
+  if (status === "user_classified") return <span className="badge badge-blue text-[10px]">User Classified</span>;
+  if (status === "system_classified") return <span className="badge badge-blue text-[10px]">Auto-Classified</span>;
+  if (status === "reviewed") return <span className="badge text-[10px]">Reviewed</span>;
+  return <span className="badge text-[10px]">{status}</span>;
+}
+
+function CategoryBadge({ category }: { category: BankImportCategory }) {
+  if (category === "needs_review") {
+    return <span className="badge badge-amber text-[10px]">{BANK_IMPORT_CATEGORY_LABELS[category]}</span>;
+  }
+  return <span className="badge badge-blue text-[10px]">{BANK_IMPORT_CATEGORY_LABELS[category]}</span>;
+}
+
+function TypeBadge({ type }: { type: TransactionType }) {
+  return (
+    <span className={clsx("badge text-[10px]", type === "income" ? "badge-green" : "badge-red")}>
+      {type === "income" ? "Income" : "Expense"}
+    </span>
+  );
+}
+
+function RuleAppliedBadge({ kind }: { kind: RuleMatchKind }) {
+  if (!kind) return null;
+  return (
+    <span className="badge badge-green text-[10px]">
+      Rule Applied ({kind === "amount" ? "Amount" : "Vendor"})
+    </span>
+  );
+}
+
+function RuleFormPanel({
+  type,
+  vendorPattern,
+  amount,
+  category,
+  ruleType,
+  ruleAmount,
+  ruleTolerance,
+  onRuleTypeChange,
+  onCategoryChange,
+  onAmountChange,
+  onToleranceChange,
+  onSave,
+  onCancel,
+  saving,
+  message,
+}: {
+  type: TransactionType;
+  vendorPattern: string;
+  amount: number;
+  category: BankImportCategory;
+  ruleType: RuleType;
+  ruleAmount: string;
+  ruleTolerance: string;
+  onRuleTypeChange: (t: RuleType) => void;
+  onCategoryChange: (c: BankImportCategory) => void;
+  onAmountChange: (v: string) => void;
+  onToleranceChange: (v: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saving: boolean;
+  message: { type: "error" | "success"; text: string } | null;
+}) {
+  return (
+    <div className="space-y-3 text-[12px]">
+      <div className="flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+          <input
+            type="radio"
+            name="rule-type"
+            checked={ruleType === "vendor"}
+            onChange={() => onRuleTypeChange("vendor")}
+            className="border-white/20"
+          />
+          By vendor name
+        </label>
+        <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+          <input
+            type="radio"
+            name="rule-type"
+            checked={ruleType === "amount"}
+            onChange={() => onRuleTypeChange("amount")}
+            className="border-white/20"
+          />
+          By amount
+        </label>
+      </div>
+      {ruleType === "vendor" ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-slate-300">
+            Always categorize transactions containing{" "}
+            <span className="font-mono text-slate-100">{vendorPattern}</span> as:
+          </span>
+          <select
+            value={category}
+            onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
+            className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
+          >
+            {getImportCategoriesForType(type).map((f) => (
+              <option key={f} value={f}>
+                {BANK_IMPORT_CATEGORY_LABELS[f]}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-slate-300">
+            Always categorize {type === "income" ? "income" : "expense"} transactions of
+          </span>
+          <span className="text-slate-400">$</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={ruleAmount}
+            onChange={(e) => onAmountChange(e.target.value)}
+            className={clsx(INPUT_CLASS, "w-28 py-1.5 text-[12px] tabular-nums")}
+          />
+          <span className="text-slate-400">within $</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={ruleTolerance}
+            onChange={(e) => onToleranceChange(e.target.value)}
+            className={clsx(INPUT_CLASS, "w-20 py-1.5 text-[12px] tabular-nums")}
+          />
+          <span className="text-slate-300">as:</span>
+          <select
+            value={category}
+            onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
+            className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
+          >
+            {getImportCategoriesForType(type).map((f) => (
+              <option key={f} value={f}>
+                {BANK_IMPORT_CATEGORY_LABELS[f]}
+              </option>
+            ))}
+          </select>
+          <span className="text-slate-500">(from ${amount.toFixed(2)})</span>
+        </div>
+      )}
+      {message && (
+        <div
+          className={clsx(
+            "rounded-lg px-3 py-2 text-[12px]",
+            message.type === "error"
+              ? "bg-red-500/10 border border-red-500/20 text-red-400"
+              : "bg-green-500/10 border border-green-500/20 text-green-400"
+          )}
+        >
+          {message.text}
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="btn-primary text-[11px]" onClick={onSave} disabled={saving}>
+          {saving ? "Saving…" : "Save Rule"}
+        </button>
+        <button type="button" className="btn-outline text-[11px]" onClick={onCancel} disabled={saving}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AuditHistoryPanel({
+  entries,
+  loading,
+}: {
+  entries: TransactionAuditLogEntry[];
+  loading: boolean;
+}) {
+  if (loading) {
+    return <div className="text-[11px] text-slate-500 py-2">Loading history…</div>;
+  }
+  if (entries.length === 0) {
+    return <div className="text-[11px] text-slate-500 py-2">No history recorded yet.</div>;
+  }
+  return (
+    <ul className="space-y-1.5 py-2 text-[11px] text-slate-400">
+      {entries.map((entry) => (
+        <li key={entry.id} className="flex flex-wrap gap-x-2 gap-y-0.5">
+          <span className="text-slate-500 whitespace-nowrap">
+            {new Date(entry.changed_at).toLocaleString()}
+          </span>
+          <span className="text-slate-300">{entry.field_changed}</span>
+          <span>
+            {entry.old_value ?? "—"} → {entry.new_value ?? "—"}
+          </span>
+          <span className="text-slate-600">({entry.change_source})</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export default function TransactionsPage() {
+  const supabase = useMemo(() => createClient(), []);
+  const { selectedStore, loading: storesLoading } = useStores();
+
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [store, setStore] = useState<StoreFinancialProfile | null>(null);
+  const [activeTab, setActiveTab] = useState<StatusTab>("needs_review");
+  const [transactions, setTransactions] = useState<BankTransaction[]>([]);
+  const [countRows, setCountRows] = useState<Pick<BankTransaction, "id" | "status" | "excluded">[]>([]);
+  const [financialRecords, setFinancialRecords] = useState<MonthlyFinancialRecord[]>([]);
+  const [utilityRecords, setUtilityRecords] = useState<MonthlyUtilityRecord[]>([]);
+  const [plLinksByTxn, setPlLinksByTxn] = useState<Map<string, TransactionPlLink>>(new Map());
+  const [categorizationRules, setCategorizationRules] = useState<CategorizationRule[]>([]);
+  const [stagedCsv, setStagedCsv] = useState<StagedCsvRow[]>([]);
+  const [categoryOverrides, setCategoryOverrides] = useState<Map<string, BankImportCategory>>(new Map());
+  const [notesDraft, setNotesDraft] = useState<Map<string, string>>(new Map());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkCategory, setBulkCategory] = useState<BankImportCategory>("self_service_revenue");
+  const [groupByVendor, setGroupByVendor] = useState(true);
+  const [showManageRules, setShowManageRules] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [postingCount, setPostingCount] = useState(0);
+  const [duplicateImportCount, setDuplicateImportCount] = useState(0);
+
+  const [expandedHistory, setExpandedHistory] = useState<Set<string>>(new Set());
+  const [auditLogsByTxn, setAuditLogsByTxn] = useState<Map<string, TransactionAuditLogEntry[]>>(new Map());
+  const [auditLoading, setAuditLoading] = useState<Set<string>>(new Set());
+
+  const [excludeModal, setExcludeModal] = useState<{ ids: string[]; reason: string } | null>(null);
+  const [reclassifyModal, setReclassifyModal] = useState<{
+    row: ReviewRow;
+    newCategory: BankImportCategory;
+  } | null>(null);
+
+  const [ruleFormKey, setRuleFormKey] = useState<string | null>(null);
+  const [ruleFormCategory, setRuleFormCategory] = useState<BankImportCategory>("self_service_revenue");
+  const [ruleFormType, setRuleFormType] = useState<RuleType>("vendor");
+  const [ruleFormAmount, setRuleFormAmount] = useState("");
+  const [ruleFormTolerance, setRuleFormTolerance] = useState("0.01");
+  const [ruleFormTxnType, setRuleFormTxnType] = useState<TransactionType>("expense");
+  const [ruleFormVendorPattern, setRuleFormVendorPattern] = useState("");
+  const [ruleFormSourceAmount, setRuleFormSourceAmount] = useState(0);
+  const [ruleFormSaving, setRuleFormSaving] = useState(false);
+  const [ruleFormMessage, setRuleFormMessage] = useState<{ type: "error" | "success"; text: string } | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => setMessage(null), 4000);
+    return () => clearTimeout(timer);
+  }, [message]);
+
+  const statusCounts = useMemo(() => {
+    let needsReview = 0;
+    let posted = 0;
+    let excluded = 0;
+    for (const row of countRows) {
+      if (row.excluded || row.status === "excluded") {
+        excluded += 1;
+      } else if (row.status === "posted") {
+        posted += 1;
+      } else if (isNeedsReview(row)) {
+        needsReview += 1;
+      }
+    }
+    return { needsReview, posted, excluded, total: countRows.length };
+  }, [countRows]);
+
+  const loadData = useCallback(async () => {
+    if (!selectedStore?.id) {
+      setStore(null);
+      setTransactions([]);
+      setCountRows([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLoadError(false);
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      setUserId(user.id);
+
+      const [
+        { data: storeData, error: storeError },
+        { data: countData, error: countError },
+        { data: financialsData, error: financialsError },
+        { data: utilitiesData, error: utilitiesError },
+        { data: rulesData, error: rulesError },
+      ] = await Promise.all([
+        supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
+        supabase
+          .from("bank_transactions")
+          .select("id, status, excluded")
+          .eq("store_id", selectedStore.id),
+        supabase
+          .from("monthly_financials")
+          .select("*")
+          .eq("store_id", selectedStore.id)
+          .order("year", { ascending: false })
+          .order("month", { ascending: false }),
+        supabase
+          .from("monthly_utilities")
+          .select("year, month, water, gas, electric, sewer, trash, internet")
+          .eq("store_id", selectedStore.id),
+        supabase
+          .from("categorization_rules")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
+      ]);
+
+      if (storeError || countError || financialsError || utilitiesError || rulesError) {
+        throw new Error(
+          [storeError, countError, financialsError, utilitiesError, rulesError]
+            .filter(Boolean)
+            .map((e) => e!.message)
+            .join(" · ")
+        );
+      }
+
+      setStore(storeData as StoreFinancialProfile);
+      setCountRows((countData ?? []) as Pick<BankTransaction, "id" | "status" | "excluded">[]);
+      setFinancialRecords((financialsData ?? []) as MonthlyFinancialRecord[]);
+      setUtilityRecords((utilitiesData ?? []) as MonthlyUtilityRecord[]);
+      setCategorizationRules((rulesData ?? []) as CategorizationRule[]);
+
+      let txnQuery = supabase
+        .from("bank_transactions")
+        .select("*")
+        .eq("store_id", selectedStore.id)
+        .order("transaction_date", { ascending: false });
+
+      if (activeTab === "needs_review") {
+        txnQuery = txnQuery.eq("excluded", false).not("status", "in", '("posted","excluded","reviewed")');
+      } else if (activeTab === "posted") {
+        txnQuery = txnQuery.eq("status", "posted").eq("excluded", false);
+      } else if (activeTab === "excluded") {
+        txnQuery = txnQuery.or("excluded.eq.true,status.eq.excluded");
+      }
+
+      const { data: txnData, error: txnError } = await txnQuery;
+      if (txnError) throw new Error(txnError.message);
+
+      const rows = (txnData ?? []) as BankTransaction[];
+      setTransactions(rows);
+
+      const notesMap = new Map<string, string>();
+      for (const row of rows) {
+        notesMap.set(row.id, row.notes ?? "");
+      }
+      setNotesDraft(notesMap);
+      setCategoryOverrides(new Map());
+      setSelectedIds(new Set());
+
+      if (activeTab === "posted" || activeTab === "all") {
+        const postedIds = rows.filter((r) => r.status === "posted").map((r) => r.id);
+        if (postedIds.length > 0) {
+          const { data: linkData } = await supabase
+            .from("transaction_pl_links")
+            .select("*")
+            .in("transaction_id", postedIds);
+          const linkMap = new Map<string, TransactionPlLink>();
+          for (const link of (linkData ?? []) as TransactionPlLink[]) {
+            linkMap.set(link.transaction_id, link);
+          }
+          setPlLinksByTxn(linkMap);
+        } else {
+          setPlLinksByTxn(new Map());
+        }
+      } else {
+        setPlLinksByTxn(new Map());
+      }
+    } catch {
+      setLoadError(true);
+      setStore(null);
+      setTransactions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTab, selectedStore?.id, supabase]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const reviewRows = useMemo((): ReviewRow[] => {
+    return transactions.map((txn) => {
+      const type = (txn.transaction_type as TransactionType | null) ?? inferTransactionType(txn.amount, txn.category);
+      const amount = Math.abs(txn.amount);
+      const storedCategory = txn.category as BankImportCategory | null;
+      const override = categoryOverrides.get(txn.id);
+
+      const { category: ruleCategory, suggested, ruleApplied } = categorizeWithRules(
+        txn.description,
+        type,
+        amount,
+        categorizationRules
+      );
+
+      let category: BankImportCategory;
+      if (override) {
+        category = override;
+      } else if (ruleApplied) {
+        category = ruleCategory;
+      } else {
+        category = storedCategory ?? suggestTransactionCategory(txn.description, type);
+      }
+
+      return {
+        id: txn.id,
+        transaction_date: txn.transaction_date,
+        description: txn.description,
+        amount,
+        type,
+        category,
+        suggested: ruleApplied ? ruleCategory : suggested,
+        ruleApplied: ruleApplied || false,
+        possibleDuplicate: false,
+        status: (txn.status ?? "needs_review") as TransactionStatus,
+        excluded: txn.excluded ?? false,
+        exclusion_reason: txn.exclusion_reason ?? null,
+        notes: txn.notes ?? null,
+        original_category: txn.original_category ?? null,
+      };
+    });
+  }, [transactions, categorizationRules, categoryOverrides]);
+
+  const transactionGroups = useMemo((): TransactionGroup[] => {
+    const map = new Map<string, TransactionGroup>();
+    for (const txn of reviewRows) {
+      const vendorPattern = normalizeVendorPattern(txn.description);
+      const groupKey = isGenericTransactionDescription(txn.description)
+        ? `__individual__::${txn.id}`
+        : `${vendorPattern || "(no description)"}::${txn.type}`;
+
+      const existing = map.get(groupKey);
+      if (existing) {
+        existing.count += 1;
+        existing.totalAmount += txn.amount;
+        existing.items.push(txn);
+        if (txn.ruleApplied) existing.ruleApplied = txn.ruleApplied;
+        const categories = new Set(existing.items.map((i) => i.category));
+        if (categories.size === 1) existing.category = txn.category;
+      } else {
+        map.set(groupKey, {
+          groupKey,
+          vendorPattern: vendorPattern || "(no description)",
+          description: txn.description ?? vendorPattern ?? "(no description)",
+          count: 1,
+          totalAmount: txn.amount,
+          type: txn.type,
+          category: txn.category,
+          suggested: txn.suggested,
+          ruleApplied: txn.ruleApplied,
+          items: [txn],
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [reviewRows]);
+
+  const selectableIds = useMemo(
+    () => reviewRows.filter((t) => !t.possibleDuplicate).map((t) => t.id),
+    [reviewRows]
+  );
+  const allSelected =
+    selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
+  const someSelected = selectedIds.size > 0;
+
+  function toggleSelectAll(checked: boolean) {
+    setSelectedIds(checked ? new Set(selectableIds) : new Set());
+  }
+
+  function toggleSelectId(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  async function updateCategory(
+    id: string,
+    category: BankImportCategory,
+    previousCategory: string | null,
+    persist = true
+  ) {
+    setCategoryOverrides((prev) => new Map(prev).set(id, category));
+
+    if (!persist) return;
+
+    setTransactions((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, category, status: "user_classified" as TransactionStatus } : t))
+    );
+
+    if (!userId || !store?.id) return;
+
+    const now = new Date().toISOString();
+    await supabase
+      .from("bank_transactions")
+      .update({ category, status: "user_classified", modified_at: now })
+      .eq("id", id);
+
+    if (previousCategory !== category) {
+      await supabase.from("transaction_audit_log").insert({
+        transaction_id: id,
+        store_id: store.id,
+        user_id: userId,
+        field_changed: "category",
+        old_value: previousCategory,
+        new_value: category,
+        change_source: "user",
+      });
+    }
+  }
+
+  async function saveNotes(id: string) {
+    const notes = notesDraft.get(id) ?? "";
+    const previous = transactions.find((t) => t.id === id)?.notes ?? "";
+    if (notes === previous) return;
+
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("bank_transactions")
+      .update({ notes: notes.trim() || null, modified_at: now })
+      .eq("id", id);
+
+    if (error) {
+      setMessage({ type: "error", text: error.message });
+      return;
+    }
+
+    setTransactions((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, notes: notes.trim() || null } : t))
+    );
+  }
+
+  async function toggleHistory(id: string) {
+    const next = new Set(expandedHistory);
+    if (next.has(id)) {
+      next.delete(id);
+      setExpandedHistory(next);
+      return;
+    }
+    next.add(id);
+    setExpandedHistory(next);
+
+    if (!auditLogsByTxn.has(id)) {
+      setAuditLoading((prev) => new Set(prev).add(id));
+      const { data, error } = await supabase
+        .from("transaction_audit_log")
+        .select("*")
+        .eq("transaction_id", id)
+        .order("changed_at", { ascending: false });
+
+      setAuditLoading((prev) => {
+        const s = new Set(prev);
+        s.delete(id);
+        return s;
+      });
+
+      if (!error && data) {
+        setAuditLogsByTxn((prev) => new Map(prev).set(id, data as TransactionAuditLogEntry[]));
+      }
+    }
+  }
+
+  async function handlePostRows(rows: ReviewRow[]) {
+    if (!store?.id || !userId || rows.length === 0) return;
+
+    for (const row of rows) {
+      if (!isCategoryReadyToPost(row.category)) {
+        setMessage({
+          type: "error",
+          text: "Assign a category before posting. Transactions marked Needs Review cannot be posted.",
+        });
+        return;
+      }
+    }
+
+    setPosting(true);
+    setPostingCount(rows.length);
+    setMessage(null);
+
+    const batch: BatchPostTransaction[] = rows.map((row) => {
+      const txn = transactions.find((t) => t.id === row.id);
+      return {
+        id: row.id,
+        transaction_date: row.transaction_date,
+        amount: row.amount,
+        category: row.category,
+        status: txn?.status ?? "needs_review",
+        original_category: txn?.original_category ?? null,
+      };
+    });
+
+    const utilitiesLookup = buildUtilitiesLookup(utilityRecords);
+    const enrichedRecords = enrichMonthlyRecords(sortRecordsDesc(financialRecords), utilitiesLookup);
+
+    const result = await postTransactionsBatch(supabase, {
+      storeId: store.id,
+      userId,
+      transactions: batch,
+      existingRecords: enrichedRecords,
+      existingUtilityRecords: utilityRecords,
+      store,
+      changeSource: "user",
+    });
+
+    setPosting(false);
+    setPostingCount(0);
+
+    if (result.error) {
+      setMessage({ type: "error", text: result.error });
+      return;
+    }
+
+    invalidateValuationCache(store.id);
+    setMessage({
+      type: "success",
+      text:
+        result.postedCount === 1
+          ? "Posted 1 transaction to P&L."
+          : `Posted ${result.postedCount} transactions to P&L.`,
+    });
+    await loadData();
+  }
+
+  async function confirmExclude() {
+    if (!excludeModal || !userId) return;
+    const reason = excludeModal.reason.trim();
+    if (!reason) {
+      setMessage({ type: "error", text: "Enter a reason before excluding." });
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+
+    for (const id of excludeModal.ids) {
+      const { error } = await excludeTransaction(supabase, id, reason, userId, store);
+      if (error) {
+        setSaving(false);
+        setMessage({ type: "error", text: error });
+        return;
+      }
+    }
+
+    if (store?.id) invalidateValuationCache(store.id);
+    setExcludeModal(null);
+    setSaving(false);
+    setSelectedIds(new Set());
+    setMessage({
+      type: "success",
+      text:
+        excludeModal.ids.length === 1
+          ? "Transaction excluded."
+          : `Excluded ${excludeModal.ids.length} transactions.`,
+    });
+    await loadData();
+  }
+
+  async function confirmReclassify() {
+    if (!reclassifyModal || !userId) return;
+
+    setSaving(true);
+    setMessage(null);
+
+    const { error } = await reclassifyPostedTransaction(
+      supabase,
+      reclassifyModal.row.id,
+      reclassifyModal.newCategory,
+      userId,
+      store
+    );
+
+    setSaving(false);
+
+    if (error) {
+      setMessage({ type: "error", text: error });
+      return;
+    }
+
+    if (store?.id) invalidateValuationCache(store.id);
+    setReclassifyModal(null);
+    setMessage({ type: "success", text: "Transaction reclassified and P&L updated." });
+    await loadData();
+  }
+
+  function handleCSVUpload(file: File) {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = e.target?.result as string;
+      const parsed = parseBankCsv(text);
+      if (parsed.length === 0) {
+        setMessage({
+          type: "error",
+          text: "Could not parse CSV. Expected columns: Processed Date, Description, Credit or Debit, and Amount.",
+        });
+        return;
+      }
+
+      if (!store?.id) {
+        setMessage({ type: "error", text: "Select a store before importing transactions." });
+        return;
+      }
+
+      let rules = categorizationRules;
+      if (userId) {
+        const { data: freshRules } = await supabase
+          .from("categorization_rules")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false });
+        if (freshRules) {
+          rules = freshRules as CategorizationRule[];
+          setCategorizationRules(rules);
+        }
+      }
+
+      const { data: existingBankRows } = await supabase
+        .from("bank_transactions")
+        .select("transaction_date, amount, category, transaction_type")
+        .eq("store_id", store.id);
+
+      const existingForDedup = [
+        ...(existingBankRows ?? []).map((row) => ({
+          transaction_date: row.transaction_date,
+          amount: Math.abs(row.amount),
+          type:
+            (row.transaction_type as TransactionType | null) ??
+            inferTransactionType(row.amount, row.category),
+        })),
+        ...reviewRows.map((txn) => ({
+          transaction_date: txn.transaction_date,
+          amount: txn.amount,
+          type: txn.type,
+        })),
+        ...stagedCsv.map((txn) => ({
+          transaction_date: txn.transaction_date,
+          amount: txn.amount,
+          type: txn.type,
+        })),
+      ];
+
+      const parsedForDedup = parsed.map((row) => ({
+        transaction_date: row.date,
+        amount: row.amount,
+        type: row.type,
+      }));
+      const withDuplicateFlags = markDuplicateTransactions(parsedForDedup, existingForDedup);
+      const duplicateCount = withDuplicateFlags.filter((row) => row.possibleDuplicate).length;
+      setDuplicateImportCount(duplicateCount);
+
+      const baseId = Date.now();
+      const staged: StagedCsvRow[] = withDuplicateFlags.map((row, i) => {
+        const { category, suggested, ruleApplied } = categorizeWithRules(
+          parsed[i].description,
+          row.type,
+          row.amount,
+          rules
+        );
+        return {
+          tempId: `csv-${baseId}-${i}`,
+          transaction_date: row.transaction_date,
+          description: parsed[i].description,
+          amount: row.amount,
+          type: row.type,
+          category,
+          suggested,
+          ruleApplied,
+          possibleDuplicate: row.possibleDuplicate,
+        };
+      });
+      setStagedCsv((prev) => [...staged, ...prev]);
+      const dupMsg =
+        duplicateCount > 0
+          ? ` ${duplicateCount} possible duplicate${duplicateCount === 1 ? "" : "s"} flagged.`
+          : "";
+      setMessage({
+        type: "success",
+        text: `Parsed ${staged.length} transaction${staged.length === 1 ? "" : "s"} from CSV.${dupMsg}`,
+      });
+    };
+    reader.readAsText(file);
+  }
+
+  async function saveStagedToQueue() {
+    if (!store?.id || !userId || stagedCsv.length === 0) return;
+    setSaving(true);
+
+    const rows = stagedCsv.map((t) => ({
+      store_id: store.id,
+      user_id: userId,
+      transaction_date: t.transaction_date,
+      description: t.description,
+      amount: t.amount,
+      category: t.category,
+      transaction_type: t.type,
+      original_category: t.category,
+      status: "needs_review" as TransactionStatus,
+      is_reviewed: false,
+      excluded: false,
+    }));
+
+    const { error } = await supabase.from("bank_transactions").insert(rows);
+    setSaving(false);
+
+    if (error) {
+      setMessage({ type: "error", text: error.message });
+      return;
+    }
+
+    setStagedCsv([]);
+    setMessage({
+      type: "success",
+      text: `Saved ${rows.length} transaction${rows.length === 1 ? "" : "s"} to review queue.`,
+    });
+    await loadData();
+  }
+
+  function openRuleForm(
+    key: string,
+    category: BankImportCategory,
+    type: TransactionType,
+    vendorPattern: string,
+    amount: number
+  ) {
+    setRuleFormKey(key);
+    setRuleFormCategory(category);
+    setRuleFormTxnType(type);
+    setRuleFormVendorPattern(vendorPattern);
+    setRuleFormSourceAmount(amount);
+    setRuleFormMessage(null);
+  }
+
+  async function saveCategorizationRule() {
+    setRuleFormMessage(null);
+    let activeUserId = userId;
+    if (!activeUserId) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setRuleFormMessage({ type: "error", text: "Couldn't save rule. Please sign in and try again." });
+        return;
+      }
+      activeUserId = user.id;
+      setUserId(user.id);
+    }
+
+    if (ruleFormType === "vendor") {
+      if (!ruleFormVendorPattern.trim()) {
+        setRuleFormMessage({ type: "error", text: "Enter a vendor pattern for the rule." });
+        return;
+      }
+
+      setRuleFormSaving(true);
+      try {
+        const { data, error: insertError } = await supabase
+          .from("categorization_rules")
+          .insert({
+            user_id: activeUserId,
+            vendor_pattern: ruleFormVendorPattern.trim().toUpperCase(),
+            category: ruleFormCategory,
+            rule_type: "vendor",
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          setRuleFormMessage({ type: "error", text: "Couldn't save rule. Please try again." });
+          return;
+        }
+
+        setCategorizationRules((prev) => [data as CategorizationRule, ...prev]);
+        setRuleFormKey(null);
+        setMessage({
+          type: "success",
+          text: `Rule saved: "${(data as CategorizationRule).vendor_pattern}" → ${BANK_IMPORT_CATEGORY_LABELS[ruleFormCategory]}`,
+        });
+      } finally {
+        setRuleFormSaving(false);
+      }
+      return;
+    }
+
+    const amount = Math.abs(parseFloat(ruleFormAmount));
+    const tolerance = parseFloat(ruleFormTolerance);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setRuleFormMessage({ type: "error", text: "Enter a valid amount for the rule." });
+      return;
+    }
+    if (!Number.isFinite(tolerance) || tolerance < 0) {
+      setRuleFormMessage({ type: "error", text: "Enter a valid tolerance (0 or greater)." });
+      return;
+    }
+
+    setRuleFormSaving(true);
+    try {
+      const { data, error: insertError } = await supabase
+        .from("categorization_rules")
+        .insert({
+          user_id: activeUserId,
+          vendor_pattern: amountRuleVendorPattern(ruleFormTxnType, amount),
+          category: ruleFormCategory,
+          rule_type: "amount",
+          amount,
+          amount_tolerance: tolerance,
+          transaction_type: ruleFormTxnType,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        setRuleFormMessage({ type: "error", text: "Couldn't save rule. Please try again." });
+        return;
+      }
+
+      setCategorizationRules((prev) => [data as CategorizationRule, ...prev]);
+      setRuleFormKey(null);
+      setMessage({ type: "success", text: "Amount rule saved." });
+    } finally {
+      setRuleFormSaving(false);
+    }
+  }
+
+  async function deleteCategorizationRule(ruleId: string) {
+    const { error } = await supabase.from("categorization_rules").delete().eq("id", ruleId);
+    if (error) {
+      setMessage({ type: "error", text: error.message });
+      return;
+    }
+    setCategorizationRules((prev) => prev.filter((r) => r.id !== ruleId));
+    setMessage({ type: "success", text: "Rule deleted." });
+  }
+
+  function updateGroupCategory(groupKey: string, category: BankImportCategory) {
+    const group = transactionGroups.find((g) => g.groupKey === groupKey);
+    if (!group) return;
+    for (const row of group.items) {
+      const txn = transactions.find((t) => t.id === row.id);
+      void updateCategory(row.id, category, txn?.category ?? null, true);
+    }
+  }
+
+  function renderNotesInput(row: ReviewRow, readOnly = false) {
+    return (
+      <input
+        type="text"
+        value={notesDraft.get(row.id) ?? ""}
+        onChange={(e) => setNotesDraft((prev) => new Map(prev).set(row.id, e.target.value))}
+        onBlur={() => void saveNotes(row.id)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur();
+          }
+        }}
+        disabled={readOnly}
+        placeholder="Add note…"
+        className={clsx(INPUT_CLASS, "w-full min-w-[120px] py-1 text-[11px]")}
+      />
+    );
+  }
+
+  function renderHistoryToggle(row: ReviewRow, colSpan: number) {
+    const expanded = expandedHistory.has(row.id);
+    return (
+      <>
+        <tr className="border-b border-white/[0.02]">
+          <td colSpan={colSpan} className="py-1 px-0">
+            <button
+              type="button"
+              onClick={() => void toggleHistory(row.id)}
+              className="text-[11px] text-blue-400 hover:text-blue-300"
+            >
+              {expanded ? "▾ History" : "▸ History"}
+            </button>
+          </td>
+        </tr>
+        {expanded && (
+          <tr className="border-b border-white/[0.04] bg-white/[0.02]">
+            <td colSpan={colSpan} className="py-1 px-3">
+              <AuditHistoryPanel
+                entries={auditLogsByTxn.get(row.id) ?? []}
+                loading={auditLoading.has(row.id)}
+              />
+            </td>
+          </tr>
+        )}
+      </>
+    );
+  }
+
+  function renderPostedLink(row: ReviewRow) {
+    const link = plLinksByTxn.get(row.id);
+    if (!link) return null;
+    return (
+      <div className="text-[10px] text-slate-500 mt-0.5">
+        Posted to {MONTH_SHORT[link.month - 1]} {link.year} · {formatPlLinkCategory(link.category)}
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return <PageError onRetry={loadData} />;
+  }
+
+  if (!storesLoading && !selectedStore?.id) {
+    return (
+      <div className="p-6">
+        <p className="text-[13px] text-slate-500">Select a store from the dropdown above to review transactions.</p>
+      </div>
+    );
+  }
+
+  if (loading || storesLoading) {
+    return (
+      <div className="p-6 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+        <CardSkeleton />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-4 max-w-[1400px]">
+      <div>
+        <h1 className="text-[20px] font-bold text-slate-100">Transaction Review</h1>
+        <p className="text-[12px] text-slate-500 mt-1">
+          Categorize bank transactions, post to P&L, exclude transfers, and reclassify posted items.
+        </p>
+      </div>
+
+      <FormBanner message={message} />
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <KpiCard label="Needs Review" value={statusCounts.needsReview} />
+        <KpiCard label="Posted" value={statusCounts.posted} valueColor="var(--text-success)" />
+        <KpiCard label="Excluded" value={statusCounts.excluded} />
+      </div>
+
+      <div className="card flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="text-[14px] font-semibold text-slate-100">Import Bank Transactions</div>
+          <div className="text-[12px] text-slate-500 mt-1">
+            Upload a CSV, then save to the review queue before posting.
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <label className="btn-outline cursor-pointer">
+            Upload CSV
+            <input
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleCSVUpload(file);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          {stagedCsv.length > 0 && (
+            <button type="button" className="btn-primary" onClick={() => void saveStagedToQueue()} disabled={saving}>
+              Save {stagedCsv.length} to Queue
+            </button>
+          )}
+        </div>
+      </div>
+
+      {stagedCsv.length > 0 && (
+        <div className="rounded-lg p-3 text-[12px] bg-amber-500/10 border border-amber-500/30 text-amber-200">
+          {stagedCsv.length} parsed transaction{stagedCsv.length === 1 ? "" : "s"} waiting to be saved to the queue.
+          {duplicateImportCount > 0 &&
+            ` ${duplicateImportCount} possible duplicate${duplicateImportCount === 1 ? "" : "s"} flagged.`}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            ["needs_review", `Needs Review (${statusCounts.needsReview})`],
+            ["posted", `Posted (${statusCounts.posted})`],
+            ["excluded", `Excluded (${statusCounts.excluded})`],
+            ["all", `All (${statusCounts.total})`],
+          ] as [StatusTab, string][]
+        ).map(([tab, label]) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={clsx(
+              "px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors",
+              activeTab === tab
+                ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                : "text-slate-400 border border-white/[0.06] hover:text-slate-200"
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="section-title flex flex-wrap items-center gap-3">
+          <span>
+            {activeTab === "needs_review" && "Review Queue"}
+            {activeTab === "posted" && "Posted Transactions"}
+            {activeTab === "excluded" && "Excluded Transactions"}
+            {activeTab === "all" && "All Transactions"}
+          </span>
+          <span className="text-[11px] text-slate-600 font-normal">{reviewRows.length} shown</span>
+          <button
+            type="button"
+            className="ml-auto text-[12px] text-blue-400 hover:text-blue-300"
+            onClick={() => setShowManageRules((v) => !v)}
+          >
+            {showManageRules ? "Hide Rules" : "Manage Rules"}
+            {categorizationRules.length > 0 && (
+              <span className="ml-1.5 badge badge-blue text-[10px]">{categorizationRules.length}</span>
+            )}
+          </button>
+          {activeTab === "needs_review" && (
+            <label className="flex items-center gap-2 text-[12px] text-slate-400 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={groupByVendor}
+                onChange={(e) => setGroupByVendor(e.target.checked)}
+                className="rounded border-white/20"
+              />
+              Group similar vendors
+            </label>
+          )}
+        </div>
+
+        {showManageRules && (
+          <div className="mb-4 p-4 rounded-lg bg-[#243347]/50 border border-white/[0.06]">
+            <div className="text-[13px] font-medium text-slate-200 mb-3">Categorization Rules</div>
+            {categorizationRules.length === 0 ? (
+              <p className="text-[12px] text-slate-500">
+                No rules yet. Use &quot;Set as Rule&quot; on a transaction to auto-categorize future imports.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {categorizationRules.map((rule) => {
+                  const isAmountRule = rule.rule_type === "amount";
+                  return (
+                    <div
+                      key={rule.id}
+                      className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-white/[0.04] last:border-b-0"
+                    >
+                      <div className="text-[12px] text-slate-300">
+                        {isAmountRule ? (
+                          <>
+                            When{" "}
+                            <span className="text-slate-100">
+                              {rule.transaction_type === "income" ? "income" : "expense"}
+                            </span>{" "}
+                            amount ={" "}
+                            <span className="font-mono text-slate-100">
+                              ${Number(rule.amount ?? 0).toFixed(2)}
+                            </span>
+                          </>
+                        ) : (
+                          <>When description contains &apos;{rule.vendor_pattern}&apos;</>
+                        )}
+                        <span className="text-slate-500 mx-2">→</span>
+                        <CategoryBadge category={rule.category as BankImportCategory} />
+                      </div>
+                      <button
+                        type="button"
+                        className="text-[11px] text-red-400 hover:text-red-300"
+                        onClick={() => void deleteCategorizationRule(rule.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {someSelected && activeTab === "needs_review" && !groupByVendor && (
+          <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+            <span className="text-[12px] text-blue-300 font-medium">{selectedIds.size} selected</span>
+            <select
+              value={bulkCategory}
+              onChange={(e) => setBulkCategory(e.target.value as BankImportCategory)}
+              className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
+            >
+              {getImportCategoriesForType("expense").map((f) => (
+                <option key={f} value={f}>
+                  {BANK_IMPORT_CATEGORY_LABELS[f]}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn-outline text-[11px]"
+              onClick={() => {
+                for (const id of Array.from(selectedIds)) {
+                  const txn = transactions.find((t) => t.id === id);
+                  void updateCategory(id, bulkCategory, txn?.category ?? null);
+                }
+                setMessage({ type: "success", text: `Applied category to ${selectedIds.size} transactions.` });
+              }}
+            >
+              Apply Category
+            </button>
+            <button
+              type="button"
+              className="btn-primary text-[11px]"
+              onClick={() => void handlePostRows(reviewRows.filter((r) => selectedIds.has(r.id)))}
+              disabled={posting}
+            >
+              {posting ? `Posting ${postingCount}…` : "Post Selected"}
+            </button>
+            <button
+              type="button"
+              className="btn-outline text-[11px] text-red-400 border-red-500/30"
+              onClick={() => setExcludeModal({ ids: Array.from(selectedIds), reason: "" })}
+            >
+              Exclude Selected
+            </button>
+          </div>
+        )}
+
+        {reviewRows.length === 0 ? (
+          <p className="text-[13px] text-slate-500 py-6 text-center">
+            {activeTab === "needs_review"
+              ? "No transactions to review. Upload a CSV to get started."
+              : "No transactions in this view."}
+          </p>
+        ) : activeTab === "needs_review" && groupByVendor ? (
+          <div className="table-scroll">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+                  <th className="pb-3 pr-3 font-medium">Vendor</th>
+                  <th className="pb-3 pr-3 font-medium">Type</th>
+                  <th className="pb-3 pr-3 font-medium">Count</th>
+                  <th className="pb-3 pr-3 font-medium text-right">Total</th>
+                  <th className="pb-3 pr-3 font-medium">Category</th>
+                  <th className="pb-3 pr-3 font-medium">Notes</th>
+                  <th className="pb-3 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactionGroups.map((group) => (
+                  <Fragment key={group.groupKey}>
+                    <tr className="border-b border-white/[0.04]">
+                      <td className="py-3 pr-3 text-slate-200 max-w-[200px] truncate">{group.vendorPattern}</td>
+                      <td className="py-3 pr-3">
+                        <TypeBadge type={group.type} />
+                      </td>
+                      <td className="py-3 pr-3 text-slate-400">{group.count}</td>
+                      <td className="py-3 pr-3 text-right font-semibold tabular-nums">{fmtDollar(group.totalAmount)}</td>
+                      <td className="py-3 pr-3">
+                        <select
+                          value={group.category}
+                          onChange={(e) =>
+                            updateGroupCategory(group.groupKey, e.target.value as BankImportCategory)
+                          }
+                          className={clsx(INPUT_CLASS, "w-40 py-1.5 text-[12px]")}
+                        >
+                          {getImportCategoriesForType(group.type).map((f) => (
+                            <option key={f} value={f}>
+                              {BANK_IMPORT_CATEGORY_LABELS[f]}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-3 pr-3 text-slate-500 text-[11px]">—</td>
+                      <td className="py-3 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          className="btn-primary text-[11px] mr-1.5"
+                          onClick={() => void handlePostRows(group.items)}
+                          disabled={!isCategoryReadyToPost(group.category) || posting}
+                        >
+                          Post All
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-outline text-[11px] mr-1.5 text-red-400 border-red-500/30"
+                          onClick={() =>
+                            setExcludeModal({ ids: group.items.map((i) => i.id), reason: "" })
+                          }
+                        >
+                          Exclude All
+                        </button>
+                        <button
+                          type="button"
+                          className="text-[11px] text-blue-400"
+                          onClick={() =>
+                            openRuleForm(
+                              group.groupKey,
+                              group.category,
+                              group.type,
+                              group.vendorPattern,
+                              group.items[0]?.amount ?? group.totalAmount
+                            )
+                          }
+                        >
+                          Set as Rule
+                        </button>
+                      </td>
+                    </tr>
+                    {group.count === 1 && renderHistoryToggle(group.items[0], 7)}
+                    {ruleFormKey === group.groupKey && (
+                      <tr className="border-b border-white/[0.04] bg-blue-500/5">
+                        <td colSpan={7} className="py-3 px-3">
+                          <RuleFormPanel
+                            type={group.type}
+                            vendorPattern={group.vendorPattern}
+                            amount={group.items[0]?.amount ?? group.totalAmount}
+                            category={ruleFormCategory}
+                            ruleType={ruleFormType}
+                            ruleAmount={ruleFormAmount}
+                            ruleTolerance={ruleFormTolerance}
+                            onRuleTypeChange={setRuleFormType}
+                            onCategoryChange={setRuleFormCategory}
+                            onAmountChange={setRuleFormAmount}
+                            onToleranceChange={setRuleFormTolerance}
+                            onSave={() => void saveCategorizationRule()}
+                            onCancel={() => setRuleFormKey(null)}
+                            saving={ruleFormSaving}
+                            message={ruleFormMessage}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="table-scroll">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+                  {activeTab === "needs_review" && (
+                    <th className="pb-3 pr-2 font-medium w-8">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={(e) => toggleSelectAll(e.target.checked)}
+                        className="rounded border-white/20"
+                        aria-label="Select all"
+                      />
+                    </th>
+                  )}
+                  <th className="pb-3 pr-3 font-medium">Date</th>
+                  <th className="pb-3 pr-3 font-medium">Description</th>
+                  <th className="pb-3 pr-3 font-medium">Type</th>
+                  <th className="pb-3 pr-3 font-medium text-right">Amount</th>
+                  <th className="pb-3 pr-3 font-medium">Status</th>
+                  <th className="pb-3 pr-3 font-medium">Category</th>
+                  <th className="pb-3 pr-3 font-medium">Notes</th>
+                  <th className="pb-3 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reviewRows.map((row) => {
+                  const storedCategory = transactions.find((t) => t.id === row.id)?.category ?? null;
+                  const excluded = isExcludedRow(row);
+                  const posted = isPostedRow(row);
+                  const needsReview = isNeedsReview(row);
+                  const colSpan = activeTab === "needs_review" ? 9 : 8;
+
+                  return (
+                    <Fragment key={row.id}>
+                      <tr className="border-b border-white/[0.04]">
+                        {activeTab === "needs_review" && (
+                          <td className="py-3 pr-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(row.id)}
+                              onChange={(e) => toggleSelectId(row.id, e.target.checked)}
+                              className="rounded border-white/20"
+                            />
+                          </td>
+                        )}
+                        <td className="py-3 pr-3 text-slate-300 whitespace-nowrap">
+                          {new Date(row.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
+                        </td>
+                        <td className="py-3 pr-3 text-slate-200 max-w-[180px]">
+                          <div className="truncate" title={row.description ?? undefined}>
+                            {row.description ?? "—"}
+                          </div>
+                          {posted && renderPostedLink(row)}
+                          {excluded && row.exclusion_reason && (
+                            <div className="text-[10px] text-red-400/80 mt-0.5 truncate" title={row.exclusion_reason}>
+                              {row.exclusion_reason}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 pr-3">
+                          <TypeBadge type={row.type} />
+                        </td>
+                        <td className="py-3 pr-3 text-right font-semibold tabular-nums">{fmtDollar(row.amount)}</td>
+                        <td className="py-3 pr-3">
+                          <StatusBadge status={row.status} excluded={row.excluded} />
+                        </td>
+                        <td className="py-3 pr-3">
+                          {excluded ? (
+                            <span className="text-slate-400">
+                              {row.original_category
+                                ? BANK_IMPORT_CATEGORY_LABELS[row.original_category as BankImportCategory] ??
+                                  row.original_category
+                                : "—"}
+                            </span>
+                          ) : (
+                            <div className="space-y-1">
+                              <select
+                                value={row.category}
+                                onChange={(e) => {
+                                  const newCategory = e.target.value as BankImportCategory;
+                                  if (posted) {
+                                    void updateCategory(row.id, newCategory, storedCategory, false);
+                                    return;
+                                  }
+                                  void updateCategory(row.id, newCategory, storedCategory, true);
+                                }}
+                                className={clsx(
+                                  INPUT_CLASS,
+                                  "w-40 py-1.5 text-[12px]",
+                                  row.category === "needs_review" && "border-amber-500/40"
+                                )}
+                              >
+                                {getImportCategoriesForType(row.type).map((f) => (
+                                  <option key={f} value={f}>
+                                    {BANK_IMPORT_CATEGORY_LABELS[f]}
+                                  </option>
+                                ))}
+                              </select>
+                              {needsReview && (
+                                <div className="flex flex-wrap gap-1">
+                                  <CategoryBadge category={row.suggested} />
+                                  <RuleAppliedBadge kind={row.ruleApplied} />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 pr-3">{renderNotesInput(row, excluded)}</td>
+                        <td className="py-3 text-right whitespace-nowrap">
+                          {(activeTab === "needs_review" || (activeTab === "all" && needsReview)) && (
+                            <>
+                              <button
+                                type="button"
+                                className="btn-primary text-[11px] mr-1.5"
+                                onClick={() => void handlePostRows([row])}
+                                disabled={!isCategoryReadyToPost(row.category) || posting}
+                              >
+                                Post
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-outline text-[11px] mr-1.5 text-red-400 border-red-500/30"
+                                onClick={() => setExcludeModal({ ids: [row.id], reason: "" })}
+                              >
+                                Exclude
+                              </button>
+                              <button
+                                type="button"
+                                className="text-[11px] text-blue-400"
+                                onClick={() =>
+                                  openRuleForm(
+                                    row.id,
+                                    row.category,
+                                    row.type,
+                                    normalizeVendorPattern(row.description),
+                                    row.amount
+                                  )
+                                }
+                              >
+                                Rule
+                              </button>
+                            </>
+                          )}
+                          {(activeTab === "posted" || (activeTab === "all" && posted)) && (
+                            <>
+                              <button
+                                type="button"
+                                className="btn-primary text-[11px] mr-1.5"
+                                onClick={() => {
+                                  const stored = (storedCategory ?? "") as BankImportCategory;
+                                  if (row.category === stored) {
+                                    setMessage({ type: "error", text: "Choose a different category to reclassify." });
+                                    return;
+                                  }
+                                  if (!isCategoryReadyToPost(row.category)) {
+                                    setMessage({ type: "error", text: "Choose a postable category to reclassify." });
+                                    return;
+                                  }
+                                  setReclassifyModal({ row, newCategory: row.category });
+                                }}
+                                disabled={saving}
+                              >
+                                Reclassify
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-outline text-[11px] text-red-400 border-red-500/30"
+                                onClick={() => setExcludeModal({ ids: [row.id], reason: "" })}
+                              >
+                                Exclude
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                      {renderHistoryToggle(row, colSpan)}
+                      {ruleFormKey === row.id && activeTab === "needs_review" && (
+                        <tr className="border-b border-white/[0.04] bg-blue-500/5">
+                          <td colSpan={colSpan} className="py-3 px-3">
+                            <RuleFormPanel
+                              type={row.type}
+                              vendorPattern={normalizeVendorPattern(row.description)}
+                              amount={row.amount}
+                              category={ruleFormCategory}
+                              ruleType={ruleFormType}
+                              ruleAmount={ruleFormAmount}
+                              ruleTolerance={ruleFormTolerance}
+                              onRuleTypeChange={setRuleFormType}
+                              onCategoryChange={setRuleFormCategory}
+                              onAmountChange={setRuleFormAmount}
+                              onToleranceChange={setRuleFormTolerance}
+                              onSave={() => void saveCategorizationRule()}
+                              onCancel={() => setRuleFormKey(null)}
+                              saving={ruleFormSaving}
+                              message={ruleFormMessage}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {excludeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="card max-w-md w-full space-y-4">
+            <div className="text-[15px] font-semibold text-slate-100">
+              Exclude {excludeModal.ids.length === 1 ? "Transaction" : `${excludeModal.ids.length} Transactions`}
+            </div>
+            <p className="text-[12px] text-slate-400">
+              {excludeModal.ids.length === 1 && transactions.find((t) => t.id === excludeModal.ids[0])?.status === "posted"
+                ? "This transaction was posted to P&L. Excluding will reverse the P&L impact."
+                : "Excluded transactions will not appear in the review queue."}
+            </p>
+            <div>
+              <label className="text-[12px] text-slate-400 block mb-1">Reason (required)</label>
+              <input
+                type="text"
+                value={excludeModal.reason}
+                onChange={(e) => setExcludeModal({ ...excludeModal, reason: e.target.value })}
+                className={clsx(INPUT_CLASS, "w-full py-2 text-[12px]")}
+                placeholder="e.g. Internal transfer, personal expense"
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-outline" onClick={() => setExcludeModal(null)} disabled={saving}>
+                Cancel
+              </button>
+              <button type="button" className="btn-primary" onClick={() => void confirmExclude()} disabled={saving}>
+                {saving ? "Excluding…" : "Exclude"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reclassifyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="card max-w-md w-full space-y-4">
+            <div className="text-[15px] font-semibold text-slate-100">Reclassify Posted Transaction</div>
+            <p className="text-[12px] text-slate-400">
+              Move {fmtDollar(reclassifyModal.row.amount)} from{" "}
+              <span className="text-slate-200">
+                {BANK_IMPORT_CATEGORY_LABELS[
+                  (transactions.find((t) => t.id === reclassifyModal.row.id)?.category ??
+                    reclassifyModal.row.category) as BankImportCategory
+                ] ?? transactions.find((t) => t.id === reclassifyModal.row.id)?.category}
+              </span>{" "}
+              to{" "}
+              <span className="text-slate-200">
+                {BANK_IMPORT_CATEGORY_LABELS[reclassifyModal.newCategory]}
+              </span>
+              ? P&L will be adjusted for the original posting period.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-outline" onClick={() => setReclassifyModal(null)} disabled={saving}>
+                Cancel
+              </button>
+              <button type="button" className="btn-primary" onClick={() => void confirmReclassify()} disabled={saving}>
+                {saving ? "Reclassifying…" : "Reclassify"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

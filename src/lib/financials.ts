@@ -71,6 +71,16 @@ export type FinancialRatios = {
   annualPayroll: number;
 };
 
+export type TransactionStatus =
+  | "needs_review"
+  | "reviewed"
+  | "posted"
+  | "excluded"
+  | "system_classified"
+  | "user_classified";
+
+export type TransactionChangeSource = "user" | "rule" | "import";
+
 export type BankTransaction = {
   id: string;
   store_id: string;
@@ -80,6 +90,37 @@ export type BankTransaction = {
   amount: number;
   category: string | null;
   is_reviewed: boolean;
+  status?: TransactionStatus;
+  excluded?: boolean;
+  exclusion_reason?: string | null;
+  notes?: string | null;
+  original_category?: string | null;
+  transaction_type?: TransactionType | null;
+  split_parent_id?: string | null;
+  modified_at?: string;
+};
+
+export type TransactionPlLink = {
+  id: string;
+  transaction_id: string;
+  store_id: string;
+  year: number;
+  month: number;
+  category: string;
+  amount_applied: number;
+  applied_at: string;
+};
+
+export type TransactionAuditLogEntry = {
+  id: string;
+  transaction_id: string;
+  store_id: string;
+  user_id: string;
+  changed_at: string;
+  field_changed: string;
+  old_value: string | null;
+  new_value: string | null;
+  change_source: TransactionChangeSource;
 };
 
 export type StoreFinancialProfile = {
@@ -279,6 +320,7 @@ export function calcTtmMetrics(records: CalculatedMonthly[]): TtmMetrics {
 }
 
 import type { createClient } from "@/lib/supabase";
+import { toNum, toNullableText } from "@/lib/formHelpers";
 
 type FinancialsSupabaseClient = ReturnType<typeof createClient>;
 
@@ -1511,4 +1553,692 @@ export function calcOccupancyCost(ratios: FinancialRatios, ttm: TtmMetrics): {
     rentPct: ratios.rentPct,
     insurancePct: 0,
   };
+}
+
+export type PostingTargetTable = "monthly_utilities" | "monthly_financials";
+
+export type PostingTarget = {
+  table: PostingTargetTable;
+  column: string;
+};
+
+export type BatchPostTransaction = {
+  id: string;
+  transaction_date: string;
+  amount: number;
+  category: BankImportCategory;
+  status?: TransactionStatus | null;
+  original_category?: string | null;
+};
+
+export type PostTransactionsBatchParams = {
+  storeId: string;
+  userId: string;
+  transactions: BatchPostTransaction[];
+  existingRecords?: MonthlyFinancialRecord[];
+  existingUtilityRecords?: MonthlyUtilityRecord[];
+  store?: StoreFinancialProfile | null;
+  changeSource?: TransactionChangeSource;
+};
+
+export type PostTransactionsBatchResult = {
+  postedCount: number;
+  error: string | null;
+};
+
+function normalizeTransactionAmount(amount: number): number {
+  return Math.abs(amount);
+}
+
+function emptyUtilityDelta(): Record<UtilityImportField, number> {
+  return { water: 0, gas: 0, electric: 0, sewer: 0, trash: 0, internet: 0 };
+}
+
+function parseMonthPeriodKey(key: string): { year: number; month: number } {
+  const [year, month] = key.split("-").map(Number);
+  return { year, month };
+}
+
+export function resolvePostingTarget(
+  importCategory: BankImportCategory
+): PostingTarget | null {
+  const revenueField = mapBankCategoryToRevenueField(importCategory);
+  if (revenueField) {
+    return { table: "monthly_financials", column: revenueField };
+  }
+
+  const utilityField = mapBankCategoryToUtilityField(importCategory);
+  if (utilityField) {
+    return { table: "monthly_utilities", column: utilityField };
+  }
+
+  const plField = mapBankCategoryToPlField(importCategory);
+  if (plField) {
+    return { table: "monthly_financials", column: plField };
+  }
+
+  return null;
+}
+
+function isRevenueBreakdownColumn(column: string): column is RevenueBreakdownField {
+  return (REVENUE_BREAKDOWN_FIELDS as readonly string[]).includes(column);
+}
+
+function isUtilityColumn(column: string): column is UtilityImportField {
+  return (UTILITY_IMPORT_FIELDS as readonly string[]).includes(column);
+}
+
+function isPlCategoryColumn(column: string): column is PlCategoryField {
+  return (PL_CATEGORY_FIELDS as readonly string[]).includes(column);
+}
+
+function postingTargetFromStoredCategory(category: string): PostingTarget {
+  if (isUtilityColumn(category)) {
+    return { table: "monthly_utilities", column: category };
+  }
+  return { table: "monthly_financials", column: category };
+}
+
+async function writeTransactionAuditLog(
+  supabase: FinancialsSupabaseClient,
+  entry: {
+    transactionId: string;
+    storeId: string;
+    userId: string;
+    fieldChanged: string;
+    oldValue: string | null;
+    newValue: string | null;
+    changeSource: TransactionChangeSource;
+  }
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("transaction_audit_log").insert({
+    transaction_id: entry.transactionId,
+    store_id: entry.storeId,
+    user_id: entry.userId,
+    field_changed: entry.fieldChanged,
+    old_value: entry.oldValue,
+    new_value: entry.newValue,
+    change_source: entry.changeSource,
+  });
+
+  return { error: error?.message ?? null };
+}
+
+async function fetchMonthlyFinancialRow(
+  supabase: FinancialsSupabaseClient,
+  storeId: string,
+  year: number,
+  month: number
+): Promise<MonthlyFinancialRecord | null> {
+  const { data, error } = await supabase
+    .from("monthly_financials")
+    .select("*")
+    .eq("store_id", storeId)
+    .eq("year", year)
+    .eq("month", month)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data as MonthlyFinancialRecord | null) ?? null;
+}
+
+async function fetchMonthlyUtilityRow(
+  supabase: FinancialsSupabaseClient,
+  storeId: string,
+  year: number,
+  month: number
+): Promise<(MonthlyUtilityRecord & { notes?: string | null }) | null> {
+  const { data, error } = await supabase
+    .from("monthly_utilities")
+    .select("*")
+    .eq("store_id", storeId)
+    .eq("year", year)
+    .eq("month", month)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data as (MonthlyUtilityRecord & { notes?: string | null }) | null) ?? null;
+}
+
+async function applyPostingDelta(
+  supabase: FinancialsSupabaseClient,
+  params: {
+    storeId: string;
+    userId: string;
+    year: number;
+    month: number;
+    target: PostingTarget;
+    amount: number;
+    reverse?: boolean;
+    store?: StoreFinancialProfile | null;
+    existingFinancial?: MonthlyFinancialRecord | null;
+    existingUtility?: (MonthlyUtilityRecord & { notes?: string | null }) | null;
+  }
+): Promise<{ error: string | null }> {
+  const delta = params.reverse ? -params.amount : params.amount;
+
+  if (params.target.table === "monthly_utilities") {
+    if (!isUtilityColumn(params.target.column)) {
+      return { error: `Invalid utility category: ${params.target.column}` };
+    }
+
+    const existing =
+      params.existingUtility ??
+      (await fetchMonthlyUtilityRow(supabase, params.storeId, params.year, params.month));
+
+    const payload = {
+      store_id: params.storeId,
+      user_id: params.userId,
+      year: toNum(params.year),
+      month: toNum(params.month),
+      water: toNum((existing?.water ?? 0) + (params.target.column === "water" ? delta : 0)),
+      gas: toNum((existing?.gas ?? 0) + (params.target.column === "gas" ? delta : 0)),
+      electric: toNum((existing?.electric ?? 0) + (params.target.column === "electric" ? delta : 0)),
+      sewer: toNum((existing?.sewer ?? 0) + (params.target.column === "sewer" ? delta : 0)),
+      trash: toNum((existing?.trash ?? 0) + (params.target.column === "trash" ? delta : 0)),
+      internet: toNum((existing?.internet ?? 0) + (params.target.column === "internet" ? delta : 0)),
+      notes: existing?.notes ?? null,
+    };
+
+    const { error } = await supabase
+      .from("monthly_utilities")
+      .upsert(payload, { onConflict: "store_id,year,month" });
+
+    return { error: error?.message ?? null };
+  }
+
+  const existing =
+    params.existingFinancial ??
+    (await fetchMonthlyFinancialRow(supabase, params.storeId, params.year, params.month));
+
+  const base = existing
+    ? recordToForm(calcMonthly(existing))
+    : { ...emptyMonthlyForm(params.store), year: params.year, month: params.month };
+
+  let updated = { ...base };
+
+  if (isRevenueBreakdownColumn(params.target.column)) {
+    updated = {
+      ...updated,
+      [params.target.column]: toNum((updated[params.target.column] ?? 0) + delta),
+    };
+  } else if (isPlCategoryColumn(params.target.column)) {
+    updated = {
+      ...updated,
+      [params.target.column]: toNum((updated[params.target.column] ?? 0) + delta),
+    };
+  } else {
+    return { error: `Invalid financial category: ${params.target.column}` };
+  }
+
+  const breakdown = {
+    self_service_revenue: toNum(updated.self_service_revenue),
+    wdf_revenue: toNum(updated.wdf_revenue),
+    commercial_revenue: toNum(updated.commercial_revenue),
+    vending_revenue: toNum(updated.vending_revenue),
+    other_revenue: toNum(updated.other_revenue),
+  };
+
+  const payload = {
+    store_id: params.storeId,
+    user_id: params.userId,
+    year: toNum(params.year),
+    month: toNum(params.month),
+    self_service_revenue: breakdown.self_service_revenue,
+    wdf_revenue: breakdown.wdf_revenue,
+    commercial_revenue: breakdown.commercial_revenue,
+    vending_revenue: breakdown.vending_revenue,
+    other_revenue: breakdown.other_revenue,
+    revenue: sumRevenueBreakdown(breakdown),
+    utilities: existing?.utilities ?? 0,
+    rent: toNum(updated.rent),
+    payroll: toNum(updated.payroll),
+    repairs_maintenance: toNum(updated.repairs_maintenance),
+    insurance_expense: toNum(updated.insurance_expense),
+    supplies: toNum(updated.supplies),
+    marketing: toNum(updated.marketing),
+    professional_fees: toNum(updated.professional_fees),
+    software_subscriptions: toNum(updated.software_subscriptions),
+    cc_processing_fees: toNum(updated.cc_processing_fees),
+    bank_charges: toNum(updated.bank_charges),
+    other_expenses: toNum(updated.other_expenses),
+    debt_service: toNum(updated.debt_service),
+    notes: toNullableText(updated.notes),
+  };
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from("monthly_financials")
+      .update(payload)
+      .eq("id", existing.id);
+    return { error: error?.message ?? null };
+  }
+
+  const { error } = await supabase.from("monthly_financials").insert(payload);
+  return { error: error?.message ?? null };
+}
+
+export async function postTransactionsBatch(
+  supabase: FinancialsSupabaseClient,
+  params: PostTransactionsBatchParams
+): Promise<PostTransactionsBatchResult> {
+  const {
+    storeId,
+    userId,
+    transactions,
+    existingRecords = [],
+    existingUtilityRecords = [],
+    store = null,
+    changeSource = "user",
+  } = params;
+
+  if (transactions.length === 0) {
+    return { postedCount: 0, error: null };
+  }
+
+  for (const txn of transactions) {
+    if (!txn.id) {
+      return { postedCount: 0, error: "Each transaction must have an id before posting." };
+    }
+    if (!isCategoryReadyToPost(txn.category)) {
+      return {
+        postedCount: 0,
+        error: "Assign a category before posting. Transactions marked Needs Review cannot be posted.",
+      };
+    }
+    if (!resolvePostingTarget(txn.category)) {
+      return {
+        postedCount: 0,
+        error: "This category cannot be posted. Re-categorize the transaction and try again.",
+      };
+    }
+  }
+
+  type BatchItem = {
+    txn: BatchPostTransaction;
+    year: number;
+    month: number;
+    amount: number;
+    importCategory: BankImportCategory;
+    postingTarget: PostingTarget;
+  };
+
+  const items: BatchItem[] = transactions.map((txn) => {
+    const date = new Date(txn.transaction_date.split("T")[0] + "T12:00:00");
+    const importCategory = txn.category;
+    const postingTarget = resolvePostingTarget(importCategory)!;
+
+    return {
+      txn,
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      amount: normalizeTransactionAmount(txn.amount),
+      importCategory,
+      postingTarget,
+    };
+  });
+
+  const utilityDeltaMap = new Map<string, Record<UtilityImportField, number>>();
+  const revenueDeltaMap = new Map<string, Partial<Record<RevenueBreakdownField, number>>>();
+  const financialDeltaMap = new Map<string, Partial<Record<PlCategoryField, number>>>();
+
+  for (const item of items) {
+    const periodKey = monthKey(item.year, item.month);
+
+    if (isRevenueBreakdownColumn(item.postingTarget.column)) {
+      const deltas = revenueDeltaMap.get(periodKey) ?? {};
+      const column = item.postingTarget.column;
+      deltas[column] = (deltas[column] ?? 0) + item.amount;
+      revenueDeltaMap.set(periodKey, deltas);
+    } else if (item.postingTarget.table === "monthly_utilities") {
+      const deltas = utilityDeltaMap.get(periodKey) ?? emptyUtilityDelta();
+      const column = item.postingTarget.column as UtilityImportField;
+      deltas[column] += item.amount;
+      utilityDeltaMap.set(periodKey, deltas);
+    } else {
+      const column = item.postingTarget.column as PlCategoryField;
+      const fieldDeltas = financialDeltaMap.get(periodKey) ?? {};
+      fieldDeltas[column] = (fieldDeltas[column] ?? 0) + item.amount;
+      financialDeltaMap.set(periodKey, fieldDeltas);
+    }
+  }
+
+  try {
+    if (utilityDeltaMap.size > 0) {
+      const utilityRowsByPeriod = new Map(
+        existingUtilityRecords.map((row) => [monthKey(row.year, row.month), row])
+      );
+
+      for (const [periodKey, deltas] of Array.from(utilityDeltaMap.entries())) {
+        const { year, month } = parseMonthPeriodKey(periodKey);
+        const existing = utilityRowsByPeriod.get(periodKey) ?? null;
+
+        const payload = {
+          store_id: storeId,
+          user_id: userId,
+          year: toNum(year),
+          month: toNum(month),
+          water: toNum((existing?.water ?? 0) + deltas.water),
+          gas: toNum((existing?.gas ?? 0) + deltas.gas),
+          electric: toNum((existing?.electric ?? 0) + deltas.electric),
+          sewer: toNum((existing?.sewer ?? 0) + deltas.sewer),
+          trash: toNum((existing?.trash ?? 0) + deltas.trash),
+          internet: toNum((existing?.internet ?? 0) + deltas.internet),
+          notes: (existing as { notes?: string | null } | null)?.notes ?? null,
+        };
+
+        const { error: upsertError } = await supabase
+          .from("monthly_utilities")
+          .upsert(payload, { onConflict: "store_id,year,month" });
+
+        if (upsertError) return { postedCount: 0, error: upsertError.message };
+      }
+    }
+
+    const financialPeriodKeys = new Set([
+      ...Array.from(revenueDeltaMap.keys()),
+      ...Array.from(financialDeltaMap.keys()),
+    ]);
+
+    for (const periodKey of Array.from(financialPeriodKeys)) {
+      const { year, month } = parseMonthPeriodKey(periodKey);
+      const existing = existingRecords.find((r) => r.year === year && r.month === month) ?? null;
+      const base = existing
+        ? recordToForm(calcMonthly(existing))
+        : { ...emptyMonthlyForm(store), year, month };
+      const revenueDeltas = revenueDeltaMap.get(periodKey) ?? {};
+      const fieldDeltas = financialDeltaMap.get(periodKey) ?? {};
+
+      let updated = { ...base };
+      for (const [field, delta] of Object.entries(fieldDeltas) as [PlCategoryField, number][]) {
+        updated = {
+          ...updated,
+          [field]: toNum((updated[field] ?? 0) + delta),
+        };
+      }
+
+      const breakdown = {
+        self_service_revenue: toNum(
+          (base.self_service_revenue ?? 0) + (revenueDeltas.self_service_revenue ?? 0)
+        ),
+        wdf_revenue: toNum((base.wdf_revenue ?? 0) + (revenueDeltas.wdf_revenue ?? 0)),
+        commercial_revenue: toNum(
+          (base.commercial_revenue ?? 0) + (revenueDeltas.commercial_revenue ?? 0)
+        ),
+        vending_revenue: toNum((base.vending_revenue ?? 0) + (revenueDeltas.vending_revenue ?? 0)),
+        other_revenue: toNum((base.other_revenue ?? 0) + (revenueDeltas.other_revenue ?? 0)),
+      };
+
+      const payload = {
+        store_id: storeId,
+        user_id: userId,
+        year: toNum(year),
+        month: toNum(month),
+        self_service_revenue: breakdown.self_service_revenue,
+        wdf_revenue: breakdown.wdf_revenue,
+        commercial_revenue: breakdown.commercial_revenue,
+        vending_revenue: breakdown.vending_revenue,
+        other_revenue: breakdown.other_revenue,
+        revenue: sumRevenueBreakdown(breakdown),
+        utilities: existing?.utilities ?? 0,
+        rent: toNum(updated.rent),
+        payroll: toNum(updated.payroll),
+        repairs_maintenance: toNum(updated.repairs_maintenance),
+        insurance_expense: toNum(updated.insurance_expense),
+        supplies: toNum(updated.supplies),
+        marketing: toNum(updated.marketing),
+        professional_fees: toNum(updated.professional_fees),
+        software_subscriptions: toNum(updated.software_subscriptions),
+        cc_processing_fees: toNum(updated.cc_processing_fees),
+        bank_charges: toNum(updated.bank_charges),
+        other_expenses: toNum(updated.other_expenses),
+        debt_service: toNum(updated.debt_service),
+        notes: toNullableText(updated.notes),
+      };
+
+      if (existing?.id) {
+        const { error } = await supabase
+          .from("monthly_financials")
+          .update(payload)
+          .eq("id", existing.id);
+        if (error) return { postedCount: 0, error: error.message };
+      } else {
+        const { error } = await supabase.from("monthly_financials").insert(payload);
+        if (error) return { postedCount: 0, error: error.message };
+      }
+    }
+
+    for (const item of items) {
+      const { txn, year, month, amount, importCategory, postingTarget } = item;
+      const previousStatus = txn.status ?? "needs_review";
+      const now = new Date().toISOString();
+
+      const { error: linkError } = await supabase.from("transaction_pl_links").insert({
+        transaction_id: txn.id,
+        store_id: storeId,
+        year,
+        month,
+        category: postingTarget.column,
+        amount_applied: amount,
+      });
+
+      if (linkError) return { postedCount: 0, error: linkError.message };
+
+      const updatePayload: Record<string, unknown> = {
+        is_reviewed: true,
+        status: "posted",
+        modified_at: now,
+      };
+
+      if (!txn.original_category) {
+        updatePayload.original_category = importCategory;
+      }
+
+      const { error: txnError } = await supabase
+        .from("bank_transactions")
+        .update(updatePayload)
+        .eq("id", txn.id);
+
+      if (txnError) return { postedCount: 0, error: txnError.message };
+
+      const { error: auditError } = await writeTransactionAuditLog(supabase, {
+        transactionId: txn.id,
+        storeId,
+        userId,
+        fieldChanged: "status",
+        oldValue: previousStatus,
+        newValue: "posted",
+        changeSource,
+      });
+
+      if (auditError) return { postedCount: 0, error: auditError };
+    }
+
+    return { postedCount: transactions.length, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to post transactions.";
+    return { postedCount: 0, error: message };
+  }
+}
+
+export async function excludeTransaction(
+  supabase: FinancialsSupabaseClient,
+  transactionId: string,
+  reason: string,
+  userId: string,
+  store?: StoreFinancialProfile | null
+): Promise<{ error: string | null }> {
+  const { data: transaction, error: fetchError } = await supabase
+    .from("bank_transactions")
+    .select("*")
+    .eq("id", transactionId)
+    .single();
+
+  if (fetchError || !transaction) {
+    return { error: fetchError?.message ?? "Transaction not found." };
+  }
+
+  const bankTxn = transaction as BankTransaction;
+  const previousCategory = bankTxn.category;
+
+  const { data: plLink, error: plLinkError } = await supabase
+    .from("transaction_pl_links")
+    .select("*")
+    .eq("transaction_id", transactionId)
+    .maybeSingle();
+
+  if (plLinkError) {
+    return { error: plLinkError.message };
+  }
+
+  if (plLink) {
+    const link = plLink as TransactionPlLink;
+    const target = postingTargetFromStoredCategory(link.category);
+
+    const { error: reverseError } = await applyPostingDelta(supabase, {
+      storeId: bankTxn.store_id,
+      userId,
+      year: link.year,
+      month: link.month,
+      target,
+      amount: toNum(link.amount_applied),
+      reverse: true,
+      store,
+    });
+
+    if (reverseError) return { error: reverseError };
+
+    const { error: deleteLinkError } = await supabase
+      .from("transaction_pl_links")
+      .delete()
+      .eq("id", link.id);
+
+    if (deleteLinkError) return { error: deleteLinkError.message };
+  }
+
+  const now = new Date().toISOString();
+  const { error: updateError } = await supabase
+    .from("bank_transactions")
+    .update({
+      excluded: true,
+      status: "excluded",
+      exclusion_reason: reason,
+      modified_at: now,
+    })
+    .eq("id", transactionId);
+
+  if (updateError) return { error: updateError.message };
+
+  const { error: auditError } = await writeTransactionAuditLog(supabase, {
+    transactionId,
+    storeId: bankTxn.store_id,
+    userId,
+    fieldChanged: "excluded",
+    oldValue: previousCategory,
+    newValue: "excluded",
+    changeSource: "user",
+  });
+
+  return { error: auditError };
+}
+
+export async function reclassifyPostedTransaction(
+  supabase: FinancialsSupabaseClient,
+  transactionId: string,
+  newCategory: BankImportCategory,
+  userId: string,
+  store?: StoreFinancialProfile | null
+): Promise<{ error: string | null }> {
+  if (!isCategoryReadyToPost(newCategory)) {
+    return { error: "Choose a postable category before reclassifying." };
+  }
+
+  const newTarget = resolvePostingTarget(newCategory);
+  if (!newTarget) {
+    return { error: "This category cannot be posted to P&L." };
+  }
+
+  const { data: transaction, error: fetchError } = await supabase
+    .from("bank_transactions")
+    .select("*")
+    .eq("id", transactionId)
+    .single();
+
+  if (fetchError || !transaction) {
+    return { error: fetchError?.message ?? "Transaction not found." };
+  }
+
+  const bankTxn = transaction as BankTransaction;
+  const previousCategory = bankTxn.category;
+
+  const { data: plLink, error: plLinkError } = await supabase
+    .from("transaction_pl_links")
+    .select("*")
+    .eq("transaction_id", transactionId)
+    .maybeSingle();
+
+  if (plLinkError) {
+    return { error: plLinkError.message };
+  }
+
+  if (plLink) {
+    const link = plLink as TransactionPlLink;
+    const oldTarget = postingTargetFromStoredCategory(link.category);
+
+    const { error: reverseError } = await applyPostingDelta(supabase, {
+      storeId: bankTxn.store_id,
+      userId,
+      year: link.year,
+      month: link.month,
+      target: oldTarget,
+      amount: toNum(link.amount_applied),
+      reverse: true,
+      store,
+    });
+
+    if (reverseError) return { error: reverseError };
+
+    const { error: applyError } = await applyPostingDelta(supabase, {
+      storeId: bankTxn.store_id,
+      userId,
+      year: link.year,
+      month: link.month,
+      target: newTarget,
+      amount: toNum(link.amount_applied),
+      store,
+    });
+
+    if (applyError) return { error: applyError };
+
+    const { error: linkUpdateError } = await supabase
+      .from("transaction_pl_links")
+      .update({ category: newTarget.column })
+      .eq("id", link.id);
+
+    if (linkUpdateError) return { error: linkUpdateError.message };
+  }
+
+  const now = new Date().toISOString();
+  const { error: updateError } = await supabase
+    .from("bank_transactions")
+    .update({
+      category: newCategory,
+      status: "user_classified",
+      modified_at: now,
+    })
+    .eq("id", transactionId);
+
+  if (updateError) return { error: updateError.message };
+
+  const { error: auditError } = await writeTransactionAuditLog(supabase, {
+    transactionId,
+    storeId: bankTxn.store_id,
+    userId,
+    fieldChanged: "category",
+    oldValue: previousCategory,
+    newValue: newCategory,
+    changeSource: "user",
+  });
+
+  return { error: auditError };
 }
