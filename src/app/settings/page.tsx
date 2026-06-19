@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -72,6 +73,8 @@ export default function SettingsPage() {
   const [editingValuation, setEditingValuation] = useState(false);
   const [editingCash, setEditingCash] = useState(false);
   const [savingCash, setSavingCash] = useState(false);
+  const [networkBenchmarkOptIn, setNetworkBenchmarkOptIn] = useState(false);
+  const [togglingNetworkBenchmark, setTogglingNetworkBenchmark] = useState(false);
 
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
@@ -166,11 +169,41 @@ export default function SettingsPage() {
           petty_cash:
             selectedStore.petty_cash != null ? String(selectedStore.petty_cash) : "",
         });
+        setNetworkBenchmarkOptIn(selectedStore.network_benchmark_opt_in === true);
       }
       setLoading(false);
     }
     load();
   }, [selectedStore?.id]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash === "#network-benchmarks") {
+      document.getElementById("network-benchmarks")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [loading]);
+
+  async function handleToggleNetworkBenchmark(checked: boolean) {
+    if (!selectedStore?.id || togglingNetworkBenchmark) return;
+
+    setNetworkBenchmarkOptIn(checked);
+    setTogglingNetworkBenchmark(true);
+    setError("");
+    setSuccess("");
+
+    const { error: updateError } = await supabase
+      .from("stores")
+      .update({ network_benchmark_opt_in: checked })
+      .eq("id", selectedStore.id);
+
+    if (updateError) {
+      setNetworkBenchmarkOptIn(!checked);
+      setError(updateError.message);
+    } else {
+      await refreshStores();
+    }
+    setTogglingNetworkBenchmark(false);
+  }
 
   async function handleSaveStore() {
     if (!selectedStore?.id) return;
@@ -497,6 +530,42 @@ export default function SettingsPage() {
                 </button>
               </>
             )}
+          </div>
+
+          {/* Network Benchmarks */}
+          <div className="card" id="network-benchmarks">
+            <div className="section-title">Network Benchmarks</div>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] text-slate-300 leading-snug">
+                  Contribute anonymous data to LaundroCFO Network Benchmarks
+                </div>
+                <p className="text-[11px] mt-2 leading-relaxed" style={{ color: "var(--text-muted)" }}>
+                  Your store&apos;s financial data is never shared. Only anonymized percentile statistics are used to
+                  power network comparisons.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={networkBenchmarkOptIn}
+                aria-label="Contribute anonymous data to LaundroCFO Network Benchmarks"
+                disabled={togglingNetworkBenchmark}
+                onClick={() => handleToggleNetworkBenchmark(!networkBenchmarkOptIn)}
+                className={clsx(
+                  "relative w-10 h-5 rounded-full transition-colors shrink-0 mt-0.5",
+                  networkBenchmarkOptIn ? "bg-blue-600" : "bg-[#243347]",
+                  togglingNetworkBenchmark && "opacity-60 cursor-not-allowed"
+                )}
+              >
+                <span
+                  className={clsx(
+                    "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform",
+                    networkBenchmarkOptIn ? "translate-x-5" : "translate-x-0.5"
+                  )}
+                />
+              </button>
+            </div>
           </div>
 
           {/* Notifications */}
