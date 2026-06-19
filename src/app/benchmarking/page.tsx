@@ -630,7 +630,7 @@ export default function BenchmarkingPage() {
               <LaundroCfoScoreCard result={laundroCfoScoreResult} compact className="h-full" />
             ) : null}
             <div
-              className={`grid grid-cols-1 sm:grid-cols-3 gap-4 h-full ${laundroCfoScoreResult ? "lg:col-span-3" : "lg:col-span-4"}`}
+              className={`grid grid-cols-1 sm:grid-cols-3 sm:grid-rows-2 gap-4 h-full min-h-0 ${laundroCfoScoreResult ? "lg:col-span-3" : "lg:col-span-4"}`}
             >
               <div className="card border-green-500/20 h-full">
                 <div className="text-[12px] text-green-400 font-semibold mb-2">💪 Strengths</div>
@@ -660,30 +660,27 @@ export default function BenchmarkingPage() {
                   ))}
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="card">
-              <div className="metric-label">Performance Rating</div>
-              <div className="metric-value text-green-400">{summary.performanceRating}</div>
-              <div className="text-[12px] text-slate-500 mt-1">vs. laundromats nationally</div>
-            </div>
-            <div className="card">
-              <div className="metric-label">Metrics Above Median</div>
-              <div className="metric-value">
-                {summary.aboveMedian} / {summary.total}
+              <div className="card h-full">
+                <div className="metric-label">Performance Rating</div>
+                <div className="metric-value text-green-400">{summary.performanceRating}</div>
+                <div className="text-[12px] text-slate-500 mt-1">vs. laundromats nationally</div>
               </div>
-              <div className="text-[12px] text-slate-500 mt-1">
-                {summary.total > 0
-                  ? `${Math.round((summary.aboveMedian / summary.total) * 100)}% of tracked metrics`
-                  : "—"}
+              <div className="card h-full">
+                <div className="metric-label">Metrics Above Median</div>
+                <div className="metric-value">
+                  {summary.aboveMedian} / {summary.total}
+                </div>
+                <div className="text-[12px] text-slate-500 mt-1">
+                  {summary.total > 0
+                    ? `${Math.round((summary.aboveMedian / summary.total) * 100)}% of tracked metrics`
+                    : "—"}
+                </div>
               </div>
-            </div>
-            <div className="card">
-              <div className="metric-label">Financeability Rating</div>
-              <div className="metric-value text-green-400">{summary.financeRating}</div>
-              <div className="text-[12px] text-slate-500 mt-1">Based on live DSCR</div>
+              <div className="card h-full">
+                <div className="metric-label">Financeability Rating</div>
+                <div className="metric-value text-green-400">{summary.financeRating}</div>
+                <div className="text-[12px] text-slate-500 mt-1">Based on live DSCR</div>
+              </div>
             </div>
           </div>
 
