@@ -147,7 +147,7 @@ function ScoresCalculationGuide() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="card !py-3 !px-4">
+    <div className="card overflow-hidden min-w-0 !py-3 !px-4">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -317,7 +317,7 @@ function NetworkBenchmarksSection({ optedIn }: { optedIn: boolean }) {
         </p>
       </div>
 
-      <div className="card">
+      <div className="card overflow-hidden min-w-0">
         {networkBenchmarkMetrics.map((b) => (
           <NetworkLockedRow key={b.metric} metric={b.metric} />
         ))}
@@ -600,7 +600,7 @@ export default function BenchmarkingPage() {
 
   if (stores.length === 0 || isAllStores || !selectedStore) {
     return (
-      <div className="card text-center py-10">
+      <div className="card overflow-hidden min-w-0 text-center py-10">
         <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
           Add store financials to see benchmarks
         </p>
@@ -632,7 +632,7 @@ export default function BenchmarkingPage() {
             <div
               className={`grid grid-cols-1 sm:grid-cols-3 sm:grid-rows-2 gap-4 h-full min-h-0 ${laundroCfoScoreResult ? "lg:col-span-3" : "lg:col-span-4"}`}
             >
-              <div className="card border-green-500/20 h-full">
+              <div className="card overflow-hidden min-w-0 border-green-500/20 h-full">
                 <div className="text-[12px] text-green-400 font-semibold mb-2">💪 Strengths</div>
                 <div className="space-y-1.5 text-[12px] text-slate-400">
                   {callouts.strengths.length > 0 ? (
@@ -642,7 +642,7 @@ export default function BenchmarkingPage() {
                   )}
                 </div>
               </div>
-              <div className="card border-amber-500/20 h-full">
+              <div className="card overflow-hidden min-w-0 border-amber-500/20 h-full">
                 <div className="text-[12px] text-amber-400 font-semibold mb-2">⚠️ Watch</div>
                 <div className="space-y-1.5 text-[12px] text-slate-400">
                   {callouts.watch.length > 0 ? (
@@ -652,7 +652,7 @@ export default function BenchmarkingPage() {
                   )}
                 </div>
               </div>
-              <div className="card border-blue-500/20 h-full">
+              <div className="card overflow-hidden min-w-0 border-blue-500/20 h-full">
                 <div className="text-[12px] text-blue-400 font-semibold mb-2">🎯 Opportunities</div>
                 <div className="space-y-1.5 text-[12px] text-slate-400">
                   {callouts.opportunities.map((s) => (
@@ -660,12 +660,12 @@ export default function BenchmarkingPage() {
                   ))}
                 </div>
               </div>
-              <div className="card h-full">
+              <div className="card overflow-hidden min-w-0 h-full">
                 <div className="metric-label">Performance Rating</div>
                 <div className="metric-value text-green-400">{summary.performanceRating}</div>
                 <div className="text-[12px] text-slate-500 mt-1">vs. laundromats nationally</div>
               </div>
-              <div className="card h-full">
+              <div className="card overflow-hidden min-w-0 h-full">
                 <div className="metric-label">Metrics Above Median</div>
                 <div className="metric-value">
                   {summary.aboveMedian} / {summary.total}
@@ -676,7 +676,7 @@ export default function BenchmarkingPage() {
                     : "—"}
                 </div>
               </div>
-              <div className="card h-full">
+              <div className="card overflow-hidden min-w-0 h-full">
                 <div className="metric-label">Financeability Rating</div>
                 <div className="metric-value text-green-400">{summary.financeRating}</div>
                 <div className="text-[12px] text-slate-500 mt-1">Based on live DSCR</div>
@@ -686,7 +686,7 @@ export default function BenchmarkingPage() {
 
           <ScoresCalculationGuide />
 
-          <div className="card">
+          <div className="card overflow-hidden min-w-0">
             <div className="section-title">
               Store vs. Industry Benchmarks
               <span className="text-[11px] text-slate-600 font-normal ml-auto">
@@ -703,7 +703,7 @@ export default function BenchmarkingPage() {
           </div>
         </>
       ) : (
-        <div className="card text-center py-10">
+        <div className="card overflow-hidden min-w-0 text-center py-10">
           <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
             Add store financials to see benchmarks
           </p>

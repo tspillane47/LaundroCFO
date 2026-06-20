@@ -43,7 +43,7 @@ export function CashCard({ store, onUpdate }: CashCardProps) {
     : null;
 
   return (
-    <div className="card">
+    <div className="card overflow-hidden min-w-0">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
         <div className="metric-label">Cash Position</div>
         <button
@@ -57,7 +57,7 @@ export function CashCard({ store, onUpdate }: CashCardProps) {
 
       {!editing ? (
         <div>
-          <div className="metric-value" style={{ color: 'var(--text-primary)' }}>
+          <div className="metric-value" style={{ color: 'var(--text-primary)' }} title={`$${totalCash.toLocaleString()}`}>
             ${totalCash.toLocaleString()}
           </div>
           {lastUpdated && (

@@ -375,7 +375,7 @@ function PillSelector<T extends string>({
   showAdj?: boolean;
 }) {
   return (
-    <div className="card">
+    <div className="card overflow-hidden min-w-0">
       <div className="metric-label mb-3">{label}</div>
       <div className="flex flex-wrap gap-2">
         {options.map((opt) => (
@@ -755,7 +755,7 @@ export default function ValuationPage() {
 
   if (stores.length === 0 || isAllStores || !selectedStore) {
     return (
-      <div className="card text-center py-10">
+      <div className="card overflow-hidden min-w-0 text-center py-10">
         <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
           Select a store from the dropdown above to view valuation details.
         </p>
@@ -850,7 +850,7 @@ export default function ValuationPage() {
       )}
 
       {/* Store Value History */}
-      <div className="card">
+      <div className="card overflow-hidden min-w-0">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div className="section-title mb-0">Store Value History</div>
           <div className="flex gap-1 flex-wrap">
@@ -928,7 +928,7 @@ export default function ValuationPage() {
       </div>
 
       {/* Section 2 — Valuation Breakdown */}
-      <div className="card !p-3.5">
+      <div className="card overflow-hidden min-w-0 !p-3.5">
         <div
           className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-3 lg:gap-4"
           style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}
@@ -997,7 +997,7 @@ export default function ValuationPage() {
 
           {/* Right — key metrics & drivers */}
           <div className="flex flex-col gap-2 min-w-0">
-            <div className="card2 !p-2.5 space-y-1.5">
+            <div className="card2 overflow-hidden min-w-0 !p-2.5 space-y-1.5">
               <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
                 Key Metrics
               </div>
@@ -1037,7 +1037,7 @@ export default function ValuationPage() {
               </div>
             </div>
 
-            <div className="card2 !p-2.5 border-green-500/25 bg-green-500/[0.06]">
+            <div className="card2 overflow-hidden min-w-0 !p-2.5 border-green-500/25 bg-green-500/[0.06]">
               <div className="text-[10px] font-semibold text-green-400/90 mb-1.5">
                 Helping Value ✓
               </div>
@@ -1058,7 +1058,7 @@ export default function ValuationPage() {
               )}
             </div>
 
-            <div className="card2 !p-2.5 border-amber-500/25 bg-amber-500/[0.06]">
+            <div className="card2 overflow-hidden min-w-0 !p-2.5 border-amber-500/25 bg-amber-500/[0.06]">
               <div className="text-[10px] font-semibold text-amber-400/90 mb-1.5">
                 Hurting Value ⚠
               </div>
@@ -1085,7 +1085,7 @@ export default function ValuationPage() {
       <button
         type="button"
         onClick={() => setCalcExpanded((v) => !v)}
-        className="card2 w-full text-left !p-3.5 hover:opacity-90 transition-opacity"
+        className="card2 overflow-hidden min-w-0 w-full text-left !p-3.5 hover:opacity-90 transition-opacity"
       >
         <div className="flex items-center justify-between">
           <span className="text-[13px] font-semibold text-slate-200">How is this calculated?</span>
@@ -1135,7 +1135,7 @@ export default function ValuationPage() {
         />
       </div>
 
-      <div className="card">
+      <div className="card overflow-hidden min-w-0">
         <div className="section-title mb-4">Service Mix & Retool</div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {[
@@ -1213,7 +1213,7 @@ export default function ValuationPage() {
       </div>
 
       {/* Section 4 — Improvement Opportunities */}
-      <div className="card">
+      <div className="card overflow-hidden min-w-0">
           <div className="section-title mb-3">Improvement Opportunities</div>
           {valuation.improvements.length === 0 ? (
             <p className="text-[12px] text-slate-500">Store is well-optimized across key factors.</p>
@@ -1244,7 +1244,7 @@ export default function ValuationPage() {
 
       {/* Section 5 — Equipment & Lease summary */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="card">
+        <div className="card overflow-hidden min-w-0">
           <div className="section-title mb-4">Equipment Summary</div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -1285,7 +1285,7 @@ export default function ValuationPage() {
           </div>
         </div>
 
-        <div className="card">
+        <div className="card overflow-hidden min-w-0">
           <div className="section-title mb-4">Lease Summary</div>
           {isOwnerOccupied ? (
             <div className="text-[13px] text-slate-400">

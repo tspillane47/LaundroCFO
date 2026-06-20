@@ -728,7 +728,7 @@ export default function PortfolioPage() {
           style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}
         >
           {storeMetrics.map((m) => (
-            <div key={m.store.id} className="card relative">
+            <div key={m.store.id} className="card relative overflow-hidden min-w-0">
               {m.hasDscrWarning && (
                 <span className="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-red-500" />
               )}
@@ -749,15 +749,16 @@ export default function PortfolioPage() {
               <div className="pt-2 border-t mb-4" style={{ borderColor: "var(--border)" }}>
                 <div className="metric-label mb-1">Value</div>
                 <div
-                  className="text-[14px] font-semibold tabular-nums"
+                  className="text-[14px] font-semibold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis"
                   style={{ color: "var(--text-primary)" }}
+                  title={fmtDollar(m.estimatedValue)}
                 >
                   {fmtDollar(m.estimatedValue)}
                 </div>
               </div>
 
               {m.hasFinancials ? (
-                <div className="grid grid-cols-3 gap-3 mb-4" style={{ borderColor: "var(--border)" }}>
+                <div className="grid grid-cols-3 gap-3 mb-4 min-w-0" style={{ borderColor: "var(--border)" }}>
                   {[
                     { label: "Revenue", value: fmtDollar(m.monthlyRevenue) },
                     { label: "EBITDA", value: fmtDollar(m.monthlyEbitda) },
@@ -767,11 +768,15 @@ export default function PortfolioPage() {
                       color: m.dscr > 0 ? dscrColorClass(m.dscr) : undefined,
                     },
                   ].map((metric) => (
-                    <div key={metric.label}>
+                    <div key={metric.label} className="min-w-0 overflow-hidden">
                       <div className="metric-label mb-1">{metric.label}</div>
                       <div
-                        className={clsx("text-[14px] font-semibold tabular-nums", metric.color)}
+                        className={clsx(
+                          "text-[14px] font-semibold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis",
+                          metric.color,
+                        )}
                         style={metric.color ? undefined : { color: "var(--text-primary)" }}
+                        title={metric.value}
                       >
                         {metric.value}
                       </div>

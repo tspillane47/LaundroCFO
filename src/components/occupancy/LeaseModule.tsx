@@ -542,7 +542,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       )}
 
       {mode === "view" && !lease && hideHeader ? null : mode === "view" && !lease && !hideHeader ? (
-        <div className="card text-center py-12">
+        <div className="card overflow-hidden min-w-0 text-center py-12">
           <div className="text-slate-300 text-[14px]">No lease on file</div>
           <p className="text-slate-500 text-[13px] mt-2 mb-4">
             Add your lease terms to calculate risk score and track renewal options.
@@ -554,7 +554,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       ) : mode === "view" && lease ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-            <div className="card flex flex-col items-center justify-center py-4">
+            <div className="card overflow-hidden min-w-0 flex flex-col items-center justify-center py-4">
               <div className="metric-label mb-2">Lease Score</div>
               <ScoreRing score={metrics.score} size={90} color={metrics.risk.ringColor} />
               <div className={clsx("text-[12px] font-semibold mt-2", metrics.risk.color)}>
@@ -576,7 +576,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               value={metrics.totalControl.toFixed(1) + " yrs"}
               color="text-green-400"
             />
-            <div className="card2">
+            <div className="card2 overflow-hidden min-w-0">
               <div className="metric-label">Lease Risk Level</div>
               <div className={clsx("text-lg font-bold", metrics.risk.color)}>
                 {metrics.risk.label}
@@ -599,7 +599,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             />
           </div>
 
-          <div className="card">
+          <div className="card overflow-hidden min-w-0">
             <div className="section-title">Base Lease Information</div>
             <div>
               <LabelValue label="Landlord" value={lease.landlord ?? "—"} />
@@ -645,7 +645,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             </div>
           </div>
 
-          <div className="card">
+          <div className="card overflow-hidden min-w-0">
             <div className="section-title">Renewal Options</div>
             {options.length === 0 ? (
               <p className="text-slate-500 text-[13px]">No renewal options on file.</p>
@@ -710,7 +710,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
         </>
       ) : (
         <div className="space-y-5">
-          <div className="card space-y-4">
+          <div className="card overflow-hidden min-w-0 space-y-4">
             <div className="section-title mb-0">Base Lease Information</div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
@@ -893,7 +893,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             </div>
           </div>
 
-          <div className="card space-y-4">
+          <div className="card overflow-hidden min-w-0 space-y-4">
             <div className="flex items-center justify-between">
               <div className="section-title mb-0">Renewal Options</div>
               <button
@@ -906,7 +906,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             </div>
 
             {optionForms.map((form, i) => (
-              <div key={form.id ?? `new-${i}`} className="card2 grid grid-cols-5 gap-3 items-end">
+              <div key={form.id ?? `new-${i}`} className="card2 overflow-hidden min-w-0 grid grid-cols-5 gap-3 items-end">
                 <div>
                   <div className="metric-label mb-1.5">Option #</div>
                   <input

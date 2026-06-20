@@ -467,7 +467,7 @@ export function RealEstateModule({ store }: Props) {
       )}
 
       {mode === "view" && !record ? (
-        <div className="card text-center py-12">
+        <div className="card overflow-hidden min-w-0 text-center py-12">
           <div className="text-slate-300 text-[14px]">No real estate profile on file</div>
           <p className="text-slate-500 text-[13px] mt-2 mb-4">
             Add building ownership and mortgage details to track equity and debt position.
@@ -479,7 +479,7 @@ export function RealEstateModule({ store }: Props) {
       ) : mode === "view" && record ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-            <div className="card flex flex-col items-center justify-center py-4">
+            <div className="card overflow-hidden min-w-0 flex flex-col items-center justify-center py-4">
               <div className="metric-label mb-2">Real Estate Score</div>
               <ScoreRing score={metrics.score} size={90} color={metrics.risk.ringColor} />
               <div className={clsx("text-[12px] font-semibold mt-2", metrics.risk.color)}>
@@ -503,7 +503,7 @@ export function RealEstateModule({ store }: Props) {
               value={metrics.yearsOwned.toFixed(1)}
               color="text-blue-400"
             />
-            <div className="card2">
+            <div className="card2 overflow-hidden min-w-0">
               <div className="metric-label">Position</div>
               <div className={clsx("text-lg font-bold", metrics.risk.color)}>
                 {metrics.risk.label}
@@ -524,7 +524,7 @@ export function RealEstateModule({ store }: Props) {
             />
           </div>
 
-          <div className="card">
+          <div className="card overflow-hidden min-w-0">
             <div className="section-title">Automatic Calculations</div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <SmallMetric
@@ -586,7 +586,7 @@ export function RealEstateModule({ store }: Props) {
           </div>
 
           {metrics.flags.length > 0 && (
-            <div className="card space-y-3">
+            <div className="card overflow-hidden min-w-0 space-y-3">
               <div className="section-title mb-0">Underwriting Flags</div>
               {metrics.flags.map((flag, i) => (
                 <div
@@ -599,7 +599,7 @@ export function RealEstateModule({ store }: Props) {
             </div>
           )}
 
-          <div className="card">
+          <div className="card overflow-hidden min-w-0">
             <div className="section-title">Building Ownership</div>
             <div>
               <LabelValue
@@ -651,7 +651,7 @@ export function RealEstateModule({ store }: Props) {
             </div>
           </div>
 
-          <div className="card">
+          <div className="card overflow-hidden min-w-0">
             <div className="section-title">Mortgage & Debt</div>
             <div>
               <LabelValue label="Mortgage Lender" value={record.mortgage_lender ?? "—"} />
@@ -691,7 +691,7 @@ export function RealEstateModule({ store }: Props) {
             </div>
           </div>
 
-          <div className="card">
+          <div className="card overflow-hidden min-w-0">
             <div className="section-title">Related-Party Rent</div>
             <div>
               <LabelValue
@@ -707,7 +707,7 @@ export function RealEstateModule({ store }: Props) {
         </>
       ) : (
         <div className="space-y-5">
-          <div className="card space-y-4">
+          <div className="card overflow-hidden min-w-0 space-y-4">
             <div className="section-title mb-0">Building Ownership</div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -852,7 +852,7 @@ export function RealEstateModule({ store }: Props) {
             </div>
           </div>
 
-          <div className="card space-y-4">
+          <div className="card overflow-hidden min-w-0 space-y-4">
             <div className="section-title mb-0">Mortgage & Debt</div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -977,7 +977,7 @@ export function RealEstateModule({ store }: Props) {
             </div>
           </div>
 
-          <div className="card space-y-4">
+          <div className="card overflow-hidden min-w-0 space-y-4">
             <div className="section-title mb-0">Related-Party Rent</div>
             <div className="grid grid-cols-2 gap-4">
               <div>

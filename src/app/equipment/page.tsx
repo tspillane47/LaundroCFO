@@ -326,7 +326,7 @@ export default function EquipmentPage() {
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 grid-4">
         <MetricCard label="Total Washers" value={String(metrics.totalWashers)} sub="Front-load fleet" />
         <MetricCard label="Total Dryers" value={String(metrics.totalDryers)} sub="Dryer fleet" />
-        <div className="card">
+        <div className="card overflow-hidden min-w-0">
           <div className="metric-label">Weighted Avg Age</div>
           <div className={clsx("metric-value", avgAgeColor(metrics.weightedAvgAge))}>
             {metrics.weightedAvgAge.toFixed(1)} yrs
@@ -339,13 +339,13 @@ export default function EquipmentPage() {
                 : "Replacement risk"}
           </div>
         </div>
-        <div className="card">
+        <div className="card overflow-hidden min-w-0">
           <div className="metric-label">Equipment Quality Score</div>
-          <div className="flex items-center gap-2">
-            <div className={clsx("metric-value", gradeColor(metrics.grade))}>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className={clsx("metric-value min-w-0", gradeColor(metrics.grade))}>
               Grade {metrics.grade}
             </div>
-            <span className="text-[12px] text-slate-500">({metrics.qualityScore}/100)</span>
+            <span className="text-[12px] text-slate-500 shrink-0">({metrics.qualityScore}/100)</span>
           </div>
           <div className="progress-bar mt-2">
             <div
@@ -368,9 +368,12 @@ export default function EquipmentPage() {
           value={fmtDollar(metrics.estimatedReplacementValue)}
           sub="Full fleet replacement"
         />
-        <div className="card">
+        <div className="card overflow-hidden min-w-0">
           <div className="metric-label">Valuation Impact</div>
-          <div className={clsx("metric-value", adjustmentColor(metrics.totalEquipmentAdjustment))}>
+          <div
+            className={clsx("metric-value", adjustmentColor(metrics.totalEquipmentAdjustment))}
+            title={formatAdjustment(metrics.totalEquipmentAdjustment)}
+          >
             {formatAdjustment(metrics.totalEquipmentAdjustment)}
           </div>
           <div className="text-[12px] mt-1 text-slate-500">EBITDA multiple adjustment</div>

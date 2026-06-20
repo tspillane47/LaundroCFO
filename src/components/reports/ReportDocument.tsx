@@ -19,6 +19,7 @@ import type { ValuationResult } from "@/lib/valuation";
 import type { ReportFinancialContext } from "@/lib/reportFinancials";
 import type { LaundroCfoScoreResult } from "@/lib/laundroCfoScore";
 import { buildEquitySnapshot } from "@/lib/getStoreReportData";
+import { pdfMetricValueFontSize } from "@/lib/metricStyles";
 import {
   RevenueExpenseBarChart,
   CategoryBreakdownBar,
@@ -87,6 +88,8 @@ const styles = StyleSheet.create({
     padding: 12,
     margin: 4,
     flex: 1,
+    overflow: "hidden",
+    minWidth: 100,
   },
   ratioCard: {
     backgroundColor: "white",
@@ -96,6 +99,7 @@ const styles = StyleSheet.create({
     width: "23%",
     minWidth: 120,
     marginBottom: 8,
+    overflow: "hidden",
   },
   ratioGrid: {
     flexDirection: "row",
@@ -334,10 +338,19 @@ function MetricTile({
   valueColor?: string;
   width?: string;
 }) {
+  const valueSize = pdfMetricValueFontSize(value);
   return (
     <View style={[styles.metricCard, { width }]}>
       <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={[styles.metricValue, valueColor ? { color: valueColor } : {}]}>{value}</Text>
+      <Text
+        style={[
+          styles.metricValue,
+          { fontSize: valueSize },
+          valueColor ? { color: valueColor } : {},
+        ]}
+      >
+        {value}
+      </Text>
     </View>
   );
 }
@@ -351,13 +364,18 @@ function RatioMetricTile({
   value: string;
   valueColor?: string;
 }) {
+  const valueSize = pdfMetricValueFontSize(value);
   return (
     <View style={styles.ratioCard}>
       <Text style={styles.ratioLabel} hyphenationCallback={(word) => [word]}>
         {label}
       </Text>
       <Text
-        style={[styles.ratioValue, valueColor ? { color: valueColor } : {}]}
+        style={[
+          styles.ratioValue,
+          { fontSize: valueSize },
+          valueColor ? { color: valueColor } : {},
+        ]}
         hyphenationCallback={(word) => [word]}
       >
         {value}

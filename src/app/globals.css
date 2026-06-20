@@ -115,6 +115,41 @@ html, body {
     color: var(--text-primary);
     letter-spacing: -0.03em;
     line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+  }
+  .metric-value--compact {
+    font-size: 18px;
+  }
+  .metric-value--xs {
+    font-size: 15px;
+  }
+  /* Horizontal scroll for wide data tables at all viewport sizes */
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+  /* Column min-widths for financial tables */
+  .col-store-name { min-width: 160px; }
+  .col-address { min-width: 140px; }
+  .col-money {
+    min-width: 90px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .col-score {
+    min-width: 80px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .col-pct {
+    min-width: 80px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
   }
   .badge {
     display: inline-flex;
@@ -467,12 +502,6 @@ html, body {
   .hide-mobile { display: none !important; }
   
   .card { padding: 16px !important; }
-  
-  /* Mobile table scroll */
-  .table-scroll {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
   
   /* Stack flex rows on mobile */
   .mobile-stack {

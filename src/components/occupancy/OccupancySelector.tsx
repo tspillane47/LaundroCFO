@@ -34,7 +34,7 @@ export function OccupancySelector({ saving, onSelect }: Props) {
   const [hovered, setHovered] = useState<OccupancyType | null>(null);
 
   return (
-    <div className="card max-w-3xl mx-auto">
+    <div className="card overflow-hidden min-w-0 max-w-3xl mx-auto">
       <h2 className="text-[16px] font-semibold text-slate-100 text-center mb-1">
         How does this laundromat occupy its space?
       </h2>
@@ -52,7 +52,7 @@ export function OccupancySelector({ saving, onSelect }: Props) {
             onMouseEnter={() => setHovered(opt.type)}
             onMouseLeave={() => setHovered(null)}
             className={clsx(
-              "card2 text-left p-6 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+              "card2 overflow-hidden min-w-0 text-left p-6 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
               hovered === opt.type
                 ? "border-blue-500/40 bg-blue-500/5"
                 : "hover:border-white/20 hover:bg-white/[0.02]"

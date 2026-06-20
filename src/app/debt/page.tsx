@@ -493,7 +493,7 @@ export default function DebtPage() {
 
   if (stores.length === 0) {
     return (
-      <div className="card text-center py-10">
+      <div className="card overflow-hidden min-w-0 text-center py-10">
         <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
           No stores yet. Add your first store to get started.
         </p>
@@ -503,7 +503,7 @@ export default function DebtPage() {
 
   if (isAllStores || !selectedStore) {
     return (
-      <div className="card text-center py-10">
+      <div className="card overflow-hidden min-w-0 text-center py-10">
         <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
           Select a store from the dropdown above to manage debt.
         </p>
@@ -648,7 +648,7 @@ export default function DebtPage() {
         </div>
 
         {enrichedLoans.length === 0 ? (
-          <div className="card text-center py-12">
+          <div className="card overflow-hidden min-w-0 text-center py-12">
             <p className="text-[14px] mb-4" style={{ color: "var(--text-muted)" }}>
               No loans added yet
             </p>
@@ -659,7 +659,7 @@ export default function DebtPage() {
         ) : (
           <div className="space-y-4">
             {enrichedLoans.map((loan) => (
-              <div key={loan.id} className="card">
+              <div key={loan.id} className="card overflow-hidden min-w-0">
                 <div className="flex items-start justify-between gap-4 mb-4">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -758,7 +758,7 @@ export default function DebtPage() {
 
       {/* Section 4 — Add/Edit form */}
       {showForm && (
-        <div className="card">
+        <div className="card overflow-hidden min-w-0">
           <div className="flex items-center justify-between mb-4">
             <h3 className="section-title mb-0">{editingId ? "Edit Loan" : "Add Loan"}</h3>
             <button type="button" onClick={closeForm} className="text-[13px]" style={{ color: "var(--text-muted)" }}>
@@ -922,7 +922,7 @@ export default function DebtPage() {
 
       {/* Section 5 — Payoff Projection chart */}
       {largestLoan && payoffSchedule.length > 0 && (
-        <div className="card">
+        <div className="card overflow-hidden min-w-0">
           <div className="section-title mb-1">Debt Payoff Projection (24 Months)</div>
           <p className="text-[12px] mb-4" style={{ color: "var(--text-muted)" }}>
             Based on {largestLoan.lender_name ?? "largest loan"} — {fmtDollar(largestLoan.estimatedCurrentBalance)} balance
@@ -967,7 +967,7 @@ export default function DebtPage() {
 
       {/* Section 6 — Loan breakdown table */}
       {enrichedLoans.length > 1 && (
-        <div className="card overflow-x-auto">
+        <div className="card overflow-x-auto min-w-0">
           <div className="section-title mb-4">Loan Breakdown</div>
           <table className="w-full text-[13px]">
             <thead>

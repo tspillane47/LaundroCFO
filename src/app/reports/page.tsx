@@ -88,9 +88,14 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 function PreviewRow({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
-    <div className="flex justify-between py-2">
-      <span className="text-slate-400">{label}</span>
-      <span className={clsx("font-semibold", className ?? "text-slate-100")}>{value}</span>
+    <div className="flex justify-between gap-3 py-2 min-w-0">
+      <span className="text-slate-400 shrink-0">{label}</span>
+      <span
+        className={clsx("font-semibold tabular-nums whitespace-nowrap shrink-0", className ?? "text-slate-100")}
+        title={value}
+      >
+        {value}
+      </span>
     </div>
   );
 }
@@ -778,38 +783,55 @@ export default function ReportsPage() {
           <div className="card">
             <SectionHeading>Store Summary</SectionHeading>
             <div className="table-scroll">
-              <table className="w-full text-[12px] min-w-[900px]">
+              <table className="w-full text-[12px]" style={{ minWidth: "1090px" }}>
+                <colgroup>
+                  <col className="col-store-name" style={{ minWidth: "160px" }} />
+                  <col className="col-address" style={{ minWidth: "140px" }} />
+                  <col style={{ minWidth: "90px" }} />
+                  <col style={{ minWidth: "90px" }} />
+                  <col style={{ minWidth: "90px" }} />
+                  <col style={{ minWidth: "90px" }} />
+                  <col style={{ minWidth: "90px" }} />
+                  <col style={{ minWidth: "90px" }} />
+                  <col style={{ minWidth: "90px" }} />
+                  <col className="col-score" style={{ minWidth: "80px" }} />
+                  <col className="col-score" style={{ minWidth: "80px" }} />
+                </colgroup>
                 <thead>
                   <tr className="text-left text-slate-500 border-b border-white/[0.06]">
-                    <th className="pb-3 pr-3 font-medium">Store Name</th>
-                    <th className="pb-3 pr-3 font-medium">Address</th>
-                    <th className="pb-3 pr-3 font-medium text-right">Revenue</th>
-                    <th className="pb-3 pr-3 font-medium text-right">EBITDA</th>
-                    <th className="pb-3 pr-3 font-medium text-right">DSCR</th>
-                    <th className="pb-3 pr-3 font-medium text-right">Value</th>
-                    <th className="pb-3 pr-3 font-medium text-right">Debt</th>
-                    <th className="pb-3 pr-3 font-medium text-right">Cash</th>
-                    <th className="pb-3 pr-3 font-medium text-right">Equity</th>
-                    <th className="pb-3 pr-3 font-medium text-right">Lease Score</th>
-                    <th className="pb-3 font-medium text-right">Equip. Grade</th>
+                    <th className="pb-3 pr-3 font-medium col-store-name">Store Name</th>
+                    <th className="pb-3 pr-3 font-medium col-address">Address</th>
+                    <th className="pb-3 pr-3 font-medium text-right col-money">Revenue</th>
+                    <th className="pb-3 pr-3 font-medium text-right col-money">EBITDA</th>
+                    <th className="pb-3 pr-3 font-medium text-right col-money">DSCR</th>
+                    <th className="pb-3 pr-3 font-medium text-right col-money">Value</th>
+                    <th className="pb-3 pr-3 font-medium text-right col-money">Debt</th>
+                    <th className="pb-3 pr-3 font-medium text-right col-money">Cash</th>
+                    <th className="pb-3 pr-3 font-medium text-right col-money">Equity</th>
+                    <th className="pb-3 pr-3 font-medium text-right col-score">Lease Score</th>
+                    <th className="pb-3 font-medium text-right col-score">Equip. Grade</th>
                   </tr>
                 </thead>
                 <tbody>
                   {storeDetails.map((d) => (
                     <tr key={d.store.id} className="border-b border-white/[0.04]">
-                      <td className="py-2.5 pr-3 text-slate-200">{d.store.name ?? "Store"}</td>
-                      <td className="py-2.5 pr-3 text-slate-400">{d.store.address ?? "—"}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-200">{fmtDollar(d.annualRevenue)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-400">{fmtDollar(d.annualEbitda)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">
+                      <td className="py-2.5 pr-3 text-slate-200 truncate max-w-0" title={d.store.name ?? "Store"}>
+                        {d.store.name ?? "Store"}
+                      </td>
+                      <td className="py-2.5 pr-3 text-slate-400 truncate max-w-0" title={d.store.address ?? "—"}>
+                        {d.store.address ?? "—"}
+                      </td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-200 col-money whitespace-nowrap" title={fmtDollar(d.annualRevenue)}>{fmtDollar(d.annualRevenue)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-400 col-money whitespace-nowrap" title={fmtDollar(d.annualEbitda)}>{fmtDollar(d.annualEbitda)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300 col-money whitespace-nowrap">
                         {d.annualDebtService > 0 ? fmtMultiple(d.dscr) : "—"}
                       </td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-200">{fmtDollar(d.valuation.businessValue)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{fmtDollar(d.debt)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{fmtDollar(d.cash)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-400">{fmtDollar(d.equity)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{d.leaseScore}</td>
-                      <td className="py-2.5 text-right tabular-nums text-slate-200">{d.equipmentGrade}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-200 col-money whitespace-nowrap" title={fmtDollar(d.valuation.businessValue)}>{fmtDollar(d.valuation.businessValue)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300 col-money whitespace-nowrap" title={fmtDollar(d.debt)}>{fmtDollar(d.debt)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300 col-money whitespace-nowrap" title={fmtDollar(d.cash)}>{fmtDollar(d.cash)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-400 col-money whitespace-nowrap" title={fmtDollar(d.equity)}>{fmtDollar(d.equity)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300 col-score whitespace-nowrap">{d.leaseScore}</td>
+                      <td className="py-2.5 text-right tabular-nums text-slate-200 col-score whitespace-nowrap">{d.equipmentGrade}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -890,11 +912,17 @@ export default function ReportsPage() {
                   explanation: "Portfolio value minus debt plus cash on hand.",
                 },
               ].map((item) => (
-                <div key={item.label} className="card2 p-4">
+                <div key={item.label} className="card2 p-4 overflow-hidden min-w-0">
                   <div className="metric-label mb-1">
                     <MetricTooltip label={item.label} explanation={item.explanation} />
                   </div>
-                  <div className="text-[18px] font-bold text-slate-100">{item.value}</div>
+                  <div
+                    className="metric-value text-slate-100"
+                    style={{ fontSize: item.value.length > 7 ? "16px" : "18px" }}
+                    title={item.value}
+                  >
+                    {item.value}
+                  </div>
                   <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">{item.explanation}</p>
                 </div>
               ))}
@@ -1227,9 +1255,15 @@ export default function ReportsPage() {
             ["EBITDA / SF", `$${metrics.ebitdaPerSF.toFixed(2)}`, "text-slate-100"],
             ["Debt Yield", financial && financial.totalOutstandingDebt > 0 ? fmtPct(metrics.debtYield) : "N/A", ratioColorClass(metrics.debtYield, 12, 8)],
           ].map(([label, val, color]) => (
-            <div key={label as string} className="card2">
+            <div key={label as string} className="card2 overflow-hidden min-w-0">
               <div className="metric-label">{label}</div>
-              <div className={clsx("text-[16px] font-bold", color)}>{val}</div>
+              <div
+                className={clsx("metric-value", color)}
+                style={{ fontSize: (val as string).length > 7 ? "14px" : "16px" }}
+                title={val as string}
+              >
+                {val}
+              </div>
             </div>
           ))}
         </div>
@@ -1247,9 +1281,9 @@ export default function ReportsPage() {
                 ["Profile", storeReportData.laundroCfoScore.categories.profileCompleteness],
               ] as const
             ).map(([label, cat]) => (
-              <div key={label} className="card2 p-3">
+              <div key={label} className="card2 p-3 overflow-hidden min-w-0">
                 <div className="metric-label">{label}</div>
-                <div className="text-[16px] font-bold text-slate-100">
+                <div className="metric-value text-slate-100" title={`${cat.score}/${cat.max}`}>
                   {cat.score}/{cat.max}
                 </div>
               </div>

@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { MetricValue } from "@/components/ui/MetricValue";
 
 type KpiCardProps = {
   label: ReactNode;
@@ -13,8 +14,8 @@ type KpiCardProps = {
 export function KpiCard({ label, value, sub, valueColor, className, style, labelStyle }: KpiCardProps) {
   return (
     <div
-      className={className ? `card ${className}` : "card"}
-      style={{ padding: "24px", minHeight: "110px", minWidth: 0, ...style }}
+      className={className ? `card overflow-hidden min-w-[140px] ${className}` : "card overflow-hidden min-w-[140px]"}
+      style={{ padding: "24px", minHeight: "110px", ...style }}
     >
       <div
         className="metric-label"
@@ -22,20 +23,7 @@ export function KpiCard({ label, value, sub, valueColor, className, style, label
       >
         {label}
       </div>
-      <div
-        style={{
-          fontSize: "22px",
-          fontWeight: 700,
-          letterSpacing: "-0.02em",
-          color: valueColor ?? "var(--text-primary)",
-          lineHeight: 1.2,
-          overflow: "visible",
-          whiteSpace: "nowrap",
-          minWidth: 0,
-        }}
-      >
-        {value}
-      </div>
+      <MetricValue color={valueColor}>{value}</MetricValue>
       {sub && (
         <div style={{ fontSize: "12px", marginTop: "8px", color: "var(--text-muted)" }}>{sub}</div>
       )}

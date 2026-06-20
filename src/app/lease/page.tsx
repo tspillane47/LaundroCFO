@@ -128,7 +128,7 @@ export default function OccupancyPage() {
 
   if (!store) {
     return (
-      <div className="card text-center py-12">
+      <div className="card overflow-hidden min-w-0 text-center py-12">
         <div className="text-slate-300 text-[14px]">No store found.</div>
         <p className="text-slate-500 text-[13px] mt-2">
           Complete onboarding to manage occupancy and real estate.
@@ -172,7 +172,7 @@ export default function OccupancyPage() {
       ) : store.occupancy_type === "leased" ? (
         <>
           {!hasLease && (
-            <div className="card text-center py-16">
+            <div className="card overflow-hidden min-w-0 text-center py-16">
               <div className="text-[40px] mb-4">📋</div>
               <div className="text-slate-200 text-[16px] font-semibold mb-2">No lease on file yet</div>
               <p className="text-slate-500 text-[13px] mb-6 max-w-sm mx-auto">

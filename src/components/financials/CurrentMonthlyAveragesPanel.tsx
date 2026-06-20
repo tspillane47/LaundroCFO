@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import clsx from "clsx";
 import { fmtDollar, fmtMultiple, fmtPct } from "@/lib/calculations";
 import { dscrTextColor } from "@/lib/financials";
+import { metricValueStyle } from "@/lib/metricStyles";
 import type { CurrentMonthlyAverages } from "@/lib/getCurrentMonthlyAverages";
 
 type CurrentMonthlyAveragesPanelProps = {
@@ -25,18 +26,18 @@ function waterStatusBadgeClass(status: CurrentMonthlyAverages["waterKPI"]["statu
 
 function LineItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 py-1 text-[12px] border-b border-white/[0.04] last:border-0">
-      <span className="text-slate-400 truncate">{label}</span>
-      <span className="text-slate-200 tabular-nums shrink-0">{value}</span>
+    <div className="flex items-baseline justify-between gap-3 py-1 text-[12px] border-b border-white/[0.04] last:border-0 min-w-0">
+      <span className="text-slate-400 truncate" title={label}>{label}</span>
+      <span className="text-slate-200 tabular-nums shrink-0 whitespace-nowrap" title={value}>{value}</span>
     </div>
   );
 }
 
 function TotalLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 pt-2 mt-1 border-t border-white/[0.08]">
-      <span className="text-[12px] font-semibold text-slate-200">{label}</span>
-      <span className="text-[13px] font-bold text-slate-100 tabular-nums">{value}</span>
+    <div className="flex items-baseline justify-between gap-3 pt-2 mt-1 border-t border-white/[0.08] min-w-0">
+      <span className="text-[12px] font-semibold text-slate-200 truncate" title={label}>{label}</span>
+      <span className="text-[13px] font-bold text-slate-100 tabular-nums shrink-0 whitespace-nowrap" title={value}>{value}</span>
     </div>
   );
 }
@@ -61,14 +62,18 @@ function HeroMetric({
   valueClassName?: string;
 }) {
   return (
-    <div className="py-3">
+    <div className="py-3 overflow-hidden min-w-0">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
         {label}
       </div>
-      <div className={clsx("text-[28px] font-bold tabular-nums leading-none", valueClassName ?? "text-slate-100")}>
+      <div
+        className={clsx("font-bold tabular-nums leading-none", valueClassName ?? "text-slate-100")}
+        style={metricValueStyle(value, { base: 28, compact: 22, xs: 18, inheritColor: !!valueClassName })}
+        title={value}
+      >
         {value}
       </div>
-      {sub && <div className="text-[12px] text-slate-500 mt-1.5">{sub}</div>}
+      {sub && <div className="text-[12px] text-slate-500 mt-1.5 truncate" title={sub}>{sub}</div>}
     </div>
   );
 }
