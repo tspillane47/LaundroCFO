@@ -218,6 +218,39 @@ function calcDaysUntilNoticeDeadline(
   return earliestDays;
 }
 
+type RentProjectionRow = {
+  calendarYear: number;
+  leaseYear: number;
+  monthlyRent: number;
+  annualRent: number;
+};
+
+const DEFAULT_ANNUAL_ESCALATION_PCT = 3;
+
+function calcRentProjection(
+  baseMonthlyRent: number,
+  annualEscalationPct: number | null,
+  leaseStartDate: string | null,
+  projectionYears = 5
+): RentProjectionRow[] {
+  const escalationRate = (annualEscalationPct ?? DEFAULT_ANNUAL_ESCALATION_PCT) / 100;
+  const leaseStart = parseDate(leaseStartDate);
+  const projectionStartYear = new Date().getFullYear();
+  const leaseStartYear = leaseStart?.getFullYear() ?? projectionStartYear;
+
+  return Array.from({ length: projectionYears }, (_, index) => {
+    const calendarYear = projectionStartYear + index;
+    const leaseYear = leaseStart ? calendarYear - leaseStartYear + 1 : index + 1;
+    const monthlyRent = baseMonthlyRent * Math.pow(1 + escalationRate, Math.max(leaseYear, 1) - 1);
+    return {
+      calendarYear,
+      leaseYear: Math.max(leaseYear, 1),
+      monthlyRent,
+      annualRent: monthlyRent * 12,
+    };
+  });
+}
+
 type Props = {
   store: Store;
   editTrigger?: number;
@@ -326,6 +359,16 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       availableOptions,
     };
   }, [lease, options, store]);
+
+  const rentProjection = useMemo(() => {
+    const baseRent = lease?.monthly_rent ?? null;
+    if (baseRent == null || baseRent <= 0) return null;
+    return calcRentProjection(
+      baseRent,
+      lease?.annual_escalation_pct ?? null,
+      lease?.lease_start_date ?? null
+    );
+  }, [lease]);
 
   function enterEditMode() {
     if (lease) {
@@ -644,6 +687,39 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               <LabelValue label="Use Restrictions" value={lease.use_restrictions ?? "—"} />
             </div>
           </div>
+
+          {rentProjection && (
+            <div className="card overflow-hidden min-w-0">
+              <div className="section-title">Rent Projection</div>
+              <p className="text-[12px] text-slate-500 mb-3">
+                Projected monthly rent for the next 5 years at{" "}
+                {(lease.annual_escalation_pct ?? DEFAULT_ANNUAL_ESCALATION_PCT).toFixed(1)}% annual
+                escalation from {formatCurrency(lease.monthly_rent)}/mo base.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[12px]">
+                  <thead>
+                    <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.06]">
+                      <th className="text-left pb-2 font-medium">Year</th>
+                      <th className="text-left pb-2 font-medium">Lease Year</th>
+                      <th className="text-left pb-2 font-medium">Monthly Rent</th>
+                      <th className="text-left pb-2 font-medium">Annual Rent</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04]">
+                    {rentProjection.map((row) => (
+                      <tr key={row.calendarYear}>
+                        <td className="py-2.5 text-slate-300">{row.calendarYear}</td>
+                        <td className="py-2.5 text-slate-300">{row.leaseYear}</td>
+                        <td className="py-2.5 text-slate-300">{formatCurrency(row.monthlyRent)}</td>
+                        <td className="py-2.5 text-slate-300">{formatCurrency(row.annualRent)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           <div className="card overflow-hidden min-w-0">
             <div className="section-title">Renewal Options</div>

@@ -88,6 +88,32 @@ export function resolveDebtFromLoans(loans: StoreLoanRow[]): ResolvedDebt {
   };
 }
 
+export type RentDisplaySource = "transactions" | "lease" | "none";
+
+/** Rent for Current Monthly Averages panel — TTM transactions first, lease fallback. */
+export function resolveTtmRentDisplay(
+  ttmRecords: { rent?: number | null }[],
+  monthsUsed: number,
+  leaseMonthlyRent: number | null | undefined
+): { monthlyAverage: number | null; rentSource: RentDisplaySource } {
+  const hasTransactionRent = ttmRecords.some((r) => (r.rent ?? 0) !== 0);
+
+  if (hasTransactionRent && monthsUsed > 0) {
+    const ttmRentTotal = ttmRecords.reduce((sum, r) => sum + (r.rent ?? 0), 0);
+    return {
+      monthlyAverage: ttmRentTotal / monthsUsed,
+      rentSource: "transactions",
+    };
+  }
+
+  const leaseRent = leaseMonthlyRent ?? 0;
+  if (leaseRent > 0) {
+    return { monthlyAverage: leaseRent, rentSource: "lease" };
+  }
+
+  return { monthlyAverage: null, rentSource: "none" };
+}
+
 /** Occupancy rent for display (lease or owner-occupied charge — not stores.monthly_rent). */
 export function resolveOccupancyRentDisplay(
   lease: { monthly_rent?: number | null } | null,

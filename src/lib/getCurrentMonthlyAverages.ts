@@ -18,6 +18,7 @@ import {
   type TtmMetrics,
   type UtilityImportField,
 } from "@/lib/financials";
+import { resolveTtmRentDisplay, type RentDisplaySource } from "@/lib/storeCanonical";
 
 export type CategoryMonthlyAverage = {
   category: string;
@@ -61,6 +62,8 @@ export type CurrentMonthlyAverages = {
   };
   /** Trailing months included in averages (matches Financials TTM window). */
   monthsUsed: number;
+  /** How the Rent line in expenses was resolved (display only — P&L totals use monthly_financials). */
+  rentSource: RentDisplaySource;
 };
 
 /** P&L expense fields included in EBITDA (excludes debt_service). */
@@ -207,6 +210,30 @@ async function fetchTtmFinancialContext(storeId: string): Promise<{
   };
 }
 
+async function fetchLeaseMonthlyRent(storeId: string): Promise<number | null> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("leases")
+    .select("monthly_rent")
+    .eq("store_id", storeId)
+    .maybeSingle();
+
+  return data?.monthly_rent ?? null;
+}
+
+function applyRentDisplayOverride(
+  expensesByCategory: CategoryMonthlyAverage[],
+  rentSource: RentDisplaySource,
+  rentMonthlyAverage: number | null
+): CategoryMonthlyAverage[] {
+  const rentLabel = BANK_IMPORT_CATEGORY_LABELS.rent;
+  return expensesByCategory.map((item) => {
+    if (item.category !== rentLabel) return item;
+    if (rentSource === "none") return { ...item, monthlyAverage: 0 };
+    return { ...item, monthlyAverage: rentMonthlyAverage ?? 0 };
+  });
+}
+
 async function fetchActiveStoreLoans(storeId: string): Promise<StoreLoanRow[]> {
   const supabase = createClient();
   const { data: loans } = await supabase
@@ -222,10 +249,16 @@ async function fetchActiveStoreLoans(storeId: string): Promise<StoreLoanRow[]> {
 function buildCurrentMonthlyAveragesFromContext(
   context: NonNullable<Awaited<ReturnType<typeof fetchTtmFinancialContext>>>,
   loans: StoreLoanRow[],
-  valuation: Awaited<ReturnType<typeof getStoreValuation>>
+  valuation: Awaited<ReturnType<typeof getStoreValuation>>,
+  leaseMonthlyRent: number | null
 ): CurrentMonthlyAverages {
   const { ttmRecords, utilitiesLookup, ttm } = context;
   const monthsUsed = ttm.monthsUsed;
+  const { monthlyAverage: rentMonthlyAverage, rentSource } = resolveTtmRentDisplay(
+    ttmRecords,
+    monthsUsed,
+    leaseMonthlyRent
+  );
 
   const revenueTotal = toMonthlyAverage(ttm.ttmRevenue, monthsUsed);
   const expensesTotal = toMonthlyAverage(
@@ -284,7 +317,11 @@ function buildCurrentMonthlyAveragesFromContext(
       total: revenueTotal,
     },
     expenses: {
-      byCategory: buildExpensesByCategory(ttmRecords, utilitiesLookup, monthsUsed),
+      byCategory: applyRentDisplayOverride(
+        buildExpensesByCategory(ttmRecords, utilitiesLookup, monthsUsed),
+        rentSource,
+        rentMonthlyAverage
+      ),
       total: expensesTotal,
     },
     ebitda: {
@@ -304,6 +341,7 @@ function buildCurrentMonthlyAveragesFromContext(
     equity,
     waterKPI,
     monthsUsed,
+    rentSource,
   };
 }
 
@@ -313,12 +351,13 @@ export async function getCurrentMonthlyAverages(
   const context = await fetchTtmFinancialContext(storeId);
   if (!context || context.ttm.monthsUsed === 0) return null;
 
-  const [loans, valuation] = await Promise.all([
+  const [loans, valuation, leaseMonthlyRent] = await Promise.all([
     fetchActiveStoreLoans(storeId),
     getStoreValuation(storeId),
+    fetchLeaseMonthlyRent(storeId),
   ]);
 
-  return buildCurrentMonthlyAveragesFromContext(context, loans, valuation);
+  return buildCurrentMonthlyAveragesFromContext(context, loans, valuation, leaseMonthlyRent);
 }
 
 export type MonthlyAveragesReconciliation = {
@@ -345,11 +384,17 @@ export async function reconcileCurrentMonthlyAverages(
   const context = await fetchTtmFinancialContext(storeId);
   if (!context || context.ttm.monthsUsed === 0) return null;
 
-  const [loans, valuation] = await Promise.all([
+  const [loans, valuation, leaseMonthlyRent] = await Promise.all([
     fetchActiveStoreLoans(storeId),
     getStoreValuation(storeId),
+    fetchLeaseMonthlyRent(storeId),
   ]);
-  const monthlyAverages = buildCurrentMonthlyAveragesFromContext(context, loans, valuation);
+  const monthlyAverages = buildCurrentMonthlyAveragesFromContext(
+    context,
+    loans,
+    valuation,
+    leaseMonthlyRent
+  );
 
   const { ttm, ttmRecords } = context;
   const monthsUsed = ttm.monthsUsed;

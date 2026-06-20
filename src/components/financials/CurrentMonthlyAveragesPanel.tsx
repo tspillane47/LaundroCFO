@@ -24,11 +24,26 @@ function waterStatusBadgeClass(status: CurrentMonthlyAverages["waterKPI"]["statu
   return "badge-red";
 }
 
-function LineItem({ label, value }: { label: string; value: string }) {
+function LineItem({
+  label,
+  value,
+  badge,
+}: {
+  label: string;
+  value: string;
+  badge?: string;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1 text-[12px] border-b border-white/[0.04] last:border-0 min-w-0">
       <span className="text-slate-400 truncate" title={label}>{label}</span>
-      <span className="text-slate-200 tabular-nums shrink-0 whitespace-nowrap" title={value}>{value}</span>
+      <span className="flex items-center gap-1.5 shrink-0">
+        {badge && (
+          <span className="text-[9px] font-medium uppercase tracking-wide text-slate-500 bg-white/[0.04] px-1.5 py-0.5 rounded">
+            {badge}
+          </span>
+        )}
+        <span className="text-slate-200 tabular-nums whitespace-nowrap" title={value}>{value}</span>
+      </span>
     </div>
   );
 }
@@ -78,8 +93,43 @@ function HeroMetric({
   );
 }
 
+const RENT_CATEGORY = "Rent";
+
 function visibleCategories(items: CurrentMonthlyAverages["revenue"]["byCategory"]) {
   return items.filter((item) => Math.abs(item.monthlyAverage) >= 0.005);
+}
+
+type ExpenseDisplayLine = {
+  category: string;
+  value: string;
+  badge?: string;
+};
+
+function expenseLinesForDisplay(data: CurrentMonthlyAverages): ExpenseDisplayLine[] {
+  const lines: ExpenseDisplayLine[] = [];
+
+  for (const item of data.expenses.byCategory) {
+    if (item.category === RENT_CATEGORY) {
+      if (data.rentSource === "none") {
+        lines.push({ category: RENT_CATEGORY, value: "—" });
+      } else if (data.rentSource === "lease") {
+        lines.push({
+          category: RENT_CATEGORY,
+          value: fmtDollar(item.monthlyAverage),
+          badge: "From lease",
+        });
+      } else if (Math.abs(item.monthlyAverage) >= 0.005) {
+        lines.push({ category: RENT_CATEGORY, value: fmtDollar(item.monthlyAverage) });
+      }
+      continue;
+    }
+
+    if (Math.abs(item.monthlyAverage) >= 0.005) {
+      lines.push({ category: item.category, value: fmtDollar(item.monthlyAverage) });
+    }
+  }
+
+  return lines;
 }
 
 export function CurrentMonthlyAveragesPanel({
@@ -109,7 +159,7 @@ export function CurrentMonthlyAveragesPanel({
   }
 
   const revenueLines = visibleCategories(data.revenue.byCategory);
-  const expenseLines = visibleCategories(data.expenses.byCategory);
+  const expenseLines = expenseLinesForDisplay(data);
   const surplusColor =
     data.surplusCashFlow >= 0 ? "text-green-400" : "text-red-400";
 
@@ -138,7 +188,12 @@ export function CurrentMonthlyAveragesPanel({
         <SectionLabel>Expenses</SectionLabel>
         <div className="space-y-0">
           {expenseLines.map((item) => (
-            <LineItem key={item.category} label={item.category} value={fmtDollar(item.monthlyAverage)} />
+            <LineItem
+              key={item.category}
+              label={item.category}
+              value={item.value}
+              badge={item.badge}
+            />
           ))}
           {expenseLines.length === 0 && (
             <p className="text-[12px] text-slate-500 py-1">No expense categories recorded.</p>
