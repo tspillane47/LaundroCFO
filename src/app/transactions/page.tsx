@@ -11,12 +11,15 @@ import { FormBanner } from "@/components/ui/FormBanner";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { PageError } from "@/components/ui/PageError";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { RuleApplyPrompt } from "@/components/financials/RuleApplyPrompt";
 import {
   BANK_IMPORT_CATEGORY_LABELS,
+  applyCategorizationRuleToTransactions,
   buildUtilitiesLookup,
   categorizeWithRules,
   enrichMonthlyRecords,
   excludeTransaction,
+  fetchUnpostedBankTransactions,
   findMatchingAmountRule,
   getImportCategoriesForType,
   inferTransactionType,
@@ -25,6 +28,7 @@ import {
   markDuplicateTransactions,
   normalizeVendorPattern,
   parseBankCsv,
+  planRuleApplyToExisting,
   postTransactionsBatch,
   reclassifyPostedTransaction,
   sortRecordsDesc,
@@ -413,6 +417,23 @@ export default function TransactionsPage() {
   const [ruleFormMessage, setRuleFormMessage] = useState<{ type: "error" | "success"; text: string } | null>(
     null
   );
+  const [ruleApplyPrompt, setRuleApplyPrompt] = useState<{
+    rule: CategorizationRule;
+    matchCount: number;
+    category: BankImportCategory;
+  } | null>(null);
+  const [ruleApplyResult, setRuleApplyResult] = useState<{
+    updatedCount: number;
+    skippedManualCount: number;
+    category: BankImportCategory;
+  } | null>(null);
+  const [rulePostPrompt, setRulePostPrompt] = useState<{
+    transactions: BatchPostTransaction[];
+    count: number;
+    category: BankImportCategory;
+  } | null>(null);
+  const [ruleApplyBusy, setRuleApplyBusy] = useState(false);
+  const [rulePostBusy, setRulePostBusy] = useState(false);
 
   useEffect(() => {
     if (!message) return;
@@ -1121,6 +1142,144 @@ export default function TransactionsPage() {
     setRuleFormMessage(null);
   }
 
+  function clearRuleApplyFlow() {
+    setRuleApplyPrompt(null);
+    setRuleApplyResult(null);
+    setRulePostPrompt(null);
+  }
+
+  async function promptApplyRuleToExisting(rule: CategorizationRule, category: BankImportCategory) {
+    if (!store?.id) {
+      setMessage({ type: "success", text: "Rule saved" });
+      return;
+    }
+
+    const { transactions: unposted, error } = await fetchUnpostedBankTransactions(supabase, store.id);
+    if (error) {
+      setMessage({ type: "success", text: "Rule saved" });
+      return;
+    }
+
+    const plan = planRuleApplyToExisting(unposted, rule);
+    if (plan.matchCount === 0) {
+      setMessage({ type: "success", text: "Rule saved" });
+      return;
+    }
+
+    clearRuleApplyFlow();
+    setRuleApplyPrompt({ rule, matchCount: plan.matchCount, category });
+  }
+
+  async function confirmApplyRuleToExisting() {
+    if (!ruleApplyPrompt || !store?.id || !userId) return;
+
+    setRuleApplyBusy(true);
+    setMessage(null);
+
+    try {
+      const { transactions: unposted, error: fetchError } = await fetchUnpostedBankTransactions(
+        supabase,
+        store.id
+      );
+      if (fetchError) {
+        setMessage({ type: "error", text: fetchError });
+        return;
+      }
+
+      const result = await applyCategorizationRuleToTransactions(supabase, {
+        storeId: store.id,
+        userId,
+        rule: ruleApplyPrompt.rule,
+        transactions: unposted,
+      });
+
+      if (result.error) {
+        setMessage({ type: "error", text: result.error });
+        return;
+      }
+
+      const category = ruleApplyPrompt.category;
+      setRuleApplyPrompt(null);
+      setRuleApplyResult({
+        updatedCount: result.updatedCount,
+        skippedManualCount: result.skippedManualCount,
+        category,
+      });
+
+      if (result.updatedCount > 0) {
+        setRulePostPrompt({
+          transactions: result.updatedTransactions.map((txn) => ({
+            id: txn.id,
+            transaction_date: txn.transaction_date,
+            amount: txn.amount,
+            category,
+            status: "user_classified",
+            original_category: txn.original_category ?? null,
+          })),
+          count: result.updatedCount,
+          category,
+        });
+      }
+
+      if (store.id) invalidateValuationCache(store.id);
+      await loadData();
+    } finally {
+      setRuleApplyBusy(false);
+    }
+  }
+
+  function skipApplyRuleToExisting() {
+    clearRuleApplyFlow();
+    setMessage({ type: "success", text: "Rule saved" });
+  }
+
+  async function confirmPostAppliedRuleTransactions() {
+    if (!rulePostPrompt || !store?.id || !userId || rulePostBusy) return;
+
+    setRulePostBusy(true);
+    setMessage(null);
+
+    try {
+      const utilitiesLookup = buildUtilitiesLookup(utilityRecords);
+      const enrichedRecords = enrichMonthlyRecords(sortRecordsDesc(financialRecords), utilitiesLookup);
+
+      const result = await postTransactionsBatch(supabase, {
+        storeId: store.id,
+        userId,
+        transactions: rulePostPrompt.transactions,
+        existingRecords: enrichedRecords,
+        existingUtilityRecords: utilityRecords,
+        store,
+        changeSource: "user",
+      });
+
+      if (result.error) {
+        setMessage({ type: "error", text: result.error });
+        return;
+      }
+
+      invalidateValuationCache(store.id);
+      setMessage({
+        type: "success",
+        text:
+          result.postedCount === 1
+            ? "Posted 1 transaction to P&L."
+            : result.postedCount === 0
+              ? "No new transactions were posted (already posted)."
+              : `Posted ${result.postedCount} transactions to P&L.`,
+      });
+      clearRuleApplyFlow();
+      await loadData();
+    } finally {
+      setRulePostBusy(false);
+    }
+  }
+
+  function dismissRulePostPrompt() {
+    setRulePostPrompt(null);
+    setRuleApplyResult(null);
+  }
+
   async function saveCategorizationRule() {
     setRuleFormMessage(null);
     let activeUserId = userId;
@@ -1162,10 +1321,7 @@ export default function TransactionsPage() {
 
         setCategorizationRules((prev) => [data as CategorizationRule, ...prev]);
         setRuleFormKey(null);
-        setMessage({
-          type: "success",
-          text: `Rule saved: "${(data as CategorizationRule).vendor_pattern}" → ${BANK_IMPORT_CATEGORY_LABELS[ruleFormCategory]}`,
-        });
+        await promptApplyRuleToExisting(data as CategorizationRule, ruleFormCategory);
       } finally {
         setRuleFormSaving(false);
       }
@@ -1206,7 +1362,7 @@ export default function TransactionsPage() {
 
       setCategorizationRules((prev) => [data as CategorizationRule, ...prev]);
       setRuleFormKey(null);
-      setMessage({ type: "success", text: "Amount rule saved." });
+      await promptApplyRuleToExisting(data as CategorizationRule, ruleFormCategory);
     } finally {
       setRuleFormSaving(false);
     }
@@ -1576,6 +1732,18 @@ export default function TransactionsPage() {
             )}
           </div>
         )}
+
+        <RuleApplyPrompt
+          applyPrompt={ruleApplyPrompt}
+          applyResult={ruleApplyResult}
+          postPrompt={rulePostPrompt}
+          applying={ruleApplyBusy}
+          posting={rulePostBusy || posting}
+          onApplyAll={() => void confirmApplyRuleToExisting()}
+          onSkipApply={skipApplyRuleToExisting}
+          onPostAll={() => void confirmPostAppliedRuleTransactions()}
+          onReviewFirst={dismissRulePostPrompt}
+        />
 
         {someSelected && activeTab === "needs_review" && !groupByVendor && (
           <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">

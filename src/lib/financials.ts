@@ -1103,6 +1103,165 @@ export function categorizeWithRules(
   return { category: suggested, suggested, ruleApplied: false };
 }
 
+export type RuleApplyPlan = {
+  matchCount: number;
+  applicable: BankTransaction[];
+  skippedManual: BankTransaction[];
+};
+
+export function isUnpostedReviewTransaction(
+  txn: Pick<BankTransaction, "status" | "excluded">
+): boolean {
+  if (txn.excluded) return false;
+  const status = txn.status ?? "needs_review";
+  return status !== "posted" && status !== "excluded";
+}
+
+export function transactionMatchesRule(
+  txn: BankTransaction,
+  rule: CategorizationRule
+): boolean {
+  const type =
+    (txn.transaction_type as TransactionType | null) ??
+    inferTransactionType(txn.amount, txn.category);
+  const amount = Math.abs(txn.amount);
+  const { ruleApplied } = categorizeWithRules(txn.description, type, amount, [rule]);
+  return !!ruleApplied;
+}
+
+export function planRuleApplyToExisting(
+  transactions: BankTransaction[],
+  rule: CategorizationRule
+): RuleApplyPlan {
+  const applicable: BankTransaction[] = [];
+  const skippedManual: BankTransaction[] = [];
+  let matchCount = 0;
+
+  for (const txn of transactions) {
+    if (!isUnpostedReviewTransaction(txn)) continue;
+    if (!transactionMatchesRule(txn, rule)) continue;
+
+    matchCount += 1;
+    const status = txn.status ?? "needs_review";
+
+    if (status === "user_classified" && txn.category !== rule.category) {
+      skippedManual.push(txn);
+      continue;
+    }
+
+    if (status === "needs_review" || status === "system_classified") {
+      applicable.push(txn);
+    }
+  }
+
+  return { matchCount, applicable, skippedManual };
+}
+
+export async function fetchUnpostedBankTransactions(
+  supabase: FinancialsSupabaseClient,
+  storeId: string
+): Promise<{ transactions: BankTransaction[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from("bank_transactions")
+    .select("*")
+    .eq("store_id", storeId)
+    .eq("excluded", false)
+    .not("status", "in", '("posted","excluded")');
+
+  if (error) {
+    return { transactions: [], error: error.message };
+  }
+
+  return { transactions: (data ?? []) as BankTransaction[], error: null };
+}
+
+export type ApplyCategorizationRuleResult = {
+  updatedCount: number;
+  skippedManualCount: number;
+  updatedTransactions: BankTransaction[];
+  error: string | null;
+};
+
+export async function applyCategorizationRuleToTransactions(
+  supabase: FinancialsSupabaseClient,
+  params: {
+    storeId: string;
+    userId: string;
+    rule: CategorizationRule;
+    transactions: BankTransaction[];
+  }
+): Promise<ApplyCategorizationRuleResult> {
+  const { applicable, skippedManual } = planRuleApplyToExisting(params.transactions, params.rule);
+
+  if (applicable.length === 0) {
+    return {
+      updatedCount: 0,
+      skippedManualCount: skippedManual.length,
+      updatedTransactions: [],
+      error: null,
+    };
+  }
+
+  const category = params.rule.category;
+  const now = new Date().toISOString();
+  const updatedTransactions: BankTransaction[] = [];
+
+  for (const txn of applicable) {
+    const { error: updateError } = await supabase
+      .from("bank_transactions")
+      .update({
+        category,
+        status: "user_classified",
+        modified_at: now,
+      })
+      .eq("id", txn.id);
+
+    if (updateError) {
+      return {
+        updatedCount: 0,
+        skippedManualCount: skippedManual.length,
+        updatedTransactions: [],
+        error: updateError.message,
+      };
+    }
+
+    if (txn.category !== category) {
+      const { error: auditError } = await writeTransactionAuditLog(supabase, {
+        transactionId: txn.id,
+        storeId: params.storeId,
+        userId: params.userId,
+        fieldChanged: "category",
+        oldValue: txn.category,
+        newValue: category,
+        changeSource: "rule",
+      });
+
+      if (auditError) {
+        return {
+          updatedCount: 0,
+          skippedManualCount: skippedManual.length,
+          updatedTransactions: [],
+          error: auditError,
+        };
+      }
+    }
+
+    updatedTransactions.push({
+      ...txn,
+      category,
+      status: "user_classified",
+      modified_at: now,
+    });
+  }
+
+  return {
+    updatedCount: applicable.length,
+    skippedManualCount: skippedManual.length,
+    updatedTransactions,
+    error: null,
+  };
+}
+
 export function inferTransactionType(
   amount: number,
   category?: string | null
