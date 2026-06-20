@@ -259,7 +259,7 @@ export async function getPortfolioReport(userId: string): Promise<PortfolioRepor
   const cashFlow = {
     revenue: annualRevenue,
     utilities: portfolioTotalUtilities > 0 ? portfolioTotalUtilities * 12 : storeDetails.reduce((s, d) => s + ((d.store.monthly_expenses ?? 0) * 0.25) * 12, 0),
-    rent: storeDetails.reduce((s, d) => s + (d.store.monthly_rent ?? 0) * 12, 0),
+    rent: storeDetails.reduce((s, d) => s + (d.lease?.monthly_rent ?? 0) * 12, 0),
     payroll: storeDetails.reduce((s, d) => s + ((d.store.monthly_expenses ?? 0) * 0.35) * 12, 0),
     repairs: storeDetails.reduce((s, d) => s + ((d.store.monthly_expenses ?? 0) * 0.05) * 12, 0),
     otherExpenses: storeDetails.reduce((s, d) => s + ((d.store.monthly_expenses ?? 0) * 0.35) * 12, 0),

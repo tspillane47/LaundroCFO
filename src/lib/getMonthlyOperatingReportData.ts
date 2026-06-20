@@ -213,11 +213,8 @@ export async function getMonthlyOperatingReportData(args: {
   const equipMetrics = computeEquipmentMetrics(
     args.equipment ?? (valuation.context.equipment as EquipmentRecord[])
   );
-  const machines =
-    equipMetrics.totalMachines > 0
-      ? equipMetrics.totalMachines
-      : num(store.washers as number) + num(store.dryers as number);
-  const monthlyRent = num(args.lease?.monthly_rent as number) || num(store.monthly_rent as number);
+  const machines = equipMetrics.totalMachines;
+  const monthlyRent = num(args.lease?.monthly_rent as number);
 
   const annualRevenue = currentRevenue * 12;
   const annualEbitda = currentEbitda * 12;

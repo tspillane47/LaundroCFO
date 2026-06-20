@@ -1551,17 +1551,6 @@ export default function FinancialsPage() {
       }
     }
 
-    const { error: storeUpdateError } = await supabase
-      .from("stores")
-      .update({ monthly_revenue: 0, monthly_expenses: 0 })
-      .eq("id", storeId);
-
-    if (storeUpdateError) {
-      setError(`Failed to clear store estimates: ${storeUpdateError.message}`);
-      setClearingAllFinancialData(false);
-      return;
-    }
-
     invalidateValuationCache(storeId);
     await refreshStores();
     setShowClearAllConfirm(false);
@@ -2529,7 +2518,7 @@ export default function FinancialsPage() {
               <div className="card2">
                 <div className="metric-label">Rent / Revenue</div>
                 <div className={clsx("text-[20px] font-bold", ratioStatusColor(ratios.rentPct, { good: 12, warn: 15 }))}>
-                  {fmtPct(ratios.rentPct)}
+                  {ratios.annualRent > 0 ? fmtPct(ratios.rentPct) : "—"}
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1">Target: below 15%</div>
               </div>

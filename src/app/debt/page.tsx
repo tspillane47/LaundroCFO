@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { toBool, toNullableDate, toNullableNum, toNullableText } from "@/lib/formHelpers";
 import { getStoreValuation } from "@/lib/getStoreValuation";
+import { syncDebtToStoreCache } from "@/lib/storeCanonical";
 import type { ValuationResult } from "@/lib/valuation";
 import {
   calcEstimatedBalance,
@@ -238,7 +239,7 @@ function ToggleField({
 export default function DebtPage() {
   const router = useRouter();
   const supabase = createClient();
-  const { selectedStore, isAllStores, stores } = useStores();
+  const { selectedStore, isAllStores, stores, refreshStores } = useStores();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -440,6 +441,8 @@ export default function DebtPage() {
       setTimeout(() => setMessage(null), 3000);
       closeForm();
       setSaving(false);
+      await syncDebtToStoreCache(selectedStore.id, supabase);
+      await refreshStores();
       await loadData();
     } catch (err) {
       console.error("Unexpected loan save error:", err);
@@ -464,6 +467,10 @@ export default function DebtPage() {
     } else {
       setMessage({ type: "success", text: "Loan removed." });
       setTimeout(() => setMessage(null), 3000);
+      if (selectedStore?.id) {
+        await syncDebtToStoreCache(selectedStore.id, supabase);
+        await refreshStores();
+      }
       await loadData();
     }
     setDeletingId(null);

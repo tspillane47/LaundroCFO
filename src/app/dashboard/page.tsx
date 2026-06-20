@@ -7,6 +7,13 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { getStoreValuation, getStoreDebt, type StoreValuationResult } from "@/lib/getStoreValuation";
 import {
+  isUsingProfileFinancialEstimate,
+  resolveDebtFromLoans,
+  resolveEquipmentFromInventory,
+  resolveOccupancyRentDisplay,
+  resolveSquareFootage,
+} from "@/lib/storeCanonical";
+import {
   calcBuildingEquity,
   calcOccupancyCostRatioFromRent,
   calcRealEstateLTV,
@@ -163,6 +170,7 @@ export default function DashboardPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [valuation, setValuation] = useState<StoreValuationResult | null>(null);
   const [totalDebt, setTotalDebt] = useState(0);
+  const [annualDebtService, setAnnualDebtService] = useState(0);
   const supabase = createClient();
 
   const loadDashboardData = useCallback(async () => {
@@ -187,6 +195,13 @@ export default function DashboardPage() {
 
       const debt = await getStoreDebt(loadedStore.id);
       setTotalDebt(debt);
+
+      const { data: loansData } = await supabase
+        .from("store_loans")
+        .select("monthly_payment, current_balance, is_active")
+        .eq("store_id", loadedStore.id)
+        .eq("is_active", true);
+      setAnnualDebtService(resolveDebtFromLoans(loansData ?? []).annualDebtService);
 
       const [
         { data: policiesData, error: policiesError },
@@ -331,48 +346,79 @@ export default function DashboardPage() {
     };
   }, [realEstate, store]);
 
-  const revenue = store?.monthly_revenue ?? DEMO_MONTHLY_REVENUE;
-  const expenses = store?.monthly_expenses ?? DEMO_MONTHLY_EXPENSES;
+  const hasPlData = (valuation?.ttmMonthsUsed ?? 0) > 0;
+  const usingProfileEstimate =
+    isUsingProfileFinancialEstimate(valuation?.ttmMonthsUsed) &&
+    store?.monthly_revenue != null &&
+    store?.monthly_expenses != null;
+
+  const revenue = hasPlData
+    ? (valuation!.ttmRevenue / Math.max(valuation!.ttmMonthsUsed, 1))
+    : store?.monthly_revenue ?? DEMO_MONTHLY_REVENUE;
+  const monthlyEbitdaFromTtm = hasPlData
+    ? valuation!.ttmEbitda / Math.max(valuation!.ttmMonthsUsed, 1)
+    : null;
+  const expenses =
+    monthlyEbitdaFromTtm != null
+      ? revenue - monthlyEbitdaFromTtm
+      : store?.monthly_expenses ?? DEMO_MONTHLY_EXPENSES;
   const ebitda = revenue - expenses;
   const annualEbitda =
-    store?.monthly_revenue != null && valuation
+    hasPlData && valuation
       ? valuation.annualEbitda
-      : ebitda * 12;
-  const debtService = store?.annual_debt_service ?? DEMO_ANNUAL_DEBT_SERVICE;
-  const annualCashFlow = store?.monthly_revenue != null
-    ? annualEbitda - debtService
-    : demoFinancials.cashFlow;
+      : store?.monthly_revenue != null
+        ? ebitda * 12
+        : demoFinancials.ebitda;
+  const debtService =
+    annualDebtService > 0
+      ? annualDebtService
+      : store?.annual_debt_service ?? DEMO_ANNUAL_DEBT_SERVICE;
+  const annualCashFlow =
+    hasPlData || store?.monthly_revenue != null
+      ? annualEbitda - debtService
+      : demoFinancials.cashFlow;
   const monthlyCashFlow = annualCashFlow / 12;
   const dscrNum = debtService > 0 ? annualCashFlow / debtService : 0;
   const ebitdaMargin = revenue > 0 ? (ebitda / revenue) * 100 : 0;
   const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
   const utilities = store?.monthly_utilities ?? 12340;
   const utilityRatio = revenue > 0 ? (utilities / revenue) * 100 : 0;
-  const sqft = store?.square_footage ?? 4450;
+  const sqft = resolveSquareFootage(store, lease, realEstate) ?? 4450;
   const revenuePerSF = sqft > 0 ? (revenue * 12) / sqft : 0;
-  const avgEquipmentAge = store?.avg_machine_age ?? 6.1;
+  const equipResolved = resolveEquipmentFromInventory(equipment);
+  const avgEquipmentAge = equipResolved.weightedAvgAge ?? store?.avg_machine_age ?? 6.1;
   const equipmentScore = calcEquipmentScore(avgEquipmentAge);
-  const machines = (store?.washers ?? 28) + (store?.dryers ?? 32);
+  const machines =
+    equipResolved.totalMachines > 0
+      ? equipResolved.totalMachines
+      : (store?.washers ?? 28) + (store?.dryers ?? 32);
+  const occupancyRent = resolveOccupancyRentDisplay(lease, realEstate, isOwnerOccupied);
 
-  const estimatedValue = store?.monthly_revenue != null && valuation
-    ? valuation.businessValue
-    : demoFinancials.estimatedValue;
-  const finalMultiple = store?.monthly_revenue != null && valuation
-    ? valuation.finalMultiple
-    : demoFinancials.valuationMultiple;
+  const estimatedValue =
+    (hasPlData || store?.monthly_revenue != null) && valuation
+      ? valuation.businessValue
+      : demoFinancials.estimatedValue;
+  const finalMultiple =
+    (hasPlData || store?.monthly_revenue != null) && valuation
+      ? valuation.finalMultiple
+      : demoFinancials.valuationMultiple;
 
-  const totalCash = (storeData?.operating_account_balance ?? 0) + (storeData?.reserve_account_balance ?? 0) + (storeData?.petty_cash ?? 0);
-  const businessValue = store?.monthly_revenue != null && valuation
-    ? valuation.businessValue
-    : demoFinancials.estimatedValue;
+  const totalCash =
+    (storeData?.operating_account_balance ?? 0) +
+    (storeData?.reserve_account_balance ?? 0) +
+    (storeData?.petty_cash ?? 0);
+  const businessValue =
+    (hasPlData || store?.monthly_revenue != null) && valuation
+      ? valuation.businessValue
+      : demoFinancials.estimatedValue;
   const equity = businessValue + totalCash - totalDebt;
 
   const valuationTrend = useMemo(
     () =>
-      store?.monthly_revenue != null
+      hasPlData || store?.monthly_revenue != null
         ? generateValuationTrend(estimatedValue)
         : demoValueTrend,
-    [estimatedValue, store?.monthly_revenue]
+    [estimatedValue, hasPlData, store?.monthly_revenue]
   );
   const revenueEbitdaData = useMemo(() => generateRevenueEbitdaData(revenue, ebitda), [revenue, ebitda]);
 
@@ -634,6 +680,15 @@ export default function DashboardPage() {
       </div>
 
       {/* Section 2: KPI Cards */}
+      {usingProfileEstimate ? (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-[12px] text-amber-200">
+          Profile estimate — no P&amp;L data. Enter monthly financials in{" "}
+          <Link href="/financials" className="text-blue-400 hover:underline">
+            Financials
+          </Link>{" "}
+          for live metrics.
+        </div>
+      ) : null}
       <div
         style={{
           display: "grid",
@@ -1043,7 +1098,7 @@ export default function DashboardPage() {
             },
             { label: "Annual EBITDA", value: fmtDollar(store?.monthly_revenue != null ? annualEbitda : demoFinancials.ebitda) },
             { label: "Annual Revenue", value: fmtDollar(store?.monthly_revenue != null ? revenue * 12 : demoFinancials.annualRevenue) },
-            { label: "NOI", value: fmtDollar(store?.monthly_revenue != null ? annualEbitda - (store?.monthly_rent ?? demoFinancials.monthlyRent) * 12 : demoFinancials.noi) },
+            { label: "NOI", value: fmtDollar((hasPlData || store?.monthly_revenue != null) ? annualEbitda - (occupancyRent ?? demoFinancials.monthlyRent) * 12 : demoFinancials.noi) },
             { label: "DSCR", value: `${dscrNum.toFixed(2)}x` },
             { label: "Cash Flow", value: fmtDollar(annualCashFlow) },
           ].map((item) => (

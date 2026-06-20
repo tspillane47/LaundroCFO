@@ -30,6 +30,7 @@ export async function getStoreReportData(args: {
       store: args.store,
       equipment: args.equipment,
       lease: args.lease,
+      realEstate: args.realEstate,
     }),
     getStoreValuation(args.storeId),
   ]);

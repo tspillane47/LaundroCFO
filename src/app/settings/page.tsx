@@ -14,30 +14,13 @@ const inputClass =
 type StoreForm = {
   name: string;
   address: string;
-  square_footage: string;
   store_type: string;
   year_opened: string;
-  washers: string;
-  dryers: string;
-  market_density: string;
-  store_condition: string;
-  revenue_trend: string;
-  competition_level: string;
   self_service_pct: string;
   wdf_pct: string;
   commercial_pct: string;
 };
 
-const MARKET_OPTIONS = [
-  { value: "urban", label: "Dense Urban" },
-  { value: "suburban", label: "Suburban" },
-  { value: "average", label: "Small City" },
-  { value: "rural", label: "Rural" },
-];
-
-const CONDITION_OPTIONS = ["excellent", "good", "fair", "poor"];
-const TREND_OPTIONS = ["growing", "stable", "declining"];
-const COMPETITION_OPTIONS = ["protected", "normal", "heavy"];
 const STORE_TYPES = ["Coin", "Card", "Hybrid"];
 const PREFERENCES_KEY = "laundrocfo_preferences";
 
@@ -96,15 +79,8 @@ export default function SettingsPage() {
   const [form, setForm] = useState<StoreForm>({
     name: "",
     address: "",
-    square_footage: "",
     store_type: "Hybrid",
     year_opened: "",
-    washers: "",
-    dryers: "",
-    market_density: "suburban",
-    store_condition: "fair",
-    revenue_trend: "stable",
-    competition_level: "normal",
     self_service_pct: "70",
     wdf_pct: "18",
     commercial_pct: "12",
@@ -144,15 +120,8 @@ export default function SettingsPage() {
         setForm({
           name: selectedStore.name ?? "",
           address: selectedStore.address ?? "",
-          square_footage: selectedStore.square_footage != null ? String(selectedStore.square_footage) : "",
           store_type: selectedStore.store_type ?? "Hybrid",
           year_opened: selectedStore.year_opened != null ? String(selectedStore.year_opened) : "",
-          washers: selectedStore.washers != null ? String(selectedStore.washers) : "",
-          dryers: selectedStore.dryers != null ? String(selectedStore.dryers) : "",
-          market_density: selectedStore.market_density ?? selectedStore.location_type ?? "suburban",
-          store_condition: selectedStore.store_condition ?? "fair",
-          revenue_trend: selectedStore.revenue_trend ?? "stable",
-          competition_level: selectedStore.competition_level ?? "normal",
           self_service_pct: selectedStore.self_service_pct != null ? String(selectedStore.self_service_pct) : "70",
           wdf_pct: selectedStore.wdf_pct != null ? String(selectedStore.wdf_pct) : "18",
           commercial_pct: selectedStore.commercial_pct != null ? String(selectedStore.commercial_pct) : "12",
@@ -216,15 +185,8 @@ export default function SettingsPage() {
       .update({
         name: form.name,
         address: form.address,
-        square_footage: form.square_footage ? Number(form.square_footage) : null,
         store_type: form.store_type,
         year_opened: form.year_opened ? Number(form.year_opened) : null,
-        washers: form.washers ? Number(form.washers) : null,
-        dryers: form.dryers ? Number(form.dryers) : null,
-        market_density: form.market_density,
-        store_condition: form.store_condition,
-        revenue_trend: form.revenue_trend,
-        competition_level: form.competition_level,
         self_service_pct: form.self_service_pct ? Number(form.self_service_pct) : null,
         wdf_pct: form.wdf_pct ? Number(form.wdf_pct) : null,
         commercial_pct: form.commercial_pct ? Number(form.commercial_pct) : null,
@@ -296,9 +258,6 @@ export default function SettingsPage() {
     );
   }
 
-  const totalMachines =
-    (Number(form.washers) || 0) + (Number(form.dryers) || 0);
-
   return (
     <div className="space-y-5">
       <h1 className="text-[15px] font-semibold text-slate-100">Settings</h1>
@@ -328,10 +287,6 @@ export default function SettingsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="metric-label mb-1.5">Square Footage</div>
-                    <input type="number" value={form.square_footage} onChange={(e) => setField("square_footage", e.target.value)} className={inputClass} />
-                  </div>
-                  <div>
                     <div className="metric-label mb-1.5">Store Type</div>
                     <select value={form.store_type} onChange={(e) => setField("store_type", e.target.value)} className={inputClass}>
                       {STORE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -340,38 +295,6 @@ export default function SettingsPage() {
                   <div>
                     <div className="metric-label mb-1.5">Year Opened</div>
                     <input type="number" value={form.year_opened} onChange={(e) => setField("year_opened", e.target.value)} className={inputClass} />
-                  </div>
-                  <div>
-                    <div className="metric-label mb-1.5">Market Density</div>
-                    <select value={form.market_density} onChange={(e) => setField("market_density", e.target.value)} className={inputClass}>
-                      {MARKET_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <div className="metric-label mb-1.5">Washers</div>
-                    <input type="number" value={form.washers} onChange={(e) => setField("washers", e.target.value)} className={inputClass} />
-                  </div>
-                  <div>
-                    <div className="metric-label mb-1.5">Dryers</div>
-                    <input type="number" value={form.dryers} onChange={(e) => setField("dryers", e.target.value)} className={inputClass} />
-                  </div>
-                  <div>
-                    <div className="metric-label mb-1.5">Store Condition</div>
-                    <select value={form.store_condition} onChange={(e) => setField("store_condition", e.target.value)} className={inputClass}>
-                      {CONDITION_OPTIONS.map((c) => <option key={c} value={c}>{labelize(c)}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <div className="metric-label mb-1.5">Revenue Trend</div>
-                    <select value={form.revenue_trend} onChange={(e) => setField("revenue_trend", e.target.value)} className={inputClass}>
-                      {TREND_OPTIONS.map((t) => <option key={t} value={t}>{labelize(t)}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <div className="metric-label mb-1.5">Competition Level</div>
-                    <select value={form.competition_level} onChange={(e) => setField("competition_level", e.target.value)} className={inputClass}>
-                      {COMPETITION_OPTIONS.map((c) => <option key={c} value={c}>{labelize(c)}</option>)}
-                    </select>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
@@ -401,16 +324,8 @@ export default function SettingsPage() {
                   {[
                     ["Store Name", form.name || "—"],
                     ["Address", form.address || "—"],
-                    ["Square Footage", form.square_footage ? `${Number(form.square_footage).toLocaleString()} SF` : "—"],
-                    ["Total Washers", form.washers || "—"],
-                    ["Total Dryers", form.dryers || "—"],
-                    ["Total Machines", totalMachines > 0 ? String(totalMachines) : "—"],
                     ["Year Opened", form.year_opened || "—"],
                     ["Store Type", form.store_type || "—"],
-                    ["Market Density", MARKET_OPTIONS.find((o) => o.value === form.market_density)?.label ?? form.market_density],
-                    ["Store Condition", labelize(form.store_condition)],
-                    ["Revenue Trend", labelize(form.revenue_trend)],
-                    ["Competition", labelize(form.competition_level)],
                     ["Self-Service %", form.self_service_pct ? `${form.self_service_pct}%` : "—"],
                     ["WDF %", form.wdf_pct ? `${form.wdf_pct}%` : "—"],
                     ["Commercial %", form.commercial_pct ? `${form.commercial_pct}%` : "—"],
@@ -424,6 +339,12 @@ export default function SettingsPage() {
                 <button onClick={() => setEditingStore(true)} className="btn-outline w-full mt-4">
                   Edit Store Profile
                 </button>
+                <Link
+                  href="/settings/edit-store"
+                  className="btn-outline w-full mt-3 text-center block text-[13px] py-2.5"
+                >
+                  Edit Store Identity &amp; Valuation Profile →
+                </Link>
                 <Link
                   href="/settings/manage-stores"
                   className="btn-primary w-full mt-3 text-center block text-[13px] py-2.5"

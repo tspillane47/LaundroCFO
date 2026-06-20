@@ -453,10 +453,6 @@ export function monthChartLabel(year: number, month: number): string {
 export function emptyMonthlyForm(
   store?: StoreFinancialProfile | null
 ): Omit<MonthlyFinancialRecord, "id" | "store_id"> {
-  const monthlyDebt = store?.annual_debt_service
-    ? Math.round(store.annual_debt_service / 12)
-    : 0;
-
   return {
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
@@ -467,7 +463,7 @@ export function emptyMonthlyForm(
     vending_revenue: 0,
     other_revenue: 0,
     utilities: 0,
-    rent: num(store?.monthly_rent),
+    rent: 0,
     payroll: 0,
     repairs_maintenance: 0,
     insurance_expense: 0,
@@ -478,7 +474,7 @@ export function emptyMonthlyForm(
     cc_processing_fees: 0,
     bank_charges: 0,
     other_expenses: 0,
-    debt_service: monthlyDebt,
+    debt_service: 0,
     notes: null,
   };
 }

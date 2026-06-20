@@ -18,6 +18,11 @@ import {
   MONTH_NAMES,
 } from "@/lib/financials";
 import { computeWaterKpi } from "@/lib/getCurrentMonthlyAverages";
+import {
+  resolveEquipmentFromInventory,
+  resolveOccupancyRentDisplay,
+  resolveSquareFootage,
+} from "@/lib/storeCanonical";
 import { benchmarks as industryBenchmarks } from "@/lib/data";
 import type { createClient } from "@/lib/supabase";
 
@@ -387,13 +392,11 @@ export function buildUtilityReportData(args: {
 function resolveAnnualRent(
   ttmRecords: CalculatedMonthly[],
   monthsUsed: number,
-  leaseMonthlyRent: number,
-  storeMonthlyRent: number
+  leaseMonthlyRent: number
 ): number {
   const ttmRent = sumTtmField(ttmRecords, "rent");
   if (ttmRent > 0) return ttmRent;
-  const monthlyRent = leaseMonthlyRent || storeMonthlyRent;
-  return monthlyRent > 0 ? monthlyRent * Math.max(monthsUsed, 1) : 0;
+  return leaseMonthlyRent > 0 ? leaseMonthlyRent * Math.max(monthsUsed, 1) : 0;
 }
 
 export function recordsThroughMonth(
@@ -437,6 +440,7 @@ export async function fetchReportFinancialContext(
     store?: Record<string, unknown>;
     equipment?: EquipmentRecord[];
     lease?: Record<string, unknown> | null;
+    realEstate?: Record<string, unknown> | null;
   }
 ): Promise<ReportFinancialContext> {
   const [{ data: financialsData }, { data: utilitiesData }, { data: loansData }] = await Promise.all([
@@ -478,23 +482,33 @@ export async function fetchReportFinancialContext(
     const monthlyRevenue = num(store.monthly_revenue as number);
     const monthlyExpenses = num(store.monthly_expenses as number);
     const monthlyEbitda = monthlyRevenue - monthlyExpenses;
-    const profileDebtService = num(store.annual_debt_service as number) / 12;
-    const debtService = totalMonthlyDebtService > 0 ? totalMonthlyDebtService : profileDebtService;
-    const sqft = num(store.square_footage as number);
-    const washers = num(store.washers as number);
-    const dryers = num(store.dryers as number);
-    const machines = washers + dryers;
-    const equipMetrics = computeEquipmentMetrics(options?.equipment ?? []);
-    const avgAge =
-      equipMetrics.totalMachines > 0
-        ? equipMetrics.weightedAvgAge
-        : num(store.avg_machine_age as number) || null;
+    const debtService = totalMonthlyDebtService;
+    const isOwnerOccupied = store.occupancy_type === "owner_occupied";
+    const sqft =
+      resolveSquareFootage(
+        store as { occupancy_type?: string | null },
+        (options?.lease as { square_footage?: number | null }) ?? null,
+        (options?.realEstate as {
+          laundromat_square_footage?: number | null;
+          total_square_footage?: number | null;
+          monthly_rent_charged?: number | null;
+        }) ?? null
+      ) ?? 0;
+    const equipResolved = resolveEquipmentFromInventory(options?.equipment ?? []);
+    const machines = equipResolved.totalMachines;
+    const avgAge = equipResolved.weightedAvgAge;
     const monthlyUtilitiesCost = num(store.monthly_utilities as number);
     const utilityRatio =
       monthlyRevenue > 0 && monthlyUtilitiesCost > 0
         ? (monthlyUtilitiesCost / monthlyRevenue) * 100
         : null;
-    const monthlyRent = num(options?.lease?.monthly_rent as number) || num(store.monthly_rent as number);
+    const leaseRent = num(options?.lease?.monthly_rent as number);
+    const monthlyRent =
+      resolveOccupancyRentDisplay(
+        (options?.lease as { monthly_rent?: number | null }) ?? null,
+        (options?.realEstate as { monthly_rent_charged?: number | null }) ?? null,
+        isOwnerOccupied
+      ) ?? leaseRent;
     const rentToRevenue =
       monthlyRevenue > 0 && monthlyRent > 0 ? ((monthlyRent * 12) / (monthlyRevenue * 12)) * 100 : null;
     const dscr =
@@ -527,7 +541,7 @@ export async function fetchReportFinancialContext(
       ttmChartData: [],
       loans,
       totalMonthlyDebtService: debtService,
-      totalOutstandingDebt: totalOutstandingDebt || num(store.loan_balance as number),
+      totalOutstandingDebt,
       annualDebtService: debtService * 12,
       dscr,
       monthlyEbitda,
@@ -611,15 +625,20 @@ export async function fetchReportFinancialContext(
         : null;
 
   const store = options?.store ?? {};
-  const sqft = num(store.square_footage as number);
-  const washers = num(store.washers as number);
-  const dryers = num(store.dryers as number);
-  const machines = washers + dryers;
-  const equipMetrics = computeEquipmentMetrics(options?.equipment ?? []);
-  const avgAge =
-    equipMetrics.totalMachines > 0
-      ? equipMetrics.weightedAvgAge
-      : num(store.avg_machine_age as number) || null;
+  const isOwnerOccupied = store.occupancy_type === "owner_occupied";
+  const sqft =
+    resolveSquareFootage(
+      store as { occupancy_type?: string | null },
+      (options?.lease as { square_footage?: number | null }) ?? null,
+      (options?.realEstate as {
+        laundromat_square_footage?: number | null;
+        total_square_footage?: number | null;
+        monthly_rent_charged?: number | null;
+      }) ?? null
+    ) ?? 0;
+  const equipResolved = resolveEquipmentFromInventory(options?.equipment ?? []);
+  const machines = equipResolved.totalMachines;
+  const avgAge = equipResolved.weightedAvgAge;
 
   const ttmUtilitiesTotal = ttmRecords.reduce((sum, record) => {
     const utilityRecord = utilitiesLookup.get(monthKey(record.year, record.month));
@@ -631,8 +650,14 @@ export async function fetchReportFinancialContext(
   }, 0);
   const utilityRatio = ttm.ttmRevenue > 0 ? (ttmUtilitiesTotal / ttm.ttmRevenue) * 100 : null;
 
-  const monthlyRent = num(options?.lease?.monthly_rent as number) || num(store.monthly_rent as number);
-  const annualRent = resolveAnnualRent(ttmRecords, monthsUsed, monthlyRent, num(store.monthly_rent as number));
+  const leaseRent = num(options?.lease?.monthly_rent as number);
+  const monthlyRent =
+    resolveOccupancyRentDisplay(
+      (options?.lease as { monthly_rent?: number | null }) ?? null,
+      (options?.realEstate as { monthly_rent_charged?: number | null }) ?? null,
+      isOwnerOccupied
+    ) ?? leaseRent;
+  const annualRent = resolveAnnualRent(ttmRecords, monthsUsed, leaseRent);
   const rentToRevenue =
     ttm.ttmRevenue > 0 && annualRent > 0 ? (annualRent / ttm.ttmRevenue) * 100 : null;
 

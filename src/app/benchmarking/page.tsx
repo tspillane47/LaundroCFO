@@ -7,7 +7,13 @@ import { useStores } from "@/lib/store-context";
 import { benchmarks as industryBenchmarks } from "@/lib/data";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import { computeLaundroCfoScoreFromRaw } from "@/lib/laundroCfoScore";
-import type { MonthlyUtilityRecord } from "@/lib/financials";
+import {
+  calcTtmMetrics,
+  enrichMonthlyRecords,
+  sortRecordsDesc,
+  type MonthlyFinancialRecord,
+} from "@/lib/financials";
+import { resolveDebtFromLoans, resolveEquipmentFromInventory, resolveSquareFootage } from "@/lib/storeCanonical";
 import { fmtMultiple, fmtPct } from "@/lib/calculations";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { LaundroCfoScoreCard } from "@/components/ui/LaundroCfoScoreGauge";
@@ -244,8 +250,15 @@ function ScoresCalculationGuide() {
               <li>Shows &ldquo;—&rdquo; if no debt service is entered or EBITDA is zero/negative.</li>
             </ul>
             <p className="mt-2 text-[12px] text-slate-500">
-              Requires <span className="text-slate-400">annual_debt_service</span> to be set in store
-              settings to calculate.
+              Requires active loans in the{" "}
+              <Link href="/debt" className="text-blue-400 hover:underline">
+                Debt
+              </Link>{" "}
+              module and P&L data in{" "}
+              <Link href="/financials" className="text-blue-400 hover:underline">
+                Financials
+              </Link>{" "}
+              to calculate.
             </p>
           </div>
 
@@ -366,10 +379,10 @@ export default function BenchmarkingPage() {
   const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
   const [lease, setLease] = useState<Record<string, unknown> | null>(null);
   const [realEstate, setRealEstate] = useState<Record<string, unknown> | null>(null);
-  const [monthlyFinancials, setMonthlyFinancials] = useState<
-    { revenue?: number | null; utilities?: number | null }[]
+  const [monthlyFinancials, setMonthlyFinancials] = useState<MonthlyFinancialRecord[]>([]);
+  const [activeLoans, setActiveLoans] = useState<
+    { monthly_payment?: number | null; current_balance?: number | null }[]
   >([]);
-  const [monthlyUtilities, setMonthlyUtilities] = useState<MonthlyUtilityRecord[]>([]);
   const [utilityRatio, setUtilityRatio] = useState<number | null>(null);
 
   const loadData = useCallback(async () => {
@@ -388,53 +401,54 @@ export default function BenchmarkingPage() {
         { data: equipmentData, error: equipError },
         { data: financialsData, error: finError },
         { data: leaseData, error: leaseError },
-        { data: utilitiesData, error: utilitiesError },
         { data: realEstateData, error: realEstateError },
+        { data: loansData, error: loansError },
       ] = await Promise.all([
         supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
         supabase.from("equipment_inventory").select("*").eq("store_id", selectedStore.id),
         supabase
           .from("monthly_financials")
-          .select("revenue, utilities")
+          .select("*")
           .eq("store_id", selectedStore.id)
           .order("year", { ascending: false })
           .order("month", { ascending: false })
           .limit(12),
         supabase
           .from("leases")
-          .select("lease_end_date, monthly_rent")
+          .select("lease_end_date, monthly_rent, square_footage")
           .eq("store_id", selectedStore.id)
           .maybeSingle(),
-        supabase
-          .from("monthly_utilities")
-          .select("year, month, water, gas, electric, sewer, trash, internet")
-          .eq("store_id", selectedStore.id),
         supabase
           .from("real_estate")
-          .select("monthly_rent_charged")
+          .select("monthly_rent_charged, laundromat_square_footage, total_square_footage")
           .eq("store_id", selectedStore.id)
           .maybeSingle(),
+        supabase
+          .from("store_loans")
+          .select("monthly_payment, current_balance, is_active")
+          .eq("store_id", selectedStore.id)
+          .eq("is_active", true),
       ]);
 
       if (storeError) throw storeError;
       if (equipError) throw equipError;
       if (finError) throw finError;
       if (leaseError) throw leaseError;
-      if (utilitiesError) throw utilitiesError;
       if (realEstateError) throw realEstateError;
+      if (loansError) throw loansError;
 
       setStore(storeData);
       setEquipment((equipmentData ?? []) as EquipmentRecord[]);
       setLease(leaseData ?? null);
       setRealEstate(realEstateData ?? null);
-      setMonthlyFinancials(financialsData ?? []);
-      setMonthlyUtilities((utilitiesData ?? []) as MonthlyUtilityRecord[]);
+      setMonthlyFinancials((financialsData ?? []) as MonthlyFinancialRecord[]);
+      setActiveLoans(loansData ?? []);
 
-      const records = financialsData ?? [];
-      const ttmRevenue = records.reduce((s, r) => s + (r.revenue ?? 0), 0);
-      const ttmUtilities = records.reduce((s, r) => s + (r.utilities ?? 0), 0);
-      if (ttmRevenue > 0 && records.length > 0) {
-        setUtilityRatio((ttmUtilities / ttmRevenue) * 100);
+      const records = enrichMonthlyRecords(sortRecordsDesc((financialsData ?? []) as MonthlyFinancialRecord[]));
+      const ttm = calcTtmMetrics(records);
+      if (ttm.ttmRevenue > 0 && ttm.monthsUsed > 0) {
+        const ttmUtilities = records.slice(0, 12).reduce((s, r) => s + (r.utilities ?? 0), 0);
+        setUtilityRatio((ttmUtilities / ttm.ttmRevenue) * 100);
       } else {
         setUtilityRatio(null);
       }
@@ -454,44 +468,58 @@ export default function BenchmarkingPage() {
   const metrics = useMemo(() => {
     if (!store) return null;
 
-    const monthlyRevenue = Number(store.monthly_revenue) || 0;
-    const monthlyExpenses = Number(store.monthly_expenses) || 0;
-    const annualRevenue = monthlyRevenue * 12;
-    const annualEbitda = (monthlyRevenue - monthlyExpenses) * 12;
-    const sqft = Number(store.square_footage) || 0;
-    const washers = Number(store.washers) || 0;
-    const dryers = Number(store.dryers) || 0;
-    const machines = washers + dryers;
-    const debtService = Number(store.annual_debt_service) || 0;
-    const monthlyRent = Number(store.monthly_rent) || 0;
+    const records = enrichMonthlyRecords(sortRecordsDesc(monthlyFinancials));
+    const ttm = calcTtmMetrics(records);
+    const hasFinancials = ttm.monthsUsed > 0 && ttm.ttmRevenue > 0;
 
-    const equipMetrics = computeEquipmentMetrics(equipment);
-    const avgAge =
-      equipMetrics.totalMachines > 0
-        ? equipMetrics.weightedAvgAge
-        : Number(store.avg_machine_age) || null;
+    if (!hasFinancials) {
+      return {
+        ebitdaMargin: null,
+        revenuePerSF: null,
+        utilityRatio: null,
+        rentToRevenue: null,
+        dscr: null,
+        revenuePerMachine: null,
+        avgEquipmentAge: null,
+        storeName: String(store.name ?? "Your Store"),
+        hasFinancials: false,
+      };
+    }
 
-    const ebitdaMargin =
-      monthlyRevenue > 0 ? ((monthlyRevenue - monthlyExpenses) / monthlyRevenue) * 100 : null;
-    const revenuePerSF = sqft > 0 && monthlyRevenue > 0 ? annualRevenue / sqft : null;
-    const dscr = debtService > 0 && annualEbitda > 0 ? annualEbitda / debtService : null;
-    const revenuePerMachine = machines > 0 && monthlyRevenue > 0 ? annualRevenue / machines : null;
-    const rentToRevenue = annualRevenue > 0 && monthlyRent > 0 ? ((monthlyRent * 12) / annualRevenue) * 100 : null;
+    const monthsUsed = ttm.monthsUsed;
+    const monthlyRevenue = ttm.ttmRevenue / monthsUsed;
+    const monthlyEbitda = ttm.ttmEbitda / monthsUsed;
+    const annualRevenue = ttm.ttmRevenue;
+    const annualEbitda = ttm.ttmEbitda;
 
-    const utilityValue = utilityRatio ?? (monthlyRevenue > 0 ? 17.8 : null);
+    const sqft = resolveSquareFootage(store, lease, realEstate);
+    const equipResolved = resolveEquipmentFromInventory(equipment);
+    const machines = equipResolved.totalMachines;
+    const avgAge = equipResolved.weightedAvgAge;
+
+    const debt = resolveDebtFromLoans(activeLoans);
+    const ttmRent = records.slice(0, 12).reduce((s, r) => s + (r.rent ?? 0), 0);
+    const annualRent = ttmRent > 0 ? ttmRent : 0;
+
+    const ebitdaMargin = monthlyRevenue > 0 ? (monthlyEbitda / monthlyRevenue) * 100 : null;
+    const revenuePerSF = sqft != null && sqft > 0 ? annualRevenue / sqft : null;
+    const dscr =
+      debt.annualDebtService > 0 && annualEbitda > 0 ? annualEbitda / debt.annualDebtService : null;
+    const revenuePerMachine = machines > 0 ? annualRevenue / machines : null;
+    const rentToRevenue = annualRevenue > 0 && annualRent > 0 ? (annualRent / annualRevenue) * 100 : null;
 
     return {
       ebitdaMargin,
       revenuePerSF,
-      utilityRatio: utilityValue,
+      utilityRatio: utilityRatio,
       rentToRevenue,
       dscr,
       revenuePerMachine,
       avgEquipmentAge: avgAge,
       storeName: String(store.name ?? "Your Store"),
-      hasFinancials: monthlyRevenue > 0,
+      hasFinancials: true,
     };
-  }, [store, equipment, utilityRatio]);
+  }, [store, equipment, lease, realEstate, monthlyFinancials, activeLoans, utilityRatio]);
 
   const rows: BenchmarkRowData[] = useMemo(() => {
     if (!metrics) return [];
@@ -576,9 +604,9 @@ export default function BenchmarkingPage() {
       lease,
       realEstate,
       monthlyFinancials,
-      monthlyUtilities,
+      monthlyUtilities: [],
     });
-  }, [store, equipment, lease, realEstate, monthlyFinancials, monthlyUtilities]);
+  }, [store, equipment, lease, realEstate, monthlyFinancials]);
 
   if (storesLoading || loading) {
     return (
@@ -705,7 +733,11 @@ export default function BenchmarkingPage() {
       ) : (
         <div className="card overflow-hidden min-w-0 text-center py-10">
           <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
-            Add store financials to see benchmarks
+            Insufficient data — enter at least one month of P&amp;L in{" "}
+            <Link href="/financials" className="text-blue-400 hover:underline">
+              Financials
+            </Link>{" "}
+            to see benchmarks.
           </p>
         </div>
       )}

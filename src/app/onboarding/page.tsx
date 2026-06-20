@@ -223,23 +223,13 @@ export default function OnboardingPage() {
         user_id: user.id,
         name,
         address,
-        square_footage: toNullableNum(data.square_footage),
         store_type: data.store_type,
         year_opened: toNullableNum(data.year_opened),
         market_density: MARKET_MAP[data.market_type] ?? "suburban",
-        monthly_revenue: toNullableNum(data.monthly_revenue),
-        monthly_expenses: toNullableNum(data.monthly_expenses),
-        monthly_rent: toNullableNum(data.monthly_rent),
-        annual_debt_service: toNullableNum(data.annual_debt_service),
-        loan_balance: toNullableNum(data.loan_balance),
-        washers: toNullableNum(data.washers),
-        dryers: toNullableNum(data.dryers),
-        avg_machine_age: toNullableNum(data.avg_machine_age),
       };
 
       if (includeLease) {
         storePayload.occupancy_type = "leased";
-        storePayload.lease_expiration = toNullableDate(data.lease_expiration);
       }
 
       const { data: newStore, error: storeError } = await supabase
@@ -272,6 +262,7 @@ export default function OnboardingPage() {
               user_id: user.id,
               lease_end_date: toNullableDate(data.lease_expiration),
               monthly_rent: toNullableNum(data.monthly_rent),
+              square_footage: toNullableNum(data.square_footage),
               personal_guaranty: toBool(data.personal_guaranty),
               assignment_rights: toNullableText(data.assignment_rights),
             },

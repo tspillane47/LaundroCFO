@@ -95,7 +95,6 @@ export function resolveOccupancyRent(
 ): number | null {
   if (lease?.monthly_rent != null && lease.monthly_rent > 0) return lease.monthly_rent;
   if (realEstateMonthlyRent != null && realEstateMonthlyRent > 0) return realEstateMonthlyRent;
-  if (store.monthly_rent != null && store.monthly_rent > 0) return store.monthly_rent;
   return null;
 }
 

@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
-import { toBool, toNum, toNullableText } from "@/lib/formHelpers";
+import { syncEquipmentToStoreCache } from "@/lib/storeCanonical";
 import { useStores } from "@/lib/store-context";
+import { toBool, toNum, toNullableText } from "@/lib/formHelpers";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import {
@@ -86,7 +87,7 @@ function SelectField({
 export default function EquipmentPage() {
   const router = useRouter();
   const supabase = createClient();
-  const { selectedStore } = useStores();
+  const { selectedStore, refreshStores } = useStores();
   const currentYear = new Date().getFullYear();
 
   const [loading, setLoading] = useState(true);
@@ -257,6 +258,8 @@ export default function EquipmentPage() {
       }
 
       invalidateValuationCache(store.id);
+      await syncEquipmentToStoreCache(store.id, supabase);
+      await refreshStores();
       setSaveStatus("success");
       setMessage({ type: "success", text: "Saved successfully." });
       setTimeout(() => {
@@ -284,6 +287,11 @@ export default function EquipmentPage() {
       return;
     }
     if (editingId === id) closeForm();
+    if (store) {
+      await syncEquipmentToStoreCache(store.id, supabase);
+      invalidateValuationCache(store.id);
+      await refreshStores();
+    }
     await loadData();
   }
 

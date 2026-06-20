@@ -29,16 +29,18 @@ export function generateStoreFeed(store: any, lease?: any, equipment?: any[], in
     });
   }
 
-  if (store.monthly_rent > 0) {
-    const rentRatio = store.monthly_revenue > 0
-      ? ((store.monthly_rent / store.monthly_revenue) * 100).toFixed(1)
+  const monthlyRent = lease?.monthly_rent ?? null;
+  if (monthlyRent != null && monthlyRent > 0) {
+    const monthlyRevenue = store.monthly_revenue;
+    const rentRatio = monthlyRevenue > 0
+      ? ((monthlyRent / monthlyRevenue) * 100).toFixed(1)
       : 0;
     items.push({
       id: 'rent-' + store.id,
       date: formatDate(now),
       category: 'financial',
       icon: '🏠',
-      headline: `Monthly rent: $${store.monthly_rent.toLocaleString()}`,
+      headline: `Monthly rent: $${monthlyRent.toLocaleString()}`,
       description: `${rentRatio}% of revenue. ${Number(rentRatio) > 20 ? '⚠ Above 20% threshold — monitor closely.' : 'Within healthy range.'}`,
       severity: Number(rentRatio) > 20 ? 'warning' : 'info',
       storeName: store.name,
@@ -96,7 +98,7 @@ export function generateStoreFeed(store: any, lease?: any, equipment?: any[], in
   }
 
   // Equipment items
-  if (store.avg_machine_age > 0) {
+  if (store.avg_machine_age > 0 && (!equipment || equipment.length === 0)) {
     const age = store.avg_machine_age;
     items.push({
       id: 'equip-' + store.id,

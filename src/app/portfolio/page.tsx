@@ -17,6 +17,8 @@ import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
+import { resolveEquipmentFromInventory } from "@/lib/storeCanonical";
+import type { EquipmentRecord } from "@/lib/equipment";
 import { totalUtilities, type MonthlyUtilityRow } from "@/lib/utilities";
 import {
   financials as demoFinancials,
@@ -108,6 +110,8 @@ export default function PortfolioPage() {
   >([]);
   const [totalDebt, setTotalDebt] = useState(0);
   const [totalAnnualDebtServiceFromLoans, setTotalAnnualDebtServiceFromLoans] = useState(0);
+  const [loanBalanceByStore, setLoanBalanceByStore] = useState<Record<string, number>>({});
+  const [debtServiceByStore, setDebtServiceByStore] = useState<Record<string, number>>({});
   const [portfolioUtilities, setPortfolioUtilities] = useState({
     portfolioWater: 0,
     portfolioGas: 0,
@@ -167,7 +171,7 @@ export default function PortfolioPage() {
         supabase.from("real_estate").select("store_id, estimated_value").in("store_id", storeIds),
         supabase.from("equipment_inventory").select("*").in("store_id", storeIds),
         supabase.from("insurance_policies").select("*").in("store_id", storeIds).eq("is_active", true),
-        supabase.from("store_loans").select("store_id, monthly_payment").in("store_id", storeIds).eq("is_active", true),
+        supabase.from("store_loans").select("store_id, monthly_payment, current_balance").in("store_id", storeIds).eq("is_active", true),
         supabase.from("monthly_utilities").select("*").in("store_id", storeIds),
       ]);
 
@@ -203,6 +207,16 @@ export default function PortfolioPage() {
         (stores as Store[]).map((store) => getStoreDebt(store.id))
       );
       setTotalDebt(debtTotal.reduce((s, d) => s + d, 0));
+
+      const balanceMap: Record<string, number> = {};
+      const debtServiceMap: Record<string, number> = {};
+      for (const loan of loansData ?? []) {
+        const sid = loan.store_id as string;
+        balanceMap[sid] = (balanceMap[sid] ?? 0) + (loan.current_balance ?? 0);
+        debtServiceMap[sid] = (debtServiceMap[sid] ?? 0) + (loan.monthly_payment ?? 0) * 12;
+      }
+      setLoanBalanceByStore(balanceMap);
+      setDebtServiceByStore(debtServiceMap);
 
       const annualDebtServiceFromLoans = (loansData ?? []).reduce(
         (s, loan) => s + (loan.monthly_payment ?? 0) * 12,
@@ -276,7 +290,7 @@ export default function PortfolioPage() {
       const monthlyEbitda = hasFinancials ? (storeValuation!.ttmEbitda ?? 0) / 12 : 0;
       const annualEbitda = hasFinancials ? (storeValuation!.annualEbitda ?? 0) : 0;
       const debtService = hasFinancials
-        ? (store.annual_debt_service ?? 0)
+        ? (debtServiceByStore[store.id] ?? 0)
         : DEMO_ANNUAL_DEBT_SERVICE;
       const dscr = hasFinancials
         ? (storeValuation!.ttmDscr ?? 0)
@@ -284,12 +298,14 @@ export default function PortfolioPage() {
           ? demoFinancials.cashFlow / debtService
           : 0;
       const estimatedValue = storeValuation?.businessValue ?? demoFinancials.estimatedValue;
-      const loanBalance = store.loan_balance ?? 0;
+      const loanBalance = loanBalanceByStore[store.id] ?? 0;
       const storeCash =
         (store.operating_account_balance ?? 0) +
         (store.reserve_account_balance ?? 0) +
         (store.petty_cash ?? 0);
-      const avgMachineAge = store.avg_machine_age ?? 6.1;
+      const storeEquipment = (equipmentByStore[store.id] ?? []) as EquipmentRecord[];
+      const equipResolved = resolveEquipmentFromInventory(storeEquipment);
+      const avgMachineAge = equipResolved.weightedAvgAge ?? store.avg_machine_age ?? 6.1;
 
       const isOwnerOccupied = store.occupancy_type === "owner_occupied";
       const storeLease = leases.find((l) => l.store_id === store.id);
@@ -316,7 +332,7 @@ export default function PortfolioPage() {
         hasDscrWarning: hasFinancials && dscr > 0 && dscr < 1.25,
       };
     });
-  }, [stores, leases, valuationByStoreId]);
+  }, [stores, leases, valuationByStoreId, equipmentByStore, loanBalanceByStore, debtServiceByStore]);
 
   const usingDemoData = !storeMetrics.some((m) => m.hasFinancials);
 

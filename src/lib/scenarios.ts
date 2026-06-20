@@ -1,5 +1,6 @@
 import { fmtDollar } from "@/lib/calculations";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
+import { resolveSquareFootage } from "@/lib/storeCanonical";
 import { calcValuation, type ValuationInputs, type ValuationResult } from "@/lib/valuation";
 
 export type ScenarioId =
@@ -55,6 +56,7 @@ export type StoreScenarioContext = {
   totalLeaseControl: number;
   isOwnerOccupied: boolean;
   realEstateValue: number;
+  leaseMonthlyRent?: number | null;
   financials?: ScenarioFinancials | null;
 };
 
@@ -119,7 +121,7 @@ export function buildValuationInputs(
   return {
     ebitda: (monthlyRevenue - monthlyExpenses) * 12,
     monthlyRevenue,
-    squareFootage: Number(store.square_footage) || 3500,
+    squareFootage: resolveSquareFootage(store, null, null) ?? 3500,
     avgEquipmentAge:
       overrides.avgEquipmentAge ??
       (equipMetrics.totalMachines > 0 ? equipMetrics.weightedAvgAge : Number(store.avg_machine_age) || 6),
@@ -556,7 +558,7 @@ export function computeScenario(
         newEbitda,
         newMultiple: result.finalMultiple,
         detail: {
-          newMonthlyRent: (Number(store.monthly_rent) || 0) + monthlyRentIncrease,
+          newMonthlyRent: (ctx.leaseMonthlyRent ?? 0) + monthlyRentIncrease,
           ebitdaImpact: -Math.round(monthlyRentIncrease * 12),
           newAnnualEbitda: Math.round(newEbitda),
         },

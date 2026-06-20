@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import { fetchStoreTtmMetrics, resolveAnnualEbitda } from "@/lib/financials";
+import { resolveSquareFootage } from "@/lib/storeCanonical";
 import { calcValuation, type ValuationInputs, type ValuationResult } from "@/lib/valuation";
 
 export type StoreValuationContext = {
@@ -87,10 +88,12 @@ export function buildStoreValuationInputs(
       ? Number(store.self_service_pct)
       : Math.max(0, 100 - wdfPct - commercialPct - pickupDeliveryPct);
 
+  const sqft = resolveSquareFootage(store, lease, realEstate) ?? 3500;
+
   const base: ValuationInputs = {
     ebitda: overrides.ebitda ?? (monthlyRevenue - monthlyExpenses) * 12,
     monthlyRevenue,
-    squareFootage: Number(store.square_footage) || 3500,
+    squareFootage: sqft,
     avgEquipmentAge:
       equipMetrics.totalMachines > 0
         ? equipMetrics.weightedAvgAge

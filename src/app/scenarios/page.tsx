@@ -92,6 +92,16 @@ export default function ScenariosPage() {
         }
       }
 
+      let leaseMonthlyRent: number | null = null;
+      if (!ownerOccupied) {
+        const { data: leaseRentData } = await supabase
+          .from("leases")
+          .select("monthly_rent")
+          .eq("store_id", storeData.id)
+          .maybeSingle();
+        leaseMonthlyRent = leaseRentData?.monthly_rent ?? null;
+      }
+
       const monthlyAverages = await getCurrentMonthlyAverages(selectedStore.id);
 
       const nextCtx: StoreScenarioContext = {
@@ -100,6 +110,7 @@ export default function ScenariosPage() {
         totalLeaseControl,
         isOwnerOccupied: ownerOccupied,
         realEstateValue,
+        leaseMonthlyRent,
         financials: monthlyAverages
           ? {
               monthlyRevenue: monthlyAverages.revenue.total,
