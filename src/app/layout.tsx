@@ -235,7 +235,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
           className="px-5 py-4 border-b"
           style={{ borderColor: "var(--sidebar-border, var(--border))" }}
         >
-          <Logo />
+          <Logo color="white" />
         </div>
 
         <nav className="flex-1 overflow-y-auto">

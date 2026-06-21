@@ -1,6 +1,34 @@
 import Link from 'next/link'
 
-export default function Logo() {
+const AUTO_COLOR_STYLES = `
+  .c { fill: none; stroke: #7ecba1; }
+  .f { fill: #7ecba1; }
+  .t { fill: #7ecba1; }
+  @media (prefers-color-scheme: dark) {
+    .c { stroke: #5b9ef5; }
+    .f { fill: #5b9ef5; }
+    .t { fill: #5b9ef5; }
+  }
+`
+
+const WHITE_COLOR_STYLES = `
+  .c { fill: none; stroke: #ffffff; }
+  .f { fill: #ffffff; }
+  .t { fill: #ffffff; }
+`
+
+const ANIMATION_STYLES = `
+  .bar { transform-origin: bottom; animation: gb 0.6s cubic-bezier(0.22,1,0.36,1) both; }
+  .b1 { animation-delay: 0.10s; }
+  .b2 { animation-delay: 0.22s; }
+  .b3 { animation-delay: 0.34s; }
+  .b4 { animation-delay: 0.46s; }
+  @keyframes gb { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+`
+
+export default function Logo({ color = 'auto' }) {
+  const colorStyles = color === 'white' ? WHITE_COLOR_STYLES : AUTO_COLOR_STYLES
+
   return (
     <Link href="/portfolio" className="inline-block hover:opacity-90 transition-opacity">
       <svg width="180" viewBox="0 0 360 84" role="img" xmlns="http://www.w3.org/2000/svg">
@@ -9,22 +37,7 @@ export default function Logo() {
           <clipPath id="porthole-clip">
             <circle cx="43" cy="44" r="14" />
           </clipPath>
-          <style>{`
-            .c { fill: none; stroke: #7ecba1; }
-            .f { fill: #7ecba1; }
-            .t { fill: #7ecba1; }
-            @media (prefers-color-scheme: dark) {
-              .c { stroke: #5b9ef5; }
-              .f { fill: #5b9ef5; }
-              .t { fill: #5b9ef5; }
-            }
-            .bar { transform-origin: bottom; animation: gb 0.6s cubic-bezier(0.22,1,0.36,1) both; }
-            .b1 { animation-delay: 0.10s; }
-            .b2 { animation-delay: 0.22s; }
-            .b3 { animation-delay: 0.34s; }
-            .b4 { animation-delay: 0.46s; }
-            @keyframes gb { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-          `}</style>
+          <style>{`${colorStyles}${ANIMATION_STYLES}`}</style>
         </defs>
         <rect className="c" x="16" y="8" width="54" height="68" rx="5" strokeWidth="2.2" />
         <line className="c" x1="16" y1="22" x2="70" y2="22" strokeWidth="1.4" />
