@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
+import { Logo } from "@/components/ui/Logo";
 
 const outcomeLinks = [
   {
@@ -74,8 +75,8 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
         )}
       >
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="text-[18px] font-bold text-[#60a5fa] tracking-tight flex-shrink-0">
-            LaundroCFO
+          <Link href="/" className="flex-shrink-0">
+            <Logo variant="marketing" />
           </Link>
 
           <nav className="hidden lg:flex items-center gap-4 xl:gap-5 absolute left-1/2 -translate-x-1/2">
