@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase";
 import { StoreProvider, useStores } from "@/lib/store-context";
 import clsx from "clsx";
 import { NavIcon, SunIcon, MoonIcon, ChevronDownIcon, MenuIcon, CloseIcon } from "@/components/ui/NavIcons";
-import { Logo } from "@/components/ui/Logo";
+import Logo from '@/components/Logo'
 
 const navSections = [
   {
@@ -235,7 +235,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
           className="px-5 py-4 border-b"
           style={{ borderColor: "var(--sidebar-border, var(--border))" }}
         >
-          <Logo variant="sidebar" />
+          <Logo />
         </div>
 
         <nav className="flex-1 overflow-y-auto">
