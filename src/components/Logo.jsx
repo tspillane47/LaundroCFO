@@ -2,8 +2,8 @@ import Link from 'next/link'
 
 export default function Logo() {
   return (
-    <Link href="/" className="inline-block hover:opacity-90 transition-opacity">
-      <svg width="220" viewBox="0 0 360 84" role="img" xmlns="http://www.w3.org/2000/svg">
+    <Link href="/portfolio" className="inline-block hover:opacity-90 transition-opacity">
+      <svg width="180" viewBox="0 0 360 84" role="img" xmlns="http://www.w3.org/2000/svg">
         <title>LaundroCFO</title>
         <defs>
           <clipPath id="porthole-clip">
@@ -38,7 +38,7 @@ export default function Logo() {
           <rect className="bar b3 f" x="46" y="38" width="6" height="22" rx="1" />
           <rect className="bar b4 f" x="54" y="41" width="6" height="19" rx="1" />
         </g>
-        <text className="t" x="82" y="54" fontFamily="Arial, Helvetica, sans-serif" fontSize="28" fontWeight="700" letterSpacing="-0.5">LaundroCFO</text>
+        <text className="t" x="82" y="58" fontFamily="Arial, Helvetica, sans-serif" fontSize="38" fontWeight="700" letterSpacing="-0.5">LaundroCFO</text>
       </svg>
     </Link>
   )
