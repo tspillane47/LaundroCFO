@@ -573,7 +573,7 @@ export default function DashboardPage() {
             >
               <div className="text-[16px] font-bold mb-1" style={{ color: "var(--text-primary)" }}>{s.name}</div>
               <div className="text-[12px] mb-3" style={{ color: "var(--text-muted)" }}>{s.address ?? "No address"}</div>
-              <div className="text-[12px] font-medium text-blue-400">Open Store →</div>
+              <div className="text-[12px] font-medium text-adaptive-info">Open Store →</div>
             </button>
           ))}
         </div>
@@ -683,7 +683,7 @@ export default function DashboardPage() {
       {usingProfileEstimate ? (
         <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-[12px] text-amber-200">
           Profile estimate — no P&amp;L data. Enter monthly financials in{" "}
-          <Link href="/financials" className="text-blue-400 hover:underline">
+          <Link href="/financials" className="text-adaptive-info hover:underline">
             Financials
           </Link>{" "}
           for live metrics.

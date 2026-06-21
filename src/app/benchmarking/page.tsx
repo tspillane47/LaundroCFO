@@ -46,8 +46,8 @@ function BenchmarkRow({
   if (store == null) {
     return (
       <div className="flex items-center gap-4 py-3 border-b border-white/[0.05]">
-        <div className="text-[13px] text-slate-400 w-44 flex-shrink-0">{metric}</div>
-        <div className="flex-1 text-[12px] text-slate-600 italic">Add data to see this metric</div>
+        <div className="text-[13px] text-adaptive-muted w-44 flex-shrink-0">{metric}</div>
+        <div className="flex-1 text-[12px] text-adaptive-muted italic">Add data to see this metric</div>
       </div>
     );
   }
@@ -65,7 +65,7 @@ function BenchmarkRow({
 
   return (
     <div className="flex items-center gap-4 py-3 border-b border-white/[0.05]">
-      <div className="text-[13px] text-slate-400 w-44 flex-shrink-0">{metric}</div>
+      <div className="text-[13px] text-adaptive-muted w-44 flex-shrink-0">{metric}</div>
       <div className="flex-1 relative">
         <div
           className="h-2 rounded-full overflow-hidden"
@@ -79,7 +79,7 @@ function BenchmarkRow({
           className="absolute top-[-3px] w-[3px] h-[14px] bg-white rounded-sm"
           style={{ left: `calc(${pct}% - 1.5px)` }}
         />
-        <div className="flex justify-between text-[10px] text-slate-600 mt-1">
+        <div className="flex justify-between text-[10px] text-adaptive-muted mt-1">
           <span>
             {lowerIsBetter ? "Best" : "Worst"} 25% — {fmtVal(lowerIsBetter ? top25 : bottom25)}
           </span>
@@ -105,7 +105,7 @@ function LockIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="text-slate-400 shrink-0"
+      className="text-adaptive-muted shrink-0"
       aria-hidden
     >
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -119,7 +119,7 @@ function NetworkLockedRow({ metric }: { metric: string }) {
     <div className="relative py-3 border-b border-white/[0.05] last:border-b-0">
       <div className="blur-[6px] pointer-events-none select-none opacity-70" aria-hidden>
         <div className="flex items-center gap-4">
-          <div className="text-[13px] text-slate-400 w-44 flex-shrink-0">{metric}</div>
+          <div className="text-[13px] text-adaptive-muted w-44 flex-shrink-0">{metric}</div>
           <div className="flex-1 relative">
             <div
               className="h-2 rounded-full overflow-hidden"
@@ -129,13 +129,13 @@ function NetworkLockedRow({ metric }: { metric: string }) {
               }}
             />
             <div className="absolute top-[-3px] w-[3px] h-[14px] bg-white rounded-sm" style={{ left: "58%" }} />
-            <div className="flex justify-between text-[10px] text-slate-600 mt-1">
+            <div className="flex justify-between text-[10px] text-adaptive-muted mt-1">
               <span>Worst 25%</span>
               <span>Median</span>
               <span>Best 25%</span>
             </div>
           </div>
-          <div className="text-[13px] font-bold w-24 text-right text-slate-500">—</div>
+          <div className="text-[13px] font-bold w-24 text-right text-adaptive-muted">—</div>
         </div>
       </div>
       <div
@@ -143,7 +143,7 @@ function NetworkLockedRow({ metric }: { metric: string }) {
         style={{ background: "rgba(15, 23, 42, 0.45)" }}
       >
         <LockIcon />
-        <span className="text-[12px] text-slate-400">Unlocks when network reaches 15 stores.</span>
+        <span className="text-[12px] text-adaptive-muted">Unlocks when network reaches 15 stores.</span>
       </div>
     </div>
   );
@@ -157,7 +157,7 @@ function ScoresCalculationGuide() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full text-left text-[12px] text-slate-500 hover:text-slate-300 transition-colors"
+        className="w-full text-left text-[12px] text-adaptive-muted hover:text-adaptive-secondary transition-colors"
         aria-expanded={open}
       >
         How are these scores calculated? {open ? "↑" : "↓"}
@@ -166,39 +166,39 @@ function ScoresCalculationGuide() {
       {open ? (
         <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-5">
           <div>
-            <h3 className="text-[13px] font-semibold text-slate-100 mb-2">LaundroCFO Score</h3>
-            <p className="text-[12px] text-slate-400 mb-2">
+            <h3 className="text-[13px] font-semibold text-adaptive-primary mb-2">LaundroCFO Score</h3>
+            <p className="text-[12px] text-adaptive-muted mb-2">
               A 0–100 composite score with letter grades (A+ through F), shown on the Dashboard and
               Benchmarking pages. Four categories, 100 points total:
             </p>
-            <ul className="space-y-1.5 text-[12px] text-slate-400 list-disc pl-4">
+            <ul className="space-y-1.5 text-[12px] text-adaptive-muted list-disc pl-4">
               <li>
-                <span className="text-slate-300">Financial Performance (40 pts):</span> EBITDA margin,
+                <span className="text-adaptive-secondary">Financial Performance (40 pts):</span> EBITDA margin,
                 utility ratio, and revenue per machine — each compared to industry quartiles.
               </li>
               <li>
-                <span className="text-slate-300">Debt &amp; Coverage (20 pts):</span> DSCR tiers (debt-free
+                <span className="text-adaptive-secondary">Debt &amp; Coverage (20 pts):</span> DSCR tiers (debt-free
                 stores receive 13 pts) and rent-to-revenue.
               </li>
               <li>
-                <span className="text-slate-300">Asset Quality (20 pts):</span> equipment age, lease years
+                <span className="text-adaptive-secondary">Asset Quality (20 pts):</span> equipment age, lease years
                 remaining, and equipment quality grade.
               </li>
               <li>
-                <span className="text-slate-300">Profile Completeness (20 pts):</span> awards points for
+                <span className="text-adaptive-secondary">Profile Completeness (20 pts):</span> awards points for
                 entering financials (6+ months TTM), equipment, lease, square footage, debt data, and
                 utility breakdown.
               </li>
             </ul>
-            <p className="mt-2 text-[12px] text-slate-500">
+            <p className="mt-2 text-[12px] text-adaptive-muted">
               An A grade requires real financial data — stores without TTM financials cannot score above
               the completeness cap. Improvement tips target your lowest-scoring categories.
             </p>
           </div>
 
           <div>
-            <h3 className="text-[13px] font-semibold text-slate-100 mb-2">Performance Rating</h3>
-            <ul className="space-y-1.5 text-[12px] text-slate-400 list-disc pl-4">
+            <h3 className="text-[13px] font-semibold text-adaptive-primary mb-2">Performance Rating</h3>
+            <ul className="space-y-1.5 text-[12px] text-adaptive-muted list-disc pl-4">
               <li>
                 Looks at up to 7 metrics: EBITDA Margin, Revenue per SF, Utility Ratio, Rent to Revenue,
                 DSCR, Revenue per Machine, and Avg Equipment Age.
@@ -209,21 +209,21 @@ function ScoresCalculationGuide() {
               </li>
               <li>Rating is based on how many metrics beat the industry median:</li>
             </ul>
-            <ul className="mt-2 space-y-1 text-[12px] text-slate-400 list-disc pl-8">
+            <ul className="mt-2 space-y-1 text-[12px] text-adaptive-muted list-disc pl-8">
               <li>
-                <span className="text-slate-300">Top 25%:</span> 4 or more metrics in the top quartile
+                <span className="text-adaptive-secondary">Top 25%:</span> 4 or more metrics in the top quartile
               </li>
               <li>
-                <span className="text-slate-300">Above Median:</span> 4 or more metrics above median
+                <span className="text-adaptive-secondary">Above Median:</span> 4 or more metrics above median
               </li>
               <li>
-                <span className="text-slate-300">Average:</span> 2–3 metrics above median
+                <span className="text-adaptive-secondary">Average:</span> 2–3 metrics above median
               </li>
               <li>
-                <span className="text-slate-300">Below Median:</span> fewer than 2 metrics above median
+                <span className="text-adaptive-secondary">Below Median:</span> fewer than 2 metrics above median
               </li>
             </ul>
-            <p className="mt-2 text-[12px] text-slate-500">
+            <p className="mt-2 text-[12px] text-adaptive-muted">
               Metrics with missing data are excluded. If your store is missing square footage, equipment
               inventory, or debt service, fewer metrics are scored — which can cap your rating even if all
               available metrics are excellent. Complete your store profile to unlock all 7 metrics.
@@ -231,31 +231,31 @@ function ScoresCalculationGuide() {
           </div>
 
           <div>
-            <h3 className="text-[13px] font-semibold text-slate-100 mb-2">Financeability Rating</h3>
-            <ul className="space-y-1.5 text-[12px] text-slate-400 list-disc pl-4">
+            <h3 className="text-[13px] font-semibold text-adaptive-primary mb-2">Financeability Rating</h3>
+            <ul className="space-y-1.5 text-[12px] text-adaptive-muted list-disc pl-4">
               <li>Based entirely on DSCR (Debt Service Coverage Ratio).</li>
               <li>DSCR = Annual EBITDA ÷ Annual Debt Service</li>
               <li>
-                <span className="text-slate-300">Strong:</span> DSCR ≥ 1.50× — lenders typically view
+                <span className="text-adaptive-secondary">Strong:</span> DSCR ≥ 1.50× — lenders typically view
                 this as low risk
               </li>
               <li>
-                <span className="text-slate-300">Acceptable:</span> DSCR ≥ 1.25× — meets minimum
+                <span className="text-adaptive-secondary">Acceptable:</span> DSCR ≥ 1.25× — meets minimum
                 thresholds for most SBA and commercial loans
               </li>
               <li>
-                <span className="text-slate-300">Marginal:</span> DSCR &lt; 1.25× — may face difficulty
+                <span className="text-adaptive-secondary">Marginal:</span> DSCR &lt; 1.25× — may face difficulty
                 securing financing
               </li>
               <li>Shows &ldquo;—&rdquo; if no debt service is entered or EBITDA is zero/negative.</li>
             </ul>
-            <p className="mt-2 text-[12px] text-slate-500">
+            <p className="mt-2 text-[12px] text-adaptive-muted">
               Requires active loans in the{" "}
-              <Link href="/debt" className="text-blue-400 hover:underline">
+              <Link href="/debt" className="text-adaptive-info hover:underline">
                 Debt
               </Link>{" "}
               module and P&L data in{" "}
-              <Link href="/financials" className="text-blue-400 hover:underline">
+              <Link href="/financials" className="text-adaptive-info hover:underline">
                 Financials
               </Link>{" "}
               to calculate.
@@ -263,14 +263,14 @@ function ScoresCalculationGuide() {
           </div>
 
           <div>
-            <h3 className="text-[13px] font-semibold text-slate-100 mb-2">Industry Benchmarks</h3>
-            <ul className="space-y-1.5 text-[12px] text-slate-400 list-disc pl-4">
+            <h3 className="text-[13px] font-semibold text-adaptive-primary mb-2">Industry Benchmarks</h3>
+            <ul className="space-y-1.5 text-[12px] text-adaptive-muted list-disc pl-4">
               <li>
                 The green/amber/red colors on each metric row show where your store falls relative to
                 industry quartiles.
               </li>
             </ul>
-            <ul className="mt-2 space-y-1.5 text-[12px] text-slate-400 pl-4">
+            <ul className="mt-2 space-y-1.5 text-[12px] text-adaptive-muted pl-4">
               <li className="flex items-center gap-2">
                 <span className="badge badge-green text-[10px]">Green</span>
                 <span>Top 25% of laundromats nationally</span>
@@ -284,11 +284,11 @@ function ScoresCalculationGuide() {
                 <span>Bottom 25% — needs attention</span>
               </li>
             </ul>
-            <p className="mt-2 text-[12px] text-slate-500">
+            <p className="mt-2 text-[12px] text-adaptive-muted">
               Benchmark values are sourced from the Coin Laundry Association and the LaundroCFO peer
               database (2024).
             </p>
-            <p className="mt-1 text-[12px] text-slate-600 italic">
+            <p className="mt-1 text-[12px] text-adaptive-muted italic">
               Network benchmarks comparing your store against other LaundroCFO operators are coming soon.
             </p>
           </div>
@@ -324,8 +324,8 @@ function NetworkBenchmarksSection({ optedIn }: { optedIn: boolean }) {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-[15px] font-semibold text-slate-100">LaundroCFO Network Benchmarks</h2>
-        <p className="text-[12px] text-slate-500 mt-1">
+        <h2 className="text-[15px] font-semibold text-adaptive-primary">LaundroCFO Network Benchmarks</h2>
+        <p className="text-[12px] text-adaptive-muted mt-1">
           See how your store compares against real LaundroCFO operators — anonymously.
         </p>
       </div>
@@ -336,14 +336,14 @@ function NetworkBenchmarksSection({ optedIn }: { optedIn: boolean }) {
         ))}
 
         <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-3">
-          <p className="text-[12px] text-slate-500">
+          <p className="text-[12px] text-adaptive-muted">
             {contributorCount == null
               ? "Loading network size…"
               : `${count} store${count === 1 ? "" : "s"} currently contributing`}
           </p>
 
           <div>
-            <div className="flex justify-between text-[11px] text-slate-600 mb-1.5">
+            <div className="flex justify-between text-[11px] text-adaptive-muted mb-1.5">
               <span>Network progress</span>
               <span>
                 {count} / {NETWORK_BENCHMARK_THRESHOLD} stores
@@ -645,9 +645,9 @@ export default function BenchmarkingPage() {
       {hasFinancials && metrics ? (
         <>
           <div className="flex items-center justify-between">
-            <h1 className="text-[15px] font-semibold text-slate-100">
+            <h1 className="text-[15px] font-semibold text-adaptive-primary">
               Industry Benchmarking{" "}
-              <span className="text-[12px] text-slate-500 font-normal ml-2">
+              <span className="text-[12px] text-adaptive-muted font-normal ml-2">
                 {storeName} — vs. U.S. 2024 Data
               </span>
             </h1>
@@ -662,7 +662,7 @@ export default function BenchmarkingPage() {
             >
               <div className="card overflow-hidden min-w-0 border-green-500/20 h-full">
                 <div className="text-[12px] text-green-400 font-semibold mb-2">💪 Strengths</div>
-                <div className="space-y-1.5 text-[12px] text-slate-400">
+                <div className="space-y-1.5 text-[12px] text-adaptive-muted">
                   {callouts.strengths.length > 0 ? (
                     callouts.strengths.map((s) => <div key={s}>✅ {s}</div>)
                   ) : (
@@ -672,7 +672,7 @@ export default function BenchmarkingPage() {
               </div>
               <div className="card overflow-hidden min-w-0 border-amber-500/20 h-full">
                 <div className="text-[12px] text-amber-400 font-semibold mb-2">⚠️ Watch</div>
-                <div className="space-y-1.5 text-[12px] text-slate-400">
+                <div className="space-y-1.5 text-[12px] text-adaptive-muted">
                   {callouts.watch.length > 0 ? (
                     callouts.watch.map((s) => <div key={s}>⚠ {s}</div>)
                   ) : (
@@ -681,8 +681,8 @@ export default function BenchmarkingPage() {
                 </div>
               </div>
               <div className="card overflow-hidden min-w-0 border-blue-500/20 h-full">
-                <div className="text-[12px] text-blue-400 font-semibold mb-2">🎯 Opportunities</div>
-                <div className="space-y-1.5 text-[12px] text-slate-400">
+                <div className="text-[12px] text-adaptive-info font-semibold mb-2">🎯 Opportunities</div>
+                <div className="space-y-1.5 text-[12px] text-adaptive-muted">
                   {callouts.opportunities.map((s) => (
                     <div key={s}>{s}</div>
                   ))}
@@ -691,14 +691,14 @@ export default function BenchmarkingPage() {
               <div className="card overflow-hidden min-w-0 h-full">
                 <div className="metric-label">Performance Rating</div>
                 <div className="metric-value text-green-400">{summary.performanceRating}</div>
-                <div className="text-[12px] text-slate-500 mt-1">vs. laundromats nationally</div>
+                <div className="text-[12px] text-adaptive-muted mt-1">vs. laundromats nationally</div>
               </div>
               <div className="card overflow-hidden min-w-0 h-full">
                 <div className="metric-label">Metrics Above Median</div>
                 <div className="metric-value">
                   {summary.aboveMedian} / {summary.total}
                 </div>
-                <div className="text-[12px] text-slate-500 mt-1">
+                <div className="text-[12px] text-adaptive-muted mt-1">
                   {summary.total > 0
                     ? `${Math.round((summary.aboveMedian / summary.total) * 100)}% of tracked metrics`
                     : "—"}
@@ -707,7 +707,7 @@ export default function BenchmarkingPage() {
               <div className="card overflow-hidden min-w-0 h-full">
                 <div className="metric-label">Financeability Rating</div>
                 <div className="metric-value text-green-400">{summary.financeRating}</div>
-                <div className="text-[12px] text-slate-500 mt-1">Based on live DSCR</div>
+                <div className="text-[12px] text-adaptive-muted mt-1">Based on live DSCR</div>
               </div>
             </div>
           </div>
@@ -717,14 +717,14 @@ export default function BenchmarkingPage() {
           <div className="card overflow-hidden min-w-0">
             <div className="section-title">
               Store vs. Industry Benchmarks
-              <span className="text-[11px] text-slate-600 font-normal ml-auto">
+              <span className="text-[11px] text-adaptive-muted font-normal ml-auto">
                 White bar = {storeName} position
               </span>
             </div>
             {rows.map((b) => (
               <BenchmarkRow key={b.metric} {...b} storeLabel={storeName} />
             ))}
-            <div className="text-[11px] text-slate-600 mt-4 pt-3 border-t border-white/[0.05]">
+            <div className="text-[11px] text-adaptive-muted mt-4 pt-3 border-t border-white/[0.05]">
               Industry benchmark data sourced from Coin Laundry Association, LaundroCFO peer database (2024).
               Utility ratio uses trailing 12-month P&amp;L when available.
             </div>
@@ -734,7 +734,7 @@ export default function BenchmarkingPage() {
         <div className="card overflow-hidden min-w-0 text-center py-10">
           <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
             Insufficient data — enter at least one month of P&amp;L in{" "}
-            <Link href="/financials" className="text-blue-400 hover:underline">
+            <Link href="/financials" className="text-adaptive-info hover:underline">
               Financials
             </Link>{" "}
             to see benchmarks.

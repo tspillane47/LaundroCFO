@@ -53,17 +53,17 @@ export default function SignupPage() {
       <div className="min-h-screen bg-[#0d1520] flex items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
           <div className="text-[64px] mb-6">✉️</div>
-          <h1 className="text-[28px] font-bold text-slate-100 mb-3">Check your email</h1>
-          <p className="text-[15px] text-slate-400 leading-relaxed mb-2">
+          <h1 className="text-[28px] font-bold text-adaptive-primary mb-3">Check your email</h1>
+          <p className="text-[15px] text-adaptive-muted leading-relaxed mb-2">
             We sent a confirmation link to{" "}
-            <span className="text-blue-300 font-medium">{pendingEmail}</span>.
+            <span className="text-adaptive-info font-medium">{pendingEmail}</span>.
           </p>
-          <p className="text-[15px] text-slate-400 leading-relaxed mb-8">
+          <p className="text-[15px] text-adaptive-muted leading-relaxed mb-8">
             Click the link to activate your account.
           </p>
 
           {resendMessage && (
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-[12px] text-blue-400 mb-4">
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-[12px] text-adaptive-info mb-4">
               {resendMessage}
             </div>
           )}
@@ -79,12 +79,12 @@ export default function SignupPage() {
           <Link
             href="/signup"
             onClick={() => { setPending(false); setEmail(""); setPassword(""); }}
-            className="text-[13px] text-slate-500 hover:text-slate-300"
+            className="text-[13px] text-adaptive-muted hover:text-adaptive-secondary"
           >
             Wrong email? Go back
           </Link>
 
-          <p className="text-[12px] text-slate-600 mt-6">
+          <p className="text-[12px] text-adaptive-muted mt-6">
             Check your spam folder if you don&apos;t see it within a minute.
           </p>
         </div>
@@ -96,8 +96,8 @@ export default function SignupPage() {
     <div className="min-h-screen bg-[#0d1520] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="text-[22px] font-bold text-blue-300 mb-1">LaundroCFO</div>
-          <div className="text-slate-500 text-[13px]">Create your free account</div>
+          <div className="text-[22px] font-bold text-adaptive-info mb-1">LaundroCFO</div>
+          <div className="text-adaptive-muted text-[13px]">Create your free account</div>
         </div>
         <div className="card space-y-4">
           {error && (
@@ -133,9 +133,9 @@ export default function SignupPage() {
           >
             {loading ? "Creating account..." : "Create Account"}
           </button>
-          <div className="text-center text-[12px] text-slate-500 pt-1">
+          <div className="text-center text-[12px] text-adaptive-muted pt-1">
             Already have an account?{" "}
-            <Link href="/login" className="text-blue-400 hover:text-blue-300">Sign in</Link>
+            <Link href="/login" className="text-adaptive-info hover:text-adaptive-info">Sign in</Link>
           </div>
         </div>
       </div>

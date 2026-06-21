@@ -253,14 +253,14 @@ export default function SettingsPage() {
   if (!selectedStore) {
     return (
       <div className="card text-center py-12">
-        <p className="text-slate-400 text-[14px]">Select a store from the dropdown above to manage settings.</p>
+        <p className="text-adaptive-muted text-[14px]">Select a store from the dropdown above to manage settings.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-5">
-      <h1 className="text-[15px] font-semibold text-slate-100">Settings</h1>
+      <h1 className="text-[15px] font-semibold text-adaptive-primary">Settings</h1>
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[12px] text-red-400">{error}</div>
@@ -331,8 +331,8 @@ export default function SettingsPage() {
                     ["Commercial %", form.commercial_pct ? `${form.commercial_pct}%` : "—"],
                   ].map(([label, value]) => (
                     <div key={String(label)} className="flex justify-between py-2.5 text-[13px]">
-                      <span className="text-slate-400">{label}</span>
-                      <span className="font-semibold text-slate-100">{value}</span>
+                      <span className="text-adaptive-muted">{label}</span>
+                      <span className="font-semibold text-adaptive-primary">{value}</span>
                     </div>
                   ))}
                 </div>
@@ -438,8 +438,8 @@ export default function SettingsPage() {
                     ],
                   ].map(([label, value]) => (
                     <div key={String(label)} className="flex justify-between py-2.5 text-[13px]">
-                      <span className="text-slate-400">{label}</span>
-                      <span className="font-semibold text-slate-100">{value}</span>
+                      <span className="text-adaptive-muted">{label}</span>
+                      <span className="font-semibold text-adaptive-primary">{value}</span>
                     </div>
                   ))}
                 </div>
@@ -458,7 +458,7 @@ export default function SettingsPage() {
             <div className="section-title">Network Benchmarks</div>
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <div className="text-[13px] text-slate-300 leading-snug">
+                <div className="text-[13px] text-adaptive-secondary leading-snug">
                   Contribute anonymous data to LaundroCFO Network Benchmarks
                 </div>
                 <p className="text-[11px] mt-2 leading-relaxed" style={{ color: "var(--text-muted)" }}>
@@ -501,7 +501,7 @@ export default function SettingsPage() {
                   ["smsAlerts", "SMS Alerts"],
                 ] as const).map(([key, label]) => (
                   <label key={key} className="flex items-center justify-between py-2 text-[13px] cursor-pointer">
-                    <span className="text-slate-400">{label}</span>
+                    <span className="text-adaptive-muted">{label}</span>
                     <input
                       type="checkbox"
                       checked={notifications[key]}
@@ -538,8 +538,8 @@ export default function SettingsPage() {
                     ["SMS Alerts", notifications.smsAlerts],
                   ] as const).map(([label, on]) => (
                     <div key={label} className="flex justify-between py-2.5 text-[13px]">
-                      <span className="text-slate-400">{label}</span>
-                      <span className={on ? "text-green-400 font-semibold" : "text-slate-600"}>
+                      <span className="text-adaptive-muted">{label}</span>
+                      <span className={on ? "text-green-400 font-semibold" : "text-adaptive-muted"}>
                         {on ? "Enabled" : "Disabled"}
                       </span>
                     </div>
@@ -592,8 +592,8 @@ export default function SettingsPage() {
                     ["Equipment Age Alert", "12 years avg"],
                   ].map(([label, value]) => (
                     <div key={label} className="flex justify-between py-2.5 text-[13px]">
-                      <span className="text-slate-400">{label}</span>
-                      <span className="font-semibold text-slate-100">{value}</span>
+                      <span className="text-adaptive-muted">{label}</span>
+                      <span className="font-semibold text-adaptive-primary">{value}</span>
                     </div>
                   ))}
                 </div>
@@ -615,8 +615,8 @@ export default function SettingsPage() {
                 ["Stores", String(stores.length)],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between py-2.5 text-[13px]">
-                  <span className="text-slate-400">{label}</span>
-                  <span className="font-semibold text-slate-100">{value}</span>
+                  <span className="text-adaptive-muted">{label}</span>
+                  <span className="font-semibold text-adaptive-primary">{value}</span>
                 </div>
               ))}
             </div>

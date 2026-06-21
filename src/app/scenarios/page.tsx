@@ -209,9 +209,9 @@ export default function ScenariosPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-[15px] font-semibold text-slate-100">
+        <h1 className="text-[15px] font-semibold text-adaptive-primary">
           Scenario Planner{" "}
-          <span className="text-[12px] text-slate-500 font-normal ml-2">
+          <span className="text-[12px] text-adaptive-muted font-normal ml-2">
             {String(ctx.store.name ?? "Store")} — based on live financials
           </span>
         </h1>
@@ -233,7 +233,7 @@ export default function ScenariosPage() {
 
         <div className="card xl:sticky xl:top-0">
           <div className="flex items-center gap-2 mb-4">
-            <div className="text-[13px] font-bold text-slate-100">
+            <div className="text-[13px] font-bold text-adaptive-primary">
               {selected.emoji} {selected.title}
             </div>
             <MetricTooltip label="How it works" explanation={selected.tip} />
@@ -251,7 +251,7 @@ export default function ScenariosPage() {
           <div className="grid grid-cols-2 gap-2.5 mb-4">
             <div className="card2">
               <div className="metric-label">Current Value</div>
-              <div className="text-[16px] font-bold text-slate-100">
+              <div className="text-[16px] font-bold text-adaptive-primary">
                 {fmtDollar(selected.currentValue)}
               </div>
             </div>
@@ -277,15 +277,15 @@ export default function ScenariosPage() {
             </div>
           </div>
 
-          <div className="text-[11px] text-slate-600 uppercase tracking-wider mb-2">Key Outputs</div>
+          <div className="text-[11px] text-adaptive-muted uppercase tracking-wider mb-2">Key Outputs</div>
           <div className="divide-y divide-white/[0.04] mb-4">
             <div className="flex items-center justify-between py-2 text-[12px]">
-              <span className="text-slate-500">New EBITDA</span>
-              <span className="font-semibold text-slate-100">{fmtDollar(selected.newEbitda)}</span>
+              <span className="text-adaptive-muted">New EBITDA</span>
+              <span className="font-semibold text-adaptive-primary">{fmtDollar(selected.newEbitda)}</span>
             </div>
             <div className="flex items-center justify-between py-2 text-[12px]">
-              <span className="text-slate-500">Multiple Applied</span>
-              <span className="font-semibold text-blue-300">{fmtMultiple(selected.newMultiple)}</span>
+              <span className="text-adaptive-muted">Multiple Applied</span>
+              <span className="font-semibold text-adaptive-info">{fmtMultiple(selected.newMultiple)}</span>
             </div>
             {Object.entries(selected.detail).map(([k, v]) => {
               const label = k
@@ -293,8 +293,8 @@ export default function ScenariosPage() {
                 .replace(/^./, (s) => s.toUpperCase());
               return (
                 <div key={k} className="flex items-center justify-between py-2 text-[12px]">
-                  <span className="text-slate-500">{label}</span>
-                  <span className="font-semibold text-slate-100">
+                  <span className="text-adaptive-muted">{label}</span>
+                  <span className="font-semibold text-adaptive-primary">
                     {typeof v === "number" && k.toLowerCase().includes("revenue") && k !== "revenueGain"
                       ? fmtDollar(v)
                       : String(v)}
@@ -334,8 +334,8 @@ function ScenarioSlider({
   return (
     <div className={className}>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[10px] text-slate-500 uppercase tracking-wider">{config.label}</span>
-        <span className="text-[12px] font-semibold text-blue-300 tabular-nums">
+        <span className="text-[10px] text-adaptive-muted uppercase tracking-wider">{config.label}</span>
+        <span className="text-[12px] font-semibold text-adaptive-info tabular-nums">
           {config.format(value)}
         </span>
       </div>
@@ -349,7 +349,7 @@ function ScenarioSlider({
         className="scenario-slider w-full"
         aria-label={config.label}
       />
-      <div className="flex justify-between text-[10px] text-slate-600 mt-0.5">
+      <div className="flex justify-between text-[10px] text-adaptive-muted mt-0.5">
         <span>{config.format(config.min)}</span>
         <span>{config.format(config.max)}</span>
       </div>
@@ -387,12 +387,12 @@ function ScenarioCard({
         className="w-full text-left hover:opacity-90"
       >
         <div className="flex items-center gap-1">
-          <div className="text-[13px] font-semibold text-slate-100">
+          <div className="text-[13px] font-semibold text-adaptive-primary">
             {scenario.emoji} {scenario.title}
           </div>
           <MetricTooltip label="How it works" explanation={scenario.tip} />
         </div>
-        <div className="text-[11px] text-slate-500 mt-1">{scenario.description}</div>
+        <div className="text-[11px] text-adaptive-muted mt-1">{scenario.description}</div>
       </button>
 
       {hasSlider && scenario.slider && (
@@ -416,28 +416,28 @@ function ScenarioCard({
       >
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <div className="text-[10px] text-slate-600 uppercase tracking-wider">Value Impact</div>
+            <div className="text-[10px] text-adaptive-muted uppercase tracking-wider">Value Impact</div>
             <div className={clsx("text-[15px] font-bold mt-0.5", neg ? "text-red-400" : "text-green-400")}>
               {neg ? "−" : "+"}
               {fmtDollar(Math.abs(scenario.valueImpact))}
             </div>
           </div>
           <div>
-            <div className="text-[10px] text-slate-600 uppercase tracking-wider">% Change</div>
+            <div className="text-[10px] text-adaptive-muted uppercase tracking-wider">% Change</div>
             <div className={clsx("text-[15px] font-bold mt-0.5", neg ? "text-red-400" : "text-green-400")}>
               {neg ? "−" : "+"}
               {Math.abs(scenario.pctChange).toFixed(1)}%
             </div>
           </div>
           <div>
-            <div className="text-[10px] text-slate-600 uppercase tracking-wider">New EBITDA</div>
-            <div className="text-[15px] font-bold text-slate-100 mt-0.5">
+            <div className="text-[10px] text-adaptive-muted uppercase tracking-wider">New EBITDA</div>
+            <div className="text-[15px] font-bold text-adaptive-primary mt-0.5">
               {fmtDollar(scenario.newEbitda)}
             </div>
           </div>
           <div>
-            <div className="text-[10px] text-slate-600 uppercase tracking-wider">Multiple</div>
-            <div className="text-[15px] font-bold text-blue-300 mt-0.5">
+            <div className="text-[10px] text-adaptive-muted uppercase tracking-wider">Multiple</div>
+            <div className="text-[15px] font-bold text-adaptive-info mt-0.5">
               {fmtMultiple(scenario.newMultiple)}
             </div>
           </div>

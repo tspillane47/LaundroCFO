@@ -219,7 +219,7 @@ function ToggleField({
 }) {
   return (
     <div className="flex items-center justify-between py-2">
-      <span className="text-[13px] text-slate-300">{label}</span>
+      <span className="text-[13px] text-adaptive-secondary">{label}</span>
       <button
         type="button"
         onClick={() => onChange(!value)}

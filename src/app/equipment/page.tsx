@@ -96,7 +96,7 @@ function SelectField({
 }) {
   return (
     <div>
-      <label className="block text-[11px] text-slate-500 mb-1.5">{label}</label>
+      <label className="block text-[11px] text-adaptive-muted mb-1.5">{label}</label>
       <select value={value} onChange={(e) => onChange(e.target.value)} className={INPUT_CLASS}>
         {options.map((opt) => (
           <option key={opt} value={opt}>
@@ -457,8 +457,8 @@ export default function EquipmentPage() {
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-[15px] font-semibold text-slate-100">Equipment Inventory</h1>
-          <p className="text-slate-500 text-[13px] mt-0.5">
+          <h1 className="text-[15px] font-semibold text-adaptive-primary">Equipment Inventory</h1>
+          <p className="text-adaptive-muted text-[13px] mt-0.5">
             Fleet tracking, age analysis, and valuation impact for {store?.name ?? "your store"}
           </p>
         </div>
@@ -478,7 +478,7 @@ export default function EquipmentPage() {
           <div className={clsx("metric-value", avgAgeColor(metrics.weightedAvgAge))}>
             {metrics.weightedAvgAge.toFixed(1)} yrs
           </div>
-          <div className="text-[12px] mt-1 text-slate-500">
+          <div className="text-[12px] mt-1 text-adaptive-muted">
             {metrics.weightedAvgAge < 8
               ? "Modern fleet"
               : metrics.weightedAvgAge < 12
@@ -492,7 +492,7 @@ export default function EquipmentPage() {
             <div className={clsx("metric-value min-w-0", gradeColor(metrics.grade))}>
               Grade {metrics.grade}
             </div>
-            <span className="text-[12px] text-slate-500 shrink-0">({metrics.qualityScore}/100)</span>
+            <span className="text-[12px] text-adaptive-muted shrink-0">({metrics.qualityScore}/100)</span>
           </div>
           <div className="progress-bar mt-2">
             <div
@@ -523,7 +523,7 @@ export default function EquipmentPage() {
           >
             {formatAdjustment(metrics.totalEquipmentAdjustment)}
           </div>
-          <div className="text-[12px] mt-1 text-slate-500">EBITDA multiple adjustment</div>
+          <div className="text-[12px] mt-1 text-adaptive-muted">EBITDA multiple adjustment</div>
         </div>
       </div>
 
@@ -531,7 +531,7 @@ export default function EquipmentPage() {
       <div className="card">
         <div className="section-title mb-4">Operating Metrics</div>
         {!hasSelfServiceTtm ? (
-          <p className="text-[13px] text-slate-500">
+          <p className="text-[13px] text-adaptive-muted">
             Enter financials to calculate operating metrics.
           </p>
         ) : (
@@ -539,31 +539,31 @@ export default function EquipmentPage() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="card2 min-w-0">
                 <div className="metric-label">Revenue Per Machine</div>
-                <div className="text-[18px] font-bold text-slate-100 tabular-nums">
+                <div className="text-[18px] font-bold text-adaptive-primary tabular-nums">
                   {revenuePerMachine != null ? fmtDollar(revenuePerMachine) : "—"}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">Self-service, annualized</div>
+                <div className="text-[11px] text-adaptive-muted mt-1">Self-service, annualized</div>
               </div>
               <div className="card2 min-w-0">
                 <div className="metric-label">Revenue Per SF</div>
-                <div className="text-[18px] font-bold text-slate-100 tabular-nums">
+                <div className="text-[18px] font-bold text-adaptive-primary tabular-nums">
                   {revenuePerSF != null ? fmtDollar(revenuePerSF) : "—"}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">Total revenue, annualized</div>
+                <div className="text-[11px] text-adaptive-muted mt-1">Total revenue, annualized</div>
               </div>
               <div className="card2 min-w-0">
                 <div className="metric-label">Washer Revenue</div>
-                <div className="text-[18px] font-bold text-blue-300 tabular-nums">
+                <div className="text-[18px] font-bold text-adaptive-info tabular-nums">
                   {turns ? fmtDollar(turns.washerRevenue) : "—"}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">Backed out of self-service TTM</div>
+                <div className="text-[11px] text-adaptive-muted mt-1">Backed out of self-service TTM</div>
               </div>
               <div className="card2 min-w-0">
                 <div className="metric-label">Dryer Revenue</div>
                 <div className="text-[18px] font-bold text-purple-300 tabular-nums">
                   {turns ? fmtDollar(turns.dryerRevenue) : "—"}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">
+                <div className="text-[11px] text-adaptive-muted mt-1">
                   {turns && turns.dryerRevenuePct === 0
                     ? "Free dry store"
                     : turns
@@ -577,11 +577,11 @@ export default function EquipmentPage() {
               <div className="space-y-3 mb-4">
                 <div className="flex flex-wrap items-center gap-2">
                   {dryerRevenuePct === 0 ? (
-                    <span className="text-[12px] font-medium text-slate-300">Free dry store</span>
+                    <span className="text-[12px] font-medium text-adaptive-secondary">Free dry store</span>
                   ) : (
-                    <span className="text-[12px] font-medium text-slate-300">Dryer revenue estimate</span>
+                    <span className="text-[12px] font-medium text-adaptive-secondary">Dryer revenue estimate</span>
                   )}
-                  <span className="text-[18px] font-bold text-slate-100 tabular-nums">
+                  <span className="text-[18px] font-semibold text-adaptive-primary tabular-nums">
                     {dryerRevenuePct.toFixed(1)}%
                   </span>
                   {dryerRevenuePct === 0 && (
@@ -602,9 +602,9 @@ export default function EquipmentPage() {
                   onTouchEnd={handleDryerSliderRelease}
                   className="w-full h-2 accent-blue-500 cursor-pointer disabled:opacity-50"
                 />
-                <div className="flex justify-between text-[10px] text-slate-600">
+                <div className="flex justify-between text-[10px] text-adaptive-muted">
                   <span>0%</span>
-                  <span className="text-slate-500">Dryer revenue as % of washer revenue</span>
+                  <span className="text-adaptive-muted">Dryer revenue as % of washer revenue</span>
                   <span>60%</span>
                 </div>
               </div>
@@ -622,17 +622,17 @@ export default function EquipmentPage() {
                         "text-[22px] font-bold tabular-nums",
                         turns.overallTurnsPerDay != null
                           ? turnsPerDayColor(turns.overallTurnsPerDay)
-                          : "text-slate-400"
+                          : "text-adaptive-muted"
                       )}
                     >
                       {turns.overallTurnsPerDay != null ? turns.overallTurnsPerDay.toFixed(2) : "—"}
                     </div>
-                    <div className="text-[11px] text-slate-500 mt-1">Fleet-wide washer utilization</div>
+                    <div className="text-[11px] text-adaptive-muted mt-1">Fleet-wide washer utilization</div>
                   </div>
                   <div className="card2 min-w-0 lg:col-span-2">
                     <div className="metric-label mb-2">Turns by Size</div>
                     {turns.bySize.length === 0 ? (
-                      <div className="text-[12px] text-slate-500">No washer groups with vend prices.</div>
+                      <div className="text-[12px] text-adaptive-muted">No washer groups with vend prices.</div>
                     ) : (
                       <div className="space-y-2">
                         {turns.bySize.map((group) => (
@@ -640,7 +640,7 @@ export default function EquipmentPage() {
                             key={group.size}
                             className="flex items-center justify-between text-[12px] gap-3"
                           >
-                            <span className="text-slate-400">
+                            <span className="text-adaptive-muted">
                               {group.size} · {group.quantity} machines · {fmtDollar(group.avgVendPrice)} vend
                             </span>
                             <span
@@ -658,12 +658,12 @@ export default function EquipmentPage() {
                   </div>
                   <div className="card2 min-w-0">
                     <div className="metric-label">Average Vend Price</div>
-                    <div className="text-[18px] font-bold text-slate-100 tabular-nums">
+                    <div className="text-[18px] font-bold text-adaptive-primary tabular-nums">
                       {turns.weightedAvgVendPrice != null
                         ? fmtDollar(turns.weightedAvgVendPrice)
                         : "—"}
                     </div>
-                    <div className="text-[11px] text-slate-500 mt-1">Quantity-weighted washers</div>
+                    <div className="text-[11px] text-adaptive-muted mt-1">Quantity-weighted washers</div>
                   </div>
                 </div>
               )}
@@ -680,13 +680,13 @@ export default function EquipmentPage() {
           <div className="card">
             <div className="section-title">Age Distribution</div>
             {metrics.totalMachines === 0 ? (
-              <div className="text-[13px] text-slate-500 py-4">Add equipment to see age distribution.</div>
+              <div className="text-[13px] text-adaptive-muted py-4">Add equipment to see age distribution.</div>
             ) : (
               <div className="divide-y divide-white/[0.04]">
                 {metrics.ageBuckets.map((bucket) => (
                   <div key={bucket.label} className="flex items-center gap-3 py-3">
-                    <div className="text-[12px] text-slate-400 w-28 flex-shrink-0">{bucket.label}</div>
-                    <div className="flex-1 h-2 bg-[#243347] rounded-full overflow-hidden">
+                    <div className="text-[12px] text-adaptive-muted w-28 flex-shrink-0">{bucket.label}</div>
+                    <div className="flex-1 h-2 progress-bar">
                       <div
                         className={clsx("h-full rounded-full transition-all", bucket.color)}
                         style={{ width: `${Math.max(bucket.pct, bucket.count > 0 ? 2 : 0)}%` }}
@@ -712,8 +712,8 @@ export default function EquipmentPage() {
 
             {equipment.length === 0 && !showForm ? (
               <div className="text-center py-12">
-                <div className="text-[15px] font-semibold text-slate-200 mb-2">No equipment added yet</div>
-                <div className="text-[13px] text-slate-500 mb-6 max-w-sm mx-auto">
+                <div className="text-[15px] font-semibold text-adaptive-secondary mb-2">No equipment added yet</div>
+                <div className="text-[13px] text-adaptive-muted mb-6 max-w-sm mx-auto">
                   Add your washer and dryer fleet to track age, quality score, and valuation impact.
                 </div>
                 <button type="button" onClick={openAddForm} className="btn-primary px-8 py-3 text-[14px]">
@@ -724,7 +724,7 @@ export default function EquipmentPage() {
               <div className="table-scroll overflow-x-auto">
                 <table className="w-full text-[12px]">
                   <thead>
-                    <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.06]">
+                    <tr className="text-[10px] text-adaptive-muted uppercase tracking-wider border-b border-white/[0.06]">
                       <th className="text-left pb-2 font-medium">Type</th>
                       <th className="text-left pb-2 font-medium">Manufacturer</th>
                       <th className="text-left pb-2 font-medium">Size</th>
@@ -742,10 +742,10 @@ export default function EquipmentPage() {
                       const age = currentYear - item.installation_year;
                       return (
                         <tr key={item.id}>
-                          <td className="py-2.5 text-slate-300">{item.machine_type}</td>
-                          <td className="py-2.5 text-slate-400">{item.manufacturer}</td>
-                          <td className="py-2.5 text-slate-400">{item.machine_size}</td>
-                          <td className="py-2.5 text-slate-400">
+                          <td className="py-2.5 text-adaptive-secondary">{item.machine_type}</td>
+                          <td className="py-2.5 text-adaptive-muted">{item.manufacturer}</td>
+                          <td className="py-2.5 text-adaptive-muted">{item.machine_size}</td>
+                          <td className="py-2.5 text-adaptive-muted">
                             {item.machine_type === "Dryer" ? (
                               "—"
                             ) : item.avg_vend_price != null && item.avg_vend_price > 0 ? (
@@ -759,17 +759,17 @@ export default function EquipmentPage() {
                               </span>
                             )}
                           </td>
-                          <td className="py-2.5 text-slate-400">{item.quantity}</td>
-                          <td className="py-2.5 text-slate-400">{item.installation_year}</td>
+                          <td className="py-2.5 text-adaptive-muted">{item.quantity}</td>
+                          <td className="py-2.5 text-adaptive-muted">{item.installation_year}</td>
                           <td className={clsx("py-2.5 font-semibold", ageColor(age))}>{age} yr</td>
-                          <td className="py-2.5 text-center text-slate-400">
+                          <td className="py-2.5 text-center text-adaptive-muted">
                             {item.machine_type === "Washer" && item.high_speed_extract ? (
                               <span className="text-green-400">✓</span>
                             ) : (
                               "—"
                             )}
                           </td>
-                          <td className="py-2.5 text-slate-400">{item.condition}</td>
+                          <td className="py-2.5 text-adaptive-muted">{item.condition}</td>
                           <td className="py-2.5 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button
@@ -795,10 +795,10 @@ export default function EquipmentPage() {
                   {equipment.length > 0 && (
                     <tfoot>
                       <tr className="border-t border-white/[0.08]">
-                        <td className="pt-3 text-slate-400 font-semibold" colSpan={9}>
+                        <td className="pt-3 text-adaptive-muted font-semibold" colSpan={9}>
                           Total Replacement Cost
                         </td>
-                        <td className="pt-3 text-right text-slate-100 font-bold">
+                        <td className="pt-3 text-right text-adaptive-primary font-bold">
                           {fmtDollar(metrics.estimatedReplacementValue)}
                         </td>
                       </tr>
@@ -812,7 +812,7 @@ export default function EquipmentPage() {
             {showForm && (
               <div className="mt-5 pt-5 border-t border-white/[0.08]">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="text-[13px] font-semibold text-slate-200">
+                  <div className="text-[13px] font-semibold text-adaptive-secondary">
                     {editingId ? "Edit Machine Group" : "Add Machine Group"}
                   </div>
                   <button type="button" onClick={closeForm} className="btn-outline text-[11px]">
@@ -840,7 +840,7 @@ export default function EquipmentPage() {
                     options={sizeOptions}
                   />
                   <div>
-                    <label className="block text-[11px] text-slate-500 mb-1.5">Quantity</label>
+                    <label className="block text-[11px] text-adaptive-muted mb-1.5">Quantity</label>
                     <input
                       type="number"
                       min={1}
@@ -851,7 +851,7 @@ export default function EquipmentPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-slate-500 mb-1.5">Installation Year</label>
+                    <label className="block text-[11px] text-adaptive-muted mb-1.5">Installation Year</label>
                     <input
                       type="number"
                       min={1980}
@@ -870,7 +870,7 @@ export default function EquipmentPage() {
                   />
                   {form.machine_type === "Washer" && (
                     <div>
-                      <label className="block text-[11px] text-slate-500 mb-1.5">
+                      <label className="block text-[11px] text-adaptive-muted mb-1.5">
                         Average Vend Price ($)
                       </label>
                       <input
@@ -899,13 +899,13 @@ export default function EquipmentPage() {
                         onChange={(e) => updateForm("high_speed_extract", e.target.checked)}
                         className="rounded border-white/20 bg-[#1e2a3a]"
                       />
-                      <label htmlFor="high_speed_extract" className="text-[13px] text-slate-300">
+                      <label htmlFor="high_speed_extract" className="text-[13px] text-adaptive-secondary">
                         High Speed Extract (200G+)
                       </label>
                     </div>
                   )}
                   <div className="md:col-span-2">
-                    <label className="block text-[11px] text-slate-500 mb-1.5">Notes</label>
+                    <label className="block text-[11px] text-adaptive-muted mb-1.5">Notes</label>
                     <textarea
                       value={form.notes}
                       onChange={(e) => updateForm("notes", e.target.value)}
@@ -947,19 +947,19 @@ export default function EquipmentPage() {
             <div className="section-title">Valuation Impact</div>
             <div className="space-y-3">
               <div className="flex items-center justify-between text-[13px]">
-                <span className="text-slate-400">Base equipment adjustment</span>
+                <span className="text-adaptive-muted">Base equipment adjustment</span>
                 <span className={clsx("font-semibold", adjustmentColor(metrics.baseEquipmentAdjustment))}>
                   {formatAdjustment(metrics.baseEquipmentAdjustment)}
                 </span>
               </div>
               {metrics.bonus200GAdjustment > 0 && (
                 <div className="flex items-center justify-between text-[13px]">
-                  <span className="text-slate-400">200G bonus</span>
+                  <span className="text-adaptive-muted">200G bonus</span>
                   <span className="font-semibold text-green-400">+0.10x</span>
                 </div>
               )}
               <div className="border-t border-white/[0.08] pt-3 flex items-center justify-between text-[13px]">
-                <span className="text-slate-200 font-medium">Total equipment adjustment</span>
+                <span className="text-adaptive-secondary font-medium">Total equipment adjustment</span>
                 <span className={clsx("font-bold text-[15px]", adjustmentColor(metrics.totalEquipmentAdjustment))}>
                   {formatAdjustment(metrics.totalEquipmentAdjustment)}
                 </span>
@@ -975,19 +975,19 @@ export default function EquipmentPage() {
                   {valuationImpactDollars >= 0 ? "+" : "−"}
                   {fmtDollar(Math.abs(valuationImpactDollars))}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">
+                <div className="text-[11px] text-adaptive-muted mt-1">
                   {formatAdjustment(metrics.totalEquipmentAdjustment)} × {fmtDollar(annualEbitda)} EBITDA
                 </div>
               </div>
 
               {/* Visual indicator */}
               <div className="mt-2">
-                <div className="flex justify-between text-[10px] text-slate-600 mb-1">
+                <div className="flex justify-between text-[10px] text-adaptive-muted mb-1">
                   <span>−0.50x</span>
                   <span>0.00x</span>
                   <span>+0.60x</span>
                 </div>
-                <div className="relative h-2 bg-[#243347] rounded-full">
+                <div className="relative h-2 progress-bar">
                   <div className="absolute inset-y-0 left-1/2 w-px bg-white/20" />
                   <div
                     className={clsx(
@@ -1009,7 +1009,7 @@ export default function EquipmentPage() {
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div className="card2 text-center">
                 <div className="metric-label">Washers</div>
-                <div className="text-[28px] font-bold text-blue-300">{metrics.totalWashers}</div>
+                <div className="text-[28px] font-bold text-adaptive-info">{metrics.totalWashers}</div>
               </div>
               <div className="card2 text-center">
                 <div className="metric-label">Dryers</div>
@@ -1017,17 +1017,17 @@ export default function EquipmentPage() {
               </div>
             </div>
             {metrics.totalMachines > 0 && (
-              <div className="text-[12px] text-slate-500 text-center mb-4">
+              <div className="text-[12px] text-adaptive-muted text-center mb-4">
                 Ratio {metrics.totalWashers}:{metrics.totalDryers} washer/dryer
               </div>
             )}
             <div className="space-y-3">
               <div>
                 <div className="flex items-center justify-between text-[12px] mb-1">
-                  <span className="text-slate-400">200G Washers</span>
-                  <span className="font-semibold text-slate-200">{metrics.pct200GWashers.toFixed(0)}%</span>
+                  <span className="text-adaptive-muted">200G Washers</span>
+                  <span className="font-semibold text-adaptive-secondary">{metrics.pct200GWashers.toFixed(0)}%</span>
                 </div>
-                <div className="h-1.5 bg-[#243347] rounded-full overflow-hidden">
+                <div className="h-1.5 progress-bar">
                   <div
                     className="h-full rounded-full bg-green-500"
                     style={{ width: `${Math.min(100, metrics.pct200GWashers)}%` }}
@@ -1036,10 +1036,10 @@ export default function EquipmentPage() {
               </div>
               <div>
                 <div className="flex items-center justify-between text-[12px] mb-1">
-                  <span className="text-slate-400">Under 10 Years</span>
-                  <span className="font-semibold text-slate-200">{metrics.pctUnder10Years.toFixed(0)}%</span>
+                  <span className="text-adaptive-muted">Under 10 Years</span>
+                  <span className="font-semibold text-adaptive-secondary">{metrics.pctUnder10Years.toFixed(0)}%</span>
                 </div>
-                <div className="h-1.5 bg-[#243347] rounded-full overflow-hidden">
+                <div className="h-1.5 progress-bar">
                   <div
                     className="h-full rounded-full bg-blue-500"
                     style={{ width: `${Math.min(100, metrics.pctUnder10Years)}%` }}

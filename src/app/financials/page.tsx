@@ -315,11 +315,11 @@ function RatioCard({ item }: { item: RatioBenchmark }) {
     <div className="card2">
       <div className="metric-label">{item.label}</div>
       <div className={clsx("text-[20px] font-bold tabular-nums", color)}>{display}</div>
-      <div className="text-[11px] text-slate-500 mt-1">Industry median: {benchDisplay}</div>
+      <div className="text-[11px] text-adaptive-muted mt-1">Industry median: {benchDisplay}</div>
       <div className="progress-bar mt-3">
         <div className={clsx("h-full rounded-full", barColor)} style={{ width: `${progress}%` }} />
       </div>
-      <div className="flex justify-between text-[10px] text-slate-600 mt-1.5">
+      <div className="flex justify-between text-[10px] text-adaptive-muted mt-1.5">
         <span>Top 25%: {item.unit === "$" ? `$${Math.round(item.top25).toLocaleString()}` : item.unit === "x" ? fmtMultiple(item.top25) : fmtPct(item.top25)}</span>
         <span>Bottom 25%: {item.unit === "$" ? `$${Math.round(item.bottom25).toLocaleString()}` : item.unit === "x" ? fmtMultiple(item.bottom25) : fmtPct(item.bottom25)}</span>
       </div>
@@ -409,7 +409,7 @@ function RuleFormPanel({
   return (
     <div className="space-y-3 text-[12px]">
       <div className="flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+        <label className="flex items-center gap-1.5 text-adaptive-secondary cursor-pointer">
           <input
             type="radio"
             name="rule-type"
@@ -419,7 +419,7 @@ function RuleFormPanel({
           />
           By vendor name
         </label>
-        <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+        <label className="flex items-center gap-1.5 text-adaptive-secondary cursor-pointer">
           <input
             type="radio"
             name="rule-type"
@@ -432,9 +432,9 @@ function RuleFormPanel({
       </div>
       {ruleType === "vendor" ? (
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-slate-300">
+          <span className="text-adaptive-secondary">
             Always categorize transactions containing{" "}
-            <span className="font-mono text-slate-100">{vendorPattern}</span> as:
+            <span className="font-mono text-adaptive-primary">{vendorPattern}</span> as:
           </span>
           <select
             value={category}
@@ -450,10 +450,10 @@ function RuleFormPanel({
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-slate-300">
+          <span className="text-adaptive-secondary">
             Always categorize {type === "income" ? "income" : "expense"} transactions of
           </span>
-          <span className="text-slate-400">$</span>
+          <span className="text-adaptive-muted">$</span>
           <input
             type="number"
             step="0.01"
@@ -462,7 +462,7 @@ function RuleFormPanel({
             onChange={(e) => onAmountChange(e.target.value)}
             className={clsx(INPUT_CLASS, "w-28 py-1.5 text-[12px] tabular-nums")}
           />
-          <span className="text-slate-400">within $</span>
+          <span className="text-adaptive-muted">within $</span>
           <input
             type="number"
             step="0.01"
@@ -471,7 +471,7 @@ function RuleFormPanel({
             onChange={(e) => onToleranceChange(e.target.value)}
             className={clsx(INPUT_CLASS, "w-20 py-1.5 text-[12px] tabular-nums")}
           />
-          <span className="text-slate-300">as:</span>
+          <span className="text-adaptive-secondary">as:</span>
           <select
             value={category}
             onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
@@ -483,7 +483,7 @@ function RuleFormPanel({
               </option>
             ))}
           </select>
-          <span className="text-slate-500">(from ${amount.toFixed(2)})</span>
+          <span className="text-adaptive-muted">(from ${amount.toFixed(2)})</span>
         </div>
       )}
       {message && (
@@ -1952,8 +1952,8 @@ export default function FinancialsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-[15px] font-semibold text-slate-100">Financials</h1>
-        <p className="text-[12px] text-slate-500 mt-1">
+        <h1 className="text-[15px] font-semibold text-adaptive-primary">Financials</h1>
+        <p className="text-[12px] text-adaptive-muted mt-1">
           {store?.name ?? selectedStore.name} — P&L, trends, ratios, bank import & QuickBooks
         </p>
       </div>
@@ -1977,8 +1977,8 @@ export default function FinancialsPage() {
               className={clsx(
                 "px-4 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
                 activeTab === tab.id
-                  ? "border-blue-500 text-blue-400"
-                  : "border-transparent text-slate-500 hover:text-slate-300"
+                  ? "border-blue-500 text-adaptive-info"
+                  : "border-transparent text-adaptive-muted hover:text-adaptive-secondary"
               )}
             >
               {tab.label}
@@ -1995,7 +1995,7 @@ export default function FinancialsPage() {
         <div className="space-y-5">
           {records.length === 0 && !showForm && (
             <div className="card text-center py-10">
-              <p className="text-[14px] text-slate-400 mb-4">
+              <p className="text-[14px] text-adaptive-muted mb-4">
                 Add your first month of financials to get started
               </p>
               <button type="button" className="btn-primary" onClick={() => openMonthForm(selectedMonth)}>
@@ -2025,7 +2025,7 @@ export default function FinancialsPage() {
                 />
               </div>
               <div className="metric-value">{hasFinancialData ? fmtDollar(ttm.ttmEbitda) : "—"}</div>
-              <div className="text-[12px] mt-1 text-slate-500">
+              <div className="text-[12px] mt-1 text-adaptive-muted">
                 {hasFinancialData
                   ? "Earnings before interest, taxes, depreciation, amortization"
                   : "No financial data"}
@@ -2047,7 +2047,7 @@ export default function FinancialsPage() {
               <div className="metric-value">
                 {hasFinancialData && ttm.ttmDebtService > 0 ? fmtMultiple(ttm.dscr) : "—"}
               </div>
-              <div className="text-[12px] mt-1 text-slate-500">
+              <div className="text-[12px] mt-1 text-adaptive-muted">
                 {hasFinancialData
                   ? "TTM EBITDA ÷ trailing 12-month debt payments"
                   : "No financial data"}
@@ -2075,7 +2075,7 @@ export default function FinancialsPage() {
                 />
               </div>
               <div className="metric-value">{hasFinancialData ? fmtDollar(ttm.ttmNoi) : "—"}</div>
-              <div className="text-[12px] mt-1 text-slate-500">
+              <div className="text-[12px] mt-1 text-adaptive-muted">
                 {hasFinancialData
                   ? "Net operating income after rent and operating expenses"
                   : "No financial data"}
@@ -2120,10 +2120,10 @@ export default function FinancialsPage() {
                           className={clsx(
                             "px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors",
                             isSelected
-                              ? "bg-blue-600/20 border-blue-500/40 text-blue-300"
+                              ? "bg-blue-600/20 border-blue-500/40 text-adaptive-info"
                               : hasData
                                 ? "bg-[#243347] border-white/10 text-slate-300 hover:border-blue-500/30"
-                                : "bg-transparent border-white/[0.06] text-slate-600 hover:text-slate-400"
+                                : "bg-transparent border-white/[0.06] text-adaptive-muted hover:text-adaptive-muted"
                           )}
                         >
                           {label}
@@ -2181,7 +2181,7 @@ export default function FinancialsPage() {
                 <div className="flex items-end">
                   <p className="text-[13px] pb-2" style={{ color: "var(--text-secondary)" }}>
                     Utilities are now tracked in the{" "}
-                    <Link href="/utilities" className="text-blue-400 hover:underline">
+                    <Link href="/utilities" className="text-adaptive-info hover:underline">
                       Utilities section →
                     </Link>
                   </p>
@@ -2198,11 +2198,11 @@ export default function FinancialsPage() {
                 </div>
                 <div className="card2">
                   <div className="metric-label">EBITDA Margin</div>
-                  <div className="text-lg font-bold text-slate-100">{fmtPct(liveCalc.ebitdaMargin)}</div>
+                  <div className="text-lg font-bold text-adaptive-primary">{fmtPct(liveCalc.ebitdaMargin)}</div>
                 </div>
                 <div className="card2">
                   <div className="metric-label">Cash Flow (NOI)</div>
-                  <div className="text-lg font-bold text-blue-400">{fmtDollar(liveCalc.netCashFlow)}</div>
+                  <div className="text-lg font-bold text-adaptive-info">{fmtDollar(liveCalc.netCashFlow)}</div>
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
@@ -2221,7 +2221,7 @@ export default function FinancialsPage() {
             <div className="table-scroll">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+                <tr className="text-left text-adaptive-muted border-b border-white/[0.06]">
                   <th className="pb-3 pr-3 font-medium">Month</th>
                   <th className="pb-3 pr-3 font-medium text-right">Revenue</th>
                   <th className="pb-3 pr-3 font-medium text-right">Expenses</th>
@@ -2241,8 +2241,8 @@ export default function FinancialsPage() {
                     )}
                     onClick={() => setSelectedMonth(i + 1)}
                   >
-                    <td className="py-2.5 pr-3 text-slate-300">{MONTH_NAMES[i]}</td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-200">
+                    <td className="py-2.5 pr-3 text-adaptive-secondary">{MONTH_NAMES[i]}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary">
                       {r ? fmtDollar(r.revenue) : "—"}
                     </td>
                     <td className="py-2.5 pr-3 text-right tabular-nums text-red-400/80">
@@ -2251,20 +2251,20 @@ export default function FinancialsPage() {
                     <td className="py-2.5 pr-3 text-right tabular-nums text-green-400">
                       {r ? fmtDollar(r.ebitda) : "—"}
                     </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-400">
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-muted">
                       {r ? fmtPct(r.ebitdaMargin) : "—"}
                     </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-400">
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-muted">
                       {r ? fmtDollar(r.debt_service) : "—"}
                     </td>
-                    <td className="py-2.5 text-right tabular-nums text-blue-400">
+                    <td className="py-2.5 text-right tabular-nums text-adaptive-info">
                       {r ? fmtDollar(r.noi) : "—"}
                     </td>
                   </tr>
                 ))}
                 {yearTotals && (
                   <tr className="font-semibold bg-[#243347]/50">
-                    <td className="py-3 pr-3 text-slate-100">Total</td>
+                    <td className="py-3 pr-3 text-adaptive-primary">Total</td>
                     <td className="py-3 pr-3 text-right tabular-nums">{fmtDollar(yearTotals.revenue)}</td>
                     <td className="py-3 pr-3 text-right tabular-nums text-red-400">
                       {fmtDollar(yearTotals.totalExpenses)}
@@ -2278,7 +2278,7 @@ export default function FinancialsPage() {
                         : "—"}
                     </td>
                     <td className="py-3 pr-3 text-right tabular-nums">{fmtDollar(yearTotals.debt_service)}</td>
-                    <td className="py-3 text-right tabular-nums text-blue-400">{fmtDollar(yearTotals.noi)}</td>
+                    <td className="py-3 text-right tabular-nums text-adaptive-info">{fmtDollar(yearTotals.noi)}</td>
                   </tr>
                 )}
               </tbody>
@@ -2289,7 +2289,7 @@ export default function FinancialsPage() {
           <div className="card pb-4">
             <div className="flex items-center justify-between gap-4 mb-3">
               <div className="section-title mb-0">Revenue vs EBITDA — {selectedYear}</div>
-              <div className="flex items-center gap-4 text-[12px] text-slate-400 shrink-0">
+              <div className="flex items-center gap-4 text-[12px] text-adaptive-muted shrink-0">
                 <span className="flex items-center gap-1.5">
                   <span className="w-3 h-2.5 rounded-sm bg-blue-500" />
                   Revenue
@@ -2406,7 +2406,7 @@ export default function FinancialsPage() {
           </div>
 
           {trendChartData.length === 0 ? (
-            <div className="card text-center py-10 text-[14px] text-slate-500">
+            <div className="card text-center py-10 text-[14px] text-adaptive-muted">
               Add monthly data on the P&L tab to see trends.
             </div>
           ) : (
@@ -2466,7 +2466,7 @@ export default function FinancialsPage() {
               <div className="card">
                 <div className="section-title">
                   EBITDA Margin Trend
-                  <span className="text-[11px] text-slate-600 font-normal ml-auto">22% industry median reference</span>
+                  <span className="text-[11px] text-adaptive-muted font-normal ml-auto">22% industry median reference</span>
                 </div>
                 <div className="h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -2513,21 +2513,21 @@ export default function FinancialsPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="card2">
                 <div className="metric-label">Annual Rent (TTM)</div>
-                <div className="text-[20px] font-bold text-slate-100">{fmtDollar(ratios.annualRent)}</div>
+                <div className="text-[20px] font-bold text-adaptive-primary">{fmtDollar(ratios.annualRent)}</div>
               </div>
               <div className="card2">
                 <div className="metric-label">Rent / Revenue</div>
                 <div className={clsx("text-[20px] font-bold", ratioStatusColor(ratios.rentPct, { good: 12, warn: 15 }))}>
                   {ratios.annualRent > 0 ? fmtPct(ratios.rentPct) : "—"}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">Target: below 15%</div>
+                <div className="text-[11px] text-adaptive-muted mt-1">Target: below 15%</div>
               </div>
               <div className="card2">
                 <div className="metric-label">Occupancy Cost Ratio</div>
                 <div className={clsx("text-[20px] font-bold", ratioStatusColor(occupancyPct, { good: 15, warn: 20 }))}>
                   {fmtPct(occupancyPct)}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">Rent as % of TTM revenue</div>
+                <div className="text-[11px] text-adaptive-muted mt-1">Rent as % of TTM revenue</div>
               </div>
             </div>
             <div className="mt-4 progress-bar">
@@ -2539,12 +2539,12 @@ export default function FinancialsPage() {
                 style={{ width: `${Math.min(100, (occupancyPct / 25) * 100)}%` }}
               />
             </div>
-            <div className="flex justify-between text-[11px] text-slate-600 mt-2">
+            <div className="flex justify-between text-[11px] text-adaptive-muted mt-2">
               <span>0%</span>
               <span>15% alert</span>
               <span>20% critical</span>
             </div>
-            <div className="mt-4 text-[12px] text-slate-400 leading-relaxed">
+            <div className="mt-4 text-[12px] text-adaptive-muted leading-relaxed">
               {occupancyPct <= 15
                 ? "Occupancy costs are healthy — well below the 20% lender alert threshold."
                 : occupancyPct <= 20
@@ -2560,8 +2560,8 @@ export default function FinancialsPage() {
         <div className="space-y-4">
           <div className="card flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="text-[14px] font-semibold text-slate-100">Import Bank Transactions</div>
-              <div className="text-[12px] text-slate-500 mt-1">
+              <div className="text-[14px] font-semibold text-adaptive-primary">Import Bank Transactions</div>
+              <div className="text-[12px] text-adaptive-muted mt-1">
                 Upload a CSV with Processed Date, Description, Credit or Debit, and Amount columns.
                 Income and expenses are detected from the Credit or Debit column.
               </div>
@@ -2591,7 +2591,7 @@ export default function FinancialsPage() {
           <div className="card">
             <div className="section-title flex flex-wrap items-center gap-3">
               <span>Transaction Review</span>
-              <span className="text-[11px] text-slate-600 font-normal">
+              <span className="text-[11px] text-adaptive-muted font-normal">
                 {reviewCount} pending
               </span>
               {reviewCount > 0 && (
@@ -2605,7 +2605,7 @@ export default function FinancialsPage() {
               )}
               <button
                 type="button"
-                className="ml-auto text-[12px] text-blue-400 hover:text-blue-300"
+                className="ml-auto text-[12px] text-adaptive-info hover:text-adaptive-info"
                 onClick={() => setShowManageRules((v) => !v)}
               >
                 {showManageRules ? "Hide Rules" : "Manage Rules"}
@@ -2613,7 +2613,7 @@ export default function FinancialsPage() {
                   <span className="ml-1.5 badge badge-blue text-[10px]">{categorizationRules.length}</span>
                 )}
               </button>
-              <label className="flex items-center gap-2 text-[12px] text-slate-400 cursor-pointer">
+              <label className="flex items-center gap-2 text-[12px] text-adaptive-muted cursor-pointer">
                 <input
                   type="checkbox"
                   checked={groupSimilar}
@@ -2626,9 +2626,9 @@ export default function FinancialsPage() {
 
             {showManageRules && (
               <div className="mb-4 p-4 rounded-lg bg-[#243347]/50 border border-white/[0.06]">
-                <div className="text-[13px] font-medium text-slate-200 mb-3">Categorization Rules</div>
+                <div className="text-[13px] font-medium text-adaptive-secondary mb-3">Categorization Rules</div>
                 {categorizationRules.length === 0 ? (
-                  <p className="text-[12px] text-slate-500">
+                  <p className="text-[12px] text-adaptive-muted">
                     No rules yet. Use &quot;Set as Rule&quot; on a transaction group to auto-categorize future imports.
                   </p>
                 ) : (
@@ -2640,18 +2640,18 @@ export default function FinancialsPage() {
                         key={rule.id}
                         className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-white/[0.04] last:border-b-0"
                       >
-                        <div className="text-[12px] text-slate-300">
+                        <div className="text-[12px] text-adaptive-secondary">
                           {isAmountRule ? (
                             <>
                               When{" "}
-                              <span className="text-slate-100">
+                              <span className="text-adaptive-primary">
                                 {rule.transaction_type === "income" ? "income" : "expense"}
                               </span>{" "}
                               amount ={" "}
-                              <span className="font-mono text-slate-100">
+                              <span className="font-mono text-adaptive-primary">
                                 ${Number(rule.amount ?? 0).toFixed(2)}
                               </span>{" "}
-                              <span className="text-slate-500">
+                              <span className="text-adaptive-muted">
                                 (±${Number(rule.amount_tolerance ?? 0.01).toFixed(2)})
                               </span>
                             </>
@@ -2660,7 +2660,7 @@ export default function FinancialsPage() {
                               When description contains &apos;{rule.vendor_pattern}&apos;
                             </>
                           )}
-                          <span className="text-slate-500 mx-2">→</span>
+                          <span className="text-adaptive-muted mx-2">→</span>
                           <CategoryBadge category={rule.category as BankImportCategory} />
                         </div>
                         <button
@@ -2699,10 +2699,10 @@ export default function FinancialsPage() {
 
             {someSelected && !groupSimilar && (
               <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                <span className="text-[12px] text-blue-300 font-medium">
+                <span className="text-[12px] text-adaptive-info font-medium">
                   {selectedTxnKeys.size} selected
                 </span>
-                <span className="text-[12px] text-slate-500">Apply category to selected:</span>
+                <span className="text-[12px] text-adaptive-muted">Apply category to selected:</span>
                 <select
                   value={bulkCategory}
                   onChange={(e) => setBulkCategory(e.target.value as BankImportCategory)}
@@ -2742,14 +2742,14 @@ export default function FinancialsPage() {
             )}
 
             {reviewCount === 0 ? (
-              <p className="text-[13px] text-slate-500 py-6 text-center">
+              <p className="text-[13px] text-adaptive-muted py-6 text-center">
                 No transactions to review. Upload a CSV to get started.
               </p>
             ) : groupSimilar ? (
               <div className="table-scroll">
                 <table className="w-full text-[12px]">
                   <thead>
-                    <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+                    <tr className="text-left text-adaptive-muted border-b border-white/[0.06]">
                       <th className="pb-3 pr-3 font-medium">Vendor</th>
                       <th className="pb-3 pr-3 font-medium">Type</th>
                       <th className="pb-3 pr-3 font-medium">Count</th>
@@ -2763,12 +2763,12 @@ export default function FinancialsPage() {
                     {transactionGroups.map((group) => (
                       <Fragment key={group.groupKey}>
                         <tr className="border-b border-white/[0.04]">
-                          <td className="py-3 pr-3 text-slate-200 max-w-[240px]">
+                          <td className="py-3 pr-3 text-adaptive-secondary max-w-[240px]">
                             <div className="truncate font-medium" title={group.description}>
                               {group.vendorPattern}
                             </div>
                             {group.count > 1 && (
-                              <div className="text-[10px] text-slate-500 truncate" title={group.description}>
+                              <div className="text-[10px] text-adaptive-muted truncate" title={group.description}>
                                 e.g. {group.description}
                               </div>
                             )}
@@ -2776,10 +2776,10 @@ export default function FinancialsPage() {
                           <td className="py-3 pr-3">
                             <TypeBadge type={group.type} />
                           </td>
-                          <td className="py-3 pr-3 text-slate-400">
+                          <td className="py-3 pr-3 text-adaptive-muted">
                             {group.count} transaction{group.count === 1 ? "" : "s"}
                           </td>
-                          <td className="py-3 pr-3 text-right font-semibold tabular-nums text-slate-100">
+                          <td className="py-3 pr-3 text-right font-semibold tabular-nums text-adaptive-primary">
                             {fmtDollar(group.totalAmount)}
                           </td>
                           <td className="py-3 pr-3">
@@ -2830,7 +2830,7 @@ export default function FinancialsPage() {
                             </button>
                             <button
                               type="button"
-                              className="text-[11px] text-blue-400 hover:text-blue-300"
+                              className="text-[11px] text-adaptive-info hover:text-adaptive-info"
                               onClick={() =>
                                 openRuleForm(
                                   group.groupKey,
@@ -2880,7 +2880,7 @@ export default function FinancialsPage() {
               <div className="table-scroll">
                 <table className="w-full text-[12px]">
                   <thead>
-                    <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+                    <tr className="text-left text-adaptive-muted border-b border-white/[0.06]">
                       <th className="pb-3 pr-2 font-medium w-8">
                         <input
                           type="checkbox"
@@ -2913,10 +2913,10 @@ export default function FinancialsPage() {
                               aria-label={`Select ${txn.description ?? "transaction"}`}
                             />
                           </td>
-                          <td className="py-3 pr-3 text-slate-300 whitespace-nowrap">
+                          <td className="py-3 pr-3 text-adaptive-secondary whitespace-nowrap">
                             {new Date(txn.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
                           </td>
-                          <td className="py-3 pr-3 text-slate-200 max-w-[200px] truncate">
+                          <td className="py-3 pr-3 text-adaptive-secondary max-w-[200px] truncate">
                             <div className="flex items-center gap-1.5">
                               <span className="truncate">{txn.description ?? "—"}</span>
                               {txn.possibleDuplicate && (
@@ -2927,7 +2927,7 @@ export default function FinancialsPage() {
                           <td className="py-3 pr-3">
                             <TypeBadge type={txn.type} />
                           </td>
-                          <td className="py-3 pr-3 text-right font-semibold tabular-nums text-slate-100">
+                          <td className="py-3 pr-3 text-right font-semibold tabular-nums text-adaptive-primary">
                             {fmtDollar(txn.amount)}
                           </td>
                           <td className="py-3 pr-3">
@@ -2973,7 +2973,7 @@ export default function FinancialsPage() {
                             </button>
                             <button
                               type="button"
-                              className="text-[11px] text-blue-400 hover:text-blue-300"
+                              className="text-[11px] text-adaptive-info hover:text-adaptive-info"
                               onClick={() =>
                                 openRuleForm(
                                   txn.key,
@@ -3036,10 +3036,10 @@ export default function FinancialsPage() {
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-0.5">
-                <div className="text-[14px] font-semibold text-slate-100">QuickBooks Online</div>
+                <div className="text-[14px] font-semibold text-adaptive-primary">QuickBooks Online</div>
                 <span className="badge badge-amber text-[10px]">Not Connected</span>
               </div>
-              <div className="text-[12px] text-slate-400">
+              <div className="text-[12px] text-adaptive-muted">
                 Connect QuickBooks to automatically sync monthly revenue, expenses, and debt service.
               </div>
             </div>
@@ -3050,14 +3050,14 @@ export default function FinancialsPage() {
 
           <div className="card">
             <div className="section-title">Account Mapping</div>
-            <p className="text-[12px] text-slate-500 mb-4">
+            <p className="text-[12px] text-adaptive-muted mb-4">
               Map QuickBooks accounts to LaundroCFO fields. Saved to{" "}
-              <code className="text-blue-300 text-[11px] bg-blue-500/10 px-1 rounded">quickbooks_mapping</code>.
+              <code className="text-adaptive-info text-[11px] bg-blue-500/10 px-1 rounded">quickbooks_mapping</code>.
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-[12px]">
                 <thead>
-                  <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+                  <tr className="text-left text-adaptive-muted border-b border-white/[0.06]">
                     <th className="pb-3 pr-4 font-medium">QuickBooks Account</th>
                     <th className="pb-3 font-medium">LaundroCFO Field</th>
                   </tr>
@@ -3126,7 +3126,7 @@ export default function FinancialsPage() {
                   key={item.feature}
                   className="flex items-center justify-between py-2.5 border-b border-white/[0.04] last:border-b-0"
                 >
-                  <span className="text-[13px] text-slate-300">{item.feature}</span>
+                  <span className="text-[13px] text-adaptive-secondary">{item.feature}</span>
                   {item.status === "live" ? (
                     <span className="badge badge-green text-[10px]">Live</span>
                   ) : (
@@ -3142,7 +3142,7 @@ export default function FinancialsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="card max-w-md w-full space-y-4 border border-red-500/30">
             <div className="text-[15px] font-semibold text-red-300">Clear All Financial Data</div>
-            <p className="text-[13px] text-slate-300 leading-relaxed">
+            <p className="text-[13px] text-adaptive-secondary leading-relaxed">
               This will permanently delete all financial data for {store?.name ?? "this store"}, including
               all P&L records, utility data, transaction history, and revenue/expense estimates. This cannot be
               undone.

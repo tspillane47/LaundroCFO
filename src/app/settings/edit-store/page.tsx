@@ -131,7 +131,7 @@ function EditStoreForm() {
   if (fetching) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="text-slate-500 text-[13px]">Loading store data...</div>
+        <div className="text-adaptive-muted text-[13px]">Loading store data...</div>
       </div>
     );
   }
@@ -139,8 +139,8 @@ function EditStoreForm() {
   return (
     <div className="max-w-md mx-auto">
       <div className="mb-6">
-        <h1 className="text-[15px] font-semibold text-slate-100">Edit Store</h1>
-        <p className="text-slate-500 text-[13px] mt-1">Update your store identity and valuation profile</p>
+        <h1 className="text-[15px] font-semibold text-adaptive-primary">Edit Store</h1>
+        <p className="text-adaptive-muted text-[13px] mt-1">Update your store identity and valuation profile</p>
       </div>
 
       <FormBanner message={message} />
@@ -235,21 +235,21 @@ function EditStoreForm() {
         </button>
       </div>
 
-      <p className="text-[12px] text-slate-500 mt-5 leading-relaxed">
+      <p className="text-[12px] text-adaptive-muted mt-5 leading-relaxed">
         Financial data is managed in{" "}
-        <Link href="/financials" className="text-blue-400 hover:underline">
+        <Link href="/financials" className="text-adaptive-info hover:underline">
           Financials
         </Link>
         . Equipment is managed in{" "}
-        <Link href="/equipment" className="text-blue-400 hover:underline">
+        <Link href="/equipment" className="text-adaptive-info hover:underline">
           Equipment
         </Link>
         . Lease and rent data is managed in{" "}
-        <Link href="/lease" className="text-blue-400 hover:underline">
+        <Link href="/lease" className="text-adaptive-info hover:underline">
           Occupancy
         </Link>
         . Debt is managed in{" "}
-        <Link href="/debt" className="text-blue-400 hover:underline">
+        <Link href="/debt" className="text-adaptive-info hover:underline">
           Debt
         </Link>
         .
@@ -263,7 +263,7 @@ export default function EditStorePage() {
     <Suspense
       fallback={
         <div className="flex items-center justify-center py-20">
-          <div className="text-slate-500 text-[13px]">Loading store data...</div>
+          <div className="text-adaptive-muted text-[13px]">Loading store data...</div>
         </div>
       }
     >

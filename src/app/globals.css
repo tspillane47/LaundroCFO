@@ -284,6 +284,33 @@ html, body {
     overflow: hidden;
     margin-top: 6px;
   }
+  :root:not(.dark) .progress-bar {
+    background: rgba(45, 74, 40, 0.12);
+  }
+  .text-adaptive-muted {
+    color: var(--text-muted);
+  }
+  .dark .text-adaptive-muted {
+    color: #94a3b8;
+  }
+  .text-adaptive-secondary {
+    color: var(--text-secondary);
+  }
+  .dark .text-adaptive-secondary {
+    color: #cbd5e1;
+  }
+  .text-adaptive-info {
+    color: var(--text-info);
+  }
+  .dark .text-adaptive-info {
+    color: #60a5fa;
+  }
+  .text-adaptive-primary {
+    color: var(--text-primary);
+  }
+  .dark .text-adaptive-primary {
+    color: #f1f5f9;
+  }
   .section-title {
     font-size: 13px;
     font-weight: 700;

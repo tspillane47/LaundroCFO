@@ -35,14 +35,14 @@ function LineItem({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1 text-[12px] border-b border-white/[0.04] last:border-0 min-w-0">
-      <span className="text-slate-400 truncate" title={label}>{label}</span>
+      <span className="text-adaptive-muted truncate" title={label}>{label}</span>
       <span className="flex items-center gap-1.5 shrink-0">
         {badge && (
-          <span className="text-[9px] font-medium uppercase tracking-wide text-slate-500 bg-white/[0.04] px-1.5 py-0.5 rounded">
+          <span className="text-[9px] font-medium uppercase tracking-wide text-adaptive-muted bg-white/[0.04] px-1.5 py-0.5 rounded">
             {badge}
           </span>
         )}
-        <span className="text-slate-200 tabular-nums whitespace-nowrap" title={value}>{value}</span>
+        <span className="text-adaptive-secondary tabular-nums whitespace-nowrap" title={value}>{value}</span>
       </span>
     </div>
   );
@@ -51,15 +51,15 @@ function LineItem({
 function TotalLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 pt-2 mt-1 border-t border-white/[0.08] min-w-0">
-      <span className="text-[12px] font-semibold text-slate-200 truncate" title={label}>{label}</span>
-      <span className="text-[13px] font-bold text-slate-100 tabular-nums shrink-0 whitespace-nowrap" title={value}>{value}</span>
+      <span className="text-[12px] font-semibold text-adaptive-secondary truncate" title={label}>{label}</span>
+      <span className="text-[13px] font-bold text-adaptive-primary tabular-nums shrink-0 whitespace-nowrap" title={value}>{value}</span>
     </div>
   );
 }
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
+    <div className="text-[10px] font-semibold uppercase tracking-wider text-adaptive-muted mb-2">
       {children}
     </div>
   );
@@ -78,17 +78,17 @@ function HeroMetric({
 }) {
   return (
     <div className="py-3 overflow-hidden min-w-0">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-adaptive-muted mb-1">
         {label}
       </div>
       <div
-        className={clsx("font-bold tabular-nums leading-none", valueClassName ?? "text-slate-100")}
+        className={clsx("font-bold tabular-nums leading-none", valueClassName ?? "text-adaptive-primary")}
         style={metricValueStyle(value, { base: 28, compact: 22, xs: 18, inheritColor: !!valueClassName })}
         title={value}
       >
         {value}
       </div>
-      {sub && <div className="text-[12px] text-slate-500 mt-1.5 truncate" title={sub}>{sub}</div>}
+      {sub && <div className="text-[12px] text-adaptive-muted mt-1.5 truncate" title={sub}>{sub}</div>}
     </div>
   );
 }
@@ -151,7 +151,7 @@ export function CurrentMonthlyAveragesPanel({
     return (
       <div className="card">
         <div className="section-title">Current Monthly Averages</div>
-        <p className="text-[12px] text-slate-500">
+        <p className="text-[12px] text-adaptive-muted">
           Add financial data to see monthly averages for {storeName || "this store"}.
         </p>
       </div>
@@ -167,8 +167,8 @@ export function CurrentMonthlyAveragesPanel({
     <div className="card space-y-5">
       <div>
         <div className="section-title">Current Monthly Averages</div>
-        <div className="text-[13px] font-medium text-slate-200 mt-0.5">{storeName}</div>
-        <div className="text-[11px] text-slate-500 mt-1">{periodSubtext(data.monthsUsed)}</div>
+        <div className="text-[13px] font-medium text-adaptive-secondary mt-0.5">{storeName}</div>
+        <div className="text-[11px] text-adaptive-muted mt-1">{periodSubtext(data.monthsUsed)}</div>
       </div>
 
       <div>
@@ -178,7 +178,7 @@ export function CurrentMonthlyAveragesPanel({
             <LineItem key={item.category} label={item.category} value={fmtDollar(item.monthlyAverage)} />
           ))}
           {revenueLines.length === 0 && (
-            <p className="text-[12px] text-slate-500 py-1">No revenue categories recorded.</p>
+            <p className="text-[12px] text-adaptive-muted py-1">No revenue categories recorded.</p>
           )}
           <TotalLine label="Average Monthly Revenue" value={fmtDollar(data.revenue.total)} />
         </div>
@@ -196,7 +196,7 @@ export function CurrentMonthlyAveragesPanel({
             />
           ))}
           {expenseLines.length === 0 && (
-            <p className="text-[12px] text-slate-500 py-1">No expense categories recorded.</p>
+            <p className="text-[12px] text-adaptive-muted py-1">No expense categories recorded.</p>
           )}
           <TotalLine label="Average Monthly Expenses" value={fmtDollar(data.expenses.total)} />
         </div>
@@ -214,7 +214,7 @@ export function CurrentMonthlyAveragesPanel({
       <div>
         <SectionLabel>Monthly Debt Service</SectionLabel>
         {data.debt.loans.length === 0 ? (
-          <p className="text-[12px] text-slate-500">No Active Debt</p>
+          <p className="text-[12px] text-adaptive-muted">No Active Debt</p>
         ) : (
           <div className="space-y-0">
             {data.debt.loans.map((loan) => (
@@ -264,13 +264,13 @@ export function CurrentMonthlyAveragesPanel({
 
       <div className="flex items-center justify-between gap-3 pt-1 border-t border-white/[0.06]">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-adaptive-muted mb-1">
             Water KPI
           </div>
-          <div className="text-[16px] font-bold tabular-nums text-slate-100">
+          <div className="text-[16px] font-bold tabular-nums text-adaptive-primary">
             {fmtPct(data.waterKPI.ratio * 100)}
           </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Water ÷ self-service revenue</div>
+          <div className="text-[11px] text-adaptive-muted mt-0.5">Water ÷ self-service revenue</div>
         </div>
         <span className={clsx("badge text-[10px]", waterStatusBadgeClass(data.waterKPI.status))}>
           {data.waterKPI.status}

@@ -222,7 +222,7 @@ function RuleFormPanel({
   return (
     <div className="space-y-3 text-[12px]">
       <div className="flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+        <label className="flex items-center gap-1.5 text-adaptive-secondary cursor-pointer">
           <input
             type="radio"
             name="rule-type"
@@ -232,7 +232,7 @@ function RuleFormPanel({
           />
           By vendor name
         </label>
-        <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+        <label className="flex items-center gap-1.5 text-adaptive-secondary cursor-pointer">
           <input
             type="radio"
             name="rule-type"
@@ -245,9 +245,9 @@ function RuleFormPanel({
       </div>
       {ruleType === "vendor" ? (
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-slate-300">
+          <span className="text-adaptive-secondary">
             Always categorize transactions containing{" "}
-            <span className="font-mono text-slate-100">{vendorPattern}</span> as:
+            <span className="font-mono text-adaptive-primary">{vendorPattern}</span> as:
           </span>
           <select
             value={category}
@@ -263,10 +263,10 @@ function RuleFormPanel({
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-slate-300">
+          <span className="text-adaptive-secondary">
             Always categorize {type === "income" ? "income" : "expense"} transactions of
           </span>
-          <span className="text-slate-400">$</span>
+          <span className="text-adaptive-muted">$</span>
           <input
             type="number"
             step="0.01"
@@ -275,7 +275,7 @@ function RuleFormPanel({
             onChange={(e) => onAmountChange(e.target.value)}
             className={clsx(INPUT_CLASS, "w-28 py-1.5 text-[12px] tabular-nums")}
           />
-          <span className="text-slate-400">within $</span>
+          <span className="text-adaptive-muted">within $</span>
           <input
             type="number"
             step="0.01"
@@ -284,7 +284,7 @@ function RuleFormPanel({
             onChange={(e) => onToleranceChange(e.target.value)}
             className={clsx(INPUT_CLASS, "w-20 py-1.5 text-[12px] tabular-nums")}
           />
-          <span className="text-slate-300">as:</span>
+          <span className="text-adaptive-secondary">as:</span>
           <select
             value={category}
             onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
@@ -296,7 +296,7 @@ function RuleFormPanel({
               </option>
             ))}
           </select>
-          <span className="text-slate-500">(from ${amount.toFixed(2)})</span>
+          <span className="text-adaptive-muted">(from ${amount.toFixed(2)})</span>
         </div>
       )}
       {message && (
@@ -331,23 +331,23 @@ function AuditHistoryPanel({
   loading: boolean;
 }) {
   if (loading) {
-    return <div className="text-[11px] text-slate-500 py-2">Loading history…</div>;
+    return <div className="text-[11px] text-adaptive-muted py-2">Loading history…</div>;
   }
   if (entries.length === 0) {
-    return <div className="text-[11px] text-slate-500 py-2">No history recorded yet.</div>;
+    return <div className="text-[11px] text-adaptive-muted py-2">No history recorded yet.</div>;
   }
   return (
-    <ul className="space-y-1.5 py-2 text-[11px] text-slate-400">
+    <ul className="space-y-1.5 py-2 text-[11px] text-adaptive-muted">
       {entries.map((entry) => (
         <li key={entry.id} className="flex flex-wrap gap-x-2 gap-y-0.5">
-          <span className="text-slate-500 whitespace-nowrap">
+          <span className="text-adaptive-muted whitespace-nowrap">
             {new Date(entry.changed_at).toLocaleString()}
           </span>
-          <span className="text-slate-300">{entry.field_changed}</span>
+          <span className="text-adaptive-secondary">{entry.field_changed}</span>
           <span>
             {entry.old_value ?? "—"} → {entry.new_value ?? "—"}
           </span>
-          <span className="text-slate-600">({entry.change_source})</span>
+          <span className="text-adaptive-muted">({entry.change_source})</span>
         </li>
       ))}
     </ul>
@@ -1411,10 +1411,10 @@ export default function TransactionsPage() {
       <tr key={`sub-${item.id}`} className="border-b border-white/[0.02] bg-white/[0.015]">
         <td className="py-2 pr-3 pl-8">
           <div className="min-w-0">
-            <div className="text-slate-400 whitespace-nowrap text-[11px]">
+            <div className="text-adaptive-muted whitespace-nowrap text-[11px]">
               {new Date(item.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
             </div>
-            <div className="text-[11px] text-slate-300 truncate mt-0.5" title={item.description ?? undefined}>
+            <div className="text-[11px] text-adaptive-secondary truncate mt-0.5" title={item.description ?? undefined}>
               {item.description ?? "—"}
             </div>
           </div>
@@ -1519,7 +1519,7 @@ export default function TransactionsPage() {
     const link = plLinksByTxn.get(row.id);
     if (!link) return null;
     return (
-      <div className="text-[10px] text-slate-500 mt-0.5">
+      <div className="text-[10px] text-adaptive-muted mt-0.5">
         Posted to {MONTH_SHORT[link.month - 1]} {link.year} · {formatPlLinkCategory(link.category)}
       </div>
     );
@@ -1532,7 +1532,7 @@ export default function TransactionsPage() {
   if (!storesLoading && !selectedStore?.id) {
     return (
       <div className="p-6">
-        <p className="text-[13px] text-slate-500">Select a store from the dropdown above to review transactions.</p>
+        <p className="text-[13px] text-adaptive-muted">Select a store from the dropdown above to review transactions.</p>
       </div>
     );
   }
@@ -1569,8 +1569,8 @@ export default function TransactionsPage() {
 
       <div className="card flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="text-[14px] font-semibold text-slate-100">Import Bank Transactions</div>
-          <div className="text-[12px] text-slate-500 mt-1">
+          <div className="text-[14px] font-semibold text-adaptive-primary">Import Bank Transactions</div>
+          <div className="text-[12px] text-adaptive-muted mt-1">
             Upload a CSV, then save to the review queue before posting.
           </div>
         </div>
@@ -1623,8 +1623,8 @@ export default function TransactionsPage() {
             className={clsx(
               "px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors",
               activeTab === tab
-                ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
-                : "text-slate-400 border border-white/[0.06] hover:text-slate-200"
+                ? "bg-blue-500/20 text-adaptive-info border border-blue-500/30"
+                : "text-adaptive-muted border border-white/[0.06] hover:text-adaptive-secondary"
             )}
           >
             {label}
@@ -1640,10 +1640,10 @@ export default function TransactionsPage() {
             {activeTab === "excluded" && "Excluded Transactions"}
             {activeTab === "all" && "All Transactions"}
           </span>
-          <span className="text-[11px] text-slate-600 font-normal">{reviewRows.length} shown</span>
+          <span className="text-[11px] text-adaptive-muted font-normal">{reviewRows.length} shown</span>
           <button
             type="button"
-            className="ml-auto text-[12px] text-blue-400 hover:text-blue-300"
+            className="ml-auto text-[12px] text-adaptive-info hover:text-adaptive-info"
             onClick={() => setShowManageRules((v) => !v)}
           >
             {showManageRules ? "Hide Rules" : "Manage Rules"}
@@ -1653,7 +1653,7 @@ export default function TransactionsPage() {
           </button>
           {activeTab === "needs_review" && (
             <>
-              <label className="flex items-center gap-2 text-[12px] text-slate-400 cursor-pointer">
+              <label className="flex items-center gap-2 text-[12px] text-adaptive-muted cursor-pointer">
                 <input
                   type="checkbox"
                   checked={groupByVendor}
@@ -1668,7 +1668,7 @@ export default function TransactionsPage() {
               {groupByVendor && transactionGroups.some((g) => g.count > 1) && (
                 <button
                   type="button"
-                  className="text-[12px] text-blue-400 hover:text-blue-300"
+                  className="text-[12px] text-adaptive-info hover:text-adaptive-info"
                   onClick={() => {
                     const multiGroups = transactionGroups.filter((g) => g.count > 1);
                     const allExpanded = multiGroups.every((g) => expandedGroups.has(g.groupKey));
@@ -1690,9 +1690,9 @@ export default function TransactionsPage() {
 
         {showManageRules && (
           <div className="mb-4 p-4 rounded-lg bg-[#243347]/50 border border-white/[0.06]">
-            <div className="text-[13px] font-medium text-slate-200 mb-3">Categorization Rules</div>
+            <div className="text-[13px] font-medium text-adaptive-secondary mb-3">Categorization Rules</div>
             {categorizationRules.length === 0 ? (
-              <p className="text-[12px] text-slate-500">
+              <p className="text-[12px] text-adaptive-muted">
                 No rules yet. Use &quot;Set as Rule&quot; on a transaction to auto-categorize future imports.
               </p>
             ) : (
@@ -1704,22 +1704,22 @@ export default function TransactionsPage() {
                       key={rule.id}
                       className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-white/[0.04] last:border-b-0"
                     >
-                      <div className="text-[12px] text-slate-300">
+                      <div className="text-[12px] text-adaptive-secondary">
                         {isAmountRule ? (
                           <>
                             When{" "}
-                            <span className="text-slate-100">
+                            <span className="text-adaptive-primary">
                               {rule.transaction_type === "income" ? "income" : "expense"}
                             </span>{" "}
                             amount ={" "}
-                            <span className="font-mono text-slate-100">
+                            <span className="font-mono text-adaptive-primary">
                               ${Number(rule.amount ?? 0).toFixed(2)}
                             </span>
                           </>
                         ) : (
                           <>When description contains &apos;{rule.vendor_pattern}&apos;</>
                         )}
-                        <span className="text-slate-500 mx-2">→</span>
+                        <span className="text-adaptive-muted mx-2">→</span>
                         <CategoryBadge category={rule.category as BankImportCategory} />
                       </div>
                       <button
@@ -1751,7 +1751,7 @@ export default function TransactionsPage() {
 
         {someSelected && activeTab === "needs_review" && !groupByVendor && (
           <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-            <span className="text-[12px] text-blue-300 font-medium">{selectedIds.size} selected</span>
+            <span className="text-[12px] text-adaptive-info font-medium">{selectedIds.size} selected</span>
             <select
               value={bulkCategory}
               onChange={(e) => setBulkCategory(e.target.value as BankImportCategory)}
@@ -1795,7 +1795,7 @@ export default function TransactionsPage() {
         )}
 
         {reviewRows.length === 0 ? (
-          <p className="text-[13px] text-slate-500 py-6 text-center">
+          <p className="text-[13px] text-adaptive-muted py-6 text-center">
             {activeTab === "needs_review"
               ? "No transactions to review. Upload a CSV to get started."
               : "No transactions in this view."}
@@ -1827,7 +1827,7 @@ export default function TransactionsPage() {
                             <button
                               type="button"
                               onClick={() => toggleGroupExpanded(group.groupKey)}
-                              className="text-slate-500 hover:text-slate-300 w-5 shrink-0 mt-0.5 text-[13px] leading-none"
+                              className="text-adaptive-muted hover:text-adaptive-secondary w-5 shrink-0 mt-0.5 text-[13px] leading-none"
                               aria-label={isExpanded ? "Collapse group" : "Expand group"}
                             >
                               {isExpanded ? "▾" : "▸"}
@@ -1845,7 +1845,7 @@ export default function TransactionsPage() {
                       <td className="py-3 pr-3">
                         <TypeBadge type={group.type} />
                       </td>
-                      <td className="py-3 pr-3 text-slate-400">{group.count}</td>
+                      <td className="py-3 pr-3 text-adaptive-muted">{group.count}</td>
                       <td className="py-3 pr-3 text-right font-semibold tabular-nums">{fmtDollar(group.totalAmount)}</td>
                       <td className="py-3 pr-3">
                         <select
@@ -1862,7 +1862,7 @@ export default function TransactionsPage() {
                           ))}
                         </select>
                       </td>
-                      <td className="py-3 pr-3 text-slate-500 text-[11px]">—</td>
+                      <td className="py-3 pr-3 text-adaptive-muted text-[11px]">—</td>
                       <td className="py-3 text-right whitespace-nowrap">
                         <button
                           type="button"
@@ -1884,7 +1884,7 @@ export default function TransactionsPage() {
                         </button>
                         <button
                           type="button"
-                          className="text-[11px] text-blue-400"
+                          className="text-[11px] text-adaptive-info"
                           onClick={() =>
                             openRuleForm(
                               group.groupKey,
@@ -1982,7 +1982,7 @@ export default function TransactionsPage() {
                         <td className="py-3 pr-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                           {new Date(row.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
                         </td>
-                        <td className="py-3 pr-3 text-slate-200 max-w-[180px]">
+                        <td className="py-3 pr-3 text-adaptive-secondary max-w-[180px]">
                           {renderVendorDescription(
                             normalizeVendorPattern(row.description) || "—",
                             row.description ?? "—"
@@ -2003,7 +2003,7 @@ export default function TransactionsPage() {
                         </td>
                         <td className="py-3 pr-3">
                           {excluded ? (
-                            <span className="text-slate-400">
+                            <span className="text-adaptive-muted">
                               {row.original_category
                                 ? BANK_IMPORT_CATEGORY_LABELS[row.original_category as BankImportCategory] ??
                                   row.original_category
@@ -2065,7 +2065,7 @@ export default function TransactionsPage() {
                               </button>
                               <button
                                 type="button"
-                                className="text-[11px] text-blue-400"
+                                className="text-[11px] text-adaptive-info"
                                 onClick={() =>
                                   openRuleForm(
                                     row.id,
@@ -2148,16 +2148,16 @@ export default function TransactionsPage() {
       {excludeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="card max-w-md w-full space-y-4">
-            <div className="text-[15px] font-semibold text-slate-100">
+            <div className="text-[15px] font-semibold text-adaptive-primary">
               Exclude {excludeModal.ids.length === 1 ? "Transaction" : `${excludeModal.ids.length} Transactions`}
             </div>
-            <p className="text-[12px] text-slate-400">
+            <p className="text-[12px] text-adaptive-muted">
               {excludeModal.ids.length === 1 && transactions.find((t) => t.id === excludeModal.ids[0])?.status === "posted"
                 ? "This transaction was posted to P&L. Excluding will reverse the P&L impact."
                 : "Excluded transactions will not appear in the review queue."}
             </p>
             <div>
-              <label className="text-[12px] text-slate-400 block mb-1">Reason (required)</label>
+              <label className="text-[12px] text-adaptive-muted block mb-1">Reason (required)</label>
               <input
                 type="text"
                 value={excludeModal.reason}
@@ -2182,17 +2182,17 @@ export default function TransactionsPage() {
       {reclassifyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="card max-w-md w-full space-y-4">
-            <div className="text-[15px] font-semibold text-slate-100">Reclassify Posted Transaction</div>
-            <p className="text-[12px] text-slate-400">
+            <div className="text-[15px] font-semibold text-adaptive-primary">Reclassify Posted Transaction</div>
+            <p className="text-[12px] text-adaptive-muted">
               Move {fmtDollar(reclassifyModal.row.amount)} from{" "}
-              <span className="text-slate-200">
+              <span className="text-adaptive-secondary">
                 {BANK_IMPORT_CATEGORY_LABELS[
                   (transactions.find((t) => t.id === reclassifyModal.row.id)?.category ??
                     reclassifyModal.row.category) as BankImportCategory
                 ] ?? transactions.find((t) => t.id === reclassifyModal.row.id)?.category}
               </span>{" "}
               to{" "}
-              <span className="text-slate-200">
+              <span className="text-adaptive-secondary">
                 {BANK_IMPORT_CATEGORY_LABELS[reclassifyModal.newCategory]}
               </span>
               ? P&L will be adjusted for the original posting period.
@@ -2212,13 +2212,13 @@ export default function TransactionsPage() {
       {manualModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="card max-w-md w-full space-y-4">
-            <div className="text-[15px] font-semibold text-slate-100">Add Manual Transaction</div>
-            <p className="text-[12px] text-slate-400">
+            <div className="text-[15px] font-semibold text-adaptive-primary">Add Manual Transaction</div>
+            <p className="text-[12px] text-adaptive-muted">
               Enter a transaction manually. It will appear in the review queue for posting to P&L.
             </p>
             <div className="space-y-3">
               <div>
-                <label className="text-[12px] text-slate-400 block mb-1">Date</label>
+                <label className="text-[12px] text-adaptive-muted block mb-1">Date</label>
                 <input
                   type="date"
                   value={manualDraft.date}
@@ -2227,7 +2227,7 @@ export default function TransactionsPage() {
                 />
               </div>
               <div>
-                <label className="text-[12px] text-slate-400 block mb-1">Description</label>
+                <label className="text-[12px] text-adaptive-muted block mb-1">Description</label>
                 <input
                   type="text"
                   value={manualDraft.description}
@@ -2238,7 +2238,7 @@ export default function TransactionsPage() {
                 />
               </div>
               <div>
-                <label className="text-[12px] text-slate-400 block mb-1">Amount</label>
+                <label className="text-[12px] text-adaptive-muted block mb-1">Amount</label>
                 <input
                   type="number"
                   step="0.01"
@@ -2250,9 +2250,9 @@ export default function TransactionsPage() {
                 />
               </div>
               <div>
-                <label className="text-[12px] text-slate-400 block mb-1">Type</label>
+                <label className="text-[12px] text-adaptive-muted block mb-1">Type</label>
                 <div className="flex flex-wrap items-center gap-4">
-                  <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+                  <label className="flex items-center gap-1.5 text-adaptive-secondary cursor-pointer">
                     <input
                       type="radio"
                       name="manual-txn-type"
@@ -2270,7 +2270,7 @@ export default function TransactionsPage() {
                     />
                     Income
                   </label>
-                  <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+                  <label className="flex items-center gap-1.5 text-adaptive-secondary cursor-pointer">
                     <input
                       type="radio"
                       name="manual-txn-type"
@@ -2291,7 +2291,7 @@ export default function TransactionsPage() {
                 </div>
               </div>
               <div>
-                <label className="text-[12px] text-slate-400 block mb-1">Category</label>
+                <label className="text-[12px] text-adaptive-muted block mb-1">Category</label>
                 <select
                   value={manualDraft.category}
                   onChange={(e) =>
@@ -2307,7 +2307,7 @@ export default function TransactionsPage() {
                 </select>
               </div>
               <div>
-                <label className="text-[12px] text-slate-400 block mb-1">Note (optional)</label>
+                <label className="text-[12px] text-adaptive-muted block mb-1">Note (optional)</label>
                 <input
                   type="text"
                   value={manualDraft.note}

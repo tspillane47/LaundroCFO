@@ -424,7 +424,7 @@ export function RealEstateModule({ store }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-slate-500 text-[13px]">Loading real estate data...</div>
+        <div className="text-adaptive-muted text-[13px]">Loading real estate data...</div>
       </div>
     );
   }
@@ -436,8 +436,8 @@ export function RealEstateModule({ store }: Props) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-[15px] font-semibold text-slate-100">Real Estate Ownership</h2>
-          <p className="text-slate-500 text-[13px] mt-0.5">Owner-occupied or related-party real estate</p>
+          <h2 className="text-[15px] font-semibold text-adaptive-primary">Real Estate Ownership</h2>
+          <p className="text-adaptive-muted text-[13px] mt-0.5">Owner-occupied or related-party real estate</p>
         </div>
         {mode === "view" ? (
           <button onClick={enterEditMode} className="btn-primary">
@@ -468,8 +468,8 @@ export function RealEstateModule({ store }: Props) {
 
       {mode === "view" && !record ? (
         <div className="card overflow-hidden min-w-0 text-center py-12">
-          <div className="text-slate-300 text-[14px]">No real estate profile on file</div>
-          <p className="text-slate-500 text-[13px] mt-2 mb-4">
+          <div className="text-adaptive-secondary text-[14px]">No real estate profile on file</div>
+          <p className="text-adaptive-muted text-[13px] mt-2 mb-4">
             Add building ownership and mortgage details to track equity and debt position.
           </p>
           <button onClick={enterEditMode} className="btn-primary">
@@ -495,13 +495,13 @@ export function RealEstateModule({ store }: Props) {
               label="Real Estate LTV"
               value={metrics.ltv != null ? metrics.ltv.toFixed(1) + "%" : "—"}
               color={
-                metrics.ltv != null && metrics.ltv > 70 ? "text-amber-400" : "text-slate-100"
+                metrics.ltv != null && metrics.ltv > 70 ? "text-amber-400" : "text-adaptive-primary"
               }
             />
             <SmallMetric
               label="Years Owned"
               value={metrics.yearsOwned.toFixed(1)}
-              color="text-blue-400"
+              color="text-adaptive-info"
             />
             <div className="card2 overflow-hidden min-w-0">
               <div className="metric-label">Position</div>
@@ -519,7 +519,7 @@ export function RealEstateModule({ store }: Props) {
               color={
                 metrics.debtServiceToRevenue != null && metrics.debtServiceToRevenue > 20
                   ? "text-amber-400"
-                  : "text-slate-100"
+                  : "text-adaptive-primary"
               }
             />
           </div>
@@ -536,7 +536,7 @@ export function RealEstateModule({ store }: Props) {
                 label="Real Estate LTV"
                 value={metrics.ltv != null ? metrics.ltv.toFixed(1) + "%" : "—"}
                 color={
-                  metrics.ltv != null && metrics.ltv > 70 ? "text-amber-400" : "text-slate-100"
+                  metrics.ltv != null && metrics.ltv > 70 ? "text-amber-400" : "text-adaptive-primary"
                 }
               />
               <SmallMetric
@@ -546,7 +546,7 @@ export function RealEstateModule({ store }: Props) {
                     ? "$" + metrics.rentPerSF.toFixed(2) + "/yr"
                     : "—"
                 }
-                color="text-blue-400"
+                color="text-adaptive-info"
               />
               <SmallMetric
                 label="Occupancy Cost Ratio"
@@ -558,7 +558,7 @@ export function RealEstateModule({ store }: Props) {
                 color={
                   metrics.occupancyCostRatio != null && metrics.occupancyCostRatio > 20
                     ? "text-amber-400"
-                    : "text-slate-100"
+                    : "text-adaptive-primary"
                 }
               />
               <SmallMetric
@@ -572,7 +572,7 @@ export function RealEstateModule({ store }: Props) {
                 color={
                   metrics.marketRentDiff != null && metrics.marketRentDiff !== 0
                     ? "text-amber-400"
-                    : "text-slate-100"
+                    : "text-adaptive-primary"
                 }
               />
               <SmallMetric
@@ -580,7 +580,7 @@ export function RealEstateModule({ store }: Props) {
                 value={
                   metrics.combinedValue != null ? formatCurrency(metrics.combinedValue) : "—"
                 }
-                color="text-blue-300"
+                color="text-adaptive-info"
               />
             </div>
           </div>

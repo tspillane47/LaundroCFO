@@ -83,7 +83,7 @@ export function LaundroCfoScoreGauge({ score, grade, size = 200 }: ArcGaugeProps
         style={{ marginTop: -(size * 0.22) }}
       >
         <div
-          className="font-bold text-slate-100 leading-none"
+          className="font-bold text-adaptive-primary leading-none"
           style={{ fontSize: size * 0.22 }}
         >
           {score}
@@ -134,7 +134,7 @@ export function LaundroCfoScoreCard({ result, className = "", compact = false }:
       <div className="flex flex-col items-center">
         <LaundroCfoScoreGauge score={result.total} grade={result.grade} size={gaugeSize} />
 
-        <p className="text-[11px] text-slate-600 mt-1 mb-4">
+        <p className="text-[11px] text-adaptive-muted mt-1 mb-4">
           {formatNetworkScoreHint(contributorCount)}
         </p>
       </div>
@@ -146,8 +146,8 @@ export function LaundroCfoScoreCard({ result, className = "", compact = false }:
             return (
               <div key={key}>
                 <div className="flex justify-between text-[11px] mb-1">
-                  <span className="text-slate-400">{CATEGORY_LABELS[key]}</span>
-                  <span className="text-slate-300 font-medium">
+                  <span className="text-adaptive-muted">{CATEGORY_LABELS[key]}</span>
+                  <span className="text-adaptive-secondary font-medium">
                     {cat.score}/{cat.max}
                   </span>
                 </div>
@@ -166,8 +166,8 @@ export function LaundroCfoScoreCard({ result, className = "", compact = false }:
       {result.improvementTips.length > 0 ? (
         <ul className="mt-4 pt-3 border-t border-white/[0.05] space-y-1.5">
           {result.improvementTips.map((tip) => (
-            <li key={tip} className="text-[11px] text-slate-500 flex gap-2">
-              <span className="text-slate-600 shrink-0">•</span>
+            <li key={tip} className="text-[11px] text-adaptive-muted flex gap-2">
+              <span className="text-adaptive-muted shrink-0">•</span>
               <span>{tip}</span>
             </li>
           ))}

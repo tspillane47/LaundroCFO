@@ -124,7 +124,7 @@ export default function AlertsPage() {
   if (active.length === 0 && resolved.length === 0) {
     return (
       <div className="space-y-5 max-w-3xl">
-        <h1 className="text-[15px] font-semibold text-slate-100">Active Alerts</h1>
+        <h1 className="text-[15px] font-semibold text-adaptive-primary">Active Alerts</h1>
         <div className="card text-center py-10">
           <p className="text-[14px] text-green-400 font-medium">
             No active alerts — your portfolio looks healthy.
@@ -137,7 +137,7 @@ export default function AlertsPage() {
   return (
     <div className="space-y-5 max-w-3xl">
       <div className="flex items-center gap-3">
-        <h1 className="text-[15px] font-semibold text-slate-100">Active Alerts</h1>
+        <h1 className="text-[15px] font-semibold text-adaptive-primary">Active Alerts</h1>
         {active.length > 0 && <span className="badge badge-red">{active.length} Active</span>}
       </div>
 
@@ -166,12 +166,12 @@ export default function AlertsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   {alert.storeName && (
-                    <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">
+                    <div className="text-[10px] uppercase tracking-wider text-adaptive-muted mb-0.5">
                       {alert.storeName}
                     </div>
                   )}
-                  <div className="text-[13px] font-semibold text-slate-100">{alert.title}</div>
-                  <div className="text-[12px] text-slate-400 mt-1 leading-relaxed">{alert.body}</div>
+                  <div className="text-[13px] font-semibold text-adaptive-primary">{alert.title}</div>
+                  <div className="text-[12px] text-adaptive-muted mt-1 leading-relaxed">{alert.body}</div>
                   <div className="flex gap-2 mt-3 flex-wrap">
                     {alert.tags.map((tag) => (
                       <span key={tag} className={`badge ${tagStyles[alert.severity] ?? "badge-blue"}`}>
@@ -196,7 +196,7 @@ export default function AlertsPage() {
 
       {resolved.length > 0 && (
         <div className="mt-6">
-          <h2 className="text-[13px] font-semibold text-slate-500 mb-3">Healthy / Resolved</h2>
+          <h2 className="text-[13px] font-semibold text-adaptive-muted mb-3">Healthy / Resolved</h2>
           <div className="space-y-3">
             {resolved.map((alert) => (
               <div key={alert.id} className="card opacity-60 flex items-start gap-4">
@@ -205,12 +205,12 @@ export default function AlertsPage() {
                 </div>
                 <div className="flex-1">
                   {alert.storeName && (
-                    <div className="text-[10px] uppercase tracking-wider text-slate-600 mb-0.5">
+                    <div className="text-[10px] uppercase tracking-wider text-adaptive-muted mb-0.5">
                       {alert.storeName}
                     </div>
                   )}
-                  <div className="text-[13px] font-semibold text-slate-400">{alert.title}</div>
-                  <div className="text-[12px] text-slate-600 mt-1">{alert.body}</div>
+                  <div className="text-[13px] font-semibold text-adaptive-muted">{alert.title}</div>
+                  <div className="text-[12px] text-adaptive-muted mt-1">{alert.body}</div>
                 </div>
                 <span className="badge badge-green flex-shrink-0">Healthy</span>
               </div>
@@ -232,7 +232,7 @@ export default function AlertsPage() {
           ].map(([label, val]) => (
             <div key={label} className="card2">
               <div className="metric-label">{label}</div>
-              <div className="text-[14px] font-semibold text-slate-200">{val}</div>
+              <div className="text-[14px] font-semibold text-adaptive-secondary">{val}</div>
             </div>
           ))}
         </div>

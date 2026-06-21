@@ -41,7 +41,7 @@ export function RuleApplyPrompt({
   return (
     <div className="mb-4 space-y-3">
       {applyPrompt && (
-        <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30 text-[12px] text-slate-200">
+        <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30 text-[12px] text-adaptive-secondary">
           <p>
             This rule matches {applyPrompt.matchCount} unposted transaction
             {applyPrompt.matchCount === 1 ? "" : "s"} in your review queue. Apply category &apos;

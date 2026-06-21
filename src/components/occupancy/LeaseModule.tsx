@@ -517,7 +517,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-slate-500 text-[13px]">Loading lease data...</div>
+        <div className="text-adaptive-muted text-[13px]">Loading lease data...</div>
       </div>
     );
   }
@@ -537,8 +537,8 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       {!hideHeader && (
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-[15px] font-semibold text-slate-100">Lease Management</h2>
-            <p className="text-slate-500 text-[13px] mt-0.5">Third-party leased location</p>
+            <h2 className="text-[15px] font-semibold text-adaptive-primary">Lease Management</h2>
+            <p className="text-adaptive-muted text-[13px] mt-0.5">Third-party leased location</p>
           </div>
           {mode === "view" ? (
             <button onClick={enterEditMode} className="btn-primary">
@@ -586,8 +586,8 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
 
       {mode === "view" && !lease && hideHeader ? null : mode === "view" && !lease && !hideHeader ? (
         <div className="card overflow-hidden min-w-0 text-center py-12">
-          <div className="text-slate-300 text-[14px]">No lease on file</div>
-          <p className="text-slate-500 text-[13px] mt-2 mb-4">
+          <div className="text-adaptive-secondary text-[14px]">No lease on file</div>
+          <p className="text-adaptive-muted text-[13px] mt-2 mb-4">
             Add your lease terms to calculate risk score and track renewal options.
           </p>
           <button onClick={enterEditMode} className="btn-primary">
@@ -607,12 +607,12 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             <SmallMetric
               label="Years Remaining"
               value={metrics.yearsRemaining.toFixed(1)}
-              color="text-blue-400"
+              color="text-adaptive-info"
             />
             <SmallMetric
               label="Months Remaining"
               value={String(metrics.monthsRemaining)}
-              color="text-slate-100"
+              color="text-adaptive-primary"
             />
             <SmallMetric
               label="Total Control Remaining"
@@ -637,7 +637,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               color={
                 metrics.daysUntilNotice != null && metrics.daysUntilNotice < 90
                   ? "text-amber-400"
-                  : "text-slate-100"
+                  : "text-adaptive-primary"
               }
             />
           </div>
@@ -691,7 +691,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
           {rentProjection && (
             <div className="card overflow-hidden min-w-0">
               <div className="section-title">Rent Projection</div>
-              <p className="text-[12px] text-slate-500 mb-3">
+              <p className="text-[12px] text-adaptive-muted mb-3">
                 Projected monthly rent for the next 5 years at{" "}
                 {(lease.annual_escalation_pct ?? DEFAULT_ANNUAL_ESCALATION_PCT).toFixed(1)}% annual
                 escalation from {formatCurrency(lease.monthly_rent)}/mo base.
@@ -699,7 +699,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               <div className="overflow-x-auto">
                 <table className="w-full text-[12px]">
                   <thead>
-                    <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.06]">
+                    <tr className="text-[10px] text-adaptive-muted uppercase tracking-wider border-b border-white/[0.06]">
                       <th className="text-left pb-2 font-medium">Year</th>
                       <th className="text-left pb-2 font-medium">Lease Year</th>
                       <th className="text-left pb-2 font-medium">Monthly Rent</th>
@@ -709,10 +709,10 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                   <tbody className="divide-y divide-white/[0.04]">
                     {rentProjection.map((row) => (
                       <tr key={row.calendarYear}>
-                        <td className="py-2.5 text-slate-300">{row.calendarYear}</td>
-                        <td className="py-2.5 text-slate-300">{row.leaseYear}</td>
-                        <td className="py-2.5 text-slate-300">{formatCurrency(row.monthlyRent)}</td>
-                        <td className="py-2.5 text-slate-300">{formatCurrency(row.annualRent)}</td>
+                        <td className="py-2.5 text-adaptive-secondary">{row.calendarYear}</td>
+                        <td className="py-2.5 text-adaptive-secondary">{row.leaseYear}</td>
+                        <td className="py-2.5 text-adaptive-secondary">{formatCurrency(row.monthlyRent)}</td>
+                        <td className="py-2.5 text-adaptive-secondary">{formatCurrency(row.annualRent)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -724,12 +724,12 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
           <div className="card overflow-hidden min-w-0">
             <div className="section-title">Renewal Options</div>
             {options.length === 0 ? (
-              <p className="text-slate-500 text-[13px]">No renewal options on file.</p>
+              <p className="text-adaptive-muted text-[13px]">No renewal options on file.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-[12px]">
                   <thead>
-                    <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.06]">
+                    <tr className="text-[10px] text-adaptive-muted uppercase tracking-wider border-b border-white/[0.06]">
                       <th className="text-left pb-2 font-medium">Option #</th>
                       <th className="text-left pb-2 font-medium">Term (Years)</th>
                       <th className="text-left pb-2 font-medium">Status</th>
@@ -758,15 +758,15 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                             : "badge-amber";
                       return (
                         <tr key={opt.id}>
-                          <td className="py-2.5 text-slate-300">{opt.option_number ?? "—"}</td>
-                          <td className="py-2.5 text-slate-300">{opt.option_years ?? "—"}</td>
+                          <td className="py-2.5 text-adaptive-secondary">{opt.option_number ?? "—"}</td>
+                          <td className="py-2.5 text-adaptive-secondary">{opt.option_years ?? "—"}</td>
                           <td className="py-2.5">
                             <span className={clsx("badge", statusColor)}>{opt.status ?? "—"}</span>
                           </td>
-                          <td className="py-2.5 text-slate-400">
+                          <td className="py-2.5 text-adaptive-muted">
                             {opt.notice_days != null ? `${opt.notice_days} days` : "—"}
                           </td>
-                          <td className="py-2.5 text-slate-300">{deadline}</td>
+                          <td className="py-2.5 text-adaptive-secondary">{deadline}</td>
                         </tr>
                       );
                     })}
@@ -775,7 +775,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               </div>
             )}
             {metrics.availableOptions.length > 0 && (
-              <div className="mt-4 p-3 rounded-lg bg-blue-500/8 border border-blue-500/20 text-[12px] text-blue-300">
+              <div className="mt-4 p-3 rounded-lg bg-blue-500/8 border border-blue-500/20 text-[12px] text-adaptive-info">
                 {metrics.availableOptions.length} available option
                 {metrics.availableOptions.length !== 1 ? "s" : ""} adding{" "}
                 {metrics.availableOptions.reduce((s, o) => s + (o.option_years ?? 0), 0)} years of
@@ -822,7 +822,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                 disabled
                 className={INPUT_CLASS + " opacity-60 cursor-not-allowed"}
               />
-              <p className="text-[11px] text-slate-600 mt-1">Edit address in Store Settings</p>
+              <p className="text-[11px] text-adaptive-muted mt-1">Edit address in Store Settings</p>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
@@ -928,7 +928,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             </div>
 
             <div className="flex flex-wrap gap-6">
-              <label className="flex items-center gap-2 text-[13px] text-slate-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-[13px] text-adaptive-secondary cursor-pointer">
                 <input
                   type="checkbox"
                   checked={leaseForm.sublease_rights}
@@ -937,7 +937,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                 />
                 Sublease Rights
               </label>
-              <label className="flex items-center gap-2 text-[13px] text-slate-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-[13px] text-adaptive-secondary cursor-pointer">
                 <input
                   type="checkbox"
                   checked={leaseForm.personal_guaranty}
@@ -946,7 +946,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                 />
                 Personal Guaranty
               </label>
-              <label className="flex items-center gap-2 text-[13px] text-slate-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-[13px] text-adaptive-secondary cursor-pointer">
                 <input
                   type="checkbox"
                   checked={leaseForm.exclusivity_clause}

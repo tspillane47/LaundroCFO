@@ -27,7 +27,7 @@ export function ScoreRing({ score, size = 80, strokeWidth = 10, color = "#3b82f6
         />
       </svg>
       <div
-        className="absolute inset-0 flex items-center justify-center text-slate-100 font-bold"
+        className="absolute inset-0 flex items-center justify-center text-adaptive-primary font-bold"
         style={{ fontSize: size * 0.24 }}
       >
         {score}

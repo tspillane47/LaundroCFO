@@ -51,8 +51,8 @@ export default function IntegrationsPage() {
   return (
     <div className="space-y-5 max-w-3xl">
       <div>
-        <h1 className="text-[15px] font-semibold text-slate-100">Integrations</h1>
-        <p className="text-[12px] text-slate-500 mt-1">
+        <h1 className="text-[15px] font-semibold text-adaptive-primary">Integrations</h1>
+        <p className="text-[12px] text-adaptive-muted mt-1">
           Connect your data sources to automatically populate financial metrics and reduce manual entry.
         </p>
       </div>
@@ -68,7 +68,7 @@ export default function IntegrationsPage() {
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-0.5">
-                <div className="text-[14px] font-semibold text-slate-100">{i.name}</div>
+                <div className="text-[14px] font-semibold text-adaptive-primary">{i.name}</div>
                 {i.status === "coming_soon" && (
                   <span className="badge badge-blue text-[10px]">Coming Soon</span>
                 )}
@@ -76,7 +76,7 @@ export default function IntegrationsPage() {
                   <span className="badge badge-green text-[10px]">Connected</span>
                 )}
               </div>
-              <div className="text-[12px] text-slate-400 mb-2">{i.description}</div>
+              <div className="text-[12px] text-adaptive-muted mb-2">{i.description}</div>
               <div className="flex gap-1.5 flex-wrap">
                 {i.syncs.map((s) => (
                   <span key={s} className="text-[10px] bg-[#243347] text-slate-400 px-2 py-0.5 rounded-md">
@@ -94,9 +94,9 @@ export default function IntegrationsPage() {
 
       {/* Manual entry note */}
       <div className="card border-white/[0.04] bg-[#1e2a3a]/50">
-        <div className="text-[13px] text-slate-400 leading-relaxed">
-          <span className="text-slate-200 font-semibold">Currently running on mock data.</span>{" "}
-          All metrics are calculated from the seed data in <code className="text-blue-300 text-[12px] bg-blue-500/10 px-1.5 py-0.5 rounded">src/lib/data.ts</code>.
+        <div className="text-[13px] text-adaptive-muted leading-relaxed">
+          <span className="text-adaptive-secondary font-semibold">Currently running on mock data.</span>{" "}
+          All metrics are calculated from the seed data in <code className="text-adaptive-info text-[12px] bg-blue-500/10 px-1.5 py-0.5 rounded">src/lib/data.ts</code>.
           Connect QuickBooks or upload files above to sync live store data.
         </div>
       </div>

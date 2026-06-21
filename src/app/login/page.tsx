@@ -29,8 +29,8 @@ function LoginForm() {
     <div className="min-h-screen bg-[#0d1520] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="text-[22px] font-bold text-blue-300 mb-1">LaundroCFO</div>
-          <div className="text-slate-500 text-[13px]">Sign in to your account</div>
+          <div className="text-[22px] font-bold text-adaptive-info mb-1">LaundroCFO</div>
+          <div className="text-adaptive-muted text-[13px]">Sign in to your account</div>
         </div>
         <div className="card space-y-4">
           {urlError === "verification_failed" && (
@@ -39,7 +39,7 @@ function LoginForm() {
             </div>
           )}
           {urlMessage === "check_email" && (
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-[12px] text-blue-400">
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-[12px] text-adaptive-info">
               Please check your email and click the confirmation link before signing in.
             </div>
           )}
@@ -76,11 +76,11 @@ function LoginForm() {
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
-          <div className="flex justify-between text-[12px] text-slate-500 pt-1">
-            <Link href="/forgot-password" className="hover:text-slate-300">Forgot password?</Link>
+          <div className="flex justify-between text-[12px] text-adaptive-muted pt-1">
+            <Link href="/forgot-password" className="hover:text-adaptive-secondary">Forgot password?</Link>
           </div>
           <div className="text-center pt-2 border-t border-white/[0.06]">
-            <Link href="/signup" className="text-[13px] text-blue-400 hover:text-blue-300 font-medium">
+            <Link href="/signup" className="text-[13px] text-adaptive-info hover:text-adaptive-info font-medium">
               Don&apos;t have an account? Sign up free →
             </Link>
           </div>
@@ -94,7 +94,7 @@ export default function LoginPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-[#0d1520] flex items-center justify-center">
-        <div className="text-slate-500 text-[13px]">Loading...</div>
+        <div className="text-adaptive-muted text-[13px]">Loading...</div>
       </div>
     }>
       <LoginForm />

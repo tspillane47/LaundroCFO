@@ -556,10 +556,10 @@ export default function UtilitiesPage() {
                       className={clsx(
                         "px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors",
                         isSelected
-                          ? "bg-blue-600/20 border-blue-500/40 text-blue-300"
+                          ? "bg-blue-600/20 border-blue-500/40 text-adaptive-info"
                           : hasData
                             ? "bg-[#243347] border-white/10 text-slate-300 hover:border-blue-500/30"
-                            : "bg-transparent border-white/[0.06] text-slate-600 hover:text-slate-400"
+                            : "bg-transparent border-white/[0.06] text-adaptive-muted hover:text-adaptive-muted"
                       )}
                     >
                       {label}
@@ -619,7 +619,7 @@ export default function UtilitiesPage() {
           </div>
           <div className="mt-4 card2 inline-block px-4 py-3">
             <div className="metric-label">Live Total</div>
-            <div className="text-lg font-bold text-blue-400">{fmtDollar(liveTotal)}</div>
+            <div className="text-lg font-bold text-adaptive-info">{fmtDollar(liveTotal)}</div>
           </div>
           <div className="flex gap-2 mt-4">
             <button type="button" className="btn-outline" onClick={() => setShowForm(false)}>
@@ -775,7 +775,7 @@ export default function UtilitiesPage() {
             </div>
             <div className="card2 text-center">
               <div className="metric-label">Water Expense</div>
-              <div className="text-[22px] font-bold text-blue-400">{fmtDollar(latest.water)}</div>
+              <div className="text-[22px] font-bold text-adaptive-info">{fmtDollar(latest.water)}</div>
             </div>
           </div>
           <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
@@ -790,7 +790,7 @@ export default function UtilitiesPage() {
         <div className="table-scroll">
           <table className="w-full text-[12px]">
             <thead>
-              <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+              <tr className="text-left text-adaptive-muted border-b border-white/[0.06]">
                 <th className="pb-3 pr-3 font-medium">Month</th>
                 <th className="pb-3 pr-3 font-medium text-right">Water</th>
                 <th className="pb-3 pr-3 font-medium text-right">Gas</th>
@@ -812,17 +812,17 @@ export default function UtilitiesPage() {
                     className="border-b border-white/[0.04] hover:bg-white/[0.02] cursor-pointer"
                     onClick={() => openMonthForm(r.month)}
                   >
-                    <td className="py-2.5 pr-3 text-slate-300">
+                    <td className="py-2.5 pr-3 text-adaptive-secondary">
                       {MONTH_NAMES[r.month - 1]} {r.year}
                     </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-200">{fmtDollar(r.water)}</td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-200">{fmtDollar(r.gas)}</td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-200">{fmtDollar(r.electric)}</td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-400">{fmtDollar(r.sewer)}</td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-400">{fmtDollar(r.trash)}</td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-400">{fmtDollar(r.internet)}</td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-blue-300 font-medium">{fmtDollar(total)}</td>
-                    <td className="py-2.5 text-right tabular-nums text-slate-400">
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary">{fmtDollar(r.water)}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary">{fmtDollar(r.gas)}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary">{fmtDollar(r.electric)}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-muted">{fmtDollar(r.sewer)}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-muted">{fmtDollar(r.trash)}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-muted">{fmtDollar(r.internet)}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-info font-medium">{fmtDollar(total)}</td>
+                    <td className="py-2.5 text-right tabular-nums text-adaptive-muted">
                       {fmtPct(utilityPctOfRevenue(total, revenue))}
                     </td>
                   </tr>
