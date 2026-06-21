@@ -180,10 +180,12 @@ export function computeTurnsPerDay(
   dryerRevenuePct: number | null | undefined = DEFAULT_DRYER_REVENUE_PCT
 ): TurnsPerDayResult {
   const pctDecimal = normalizeDryerRevenuePct(dryerRevenuePct);
-  const pctDisplay = pctDecimal * 100;
+  const pctDisplay = dryerRevenuePct ?? DEFAULT_DRYER_REVENUE_PCT;
   const totalSelfServiceRevenue = selfServiceTtmRevenue;
+  // Washer Revenue = self_service TTM ÷ (1 + dryer_revenue_pct / 100)
   const washerRevenue =
     totalSelfServiceRevenue > 0 ? totalSelfServiceRevenue / (1 + pctDecimal) : 0;
+  // Dryer Revenue = Washer Revenue × (dryer_revenue_pct / 100)
   const dryerRevenue = washerRevenue * pctDecimal;
 
   const washerGroups = equipment.filter((e) => e.machine_type === "Washer");
@@ -197,6 +199,7 @@ export function computeTurnsPerDay(
   }, 0);
 
   const annualVendCapacityAtOneTurn = totalWeightedVendCapacity * 365;
+  // TPD = Washer Revenue ÷ (Σ washer qty × avg_vend_price × 365)
   const overallTurnsPerDay =
     !missingVendPrices &&
     washerGroups.length > 0 &&

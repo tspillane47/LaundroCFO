@@ -79,14 +79,8 @@ const EMPTY_FORM: EquipmentForm = {
   avg_vend_price: "",
 };
 
-const DRYER_PCT_PRESETS = [35, 37.5, 40] as const;
-type DryerPctPreset = (typeof DRYER_PCT_PRESETS)[number] | "custom";
-
-function resolveDryerPctMode(pct: number): DryerPctPreset {
-  if (pct === 35) return 35;
-  if (pct === 37.5) return 37.5;
-  if (pct === 40) return 40;
-  return "custom";
+function fmtVendPrice(amount: number): string {
+  return `$${amount.toFixed(2)}`;
 }
 
 function SelectField({
@@ -131,8 +125,6 @@ export default function EquipmentPage() {
   const [ttmFinancials, setTtmFinancials] = useState<TtmFinancialSnapshot | null>(null);
   const [squareFootage, setSquareFootage] = useState<number | null>(null);
   const [dryerRevenuePct, setDryerRevenuePct] = useState(DEFAULT_DRYER_REVENUE_PCT);
-  const [dryerPctMode, setDryerPctMode] = useState<DryerPctPreset>(35);
-  const [customDryerPct, setCustomDryerPct] = useState("");
   const [savingDryerPct, setSavingDryerPct] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -176,10 +168,6 @@ export default function EquipmentPage() {
           ? Number(storeData.dryer_revenue_pct)
           : DEFAULT_DRYER_REVENUE_PCT;
       setDryerRevenuePct(storeDryerPct);
-      setDryerPctMode(resolveDryerPctMode(storeDryerPct));
-      setCustomDryerPct(
-        resolveDryerPctMode(storeDryerPct) === "custom" ? String(storeDryerPct) : ""
-      );
 
       const [{ data: equipmentData, error: equipmentError }, { data: financialsData }, { data: utilitiesData }, { data: leaseData }, { data: realEstateData }] =
         await Promise.all([
@@ -331,12 +319,9 @@ export default function EquipmentPage() {
     setShowForm(true);
   }
 
-  async function saveDryerRevenuePct(pct: number) {
+  async function persistDryerRevenuePct(pct: number) {
     if (!store || savingDryerPct) return;
     setSavingDryerPct(true);
-    setDryerRevenuePct(pct);
-    setDryerPctMode(resolveDryerPctMode(pct));
-    if (resolveDryerPctMode(pct) !== "custom") setCustomDryerPct("");
 
     const { error } = await supabase
       .from("stores")
@@ -352,19 +337,8 @@ export default function EquipmentPage() {
     setSavingDryerPct(false);
   }
 
-  function handleDryerPreset(pct: DryerPctPreset) {
-    if (pct === "custom") {
-      setDryerPctMode("custom");
-      return;
-    }
-    void saveDryerRevenuePct(pct);
-  }
-
-  function handleCustomDryerPctBlur() {
-    const pct = toNum(customDryerPct);
-    if (pct > 0 && pct <= 100) {
-      void saveDryerRevenuePct(pct);
-    }
+  function handleDryerSliderRelease() {
+    void persistDryerRevenuePct(dryerRevenuePct);
   }
 
   function closeForm() {
@@ -590,62 +564,48 @@ export default function EquipmentPage() {
                   {turns ? fmtDollar(turns.dryerRevenue) : "—"}
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1">
-                  {turns ? `${turns.dryerRevenuePct.toFixed(1)}% of washer revenue` : "Estimated split"}
+                  {turns && turns.dryerRevenuePct === 0
+                    ? "Free dry store"
+                    : turns
+                      ? `${turns.dryerRevenuePct.toFixed(1)}% of washer revenue`
+                      : "Estimated split"}
                 </div>
               </div>
             </div>
 
             <div className="border-t border-white/[0.06] pt-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <div>
-                  <div className="text-[12px] font-medium text-slate-300">Dryer Revenue Estimate</div>
-                  <div className="text-[11px] text-slate-500">
-                    Dryer revenue as a percentage of washer revenue
-                  </div>
-                </div>
+              <div className="space-y-3 mb-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  {DRYER_PCT_PRESETS.map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      disabled={savingDryerPct}
-                      onClick={() => handleDryerPreset(preset)}
-                      className={clsx(
-                        "btn-outline text-[11px] py-1 px-2.5",
-                        dryerPctMode === preset && "border-blue-500/40 bg-blue-500/10 text-blue-300"
-                      )}
-                    >
-                      {preset}%
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    disabled={savingDryerPct}
-                    onClick={() => handleDryerPreset("custom")}
-                    className={clsx(
-                      "btn-outline text-[11px] py-1 px-2.5",
-                      dryerPctMode === "custom" && "border-blue-500/40 bg-blue-500/10 text-blue-300"
-                    )}
-                  >
-                    Custom
-                  </button>
-                  {dryerPctMode === "custom" && (
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        min={1}
-                        max={100}
-                        step={0.1}
-                        value={customDryerPct}
-                        onChange={(e) => setCustomDryerPct(e.target.value)}
-                        onBlur={handleCustomDryerPctBlur}
-                        onKeyDown={preventEnterSubmit}
-                        className={clsx(INPUT_CLASS, "w-20 text-[12px] py-1")}
-                        placeholder="%"
-                      />
-                      <span className="text-[11px] text-slate-500">%</span>
-                    </div>
+                  {dryerRevenuePct === 0 ? (
+                    <span className="text-[12px] font-medium text-slate-300">Free dry store</span>
+                  ) : (
+                    <span className="text-[12px] font-medium text-slate-300">Dryer revenue estimate</span>
                   )}
+                  <span className="text-[18px] font-bold text-slate-100 tabular-nums">
+                    {dryerRevenuePct.toFixed(1)}%
+                  </span>
+                  {dryerRevenuePct === 0 && (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-green-400 bg-green-500/10 border border-green-500/20 rounded px-2 py-0.5">
+                      Free dry store
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={60}
+                  step={0.5}
+                  value={dryerRevenuePct}
+                  disabled={savingDryerPct}
+                  onChange={(e) => setDryerRevenuePct(Number(e.target.value))}
+                  onMouseUp={handleDryerSliderRelease}
+                  onTouchEnd={handleDryerSliderRelease}
+                  className="w-full h-2 accent-blue-500 cursor-pointer disabled:opacity-50"
+                />
+                <div className="flex justify-between text-[10px] text-slate-600">
+                  <span>0%</span>
+                  <span className="text-slate-500">Dryer revenue as % of washer revenue</span>
+                  <span>60%</span>
                 </div>
               </div>
 
@@ -768,6 +728,7 @@ export default function EquipmentPage() {
                       <th className="text-left pb-2 font-medium">Type</th>
                       <th className="text-left pb-2 font-medium">Manufacturer</th>
                       <th className="text-left pb-2 font-medium">Size</th>
+                      <th className="text-left pb-2 font-medium">Vend Price</th>
                       <th className="text-left pb-2 font-medium">Qty</th>
                       <th className="text-left pb-2 font-medium">Year</th>
                       <th className="text-left pb-2 font-medium">Age</th>
@@ -784,6 +745,20 @@ export default function EquipmentPage() {
                           <td className="py-2.5 text-slate-300">{item.machine_type}</td>
                           <td className="py-2.5 text-slate-400">{item.manufacturer}</td>
                           <td className="py-2.5 text-slate-400">{item.machine_size}</td>
+                          <td className="py-2.5 text-slate-400">
+                            {item.machine_type === "Dryer" ? (
+                              "—"
+                            ) : item.avg_vend_price != null && item.avg_vend_price > 0 ? (
+                              fmtVendPrice(item.avg_vend_price)
+                            ) : (
+                              <span
+                                className="text-amber-400 cursor-help"
+                                title="Add vend price to calculate turns per day"
+                              >
+                                —
+                              </span>
+                            )}
+                          </td>
                           <td className="py-2.5 text-slate-400">{item.quantity}</td>
                           <td className="py-2.5 text-slate-400">{item.installation_year}</td>
                           <td className={clsx("py-2.5 font-semibold", ageColor(age))}>{age} yr</td>
@@ -820,7 +795,7 @@ export default function EquipmentPage() {
                   {equipment.length > 0 && (
                     <tfoot>
                       <tr className="border-t border-white/[0.08]">
-                        <td className="pt-3 text-slate-400 font-semibold" colSpan={8}>
+                        <td className="pt-3 text-slate-400 font-semibold" colSpan={9}>
                           Total Replacement Cost
                         </td>
                         <td className="pt-3 text-right text-slate-100 font-bold">
