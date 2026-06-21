@@ -17,7 +17,12 @@ import {
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtPct } from "@/lib/calculations";
-import { MONTH_NAMES, MONTH_SHORT, monthKey } from "@/lib/financials";
+import { MONTH_NAMES, MONTH_SHORT, monthKey, sortRecordsDesc, enrichMonthlyRecords, buildUtilitiesLookup, type MonthlyFinancialRecord, type MonthlyUtilityRecord } from "@/lib/financials";
+import {
+  computeTurnsPerDay,
+  DEFAULT_DRYER_REVENUE_PCT,
+  type EquipmentRecord,
+} from "@/lib/equipment";
 import {
   computeEquipmentMetrics,
   getMostRecentUtility,
@@ -44,6 +49,7 @@ type StoreProfile = {
   washers: number | null;
   monthly_revenue: number | null;
   avg_machine_age: number | null;
+  dryer_revenue_pct: number | null;
 };
 
 type UtilityForm = {
@@ -56,10 +62,7 @@ type UtilityForm = {
   notes: string;
 };
 
-type EquipmentRow = {
-  quantity: number;
-  installation_year: number;
-};
+type EquipmentRow = EquipmentRecord;
 
 const emptyForm = (): UtilityForm => ({
   water: 0,
@@ -115,6 +118,10 @@ export default function UtilitiesPage() {
   const [records, setRecords] = useState<MonthlyUtilityRow[]>([]);
   const [revenueByMonth, setRevenueByMonth] = useState<Map<string, number>>(new Map());
   const [equipment, setEquipment] = useState<EquipmentRow[]>([]);
+  const [turnsContext, setTurnsContext] = useState<{
+    selfServiceTtm: number;
+    dryerRevenuePct: number;
+  } | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [showForm, setShowForm] = useState(false);
@@ -151,7 +158,7 @@ export default function UtilitiesPage() {
         await Promise.all([
           supabase
             .from("stores")
-            .select("id, name, square_footage, washers, monthly_revenue, avg_machine_age")
+            .select("id, name, square_footage, washers, monthly_revenue, avg_machine_age, dryer_revenue_pct")
             .eq("id", selectedStore.id)
             .single(),
           supabase
@@ -162,14 +169,34 @@ export default function UtilitiesPage() {
             .order("month", { ascending: false }),
           supabase
             .from("monthly_financials")
-            .select("year, month, revenue")
-            .eq("store_id", selectedStore.id),
-          supabase.from("equipment_inventory").select("quantity, installation_year").eq("store_id", selectedStore.id),
+            .select("year, month, revenue, self_service_revenue")
+            .eq("store_id", selectedStore.id)
+            .order("year", { ascending: false })
+            .order("month", { ascending: false }),
+          supabase.from("equipment_inventory").select("*").eq("store_id", selectedStore.id),
         ]);
 
       setStore(storeData as StoreProfile);
       setRecords((utilityData ?? []) as MonthlyUtilityRow[]);
       setEquipment((equipmentData ?? []) as EquipmentRow[]);
+
+      if (financialsData && financialsData.length > 0) {
+        const utilitiesLookup = buildUtilitiesLookup([] as MonthlyUtilityRecord[]);
+        const records = enrichMonthlyRecords(
+          sortRecordsDesc(financialsData as MonthlyFinancialRecord[]),
+          utilitiesLookup
+        );
+        const ttmRecords = records.slice(0, 12);
+        setTurnsContext({
+          selfServiceTtm: ttmRecords.reduce((sum, r) => sum + (r.self_service_revenue ?? 0), 0),
+          dryerRevenuePct:
+            storeData?.dryer_revenue_pct != null
+              ? Number(storeData.dryer_revenue_pct)
+              : DEFAULT_DRYER_REVENUE_PCT,
+        });
+      } else {
+        setTurnsContext(null);
+      }
 
       const revMap = new Map<string, number>();
       for (const row of financialsData ?? []) {
@@ -236,6 +263,17 @@ export default function UtilitiesPage() {
   const latestWater = latest?.water ?? 0;
   const sqft = store?.square_footage ?? 0;
   const washers = store?.washers ?? 0;
+
+  const realTurnsPerDay = useMemo(() => {
+    if (equipment.length === 0 || !turnsContext || turnsContext.selfServiceTtm <= 0) return null;
+    const turns = computeTurnsPerDay(
+      equipment,
+      turnsContext.selfServiceTtm,
+      turnsContext.dryerRevenuePct
+    );
+    if (turns.missingVendPrices || turns.overallTurnsPerDay == null) return null;
+    return turns.overallTurnsPerDay;
+  }, [equipment, turnsContext]);
 
   const yoyChange = useMemo(() => {
     if (!latest) return null;
@@ -701,7 +739,7 @@ export default function UtilitiesPage() {
               { label: "Water Cost Per Month", value: fmtDollar(latest.water) },
               { label: "Water Cost Per SF", value: fmtDollar(waterCostPerSF(latest.water, sqft)) },
               { label: "Water Cost Per Washer", value: fmtDollar(waterCostPerWasher(latest.water, washers)) },
-              { label: "Water Cost Per Turn", value: fmtDollar(waterCostPerTurn(latest.water, washers)) },
+              { label: "Water Cost Per Turn", value: fmtDollar(waterCostPerTurn(latest.water, washers, 4.5, realTurnsPerDay)) },
             ].map((item) => (
               <div key={item.label} className="card2">
                 <div className="metric-label">{item.label}</div>

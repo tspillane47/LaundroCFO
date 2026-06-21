@@ -1,6 +1,6 @@
 import { calcEstimatedBalance, calcRemainingMonths } from "@/lib/amortization";
 import { calcDSCR } from "@/lib/calculations";
-import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
+import { computeTurnsPerDay, DEFAULT_DRYER_REVENUE_PCT, type EquipmentRecord, type TurnsPerDayResult } from "@/lib/equipment";
 import {
   buildUtilitiesLookup,
   calcTtmMetrics,
@@ -118,6 +118,8 @@ export type ReportFinancialContext = {
   monthlyUtilities: MonthlyUtilityRecord[];
   availableMonths: { year: number; month: number }[];
   utilityReport: UtilityReportData;
+  selfServiceTtmTotal: number;
+  equipmentTurns: TurnsPerDayResult | null;
 };
 
 function num(value: number | null | undefined): number {
@@ -568,6 +570,8 @@ export async function fetchReportFinancialContext(
         revenueTtmTotal: emptyTtm.ttmRevenue,
         waterKPI: computeWaterKpi(0, 0),
       }),
+      selfServiceTtmTotal: 0,
+      equipmentTurns: null,
     };
   }
 
@@ -668,6 +672,14 @@ export async function fetchReportFinancialContext(
     console.log("[fetchReportFinancialContext] chartData points:", ttmChartData.length, ttmChartData);
   }
 
+  const selfServiceTtmTotal = sumTtmField(ttmRecords, "self_service_revenue");
+  const dryerRevenuePct =
+    store.dryer_revenue_pct != null ? Number(store.dryer_revenue_pct) : DEFAULT_DRYER_REVENUE_PCT;
+  const equipmentTurns =
+    selfServiceTtmTotal > 0 && (options?.equipment ?? []).length > 0
+      ? computeTurnsPerDay(options!.equipment!, selfServiceTtmTotal, dryerRevenuePct)
+      : null;
+
   return {
     hasMonthlyFinancials: true,
     limitedData: monthsUsed < 6,
@@ -712,6 +724,8 @@ export async function fetchReportFinancialContext(
       revenueTtmTotal: ttm.ttmRevenue,
       waterKPI,
     }),
+    selfServiceTtmTotal,
+    equipmentTurns,
   };
 }
 

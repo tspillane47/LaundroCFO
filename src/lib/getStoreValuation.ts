@@ -1,6 +1,12 @@
 import { createClient } from "@/lib/supabase";
-import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
-import { fetchStoreTtmMetrics, resolveAnnualEbitda } from "@/lib/financials";
+import {
+  computeEquipmentMetrics,
+  computeTurnsPerDay,
+  type EquipmentRecord,
+  type TurnsPerDayResult,
+  DEFAULT_DRYER_REVENUE_PCT,
+} from "@/lib/equipment";
+import { fetchStoreTtmMetrics, resolveAnnualEbitda, sortRecordsDesc, enrichMonthlyRecords, buildUtilitiesLookup, type MonthlyFinancialRecord, type MonthlyUtilityRecord } from "@/lib/financials";
 import { resolveSquareFootage } from "@/lib/storeCanonical";
 import { calcValuation, type ValuationInputs, type ValuationResult } from "@/lib/valuation";
 
@@ -25,6 +31,13 @@ export type StoreValuationResult = ValuationResult & {
   ttmEbitda: number;
   /** Trailing-12-month DSCR from monthly_financials (0 when no P&L history exists) */
   ttmDscr: number;
+  /** Turns-per-day operating metrics when self-service TTM and vend prices are available. */
+  equipmentOperating?: {
+    turnsAvailable: boolean;
+    turnsPerDay: number | null;
+    lowTurnsRisk: boolean;
+    turns: TurnsPerDayResult | null;
+  };
 };
 
 const valuationCache = new Map<string, { result: StoreValuationResult; timestamp: number }>();
@@ -178,8 +191,70 @@ export async function getStoreValuation(
     valuationOverrides.monthlyRevenue = ttm.ttmRevenue / ttm.monthsUsed;
   }
 
+  const valuation = computeStoreValuation(ctx, valuationOverrides);
+
+  let equipmentOperating: StoreValuationResult["equipmentOperating"];
+  let valueRisks = [...valuation.valueRisks];
+
+  const [{ data: financialsData }, { data: utilitiesData }] = await Promise.all([
+    supabase
+      .from("monthly_financials")
+      .select("year, month, self_service_revenue")
+      .eq("store_id", storeId)
+      .order("year", { ascending: false })
+      .order("month", { ascending: false }),
+    supabase
+      .from("monthly_utilities")
+      .select("year, month, water, gas, electric, sewer, trash, internet")
+      .eq("store_id", storeId),
+  ]);
+
+  const selfServiceTtmRevenue =
+    financialsData && financialsData.length > 0
+      ? enrichMonthlyRecords(
+          sortRecordsDesc(financialsData as MonthlyFinancialRecord[]),
+          buildUtilitiesLookup((utilitiesData ?? []) as MonthlyUtilityRecord[])
+        )
+          .slice(0, 12)
+          .reduce((sum, r) => sum + (r.self_service_revenue ?? 0), 0)
+      : 0;
+
+  const dryerRevenuePct =
+    store?.dryer_revenue_pct != null
+      ? Number(store.dryer_revenue_pct)
+      : DEFAULT_DRYER_REVENUE_PCT;
+
+  if (selfServiceTtmRevenue > 0 && ctx.equipment.length > 0) {
+    const turns = computeTurnsPerDay(ctx.equipment, selfServiceTtmRevenue, dryerRevenuePct);
+    const turnsAvailable =
+      !turns.missingVendPrices && turns.overallTurnsPerDay != null;
+    const lowTurnsRisk =
+      turnsAvailable && turns.overallTurnsPerDay != null && turns.overallTurnsPerDay < 3;
+
+    equipmentOperating = {
+      turnsAvailable,
+      turnsPerDay: turns.overallTurnsPerDay,
+      lowTurnsRisk,
+      turns,
+    };
+
+    if (lowTurnsRisk && turns.overallTurnsPerDay != null) {
+      valueRisks.push(
+        `Low washer utilization (${turns.overallTurnsPerDay.toFixed(1)} turns/day) — verify revenue or pricing assumptions`
+      );
+    }
+  } else {
+    equipmentOperating = {
+      turnsAvailable: false,
+      turnsPerDay: null,
+      lowTurnsRisk: false,
+      turns: null,
+    };
+  }
+
   const result: StoreValuationResult = {
-    ...computeStoreValuation(ctx, valuationOverrides),
+    ...valuation,
+    valueRisks,
     store: store ?? {},
     context: ctx,
     annualEbitda,
@@ -187,6 +262,7 @@ export async function getStoreValuation(
     ttmRevenue: ttm?.ttmRevenue ?? 0,
     ttmEbitda: ttm?.ttmEbitda ?? 0,
     ttmDscr: ttm?.dscr ?? 0,
+    equipmentOperating,
   };
 
   valuationCache.set(storeId, { result, timestamp: Date.now() });

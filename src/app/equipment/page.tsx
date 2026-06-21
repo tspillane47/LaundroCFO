@@ -5,9 +5,16 @@ import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
-import { syncEquipmentToStoreCache } from "@/lib/storeCanonical";
+import { syncEquipmentToStoreCache, resolveSquareFootage } from "@/lib/storeCanonical";
 import { useStores } from "@/lib/store-context";
 import { toBool, toNum, toNullableText } from "@/lib/formHelpers";
+import {
+  sortRecordsDesc,
+  enrichMonthlyRecords,
+  buildUtilitiesLookup,
+  type MonthlyFinancialRecord,
+  type MonthlyUtilityRecord,
+} from "@/lib/financials";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import {
@@ -15,10 +22,12 @@ import {
   WASHER_SIZES,
   DRYER_SIZES,
   CONDITIONS,
+  DEFAULT_DRYER_REVENUE_PCT,
   type EquipmentRecord,
   type MachineType,
   type MachineCondition,
   computeEquipmentMetrics,
+  turnsPerDayColor,
   ageColor,
   avgAgeColor,
   gradeColor,
@@ -35,6 +44,15 @@ type Store = {
   name: string | null;
   monthly_revenue: number | null;
   monthly_expenses: number | null;
+  dryer_revenue_pct: number | null;
+  occupancy_type: string | null;
+  square_footage: number | null;
+};
+
+type TtmFinancialSnapshot = {
+  ttmSelfServiceRevenue: number;
+  ttmRevenue: number;
+  monthsUsed: number;
 };
 
 type EquipmentForm = {
@@ -46,6 +64,7 @@ type EquipmentForm = {
   high_speed_extract: boolean;
   condition: MachineCondition;
   notes: string;
+  avg_vend_price: string;
 };
 
 const EMPTY_FORM: EquipmentForm = {
@@ -57,7 +76,18 @@ const EMPTY_FORM: EquipmentForm = {
   high_speed_extract: false,
   condition: "Good",
   notes: "",
+  avg_vend_price: "",
 };
+
+const DRYER_PCT_PRESETS = [35, 37.5, 40] as const;
+type DryerPctPreset = (typeof DRYER_PCT_PRESETS)[number] | "custom";
+
+function resolveDryerPctMode(pct: number): DryerPctPreset {
+  if (pct === 35) return 35;
+  if (pct === 37.5) return 37.5;
+  if (pct === 40) return 40;
+  return "custom";
+}
 
 function SelectField({
   label,
@@ -98,6 +128,12 @@ export default function EquipmentPage() {
   const [store, setStore] = useState<Store | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
+  const [ttmFinancials, setTtmFinancials] = useState<TtmFinancialSnapshot | null>(null);
+  const [squareFootage, setSquareFootage] = useState<number | null>(null);
+  const [dryerRevenuePct, setDryerRevenuePct] = useState(DEFAULT_DRYER_REVENUE_PCT);
+  const [dryerPctMode, setDryerPctMode] = useState<DryerPctPreset>(35);
+  const [customDryerPct, setCustomDryerPct] = useState("");
+  const [savingDryerPct, setSavingDryerPct] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EquipmentForm>(EMPTY_FORM);
@@ -119,35 +155,91 @@ export default function EquipmentPage() {
 
       if (!selectedStore?.id) {
         setMessage({ type: "error", text: "Select a store from the dropdown above." });
-        setStore(null);
-        setEquipment([]);
-        return;
+      setStore(null);
+      setEquipment([]);
+      setTtmFinancials(null);
+      setSquareFootage(null);
+      return;
       }
 
       const { data: storeData, error: storeError } = await supabase
         .from("stores")
-        .select("id, name, monthly_revenue, monthly_expenses")
+        .select("id, name, monthly_revenue, monthly_expenses, dryer_revenue_pct, occupancy_type, square_footage")
         .eq("id", selectedStore.id)
         .single();
       if (storeError) throw storeError;
       if (!storeData) throw new Error("No store found");
       setStore(storeData);
 
-      const { data: equipmentData, error: equipmentError } = await supabase
-        .from("equipment_inventory")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("store_id", storeData.id)
-        .order("machine_type", { ascending: true })
-        .order("installation_year", { ascending: false });
+      const storeDryerPct =
+        storeData.dryer_revenue_pct != null
+          ? Number(storeData.dryer_revenue_pct)
+          : DEFAULT_DRYER_REVENUE_PCT;
+      setDryerRevenuePct(storeDryerPct);
+      setDryerPctMode(resolveDryerPctMode(storeDryerPct));
+      setCustomDryerPct(
+        resolveDryerPctMode(storeDryerPct) === "custom" ? String(storeDryerPct) : ""
+      );
+
+      const [{ data: equipmentData, error: equipmentError }, { data: financialsData }, { data: utilitiesData }, { data: leaseData }, { data: realEstateData }] =
+        await Promise.all([
+          supabase
+            .from("equipment_inventory")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("store_id", storeData.id)
+            .order("machine_type", { ascending: true })
+            .order("installation_year", { ascending: false }),
+          supabase
+            .from("monthly_financials")
+            .select("year, month, revenue, self_service_revenue")
+            .eq("store_id", storeData.id)
+            .order("year", { ascending: false })
+            .order("month", { ascending: false }),
+          supabase
+            .from("monthly_utilities")
+            .select("year, month, water, gas, electric, sewer, trash, internet")
+            .eq("store_id", storeData.id),
+          supabase.from("leases").select("square_footage").eq("store_id", storeData.id).maybeSingle(),
+          supabase
+            .from("real_estate")
+            .select("laundromat_square_footage, total_square_footage")
+            .eq("store_id", storeData.id)
+            .maybeSingle(),
+        ]);
 
       if (equipmentError) throw equipmentError;
 
       setEquipment((equipmentData ?? []) as EquipmentRecord[]);
+
+      const sqft = resolveSquareFootage(storeData, leaseData, realEstateData);
+      setSquareFootage(sqft);
+
+      if (financialsData && financialsData.length > 0) {
+        const utilitiesLookup = buildUtilitiesLookup((utilitiesData ?? []) as MonthlyUtilityRecord[]);
+        const records = enrichMonthlyRecords(
+          sortRecordsDesc(financialsData as MonthlyFinancialRecord[]),
+          utilitiesLookup
+        );
+        const ttmRecords = records.slice(0, 12);
+        const monthsUsed = ttmRecords.length;
+        setTtmFinancials({
+          ttmSelfServiceRevenue: ttmRecords.reduce(
+            (sum, r) => sum + (r.self_service_revenue ?? 0),
+            0
+          ),
+          ttmRevenue: ttmRecords.reduce((sum, r) => sum + (r.revenue ?? 0), 0),
+          monthsUsed,
+        });
+      } else {
+        setTtmFinancials(null);
+      }
     } catch {
       setLoadError(true);
       setStore(null);
       setEquipment([]);
+      setTtmFinancials(null);
+      setSquareFootage(null);
     } finally {
       setLoading(false);
     }
@@ -158,9 +250,37 @@ export default function EquipmentPage() {
   }, [loadData]);
 
   const metrics = useMemo(
-    () => computeEquipmentMetrics(equipment, currentYear),
-    [equipment, currentYear]
+    () =>
+      computeEquipmentMetrics(equipment, currentYear, {
+        selfServiceTtmRevenue: ttmFinancials?.ttmSelfServiceRevenue,
+        dryerRevenuePct,
+      }),
+    [equipment, currentYear, ttmFinancials?.ttmSelfServiceRevenue, dryerRevenuePct]
   );
+
+  const turns = metrics.turns ?? null;
+  const hasSelfServiceTtm =
+    (ttmFinancials?.ttmSelfServiceRevenue ?? 0) > 0 && (ttmFinancials?.monthsUsed ?? 0) > 0;
+
+  const annualizedSelfServiceRevenue = useMemo(() => {
+    if (!ttmFinancials || ttmFinancials.monthsUsed === 0) return 0;
+    return (ttmFinancials.ttmSelfServiceRevenue / ttmFinancials.monthsUsed) * 12;
+  }, [ttmFinancials]);
+
+  const annualizedTotalRevenue = useMemo(() => {
+    if (!ttmFinancials || ttmFinancials.monthsUsed === 0) return 0;
+    return (ttmFinancials.ttmRevenue / ttmFinancials.monthsUsed) * 12;
+  }, [ttmFinancials]);
+
+  const revenuePerMachine = useMemo(() => {
+    if (!hasSelfServiceTtm || metrics.totalMachines === 0) return null;
+    return annualizedSelfServiceRevenue / metrics.totalMachines;
+  }, [hasSelfServiceTtm, annualizedSelfServiceRevenue, metrics.totalMachines]);
+
+  const revenuePerSF = useMemo(() => {
+    if (!ttmFinancials || !squareFootage || squareFootage <= 0) return null;
+    return annualizedTotalRevenue / squareFootage;
+  }, [ttmFinancials, squareFootage, annualizedTotalRevenue]);
 
   const annualEbitda = useMemo(() => {
     if (!store) return 0;
@@ -177,7 +297,10 @@ export default function EquipmentPage() {
       if (field === "machine_type") {
         const type = value as MachineType;
         next.machine_size = type === "Washer" ? "30lb" : "30lb Stack";
-        if (type === "Dryer") next.high_speed_extract = false;
+        if (type === "Dryer") {
+          next.high_speed_extract = false;
+          next.avg_vend_price = "";
+        }
       }
       return next;
     });
@@ -201,9 +324,47 @@ export default function EquipmentPage() {
       high_speed_extract: item.high_speed_extract ?? false,
       condition: item.condition,
       notes: item.notes ?? "",
+      avg_vend_price:
+        item.avg_vend_price != null && item.avg_vend_price > 0 ? String(item.avg_vend_price) : "",
     });
     setSaveStatus("idle");
     setShowForm(true);
+  }
+
+  async function saveDryerRevenuePct(pct: number) {
+    if (!store || savingDryerPct) return;
+    setSavingDryerPct(true);
+    setDryerRevenuePct(pct);
+    setDryerPctMode(resolveDryerPctMode(pct));
+    if (resolveDryerPctMode(pct) !== "custom") setCustomDryerPct("");
+
+    const { error } = await supabase
+      .from("stores")
+      .update({ dryer_revenue_pct: pct })
+      .eq("id", store.id);
+
+    if (error) {
+      setMessage({ type: "error", text: "We couldn't save dryer revenue estimate." });
+    } else {
+      setStore((prev) => (prev ? { ...prev, dryer_revenue_pct: pct } : prev));
+      await refreshStores();
+    }
+    setSavingDryerPct(false);
+  }
+
+  function handleDryerPreset(pct: DryerPctPreset) {
+    if (pct === "custom") {
+      setDryerPctMode("custom");
+      return;
+    }
+    void saveDryerRevenuePct(pct);
+  }
+
+  function handleCustomDryerPctBlur() {
+    const pct = toNum(customDryerPct);
+    if (pct > 0 && pct <= 100) {
+      void saveDryerRevenuePct(pct);
+    }
   }
 
   function closeForm() {
@@ -243,6 +404,10 @@ export default function EquipmentPage() {
         high_speed_extract: form.machine_type === "Washer" ? toBool(form.high_speed_extract) : false,
         condition: form.condition,
         notes: toNullableText(form.notes),
+        avg_vend_price:
+          form.machine_type === "Washer" && form.avg_vend_price.trim()
+            ? toNum(form.avg_vend_price)
+            : null,
       };
 
       const { error: saveError } = editingId
@@ -386,6 +551,165 @@ export default function EquipmentPage() {
           </div>
           <div className="text-[12px] mt-1 text-slate-500">EBITDA multiple adjustment</div>
         </div>
+      </div>
+
+      {/* Operating Metrics */}
+      <div className="card">
+        <div className="section-title mb-4">Operating Metrics</div>
+        {!hasSelfServiceTtm ? (
+          <p className="text-[13px] text-slate-500">
+            Enter financials to calculate operating metrics.
+          </p>
+        ) : (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="card2 min-w-0">
+                <div className="metric-label">Revenue Per Machine</div>
+                <div className="text-[18px] font-bold text-slate-100 tabular-nums">
+                  {revenuePerMachine != null ? fmtDollar(revenuePerMachine) : "—"}
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1">Self-service, annualized</div>
+              </div>
+              <div className="card2 min-w-0">
+                <div className="metric-label">Revenue Per SF</div>
+                <div className="text-[18px] font-bold text-slate-100 tabular-nums">
+                  {revenuePerSF != null ? fmtDollar(revenuePerSF) : "—"}
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1">Total revenue, annualized</div>
+              </div>
+              <div className="card2 min-w-0">
+                <div className="metric-label">Washer Revenue</div>
+                <div className="text-[18px] font-bold text-blue-300 tabular-nums">
+                  {turns ? fmtDollar(turns.washerRevenue) : "—"}
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1">Backed out of self-service TTM</div>
+              </div>
+              <div className="card2 min-w-0">
+                <div className="metric-label">Dryer Revenue</div>
+                <div className="text-[18px] font-bold text-purple-300 tabular-nums">
+                  {turns ? fmtDollar(turns.dryerRevenue) : "—"}
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1">
+                  {turns ? `${turns.dryerRevenuePct.toFixed(1)}% of washer revenue` : "Estimated split"}
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-white/[0.06] pt-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <div>
+                  <div className="text-[12px] font-medium text-slate-300">Dryer Revenue Estimate</div>
+                  <div className="text-[11px] text-slate-500">
+                    Dryer revenue as a percentage of washer revenue
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {DRYER_PCT_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      disabled={savingDryerPct}
+                      onClick={() => handleDryerPreset(preset)}
+                      className={clsx(
+                        "btn-outline text-[11px] py-1 px-2.5",
+                        dryerPctMode === preset && "border-blue-500/40 bg-blue-500/10 text-blue-300"
+                      )}
+                    >
+                      {preset}%
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    disabled={savingDryerPct}
+                    onClick={() => handleDryerPreset("custom")}
+                    className={clsx(
+                      "btn-outline text-[11px] py-1 px-2.5",
+                      dryerPctMode === "custom" && "border-blue-500/40 bg-blue-500/10 text-blue-300"
+                    )}
+                  >
+                    Custom
+                  </button>
+                  {dryerPctMode === "custom" && (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        step={0.1}
+                        value={customDryerPct}
+                        onChange={(e) => setCustomDryerPct(e.target.value)}
+                        onBlur={handleCustomDryerPctBlur}
+                        onKeyDown={preventEnterSubmit}
+                        className={clsx(INPUT_CLASS, "w-20 text-[12px] py-1")}
+                        placeholder="%"
+                      />
+                      <span className="text-[11px] text-slate-500">%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {!turns || turns.missingVendPrices ? (
+                <p className="text-[13px] text-amber-400/90 mb-4">
+                  Add vend prices to machine groups to calculate turns per day.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="card2 min-w-0">
+                    <div className="metric-label">Average Turns Per Day</div>
+                    <div
+                      className={clsx(
+                        "text-[22px] font-bold tabular-nums",
+                        turns.overallTurnsPerDay != null
+                          ? turnsPerDayColor(turns.overallTurnsPerDay)
+                          : "text-slate-400"
+                      )}
+                    >
+                      {turns.overallTurnsPerDay != null ? turns.overallTurnsPerDay.toFixed(2) : "—"}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-1">Fleet-wide washer utilization</div>
+                  </div>
+                  <div className="card2 min-w-0 lg:col-span-2">
+                    <div className="metric-label mb-2">Turns by Size</div>
+                    {turns.bySize.length === 0 ? (
+                      <div className="text-[12px] text-slate-500">No washer groups with vend prices.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {turns.bySize.map((group) => (
+                          <div
+                            key={group.size}
+                            className="flex items-center justify-between text-[12px] gap-3"
+                          >
+                            <span className="text-slate-400">
+                              {group.size} · {group.quantity} machines · {fmtDollar(group.avgVendPrice)} vend
+                            </span>
+                            <span
+                              className={clsx(
+                                "font-semibold tabular-nums shrink-0",
+                                turnsPerDayColor(group.turnsPerDay)
+                              )}
+                            >
+                              {group.turnsPerDay.toFixed(2)}/day
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="card2 min-w-0">
+                    <div className="metric-label">Average Vend Price</div>
+                    <div className="text-[18px] font-bold text-slate-100 tabular-nums">
+                      {turns.weightedAvgVendPrice != null
+                        ? fmtDollar(turns.weightedAvgVendPrice)
+                        : "—"}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-1">Quantity-weighted washers</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Section 2 — Two column layout */}
@@ -569,6 +893,28 @@ export default function EquipmentPage() {
                     onChange={(v) => updateForm("condition", v)}
                     options={CONDITIONS}
                   />
+                  {form.machine_type === "Washer" && (
+                    <div>
+                      <label className="block text-[11px] text-slate-500 mb-1.5">
+                        Average Vend Price ($)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.25}
+                        value={form.avg_vend_price}
+                        onChange={(e) => updateForm("avg_vend_price", e.target.value)}
+                        onKeyDown={preventEnterSubmit}
+                        className={INPUT_CLASS}
+                        placeholder="e.g. 4.50"
+                      />
+                      {!form.avg_vend_price.trim() && (
+                        <p className="text-[11px] text-amber-400/90 mt-1">
+                          Vend price needed for turns per day calculation
+                        </p>
+                      )}
+                    </div>
+                  )}
                   {form.machine_type === "Washer" && (
                     <div className="flex items-center gap-2 pt-6">
                       <input

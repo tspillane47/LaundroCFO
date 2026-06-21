@@ -1,5 +1,5 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
+import { computeEquipmentMetrics, type EquipmentRecord, type TurnsPerDayResult } from "@/lib/equipment";
 import {
   calcGlobalDSCR,
   calcDebtYield,
@@ -419,7 +419,13 @@ function computeReportMetrics(props: ReportProps) {
   const equitySnapshot = buildEquitySnapshot(valuation.businessValue, loanBalance);
 
   const equipRecords = (equipment ?? []) as EquipmentRecord[];
-  const equipMetrics = computeEquipmentMetrics(equipRecords);
+  const equipMetrics = computeEquipmentMetrics(equipRecords, undefined, {
+    selfServiceTtmRevenue: financial.selfServiceTtmTotal,
+    dryerRevenuePct:
+      store?.dryer_revenue_pct != null ? Number(store.dryer_revenue_pct) : undefined,
+  });
+  const equipmentTurns: TurnsPerDayResult | null =
+    financial.equipmentTurns ?? equipMetrics.turns ?? null;
 
   const yearsRemaining = lease ? calcYearsRemaining(lease.lease_end_date) : 0;
   const availableOptions = (leaseOptions ?? []).filter((o) => o.status === "Available");
@@ -485,6 +491,7 @@ function computeReportMetrics(props: ReportProps) {
     debtYield,
     equipRecords,
     equipMetrics,
+    equipmentTurns,
     yearsRemaining,
     availableOptions,
     totalLeaseControl,
@@ -1120,6 +1127,73 @@ export function ReportDocument(props: ReportProps) {
             value={`${m.equipMetrics.totalWashers}/${m.equipMetrics.totalDryers}`}
           />
         </View>
+        {m.equipmentTurns && m.equipmentTurns.totalSelfServiceRevenue > 0 && (
+          <>
+            <SectionHeader>Operating Metrics</SectionHeader>
+            <DataRow
+              label="Self-Service Revenue (TTM)"
+              value={fmtDollar(m.equipmentTurns.totalSelfServiceRevenue)}
+            />
+            <DataRow
+              label="Washer Revenue (est.)"
+              value={fmtDollar(m.equipmentTurns.washerRevenue)}
+            />
+            <DataRow
+              label={`Dryer Revenue (est. @ ${m.equipmentTurns.dryerRevenuePct.toFixed(1)}%)`}
+              value={fmtDollar(m.equipmentTurns.dryerRevenue)}
+            />
+            {m.equipmentTurns.overallTurnsPerDay != null ? (
+              <>
+                <DataRow
+                  label="Avg Turns / Day"
+                  value={m.equipmentTurns.overallTurnsPerDay.toFixed(2)}
+                  valueColor={
+                    m.equipmentTurns.overallTurnsPerDay < 3
+                      ? "#b91c1c"
+                      : m.equipmentTurns.overallTurnsPerDay <= 4.5
+                        ? "#b45309"
+                        : "#15803d"
+                  }
+                />
+                {m.equipmentTurns.weightedAvgVendPrice != null && (
+                  <DataRow
+                    label="Weighted Avg Vend Price"
+                    value={fmtDollar(m.equipmentTurns.weightedAvgVendPrice)}
+                  />
+                )}
+              </>
+            ) : (
+              <Text style={styles.bodyText}>
+                Add vend prices to washer groups to calculate turns per day.
+              </Text>
+            )}
+            {m.equipmentTurns.bySize.length > 0 && (
+              <>
+                <SectionHeader>Turns by Size</SectionHeader>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.tableCellBold, { width: "25%" }]}>Size</Text>
+                  <Text style={[styles.tableCellBold, { width: "15%" }]}>Qty</Text>
+                  <Text style={[styles.tableCellBold, { width: "25%" }]}>Vend</Text>
+                  <Text style={[styles.tableCellBold, { width: "35%", textAlign: "right" }]}>
+                    Turns/Day
+                  </Text>
+                </View>
+                {m.equipmentTurns.bySize.map((group) => (
+                  <View key={group.size} style={styles.tableRow}>
+                    <Text style={[styles.tableCell, { width: "25%" }]}>{group.size}</Text>
+                    <Text style={[styles.tableCell, { width: "15%" }]}>{group.quantity}</Text>
+                    <Text style={[styles.tableCell, { width: "25%" }]}>
+                      {fmtDollar(group.avgVendPrice)}
+                    </Text>
+                    <Text style={[styles.tableCell, { width: "35%", textAlign: "right" }]}>
+                      {group.turnsPerDay.toFixed(2)}
+                    </Text>
+                  </View>
+                ))}
+              </>
+            )}
+          </>
+        )}
         <SectionHeader>Fleet Detail</SectionHeader>
         {m.equipRecords.length === 0 ? (
           <Text style={styles.bodyText}>No equipment inventory on file.</Text>

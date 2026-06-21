@@ -31,10 +31,13 @@ export function waterCostPerWasher(waterCost: number, washerCount: number): numb
 export function waterCostPerTurn(
   waterCost: number,
   washerCount: number,
-  turnsPerWasherPerDay: number = 4.5
+  turnsPerWasherPerDay: number = 4.5,
+  realTurnsPerDay?: number | null
 ): number {
   if (washerCount <= 0) return 0;
-  const monthlyTurns = washerCount * turnsPerWasherPerDay * 30;
+  const turns =
+    realTurnsPerDay != null && realTurnsPerDay > 0 ? realTurnsPerDay : turnsPerWasherPerDay;
+  const monthlyTurns = washerCount * turns * 30;
   if (monthlyTurns <= 0) return 0;
   return waterCost / monthlyTurns;
 }
