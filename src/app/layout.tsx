@@ -228,17 +228,17 @@ function AppShell({ children }: { children: React.ReactNode }) {
           "app-sidebar w-[220px] flex flex-col flex-shrink-0 border-r transition-colors duration-300",
           sidebarOpen && "open"
         )}
-        style={{ background: "var(--bg-sidebar)", borderColor: "var(--border)" }}
+        style={{ background: "var(--bg-sidebar)", borderColor: "var(--sidebar-border, var(--border))" }}
       >
         <div
           className="px-5 py-4 border-b"
-          style={{ borderColor: "var(--border)" }}
+          style={{ borderColor: "var(--sidebar-border, var(--border))" }}
         >
           <div
             style={{
               fontSize: "15px",
               fontWeight: 700,
-              color: "var(--text-primary)",
+              color: "var(--sidebar-text, var(--text-primary))",
               letterSpacing: "-0.01em",
             }}
           >
@@ -252,7 +252,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
               <div
                 style={{
                   fontSize: "10px",
-                  color: "var(--text-muted)",
+                  color: "var(--sidebar-text-muted, var(--text-muted))",
                   padding: "16px 20px 4px",
                   letterSpacing: "0.08em",
                   fontWeight: 600,
@@ -267,24 +267,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
                     key={item.href}
                     href={item.href}
                     onClick={() => setSidebarOpen(false)}
-                    className="nav-item"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      padding: "7px 20px",
-                      fontSize: "13px",
-                      textDecoration: "none",
-                      fontWeight: active ? 500 : 400,
-                      color: active ? "var(--text-primary)" : "var(--text-muted)",
-                      background: active ? "var(--bg-card2)" : "transparent",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!active) e.currentTarget.style.background = "color-mix(in srgb, var(--bg-card2) 50%, transparent)";
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!active) e.currentTarget.style.background = "transparent";
-                    }}
+                    className={clsx("nav-item", active && "nav-item-active")}
                   >
                     <NavIcon name={item.icon} />
                     {item.label}
@@ -296,7 +279,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Store switcher */}
-        <div className="p-4 border-t relative" style={{ borderColor: "var(--border)" }} ref={sidebarStoreRef}>
+        <div className="p-4 border-t relative" style={{ borderColor: "var(--sidebar-border, var(--border))" }} ref={sidebarStoreRef}>
           <button
             type="button"
             onClick={() => setShowStoreDropdown((v) => !v)}

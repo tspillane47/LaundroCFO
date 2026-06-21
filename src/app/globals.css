@@ -5,34 +5,56 @@
 
 /* ============ LIGHT MODE (default) ============ */
 :root {
-  --bg-page: #EDF2ED;
-  --bg-card: #F7FAF7;
-  --bg-card2: #EFF5EF;
-  --bg-sidebar: #E5ECE5;
-  --bg-sidebar-hover: #DAE4DA;
-  --bg-nav-active: #EFF5EF;
-  --nav-active-border: transparent;
-  --nav-active-text: #1C2B22;
-  --text-primary: #1C2B22;
-  --text-secondary: #435748;
-  --text-muted: #7A9080;
-  --border: rgba(28, 43, 34, 0.07);
-  --border2: rgba(28, 43, 34, 0.11);
-  --accent: #2F6651;
-  --card-shadow: 0 1px 3px rgba(28, 43, 34, 0.06);
-  --card-shadow-hover: 0 2px 6px rgba(28, 43, 34, 0.08);
-  --card-radius: 10px;
-  --hero-bg: linear-gradient(135deg, #0f2419 0%, #1a3d2e 100%);
+  /* Page & Layout */
+  --bg-page: #F7FAF5;
+  --bg-card: #FFFFFF;
+  --bg-card2: #F0F5EE;
 
-  /* Semantic tints */
-  --bg-info-tint: #E8F2EF;
-  --bg-success-tint: #E5F5EA;
-  --bg-warning-tint: #F5F0E5;
-  --bg-danger-tint: #F5EBE8;
-  --text-info: #256F5C;
-  --text-success: #2D6A4F;
-  --text-warning: #8B6914;
-  --text-danger: #9B3A2F;
+  /* Sidebar & Navigation */
+  --bg-sidebar: #2C4A2E;
+  --bg-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --bg-nav-active: #3D7A3F;
+  --nav-active-border: #3D7A3F;
+  --nav-active-text: #FFFFFF;
+  --sidebar-text: #E8F0E6;
+  --sidebar-text-muted: rgba(232, 240, 230, 0.65);
+  --sidebar-border: rgba(232, 240, 230, 0.12);
+
+  /* Text */
+  --text-primary: #1A2E1A;
+  --text-secondary: #4A6741;
+  --text-muted: #7A9E74;
+
+  /* Borders */
+  --border: rgba(61, 122, 63, 0.15);
+  --border2: rgba(61, 122, 63, 0.25);
+
+  /* Accent */
+  --accent: #3D7A3F;
+  --accent-link: #1D4ED8;
+  --accent-tan: #C4A882;
+
+  /* Cards & surfaces */
+  --card-shadow: 0 1px 3px rgba(26, 46, 26, 0.06);
+  --card-shadow-hover: 0 4px 12px rgba(26, 46, 26, 0.08);
+  --card-radius: 10px;
+  --hero-bg: linear-gradient(135deg, #0f1e3d 0%, #1e3a5f 100%);
+
+  /* Semantic */
+  --text-info: #1D4ED8;
+  --text-success: #276221;
+  --text-danger: #B91C1C;
+  --text-warning: #B45309;
+  --bg-success-tint: rgba(39, 98, 33, 0.08);
+  --bg-danger-tint: rgba(185, 28, 28, 0.08);
+  --bg-info-tint: rgba(29, 78, 216, 0.08);
+  --bg-warning-tint: rgba(180, 83, 9, 0.08);
+
+  /* Chart palette */
+  --chart-primary: #3D7A3F;
+  --chart-secondary: #3B82F6;
+  --chart-tertiary: #C4A882;
+  --chart-quaternary: #52B788;
 }
 
 /* ============ DARK MODE ============ */
@@ -91,9 +113,9 @@ html, body {
   .card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: var(--card-radius);
     padding: 20px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    box-shadow: var(--card-shadow);
   }
   .card2 {
     background: var(--bg-card2);
@@ -179,9 +201,10 @@ html, body {
   .positive { color: var(--text-success); }
   .negative { color: var(--text-danger); }
   .muted { color: var(--text-secondary); }
+  .text-link { color: var(--accent-link); }
   .btn-primary {
     background: var(--accent);
-    color: white;
+    color: #FFFFFF;
     border: none;
     border-radius: 6px;
     padding: 6px 14px;
@@ -210,17 +233,33 @@ html, body {
     gap: 10px;
     padding: 7px 20px;
     font-size: 13px;
-    color: var(--text-muted);
     cursor: pointer;
-    border-left: none;
     transition: all 0.15s;
     text-decoration: none;
   }
-  .nav-item:hover {
+  :root:not(.dark) .app-sidebar .nav-item {
+    color: var(--sidebar-text-muted);
+    border-left: 3px solid transparent;
+  }
+  :root:not(.dark) .app-sidebar .nav-item:hover {
+    background: var(--bg-sidebar-hover);
+    color: var(--sidebar-text);
+  }
+  :root:not(.dark) .app-sidebar .nav-item-active {
+    background: var(--bg-nav-active);
+    color: var(--nav-active-text);
+    font-weight: 500;
+    border-left-color: var(--nav-active-border);
+  }
+  .dark .app-sidebar .nav-item {
+    color: var(--text-muted);
+    border-left: none;
+  }
+  .dark .app-sidebar .nav-item:hover {
     background: color-mix(in srgb, var(--bg-card2) 50%, transparent);
     color: var(--text-primary);
   }
-  .nav-item-active {
+  .dark .app-sidebar .nav-item-active {
     background: var(--bg-card2);
     color: var(--text-primary);
     font-weight: 500;
@@ -259,6 +298,14 @@ html, body {
   .card-success { background: var(--bg-success-tint); border-color: rgba(21,128,61,0.15); }
   .card-warning { background: var(--bg-warning-tint); border-color: rgba(180,83,9,0.15); }
   .card-danger { background: var(--bg-danger-tint); border-color: rgba(185,28,28,0.15); }
+
+  /* Light mode alternating table rows */
+  :root:not(.dark) table tbody tr:nth-child(odd) {
+    background-color: #FFFFFF;
+  }
+  :root:not(.dark) table tbody tr:nth-child(even) {
+    background-color: #F7FAF5;
+  }
 }
 
 /* Scenario planner sliders */
