@@ -193,6 +193,8 @@ const EMPTY_VALUATION: StoreValuationResult = {
   ttmRevenue: 0,
   ttmEbitda: 0,
   ttmDscr: 0,
+  ttmDebtService: 0,
+  debtServiceMonthsWithData: 0,
   store: {},
   context: {
     store: {},
@@ -727,6 +729,8 @@ export default function ValuationPage() {
           ttmRevenue: fetchedValuation?.ttmRevenue ?? 0,
           ttmEbitda: fetchedValuation?.ttmEbitda ?? annualEbitda,
           ttmDscr: fetchedValuation?.ttmDscr ?? 0,
+          ttmDebtService: fetchedValuation?.ttmDebtService ?? 0,
+          debtServiceMonthsWithData: fetchedValuation?.debtServiceMonthsWithData ?? 0,
         });
       }
       setSavedOverrides(currentOverrides);

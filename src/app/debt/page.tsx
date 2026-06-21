@@ -14,16 +14,15 @@ import {
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { toBool, toNullableDate, toNullableNum, toNullableText } from "@/lib/formHelpers";
-import { getStoreValuation } from "@/lib/getStoreValuation";
+import { getStoreValuation, type StoreValuationResult } from "@/lib/getStoreValuation";
 import { syncDebtToStoreCache } from "@/lib/storeCanonical";
-import type { ValuationResult } from "@/lib/valuation";
 import {
   calcEstimatedBalance,
   calcRemainingMonths,
   calcPayoffDate,
   generatePayoffSchedule,
 } from "@/lib/amortization";
-import { fmtDollar } from "@/lib/calculations";
+import { calcDSCR, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { FormBanner } from "@/components/ui/FormBanner";
@@ -167,6 +166,12 @@ function enrichLoan(loan: StoreLoan): EnrichedLoan {
   };
 }
 
+function dscrColorClass(dscr: number): string {
+  if (dscr >= 1.5) return "text-green-400";
+  if (dscr >= 1.25) return "text-amber-400";
+  return "text-red-400";
+}
+
 function formatAxisValue(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `$${Math.round(value / 1_000)}k`;
@@ -248,7 +253,7 @@ export default function DebtPage() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loans, setLoans] = useState<StoreLoan[]>([]);
-  const [valuation, setValuation] = useState<(ValuationResult & { store: Record<string, unknown> }) | null>(null);
+  const [valuation, setValuation] = useState<StoreValuationResult | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<LoanForm>(emptyLoanForm());
@@ -350,6 +355,42 @@ export default function DebtPage() {
       l.estimatedCurrentBalance > max.estimatedCurrentBalance ? l : max
     );
   }, [enrichedLoans]);
+
+  const debtServiceAnalysis = useMemo(() => {
+    const scheduledMonthly = totals.totalMonthlyPayment;
+    const scheduledAnnual = totals.totalAnnualDebtService;
+    const ttmEbitda = valuation?.ttmEbitda ?? 0;
+    const debtServiceMonthsWithData = valuation?.debtServiceMonthsWithData ?? 0;
+    const ttmDebtServiceSum = valuation?.ttmDebtService ?? 0;
+    const hasActualDebtService = debtServiceMonthsWithData > 0;
+
+    const actualMonthly = hasActualDebtService
+      ? ttmDebtServiceSum / debtServiceMonthsWithData
+      : 0;
+    const actualAnnual = hasActualDebtService ? actualMonthly * 12 : 0;
+
+    const scheduledDscr =
+      scheduledAnnual > 0 && ttmEbitda > 0 ? calcDSCR(ttmEbitda, scheduledAnnual) : null;
+    const actualDscr =
+      actualAnnual > 0 && ttmEbitda > 0 ? calcDSCR(ttmEbitda, actualAnnual) : null;
+
+    const variancePct =
+      hasActualDebtService && scheduledMonthly > 0
+        ? (Math.abs(scheduledMonthly - actualMonthly) / scheduledMonthly) * 100
+        : null;
+
+    return {
+      scheduledMonthly,
+      scheduledAnnual,
+      actualMonthly,
+      actualAnnual,
+      debtServiceMonthsWithData,
+      hasActualDebtService,
+      scheduledDscr,
+      actualDscr,
+      variancePct,
+    };
+  }, [totals, valuation]);
 
   const payoffSchedule = useMemo(() => {
     if (!largestLoan) return [];
@@ -645,7 +686,171 @@ export default function DebtPage() {
         />
       </div>
 
-      {/* Section 3 — Loans list */}
+      {/* Section 3 — Debt Service Analysis */}
+      <div className="card overflow-hidden min-w-0">
+        <h2 className="section-title mb-1">Debt Service Analysis</h2>
+        <p className="text-[12px] mb-5" style={{ color: "var(--text-muted)" }}>
+          Compare scheduled loan payments against actual debt service from your P&L
+        </p>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                <th
+                  className="text-left py-2.5 pr-4 font-medium w-[40%]"
+                  style={{ color: "var(--text-muted)" }}
+                />
+                <th
+                  className="text-right py-2.5 px-4 font-medium"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Scheduled
+                </th>
+                <th
+                  className="text-right py-2.5 pl-4 font-medium"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Actual (TTM)
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                <td className="py-3 pr-4" style={{ color: "var(--text-secondary)" }}>
+                  Monthly Payment
+                </td>
+                <td
+                  className="py-3 px-4 text-right tabular-nums font-semibold"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {fmtDollar(debtServiceAnalysis.scheduledMonthly)}
+                </td>
+                <td
+                  className="py-3 pl-4 text-right tabular-nums font-semibold"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {debtServiceAnalysis.hasActualDebtService
+                    ? fmtDollar(debtServiceAnalysis.actualMonthly)
+                    : "—"}
+                </td>
+              </tr>
+              <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                <td className="py-3 pr-4" style={{ color: "var(--text-secondary)" }}>
+                  Annual Total
+                </td>
+                <td
+                  className="py-3 px-4 text-right tabular-nums font-semibold"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {fmtDollar(debtServiceAnalysis.scheduledAnnual)}
+                </td>
+                <td
+                  className="py-3 pl-4 text-right tabular-nums font-semibold"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {debtServiceAnalysis.hasActualDebtService
+                    ? fmtDollar(debtServiceAnalysis.actualAnnual)
+                    : "—"}
+                </td>
+              </tr>
+              <tr>
+                <td className="py-3 pr-4 font-medium" style={{ color: "var(--text-secondary)" }}>
+                  DSCR
+                </td>
+                <td
+                  className={clsx(
+                    "py-3 px-4 text-right tabular-nums font-bold text-[15px]",
+                    debtServiceAnalysis.scheduledDscr != null
+                      ? dscrColorClass(debtServiceAnalysis.scheduledDscr)
+                      : ""
+                  )}
+                >
+                  {debtServiceAnalysis.scheduledDscr != null
+                    ? fmtMultiple(debtServiceAnalysis.scheduledDscr)
+                    : "—"}
+                </td>
+                <td
+                  className={clsx(
+                    "py-3 pl-4 text-right tabular-nums font-bold text-[15px]",
+                    debtServiceAnalysis.actualDscr != null
+                      ? dscrColorClass(debtServiceAnalysis.actualDscr)
+                      : ""
+                  )}
+                >
+                  {debtServiceAnalysis.actualDscr != null
+                    ? fmtMultiple(debtServiceAnalysis.actualDscr)
+                    : "—"}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div
+          className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-4 border-t"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+            Based on active loan schedule
+          </div>
+          <div className="text-[11px] sm:text-right" style={{ color: "var(--text-muted)" }}>
+            {debtServiceAnalysis.hasActualDebtService ? (
+              <>
+                Based on categorized transactions (TTM)
+                {debtServiceAnalysis.debtServiceMonthsWithData < 12 && (
+                  <> · {debtServiceAnalysis.debtServiceMonthsWithData} mo. of data</>
+                )}
+              </>
+            ) : (
+              "Based on categorized transactions (TTM)"
+            )}
+          </div>
+        </div>
+
+        <div className="mt-4">
+          {!debtServiceAnalysis.hasActualDebtService ? (
+            <div
+              className="px-3 py-2.5 rounded-lg text-[12px]"
+              style={{
+                background: "var(--bg-card2)",
+                border: "1px solid var(--border)",
+                color: "var(--text-secondary)",
+              }}
+            >
+              No debt service transactions found in Financials. Categorize loan payments as
+              &apos;Debt Service&apos; in the Transaction Review page to enable actual vs scheduled
+              comparison.
+            </div>
+          ) : debtServiceAnalysis.variancePct != null && debtServiceAnalysis.variancePct > 10 ? (
+            <div
+              className="px-3 py-2.5 rounded-lg text-[12px]"
+              style={{
+                background: "rgba(245,158,11,0.1)",
+                border: "1px solid rgba(245,158,11,0.25)",
+                color: "#fbbf24",
+              }}
+            >
+              Scheduled vs actual debt service differs by{" "}
+              {debtServiceAnalysis.variancePct.toFixed(0)}%. This may indicate a loan originated
+              mid-year, a refinance, or payments not yet categorized in Financials. Review your
+              transaction categories to ensure all debt payments are captured.
+            </div>
+          ) : debtServiceAnalysis.variancePct != null ? (
+            <div
+              className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px] font-semibold"
+              style={{
+                background: "rgba(34,197,94,0.12)",
+                color: "#4ade80",
+              }}
+            >
+              Debt service reconciled
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Section 4 — Loans list */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="section-title mb-0">Active Loans</h2>

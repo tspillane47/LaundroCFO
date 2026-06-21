@@ -31,6 +31,10 @@ export type StoreValuationResult = ValuationResult & {
   ttmEbitda: number;
   /** Trailing-12-month DSCR from monthly_financials (0 when no P&L history exists) */
   ttmDscr: number;
+  /** Sum of debt_service across the TTM window */
+  ttmDebtService: number;
+  /** TTM months with a non-zero debt_service entry */
+  debtServiceMonthsWithData: number;
   /** Turns-per-day operating metrics when self-service TTM and vend prices are available. */
   equipmentOperating?: {
     turnsAvailable: boolean;
@@ -234,6 +238,9 @@ export async function getStoreValuation(
     };
   }
 
+  const ttmRecords = ttmData?.ttmRecords ?? [];
+  const debtServiceMonthsWithData = ttmRecords.filter((r) => r.debt_service > 0).length;
+
   const result: StoreValuationResult = {
     ...valuation,
     valueRisks,
@@ -244,6 +251,8 @@ export async function getStoreValuation(
     ttmRevenue: ttm?.ttmRevenue ?? 0,
     ttmEbitda: ttm?.ttmEbitda ?? 0,
     ttmDscr: ttm?.dscr ?? 0,
+    ttmDebtService: ttm?.ttmDebtService ?? 0,
+    debtServiceMonthsWithData,
     equipmentOperating,
   };
 
