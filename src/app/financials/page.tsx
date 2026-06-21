@@ -439,7 +439,7 @@ function RuleFormPanel({
           <select
             value={category}
             onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
-            className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
+            className={clsx("select-tan", "w-44 py-1.5 text-[12px]")}
           >
             {getImportCategoriesForType(type).map((f) => (
               <option key={f} value={f}>
@@ -475,7 +475,7 @@ function RuleFormPanel({
           <select
             value={category}
             onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
-            className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
+            className={clsx("select-tan", "w-44 py-1.5 text-[12px]")}
           >
             {getImportCategoriesForType(type).map((f) => (
               <option key={f} value={f}>
@@ -2093,7 +2093,7 @@ export default function FinancialsPage() {
                   <select
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    className={clsx(INPUT_CLASS, "w-32")}
+                    className={clsx("select-tan", "w-32")}
                   >
                     {yearOptions.map((y) => (
                       <option key={y} value={y}>
@@ -2706,7 +2706,7 @@ export default function FinancialsPage() {
                 <select
                   value={bulkCategory}
                   onChange={(e) => setBulkCategory(e.target.value as BankImportCategory)}
-                  className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
+                  className={clsx("select-tan", "w-44 py-1.5 text-[12px]")}
                 >
                   {Array.from(
                     new Set(reviewTransactions.filter((t) => selectedTxnKeys.has(t.key)).map((t) => t.type))
@@ -2789,7 +2789,7 @@ export default function FinancialsPage() {
                                 updateGroupCategory(group.groupKey, e.target.value as BankImportCategory)
                               }
                               className={clsx(
-                                INPUT_CLASS,
+                                "select-tan",
                                 "w-40 py-1.5 text-[12px]",
                                 group.category === "needs_review" && "border-amber-500/40"
                               )}
@@ -2937,7 +2937,7 @@ export default function FinancialsPage() {
                                 updateReviewCategory(txn.key, e.target.value as BankImportCategory)
                               }
                               className={clsx(
-                                INPUT_CLASS,
+                                "select-tan",
                                 "w-40 py-1.5 text-[12px]",
                                 txn.category === "needs_review" && "border-amber-500/40"
                               )}
@@ -3088,7 +3088,7 @@ export default function FinancialsPage() {
                               )
                             )
                           }
-                          className={clsx(INPUT_CLASS, "py-1.5 text-[12px]")}
+                          className={clsx("select-tan", "py-1.5 text-[12px]")}
                         >
                           {PL_CATEGORY_FIELDS.map((f) => (
                             <option key={f} value={f}>

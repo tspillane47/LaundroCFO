@@ -252,7 +252,7 @@ function RuleFormPanel({
           <select
             value={category}
             onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
-            className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
+            className={clsx("select-tan", "w-44 py-1.5 text-[12px]")}
           >
             {getImportCategoriesForType(type).map((f) => (
               <option key={f} value={f}>
@@ -288,7 +288,7 @@ function RuleFormPanel({
           <select
             value={category}
             onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
-            className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
+            className={clsx("select-tan", "w-44 py-1.5 text-[12px]")}
           >
             {getImportCategoriesForType(type).map((f) => (
               <option key={f} value={f}>
@@ -1425,7 +1425,7 @@ export default function TransactionsPage() {
             value={item.category}
             onChange={(e) => void updateCategory(item.id, e.target.value as BankImportCategory, storedCategory, true)}
             className={clsx(
-              INPUT_CLASS,
+              "select-tan",
               "w-40 py-1.5 text-[11px]",
               item.category === "needs_review" && "border-amber-500/40"
             )}
@@ -1751,7 +1751,7 @@ export default function TransactionsPage() {
             <select
               value={bulkCategory}
               onChange={(e) => setBulkCategory(e.target.value as BankImportCategory)}
-              className={clsx(INPUT_CLASS, "w-44 py-1.5 text-[12px]")}
+              className={clsx("select-tan", "w-44 py-1.5 text-[12px]")}
             >
               {getImportCategoriesForType("expense").map((f) => (
                 <option key={f} value={f}>
@@ -1849,7 +1849,7 @@ export default function TransactionsPage() {
                           onChange={(e) =>
                             updateGroupCategory(group.groupKey, e.target.value as BankImportCategory)
                           }
-                          className={clsx(INPUT_CLASS, "w-40 py-1.5 text-[12px]")}
+                          className={clsx("select-tan", "w-40 py-1.5 text-[12px]")}
                         >
                           {getImportCategoriesForType(group.type).map((f) => (
                             <option key={f} value={f}>
@@ -2018,7 +2018,7 @@ export default function TransactionsPage() {
                                   void updateCategory(row.id, newCategory, storedCategory, true);
                                 }}
                                 className={clsx(
-                                  INPUT_CLASS,
+                                  "select-tan",
                                   "w-40 py-1.5 text-[12px]",
                                   row.category === "needs_review" && "border-amber-500/40"
                                 )}
@@ -2293,7 +2293,7 @@ export default function TransactionsPage() {
                   onChange={(e) =>
                     setManualDraft((prev) => ({ ...prev, category: e.target.value as BankImportCategory }))
                   }
-                  className={clsx(INPUT_CLASS, "w-full py-2 text-[12px]")}
+                  className={clsx("select-tan", "w-full py-2 text-[12px]")}
                 >
                   {getManualEntryCategories(manualDraft.type).map((f) => (
                     <option key={f} value={f}>
