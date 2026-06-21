@@ -62,6 +62,24 @@ export type StoreScenarioContext = {
 
 export type ScenarioParams = Partial<Record<ScenarioId, number>>;
 
+/** Monthly P&L from monthly_financials TTM when available; otherwise store profile fields. */
+function resolveScenarioMonthlyFinancials(ctx: StoreScenarioContext): {
+  monthlyRevenue: number;
+  monthlyExpenses: number;
+} {
+  if (ctx.financials) {
+    return {
+      monthlyRevenue: ctx.financials.monthlyRevenue,
+      monthlyExpenses: ctx.financials.monthlyExpenses,
+    };
+  }
+  const store = ctx.store;
+  return {
+    monthlyRevenue: Number(store.monthly_revenue) || 0,
+    monthlyExpenses: Number(store.monthly_expenses) || 0,
+  };
+}
+
 function parseDate(value: string | null | undefined): Date | null {
   if (!value) return null;
   const d = new Date(String(value).split("T")[0] + "T12:00:00");
@@ -108,8 +126,9 @@ export function buildValuationInputs(
   } = {}
 ): ValuationInputs {
   const store = ctx.store;
-  const monthlyRevenue = overrides.monthlyRevenue ?? (Number(store.monthly_revenue) || 0);
-  const monthlyExpenses = overrides.monthlyExpenses ?? (Number(store.monthly_expenses) || 0);
+  const baseFinancials = resolveScenarioMonthlyFinancials(ctx);
+  const monthlyRevenue = overrides.monthlyRevenue ?? baseFinancials.monthlyRevenue;
+  const monthlyExpenses = overrides.monthlyExpenses ?? baseFinancials.monthlyExpenses;
   const equipMetrics = computeEquipmentMetrics(ctx.equipment);
   const wdfPct = overrides.wdfPct ?? (Number(store.wdf_pct) || 18);
   const commercialPct = overrides.commercialPct ?? (Number(store.commercial_pct) || 12);
@@ -296,8 +315,7 @@ export function computeScenario(
   baseline: ValuationResult
 ): ScenarioResult | null {
   const store = ctx.store;
-  const monthlyRevenue = Number(store.monthly_revenue) || 0;
-  const monthlyExpenses = Number(store.monthly_expenses) || 0;
+  const { monthlyRevenue, monthlyExpenses } = resolveScenarioMonthlyFinancials(ctx);
   const annualEbitda = (monthlyRevenue - monthlyExpenses) * 12;
   const commercialPct = Number(store.commercial_pct) || 12;
   const wdfPct = Number(store.wdf_pct) || 18;

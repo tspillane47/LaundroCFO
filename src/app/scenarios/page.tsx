@@ -194,7 +194,7 @@ export default function ScenariosPage() {
     );
   }
 
-  if (!ctx || !selected || (Number(ctx.store.monthly_revenue) || 0) <= 0) {
+  if (!ctx || !selected || (ctx.financials?.monthlyRevenue ?? 0) <= 0) {
     return (
       <div className="card text-center py-10">
         <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
