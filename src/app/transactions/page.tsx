@@ -376,6 +376,9 @@ export default function TransactionsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkCategory, setBulkCategory] = useState<BankImportCategory>("self_service_revenue");
   const [groupByVendor, setGroupByVendor] = useState(true);
+  const [filterVendor, setFilterVendor] = useState("");
+  const [filterName, setFilterName] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showManageRules, setShowManageRules] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -582,6 +585,12 @@ export default function TransactionsPage() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    setFilterVendor("");
+    setFilterName("");
+    setFilterCategory("");
+  }, [activeTab]);
+
   const reviewRows = useMemo((): ReviewRow[] => {
     return transactions.map((txn) => {
       const type = (txn.transaction_type as TransactionType | null) ?? inferTransactionType(txn.amount, txn.category);
@@ -624,9 +633,44 @@ export default function TransactionsPage() {
     });
   }, [transactions, categorizationRules, categoryOverrides]);
 
+  const filterOptions = useMemo(() => {
+    const vendors = new Set<string>();
+    const names = new Set<string>();
+    const categories = new Set<BankImportCategory>();
+    for (const row of reviewRows) {
+      vendors.add(normalizeVendorPattern(row.description) || "(no description)");
+      names.add(row.description?.trim() || "(no description)");
+      categories.add(row.category);
+    }
+    return {
+      vendors: Array.from(vendors).sort((a, b) => a.localeCompare(b)),
+      names: Array.from(names).sort((a, b) => a.localeCompare(b)),
+      categories: Array.from(categories).sort((a, b) =>
+        (BANK_IMPORT_CATEGORY_LABELS[a] ?? a).localeCompare(BANK_IMPORT_CATEGORY_LABELS[b] ?? b)
+      ),
+    };
+  }, [reviewRows]);
+
+  const filteredReviewRows = useMemo((): ReviewRow[] => {
+    return reviewRows.filter((row) => {
+      if (filterVendor) {
+        const vendor = normalizeVendorPattern(row.description) || "(no description)";
+        if (vendor !== filterVendor) return false;
+      }
+      if (filterName) {
+        const name = row.description?.trim() || "(no description)";
+        if (name !== filterName) return false;
+      }
+      if (filterCategory && row.category !== filterCategory) return false;
+      return true;
+    });
+  }, [reviewRows, filterVendor, filterName, filterCategory]);
+
+  const hasActiveFilters = Boolean(filterVendor || filterName || filterCategory);
+
   const transactionGroups = useMemo((): TransactionGroup[] => {
     const map = new Map<string, TransactionGroup>();
-    for (const txn of reviewRows) {
+    for (const txn of filteredReviewRows) {
       const vendorPattern = normalizeVendorPattern(txn.description);
       const groupKey = isGenericTransactionDescription(txn.description)
         ? `__individual__::${txn.id}`
@@ -662,11 +706,11 @@ export default function TransactionsPage() {
         sampleDescription: mostCommonDescription(group.items),
       }))
       .sort((a, b) => b.count - a.count);
-  }, [reviewRows]);
+  }, [filteredReviewRows]);
 
   const selectableIds = useMemo(
-    () => reviewRows.filter((t) => !t.possibleDuplicate).map((t) => t.id),
-    [reviewRows]
+    () => filteredReviewRows.filter((t) => !t.possibleDuplicate).map((t) => t.id),
+    [filteredReviewRows]
   );
   const allSelected =
     selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
@@ -1640,7 +1684,11 @@ export default function TransactionsPage() {
             {activeTab === "excluded" && "Excluded Transactions"}
             {activeTab === "all" && "All Transactions"}
           </span>
-          <span className="text-[11px] text-adaptive-muted font-normal">{reviewRows.length} shown</span>
+          <span className="text-[11px] text-adaptive-muted font-normal">
+            {hasActiveFilters
+              ? `${filteredReviewRows.length} of ${reviewRows.length} shown`
+              : `${reviewRows.length} shown`}
+          </span>
           <button
             type="button"
             className="ml-auto text-[12px] text-adaptive-info hover:text-adaptive-info"
@@ -1794,11 +1842,80 @@ export default function TransactionsPage() {
           </div>
         )}
 
+        {reviewRows.length > 0 && (
+          <div className="flex flex-wrap items-end gap-4 mb-4 p-3 rounded-lg border border-white/[0.06] bg-white/[0.02]">
+            <div>
+              <div className="metric-label mb-1.5">Vendor</div>
+              <select
+                value={filterVendor}
+                onChange={(e) => setFilterVendor(e.target.value)}
+                className={clsx("select-tan", "w-44 text-[12px]")}
+                aria-label="Filter by vendor"
+              >
+                <option value="">All vendors</option>
+                {filterOptions.vendors.map((vendor) => (
+                  <option key={vendor} value={vendor}>
+                    {vendor}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <div className="metric-label mb-1.5">Name</div>
+              <select
+                value={filterName}
+                onChange={(e) => setFilterName(e.target.value)}
+                className={clsx("select-tan", "w-52 text-[12px]")}
+                aria-label="Filter by name"
+              >
+                <option value="">All names</option>
+                {filterOptions.names.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <div className="metric-label mb-1.5">Category</div>
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className={clsx("select-tan", "w-44 text-[12px]")}
+                aria-label="Filter by category"
+              >
+                <option value="">All categories</option>
+                {filterOptions.categories.map((category) => (
+                  <option key={category} value={category}>
+                    {BANK_IMPORT_CATEGORY_LABELS[category]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              className="btn-outline text-[11px]"
+              onClick={() => {
+                setFilterVendor("");
+                setFilterName("");
+                setFilterCategory("");
+              }}
+              disabled={!hasActiveFilters}
+            >
+              Clear Filters
+            </button>
+          </div>
+        )}
+
         {reviewRows.length === 0 ? (
           <p className="text-[13px] text-adaptive-muted py-6 text-center">
             {activeTab === "needs_review"
               ? "No transactions to review. Upload a CSV to get started."
               : "No transactions in this view."}
+          </p>
+        ) : filteredReviewRows.length === 0 ? (
+          <p className="text-[13px] text-adaptive-muted py-6 text-center">
+            No transactions match the selected filters.
           </p>
         ) : activeTab === "needs_review" && groupByVendor ? (
           <div className="table-scroll">
@@ -1959,7 +2076,7 @@ export default function TransactionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {reviewRows.map((row, rowIndex) => {
+                {filteredReviewRows.map((row, rowIndex) => {
                   const storedCategory = transactions.find((t) => t.id === row.id)?.category ?? null;
                   const excluded = isExcludedRow(row);
                   const posted = isPostedRow(row);
