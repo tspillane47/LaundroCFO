@@ -256,7 +256,7 @@ function buildRetoolOverrides(
 }
 
 function getUtilitySliderConfig(ctx: StoreScenarioContext): ScenarioSliderConfig | null {
-  if (!ctx.financials) return null;
+  if (!ctx.financials?.waterKpi) return null;
   const currentPct = ctx.financials.waterKpi.ratio * 100;
   const minPct = Math.max(5, Math.min(10, currentPct - 10));
   const maxPct = Math.max(minPct, currentPct);

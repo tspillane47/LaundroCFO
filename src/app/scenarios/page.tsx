@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
@@ -21,7 +21,8 @@ import { PageError } from "@/components/ui/PageError";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 
 export default function ScenariosPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+  const loadRequestId = useRef(0);
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -36,6 +37,7 @@ export default function ScenariosPage() {
       return;
     }
 
+    const requestId = ++loadRequestId.current;
     setLoading(true);
     setLoadError(false);
 
@@ -120,13 +122,19 @@ export default function ScenariosPage() {
           : null,
       };
 
+      if (requestId !== loadRequestId.current) return;
+
       setCtx(nextCtx);
       setSliderParams(getScenarioSliderDefaults(nextCtx));
-    } catch {
+    } catch (err) {
+      console.error("[ScenariosPage] loadData failed:", err);
+      if (requestId !== loadRequestId.current) return;
       setLoadError(true);
       setCtx(null);
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestId.current) {
+        setLoading(false);
+      }
     }
   }, [selectedStore?.id, supabase]);
 

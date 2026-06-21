@@ -330,10 +330,16 @@ import { toNum, toNullableText } from "@/lib/formHelpers";
 
 type FinancialsSupabaseClient = ReturnType<typeof createClient>;
 
+export type StoreTtmData = {
+  metrics: TtmMetrics;
+  /** Trailing-12-month enriched monthly_financials rows (newest first). */
+  ttmRecords: CalculatedMonthly[];
+};
+
 export async function fetchStoreTtmMetrics(
   supabase: FinancialsSupabaseClient,
   storeId: string
-): Promise<TtmMetrics | null> {
+): Promise<StoreTtmData | null> {
   const [{ data: financialsData }, { data: utilitiesData }] = await Promise.all([
     supabase
       .from("monthly_financials")
@@ -355,7 +361,10 @@ export async function fetchStoreTtmMetrics(
     utilitiesLookup
   );
 
-  return calcTtmMetrics(records);
+  return {
+    metrics: calcTtmMetrics(records),
+    ttmRecords: records.slice(0, 12),
+  };
 }
 
 export function resolveAnnualEbitda(

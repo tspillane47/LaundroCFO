@@ -6,7 +6,7 @@ import {
   type TurnsPerDayResult,
   DEFAULT_DRYER_REVENUE_PCT,
 } from "@/lib/equipment";
-import { fetchStoreTtmMetrics, resolveAnnualEbitda, sortRecordsDesc, enrichMonthlyRecords, buildUtilitiesLookup, type MonthlyFinancialRecord, type MonthlyUtilityRecord } from "@/lib/financials";
+import { fetchStoreTtmMetrics, resolveAnnualEbitda } from "@/lib/financials";
 import { resolveSquareFootage } from "@/lib/storeCanonical";
 import { calcValuation, type ValuationInputs, type ValuationResult } from "@/lib/valuation";
 
@@ -56,7 +56,7 @@ function calcYearsRemaining(endDate: string | null | undefined): number {
 }
 
 function normalizeMarketDensity(raw: string | null | undefined): string {
-  const v = (raw ?? "average").toLowerCase();
+  const v = String(raw ?? "average").toLowerCase();
   if (v === "urban" || v === "dense_urban" || v === "prime_dense_urban") return "urban";
   if (v === "suburban" || v === "strong_suburban") return "suburban";
   if (v === "rural") return "rural";
@@ -64,7 +64,7 @@ function normalizeMarketDensity(raw: string | null | undefined): string {
 }
 
 function normalizeStoreCondition(raw: string | null | undefined): string {
-  const v = (raw ?? "fair").toLowerCase();
+  const v = String(raw ?? "fair").toLowerCase();
   if (v === "excellent" || v === "remodeled") return "excellent";
   if (v === "good") return "good";
   if (v === "poor" || v === "needs_renovation") return "poor";
@@ -184,7 +184,8 @@ export async function getStoreValuation(
     realEstate: realEstate ?? null,
   };
 
-  const ttm = await fetchStoreTtmMetrics(supabase, storeId);
+  const ttmData = await fetchStoreTtmMetrics(supabase, storeId);
+  const ttm = ttmData?.metrics ?? null;
   const { annualEbitda, ttmMonthsUsed } = resolveAnnualEbitda(ttm);
   const valuationOverrides: Partial<ValuationInputs> = { ebitda: annualEbitda };
   if (ttm && ttm.monthsUsed > 0 && ttm.ttmRevenue > 0) {
@@ -196,28 +197,9 @@ export async function getStoreValuation(
   let equipmentOperating: StoreValuationResult["equipmentOperating"];
   let valueRisks = [...valuation.valueRisks];
 
-  const [{ data: financialsData }, { data: utilitiesData }] = await Promise.all([
-    supabase
-      .from("monthly_financials")
-      .select("year, month, self_service_revenue")
-      .eq("store_id", storeId)
-      .order("year", { ascending: false })
-      .order("month", { ascending: false }),
-    supabase
-      .from("monthly_utilities")
-      .select("year, month, water, gas, electric, sewer, trash, internet")
-      .eq("store_id", storeId),
-  ]);
-
-  const selfServiceTtmRevenue =
-    financialsData && financialsData.length > 0
-      ? enrichMonthlyRecords(
-          sortRecordsDesc(financialsData as MonthlyFinancialRecord[]),
-          buildUtilitiesLookup((utilitiesData ?? []) as MonthlyUtilityRecord[])
-        )
-          .slice(0, 12)
-          .reduce((sum, r) => sum + (r.self_service_revenue ?? 0), 0)
-      : 0;
+  const selfServiceTtmRevenue = ttmData
+    ? ttmData.ttmRecords.reduce((sum, r) => sum + (r.self_service_revenue ?? 0), 0)
+    : 0;
 
   const dryerRevenuePct =
     store?.dryer_revenue_pct != null
