@@ -439,7 +439,7 @@ function RuleFormPanel({
           <select
             value={category}
             onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
-            className={clsx("select-tan", "w-44 py-1.5 text-[12px]")}
+            className={clsx("select-tan", "w-44 text-[12px]")}
           >
             {getImportCategoriesForType(type).map((f) => (
               <option key={f} value={f}>
@@ -475,7 +475,7 @@ function RuleFormPanel({
           <select
             value={category}
             onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
-            className={clsx("select-tan", "w-44 py-1.5 text-[12px]")}
+            className={clsx("select-tan", "w-44 text-[12px]")}
           >
             {getImportCategoriesForType(type).map((f) => (
               <option key={f} value={f}>
@@ -2706,7 +2706,7 @@ export default function FinancialsPage() {
                 <select
                   value={bulkCategory}
                   onChange={(e) => setBulkCategory(e.target.value as BankImportCategory)}
-                  className={clsx("select-tan", "w-44 py-1.5 text-[12px]")}
+                  className={clsx("select-tan", "w-44 text-[12px]")}
                 >
                   {Array.from(
                     new Set(reviewTransactions.filter((t) => selectedTxnKeys.has(t.key)).map((t) => t.type))
@@ -2790,7 +2790,7 @@ export default function FinancialsPage() {
                               }
                               className={clsx(
                                 "select-tan",
-                                "w-40 py-1.5 text-[12px]",
+                                "w-40 text-[12px]",
                                 group.category === "needs_review" && "border-amber-500/40"
                               )}
                             >
@@ -2938,7 +2938,7 @@ export default function FinancialsPage() {
                               }
                               className={clsx(
                                 "select-tan",
-                                "w-40 py-1.5 text-[12px]",
+                                "w-40 text-[12px]",
                                 txn.category === "needs_review" && "border-amber-500/40"
                               )}
                             >
@@ -3088,7 +3088,7 @@ export default function FinancialsPage() {
                               )
                             )
                           }
-                          className={clsx("select-tan", "py-1.5 text-[12px]")}
+                          className={clsx("select-tan", "text-[12px]")}
                         >
                           {PL_CATEGORY_FIELDS.map((f) => (
                             <option key={f} value={f}>

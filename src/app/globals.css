@@ -5,55 +5,55 @@
 
 /* ============ LIGHT MODE (default) ============ */
 :root {
-  /* Page & Layout */
-  --bg-page: #F7FAF5;
+  /* Backgrounds */
+  --bg-page: #F4F7F2;
   --bg-card: #FFFFFF;
-  --bg-card2: #F0F5EE;
+  --bg-card2: #EDF2EA;
 
   /* Sidebar & Navigation */
-  --bg-sidebar: #2C4A2E;
+  --bg-sidebar: #1E3A1E;
   --bg-sidebar-hover: rgba(255, 255, 255, 0.08);
-  --bg-nav-active: #3D7A3F;
-  --nav-active-border: #3D7A3F;
+  --bg-nav-active: #2D6A2F;
+  --nav-active-border: #2D6A2F;
   --nav-active-text: #FFFFFF;
   --sidebar-text: #E8F0E6;
-  --sidebar-text-muted: rgba(232, 240, 230, 0.65);
+  --sidebar-text-muted: rgba(232, 240, 230, 0.72);
   --sidebar-border: rgba(232, 240, 230, 0.12);
 
   /* Text */
-  --text-primary: #1A2E1A;
-  --text-secondary: #4A6741;
-  --text-muted: #7A9E74;
+  --text-primary: #111B10;
+  --text-secondary: #2D4A28;
+  --text-muted: #556B50;
 
   /* Borders */
-  --border: rgba(61, 122, 63, 0.15);
-  --border2: rgba(61, 122, 63, 0.25);
+  --border: rgba(45, 74, 40, 0.18);
+  --border2: rgba(45, 74, 40, 0.28);
 
   /* Accent */
-  --accent: #3D7A3F;
+  --accent: #2D6A2F;
   --accent-link: #1D4ED8;
-  --accent-tan: #C4A882;
+  --accent-tan: #8B6914;
 
   /* Cards & surfaces */
-  --card-shadow: 0 1px 3px rgba(26, 46, 26, 0.06);
-  --card-shadow-hover: 0 4px 12px rgba(26, 46, 26, 0.08);
+  --card-shadow: 0 1px 4px rgba(17, 27, 16, 0.10);
+  --card-shadow-hover: 0 4px 16px rgba(17, 27, 16, 0.14);
   --card-radius: 10px;
   --hero-bg: linear-gradient(135deg, #0f1e3d 0%, #1e3a5f 100%);
 
   /* Semantic */
-  --text-info: #1D4ED8;
-  --text-success: #276221;
-  --text-danger: #B91C1C;
-  --text-warning: #B45309;
-  --bg-success-tint: rgba(39, 98, 33, 0.08);
-  --bg-danger-tint: rgba(185, 28, 28, 0.08);
-  --bg-info-tint: rgba(29, 78, 216, 0.08);
-  --bg-warning-tint: rgba(180, 83, 9, 0.08);
+  --text-info: #1E40AF;
+  --text-success: #1A5C1C;
+  --text-danger: #991B1B;
+  --text-warning: #92400E;
+  --bg-success-tint: rgba(26, 92, 28, 0.08);
+  --bg-danger-tint: rgba(153, 27, 27, 0.08);
+  --bg-info-tint: rgba(30, 64, 175, 0.08);
+  --bg-warning-tint: rgba(146, 64, 14, 0.08);
 
   /* Chart palette */
-  --chart-primary: #3D7A3F;
+  --chart-primary: #2D6A2F;
   --chart-secondary: #3B82F6;
-  --chart-tertiary: #C4A882;
+  --chart-tertiary: #8B6914;
   --chart-quaternary: #52B788;
 }
 
@@ -96,6 +96,8 @@ html, body {
   background: var(--bg-page);
   color: var(--text-primary);
   font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -117,6 +119,10 @@ html, body {
     padding: 20px;
     box-shadow: var(--card-shadow);
   }
+  :root:not(.dark) .card {
+    border-color: rgba(45, 74, 40, 0.12);
+    box-shadow: var(--card-shadow);
+  }
   .card2 {
     background: var(--bg-card2);
     border: 1px solid var(--border);
@@ -127,8 +133,8 @@ html, body {
     font-size: 11px;
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.07em;
-    font-weight: 500;
+    letter-spacing: 0.06em;
+    font-weight: 600;
     margin-bottom: 6px;
   }
   .metric-value {
@@ -202,42 +208,10 @@ html, body {
   .negative { color: var(--text-danger); }
   .muted { color: var(--text-secondary); }
   .text-link { color: var(--accent-link); }
-
-  /* Warm tan select — light mode walnut, dark mode navy (matches INPUT_CLASS) */
-  .select-tan {
-    appearance: none;
-    -webkit-appearance: none;
-    background-color: #6B5A3E;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23FDFAF6' d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    background-size: 12px;
-    color: #FDFAF6;
-    border: 1px solid #8B7355;
-    border-radius: 8px;
-    padding-right: 28px;
-    outline: none;
-    cursor: pointer;
-  }
-  .select-tan:focus {
-    border-color: #3D7A3F;
-  }
-  .select-tan option {
-    background: #6B5A3E;
-    color: #FDFAF6;
-  }
-  .dark .select-tan {
-    background-color: #1e2a3a;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23f1f5f9' d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
-    color: #f1f5f9;
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-  .dark .select-tan:focus {
-    border-color: #3b82f6;
-  }
-  .dark .select-tan option {
-    background: #1e2a3a;
-    color: #f1f5f9;
+  .page-subtitle {
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.5;
   }
 
   .btn-primary {
@@ -312,7 +286,7 @@ html, body {
   }
   .section-title {
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-primary);
     margin-bottom: 16px;
     text-transform: uppercase;
@@ -337,13 +311,90 @@ html, body {
   .card-warning { background: var(--bg-warning-tint); border-color: rgba(180,83,9,0.15); }
   .card-danger { background: var(--bg-danger-tint); border-color: rgba(185,28,28,0.15); }
 
-  /* Light mode alternating table rows */
+  /* Light mode table typography & row contrast */
+  :root:not(.dark) table {
+    color: var(--text-primary);
+  }
   :root:not(.dark) table tbody tr:nth-child(odd) {
     background-color: #FFFFFF;
   }
   :root:not(.dark) table tbody tr:nth-child(even) {
-    background-color: #F7FAF5;
+    background-color: #F4F7F2;
   }
+
+  /* Transaction review queue rows */
+  .review-row {
+    border-bottom: 1px solid rgba(45, 74, 40, 0.10);
+  }
+  :root:not(.dark) .review-row--odd {
+    background-color: #FFFFFF;
+  }
+  :root:not(.dark) .review-row--even {
+    background-color: #F4F7F2;
+  }
+  .review-vendor-name {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .review-vendor-desc {
+    color: var(--text-muted);
+  }
+  .review-history-link {
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .review-history-link:hover {
+    opacity: 0.85;
+  }
+  .review-table-header {
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+/* Warm tan select — light mode walnut, dark mode navy (matches INPUT_CLASS) */
+.select-tan {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: #5C4A1E;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23FFFFFF' d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px;
+  color: #FFFFFF;
+  border: 1px solid #8B7355;
+  border-radius: 8px;
+  padding: 8px 32px 8px 12px;
+  min-height: 38px;
+  line-height: 1.4;
+  font-weight: 500;
+  text-align: center;
+  outline: none;
+  cursor: pointer;
+}
+.select-tan:focus {
+  border-color: var(--accent);
+}
+.select-tan option {
+  background: #5C4A1E;
+  color: #FFFFFF;
+}
+.dark .select-tan {
+  background-color: #1e2a3a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23f1f5f9' d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
+  color: #f1f5f9;
+  border-color: rgba(255, 255, 255, 0.1);
+  text-align: left;
+  font-weight: 400;
+  min-height: auto;
+  padding: 10px 32px 10px 12px;
+}
+.dark .select-tan:focus {
+  border-color: #3b82f6;
+}
+.dark .select-tan option {
+  background: #1e2a3a;
+  color: #f1f5f9;
 }
 
 /* Scenario planner sliders */

@@ -252,7 +252,7 @@ function RuleFormPanel({
           <select
             value={category}
             onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
-            className={clsx("select-tan", "w-44 py-1.5 text-[12px]")}
+            className={clsx("select-tan", "w-44 text-[12px]")}
           >
             {getImportCategoriesForType(type).map((f) => (
               <option key={f} value={f}>
@@ -288,7 +288,7 @@ function RuleFormPanel({
           <select
             value={category}
             onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
-            className={clsx("select-tan", "w-44 py-1.5 text-[12px]")}
+            className={clsx("select-tan", "w-44 text-[12px]")}
           >
             {getImportCategoriesForType(type).map((f) => (
               <option key={f} value={f}>
@@ -1387,14 +1387,18 @@ export default function TransactionsPage() {
     }
   }
 
+  function reviewRowClass(index: number) {
+    return clsx("review-row", index % 2 === 0 ? "review-row--odd" : "review-row--even");
+  }
+
   function renderVendorDescription(vendorPattern: string, rawDescription: string, prefixSample = false) {
     const sample = rawDescription || "(no description)";
     return (
       <div className="min-w-0">
-        <div className="text-slate-200 truncate" title={vendorPattern}>
+        <div className="review-vendor-name truncate" title={vendorPattern}>
           {vendorPattern}
         </div>
-        <div className="text-[10px] text-slate-500 truncate mt-0.5" title={sample}>
+        <div className="review-vendor-desc text-[10px] truncate mt-0.5" title={sample}>
           {prefixSample && sample !== "(no description)" ? `e.g. ${sample}` : sample}
         </div>
       </div>
@@ -1426,7 +1430,7 @@ export default function TransactionsPage() {
             onChange={(e) => void updateCategory(item.id, e.target.value as BankImportCategory, storedCategory, true)}
             className={clsx(
               "select-tan",
-              "w-40 py-1.5 text-[11px]",
+              "w-40 text-[11px]",
               item.category === "needs_review" && "border-amber-500/40"
             )}
           >
@@ -1491,7 +1495,7 @@ export default function TransactionsPage() {
             <button
               type="button"
               onClick={() => void toggleHistory(row.id)}
-              className="text-[11px] text-blue-400 hover:text-blue-300"
+              className="review-history-link text-[11px]"
             >
               {expanded ? "▾ History" : "▸ History"}
             </button>
@@ -1549,8 +1553,8 @@ export default function TransactionsPage() {
   return (
     <div className="p-6 space-y-4 max-w-[1400px]">
       <div>
-        <h1 className="text-[20px] font-bold text-slate-100">Transaction Review</h1>
-        <p className="text-[12px] text-slate-500 mt-1">
+        <h1 className="text-[20px] font-bold" style={{ color: "var(--text-primary)" }}>Transaction Review</h1>
+        <p className="page-subtitle mt-1">
           Categorize bank transactions, post to P&L, exclude transfers, and reclassify posted items.
         </p>
       </div>
@@ -1751,7 +1755,7 @@ export default function TransactionsPage() {
             <select
               value={bulkCategory}
               onChange={(e) => setBulkCategory(e.target.value as BankImportCategory)}
-              className={clsx("select-tan", "w-44 py-1.5 text-[12px]")}
+              className={clsx("select-tan", "w-44 text-[12px]")}
             >
               {getImportCategoriesForType("expense").map((f) => (
                 <option key={f} value={f}>
@@ -1800,7 +1804,7 @@ export default function TransactionsPage() {
           <div className="table-scroll">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+                <tr className="text-left review-table-header">
                   <th className="pb-3 pr-3 font-medium">Vendor</th>
                   <th className="pb-3 pr-3 font-medium">Type</th>
                   <th className="pb-3 pr-3 font-medium">Count</th>
@@ -1811,12 +1815,12 @@ export default function TransactionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {transactionGroups.map((group) => {
+                {transactionGroups.map((group, groupIndex) => {
                   const isExpanded = expandedGroups.has(group.groupKey);
                   const canExpand = group.count > 1;
                   return (
                   <Fragment key={group.groupKey}>
-                    <tr className="border-b border-white/[0.04]">
+                    <tr className={reviewRowClass(groupIndex)}>
                       <td className="py-3 pr-3 max-w-[240px]">
                         <div className="flex items-start gap-1.5">
                           {canExpand ? (
@@ -1849,7 +1853,7 @@ export default function TransactionsPage() {
                           onChange={(e) =>
                             updateGroupCategory(group.groupKey, e.target.value as BankImportCategory)
                           }
-                          className={clsx("select-tan", "w-40 py-1.5 text-[12px]")}
+                          className={clsx("select-tan", "w-40 text-[12px]")}
                         >
                           {getImportCategoriesForType(group.type).map((f) => (
                             <option key={f} value={f}>
@@ -1932,7 +1936,7 @@ export default function TransactionsPage() {
           <div className="table-scroll">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+                <tr className="text-left review-table-header">
                   {activeTab === "needs_review" && (
                     <th className="pb-3 pr-2 font-medium w-8">
                       <input
@@ -1955,7 +1959,7 @@ export default function TransactionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {reviewRows.map((row) => {
+                {reviewRows.map((row, rowIndex) => {
                   const storedCategory = transactions.find((t) => t.id === row.id)?.category ?? null;
                   const excluded = isExcludedRow(row);
                   const posted = isPostedRow(row);
@@ -1964,7 +1968,7 @@ export default function TransactionsPage() {
 
                   return (
                     <Fragment key={row.id}>
-                      <tr className="border-b border-white/[0.04]">
+                      <tr className={reviewRowClass(rowIndex)}>
                         {activeTab === "needs_review" && (
                           <td className="py-3 pr-2">
                             <input
@@ -1975,7 +1979,7 @@ export default function TransactionsPage() {
                             />
                           </td>
                         )}
-                        <td className="py-3 pr-3 text-slate-300 whitespace-nowrap">
+                        <td className="py-3 pr-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                           {new Date(row.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
                         </td>
                         <td className="py-3 pr-3 text-slate-200 max-w-[180px]">
@@ -2019,7 +2023,7 @@ export default function TransactionsPage() {
                                 }}
                                 className={clsx(
                                   "select-tan",
-                                  "w-40 py-1.5 text-[12px]",
+                                  "w-40 text-[12px]",
                                   row.category === "needs_review" && "border-amber-500/40"
                                 )}
                               >
@@ -2293,7 +2297,7 @@ export default function TransactionsPage() {
                   onChange={(e) =>
                     setManualDraft((prev) => ({ ...prev, category: e.target.value as BankImportCategory }))
                   }
-                  className={clsx("select-tan", "w-full py-2 text-[12px]")}
+                  className={clsx("select-tan", "w-full text-[12px]")}
                 >
                   {getManualEntryCategories(manualDraft.type).map((f) => (
                     <option key={f} value={f}>
