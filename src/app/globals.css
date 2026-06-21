@@ -5,34 +5,34 @@
 
 /* ============ LIGHT MODE (default) ============ */
 :root {
-  --bg-page: #F4F6F9;
-  --bg-card: #FFFFFF;
-  --bg-card2: #F8FAFC;
-  --bg-sidebar: #F0F2F5;
-  --bg-sidebar-hover: #E8EBF0;
-  --bg-nav-active: #F8FAFC;
+  --bg-page: #EDF2ED;
+  --bg-card: #F7FAF7;
+  --bg-card2: #EFF5EF;
+  --bg-sidebar: #E5ECE5;
+  --bg-sidebar-hover: #DAE4DA;
+  --bg-nav-active: #EFF5EF;
   --nav-active-border: transparent;
-  --nav-active-text: #111827;
-  --text-primary: #111827;
-  --text-secondary: #4B5563;
-  --text-muted: #9CA3AF;
-  --border: rgba(0,0,0,0.06);
-  --border2: rgba(0,0,0,0.10);
-  --accent: #1D4ED8;
-  --card-shadow: 0 1px 2px rgba(0,0,0,0.04);
-  --card-shadow-hover: 0 1px 2px rgba(0,0,0,0.04);
+  --nav-active-text: #1C2B22;
+  --text-primary: #1C2B22;
+  --text-secondary: #435748;
+  --text-muted: #7A9080;
+  --border: rgba(28, 43, 34, 0.07);
+  --border2: rgba(28, 43, 34, 0.11);
+  --accent: #2F6651;
+  --card-shadow: 0 1px 3px rgba(28, 43, 34, 0.06);
+  --card-shadow-hover: 0 2px 6px rgba(28, 43, 34, 0.08);
   --card-radius: 10px;
-  --hero-bg: linear-gradient(135deg, #0f1e3d 0%, #1e3a5f 100%);
+  --hero-bg: linear-gradient(135deg, #0f2419 0%, #1a3d2e 100%);
 
   /* Semantic tints */
-  --bg-info-tint: #EFF6FF;
-  --bg-success-tint: #F0FDF4;
-  --bg-warning-tint: #FFFBEB;
-  --bg-danger-tint: #FEF2F2;
-  --text-info: #1D4ED8;
-  --text-success: #15803D;
-  --text-warning: #B45309;
-  --text-danger: #B91C1C;
+  --bg-info-tint: #E8F2EF;
+  --bg-success-tint: #E5F5EA;
+  --bg-warning-tint: #F5F0E5;
+  --bg-danger-tint: #F5EBE8;
+  --text-info: #256F5C;
+  --text-success: #2D6A4F;
+  --text-warning: #8B6914;
+  --text-danger: #9B3A2F;
 }
 
 /* ============ DARK MODE ============ */
