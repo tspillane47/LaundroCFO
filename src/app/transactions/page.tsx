@@ -374,7 +374,10 @@ export default function TransactionsPage() {
   const [categoryOverrides, setCategoryOverrides] = useState<Map<string, BankImportCategory>>(new Map());
   const [notesDraft, setNotesDraft] = useState<Map<string, string>>(new Map());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkCategory, setBulkCategory] = useState<BankImportCategory>("self_service_revenue");
+  const [bulkReclassifyModal, setBulkReclassifyModal] = useState<{
+    ids: string[];
+    category: BankImportCategory;
+  } | null>(null);
   const [groupByVendor, setGroupByVendor] = useState(true);
   const [filterVendor, setFilterVendor] = useState("");
   const [filterName, setFilterName] = useState("");
@@ -729,6 +732,42 @@ export default function TransactionsPage() {
     });
   }
 
+  function toggleSelectGroup(group: TransactionGroup, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const item of group.items) {
+        if (checked) next.add(item.id);
+        else next.delete(item.id);
+      }
+      return next;
+    });
+  }
+
+  function isGroupFullySelected(group: TransactionGroup): boolean {
+    return group.items.length > 0 && group.items.every((item) => selectedIds.has(item.id));
+  }
+
+  const selectedActionRows = useMemo(
+    () => filteredReviewRows.filter((row) => selectedIds.has(row.id) && !isExcludedRow(row)),
+    [filteredReviewRows, selectedIds]
+  );
+
+  const bulkReclassifyCategories = useMemo((): BankImportCategory[] => {
+    if (!bulkReclassifyModal) return [];
+    const categories = new Set<BankImportCategory>();
+    for (const id of bulkReclassifyModal.ids) {
+      const row =
+        filteredReviewRows.find((r) => r.id === id) ?? reviewRows.find((r) => r.id === id);
+      if (!row) continue;
+      for (const category of getImportCategoriesForType(row.type)) {
+        if (category !== "needs_review") categories.add(category);
+      }
+    }
+    return Array.from(categories).sort((a, b) =>
+      (BANK_IMPORT_CATEGORY_LABELS[a] ?? a).localeCompare(BANK_IMPORT_CATEGORY_LABELS[b] ?? b)
+    );
+  }, [bulkReclassifyModal, filteredReviewRows, reviewRows]);
+
   async function updateCategory(
     id: string,
     category: BankImportCategory,
@@ -1037,6 +1076,96 @@ export default function TransactionsPage() {
     setReclassifyModal(null);
     setMessage({ type: "success", text: "Transaction reclassified and P&L updated." });
     await loadData();
+  }
+
+  function openBulkReclassifyModal() {
+    const ids = selectedActionRows.map((row) => row.id);
+    if (ids.length === 0) {
+      setMessage({ type: "error", text: "Select at least one non-excluded transaction to reclassify." });
+      return;
+    }
+    const firstRow = selectedActionRows[0];
+    const preferred =
+      firstRow.category !== "needs_review"
+        ? firstRow.category
+        : firstRow.suggested !== "needs_review"
+          ? firstRow.suggested
+          : getImportCategoriesForType(firstRow.type).find((c) => c !== "needs_review") ??
+            (firstRow.type === "income" ? "self_service_revenue" : "rent");
+    setBulkReclassifyModal({ ids, category: preferred });
+  }
+
+  async function confirmBulkReclassify() {
+    if (!bulkReclassifyModal || !userId) return;
+
+    const category = bulkReclassifyModal.category;
+    const hasPostedSelection = bulkReclassifyModal.ids.some((id) => {
+      const row =
+        filteredReviewRows.find((r) => r.id === id) ?? reviewRows.find((r) => r.id === id);
+      return row && isPostedRow(row);
+    });
+    if (hasPostedSelection && !isCategoryReadyToPost(category)) {
+      setMessage({ type: "error", text: "Choose a postable category for posted transactions." });
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+
+    let updatedCount = 0;
+    for (const id of bulkReclassifyModal.ids) {
+      const row =
+        filteredReviewRows.find((r) => r.id === id) ?? reviewRows.find((r) => r.id === id);
+      if (!row || isExcludedRow(row)) continue;
+
+      const storedCategory = transactions.find((t) => t.id === id)?.category ?? null;
+      if (storedCategory === category) continue;
+
+      if (isPostedRow(row)) {
+        if (!isCategoryReadyToPost(category)) continue;
+        const { error } = await reclassifyPostedTransaction(
+          supabase,
+          id,
+          category,
+          userId,
+          store
+        );
+        if (error) {
+          setSaving(false);
+          setMessage({ type: "error", text: error });
+          return;
+        }
+      } else {
+        const validCategories = getImportCategoriesForType(row.type);
+        if (!validCategories.includes(category)) continue;
+        await updateCategory(id, category, storedCategory, true);
+      }
+      updatedCount += 1;
+    }
+
+    if (store?.id) invalidateValuationCache(store.id);
+    setSaving(false);
+    setBulkReclassifyModal(null);
+    setSelectedIds(new Set());
+    setMessage({
+      type: "success",
+      text:
+        updatedCount === 1
+          ? "Reclassified 1 transaction."
+          : updatedCount === 0
+            ? "No transactions were reclassified."
+            : `Reclassified ${updatedCount} transactions.`,
+    });
+    await loadData();
+  }
+
+  function handleBulkExclude() {
+    const ids = selectedActionRows.map((row) => row.id);
+    if (ids.length === 0) {
+      setMessage({ type: "error", text: "Select at least one non-excluded transaction to exclude." });
+      return;
+    }
+    setExcludeModal({ ids, reason: "" });
   }
 
   function handleCSVUpload(file: File) {
@@ -1453,7 +1582,17 @@ export default function TransactionsPage() {
     const storedCategory = transactions.find((t) => t.id === item.id)?.category ?? null;
     return (
       <tr key={`sub-${item.id}`} className="border-b border-white/[0.02] bg-white/[0.015]">
-        <td className="py-2 pr-3 pl-8">
+        <td className="py-2 pr-2 pl-2">
+          <input
+            type="checkbox"
+            checked={selectedIds.has(item.id)}
+            onChange={(e) => toggleSelectId(item.id, e.target.checked)}
+            disabled={item.possibleDuplicate}
+            className="rounded border-white/20 disabled:opacity-40"
+            aria-label={`Select ${item.description ?? "transaction"}`}
+          />
+        </td>
+        <td className="py-2 pr-3 pl-6">
           <div className="min-w-0">
             <div className="text-adaptive-muted whitespace-nowrap text-[11px]">
               {new Date(item.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
@@ -1797,47 +1936,24 @@ export default function TransactionsPage() {
           onReviewFirst={dismissRulePostPrompt}
         />
 
-        {someSelected && activeTab === "needs_review" && !groupByVendor && (
+        {someSelected && (
           <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
             <span className="text-[12px] text-adaptive-info font-medium">{selectedIds.size} selected</span>
-            <select
-              value={bulkCategory}
-              onChange={(e) => setBulkCategory(e.target.value as BankImportCategory)}
-              className={clsx("select-tan", "w-44 text-[12px]")}
-            >
-              {getImportCategoriesForType("expense").map((f) => (
-                <option key={f} value={f}>
-                  {BANK_IMPORT_CATEGORY_LABELS[f]}
-                </option>
-              ))}
-            </select>
             <button
               type="button"
               className="btn-outline text-[11px]"
-              onClick={() => {
-                for (const id of Array.from(selectedIds)) {
-                  const txn = transactions.find((t) => t.id === id);
-                  void updateCategory(id, bulkCategory, txn?.category ?? null);
-                }
-                setMessage({ type: "success", text: `Applied category to ${selectedIds.size} transactions.` });
-              }}
+              onClick={openBulkReclassifyModal}
+              disabled={selectedActionRows.length === 0 || saving}
             >
-              Apply Category
-            </button>
-            <button
-              type="button"
-              className="btn-primary text-[11px]"
-              onClick={() => void handlePostRows(reviewRows.filter((r) => selectedIds.has(r.id)))}
-              disabled={posting}
-            >
-              {posting ? `Posting ${postingCount}…` : "Post Selected"}
+              Reclassify
             </button>
             <button
               type="button"
               className="btn-outline text-[11px] text-red-400 border-red-500/30"
-              onClick={() => setExcludeModal({ ids: Array.from(selectedIds), reason: "" })}
+              onClick={handleBulkExclude}
+              disabled={selectedActionRows.length === 0 || saving}
             >
-              Exclude Selected
+              Exclude
             </button>
           </div>
         )}
@@ -1922,6 +2038,15 @@ export default function TransactionsPage() {
             <table className="w-full text-[12px]">
               <thead>
                 <tr className="text-left review-table-header">
+                  <th className="pb-3 pr-2 font-medium w-8">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={(e) => toggleSelectAll(e.target.checked)}
+                      className="rounded border-white/20"
+                      aria-label="Select all transactions"
+                    />
+                  </th>
                   <th className="pb-3 pr-3 font-medium">Vendor</th>
                   <th className="pb-3 pr-3 font-medium">Type</th>
                   <th className="pb-3 pr-3 font-medium">Count</th>
@@ -1938,6 +2063,15 @@ export default function TransactionsPage() {
                   return (
                   <Fragment key={group.groupKey}>
                     <tr className={reviewRowClass(groupIndex)}>
+                      <td className="py-3 pr-2">
+                        <input
+                          type="checkbox"
+                          checked={isGroupFullySelected(group)}
+                          onChange={(e) => toggleSelectGroup(group, e.target.checked)}
+                          className="rounded border-white/20"
+                          aria-label={`Select ${group.vendorPattern}`}
+                        />
+                      </td>
                       <td className="py-3 pr-3 max-w-[240px]">
                         <div className="flex items-start gap-1.5">
                           {canExpand ? (
@@ -2019,10 +2153,10 @@ export default function TransactionsPage() {
                     {isExpanded &&
                       canExpand &&
                       group.items.map((item) => renderGroupSubRow(item))}
-                    {group.count === 1 && renderHistoryToggle(group.items[0], 7)}
+                    {group.count === 1 && renderHistoryToggle(group.items[0], 8)}
                     {ruleFormKey === group.groupKey && (
                       <tr className="border-b border-white/[0.04] bg-blue-500/5">
-                        <td colSpan={7} className="py-3 px-3">
+                        <td colSpan={8} className="py-3 px-3">
                           <RuleFormPanel
                             type={group.type}
                             vendorPattern={group.vendorPattern}
@@ -2054,17 +2188,15 @@ export default function TransactionsPage() {
             <table className="w-full text-[12px]">
               <thead>
                 <tr className="text-left review-table-header">
-                  {activeTab === "needs_review" && (
-                    <th className="pb-3 pr-2 font-medium w-8">
-                      <input
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={(e) => toggleSelectAll(e.target.checked)}
-                        className="rounded border-white/20"
-                        aria-label="Select all"
-                      />
-                    </th>
-                  )}
+                  <th className="pb-3 pr-2 font-medium w-8">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={(e) => toggleSelectAll(e.target.checked)}
+                      className="rounded border-white/20"
+                      aria-label="Select all transactions"
+                    />
+                  </th>
                   <th className="pb-3 pr-3 font-medium">Date</th>
                   <th className="pb-3 pr-3 font-medium">Description</th>
                   <th className="pb-3 pr-3 font-medium">Type</th>
@@ -2081,21 +2213,21 @@ export default function TransactionsPage() {
                   const excluded = isExcludedRow(row);
                   const posted = isPostedRow(row);
                   const needsReview = isNeedsReview(row);
-                  const colSpan = activeTab === "needs_review" ? 9 : 8;
+                  const colSpan = 9;
 
                   return (
                     <Fragment key={row.id}>
                       <tr className={reviewRowClass(rowIndex)}>
-                        {activeTab === "needs_review" && (
-                          <td className="py-3 pr-2">
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.has(row.id)}
-                              onChange={(e) => toggleSelectId(row.id, e.target.checked)}
-                              className="rounded border-white/20"
-                            />
-                          </td>
-                        )}
+                        <td className="py-3 pr-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(row.id)}
+                            onChange={(e) => toggleSelectId(row.id, e.target.checked)}
+                            disabled={row.possibleDuplicate}
+                            className="rounded border-white/20 disabled:opacity-40"
+                            aria-label={`Select ${row.description ?? "transaction"}`}
+                          />
+                        </td>
                         <td className="py-3 pr-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                           {new Date(row.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
                         </td>
@@ -2290,6 +2422,56 @@ export default function TransactionsPage() {
               </button>
               <button type="button" className="btn-primary" onClick={() => void confirmExclude()} disabled={saving}>
                 {saving ? "Excluding…" : "Exclude"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkReclassifyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="card max-w-md w-full space-y-4">
+            <div className="text-[15px] font-semibold text-adaptive-primary">
+              Reclassify {bulkReclassifyModal.ids.length === 1 ? "Transaction" : `${bulkReclassifyModal.ids.length} Transactions`}
+            </div>
+            <p className="text-[12px] text-adaptive-muted">
+              Choose a category to apply to all selected transactions. Posted transactions will have their P&L updated.
+            </p>
+            <div>
+              <label className="text-[12px] text-adaptive-muted block mb-1">New category</label>
+              <select
+                value={bulkReclassifyModal.category}
+                onChange={(e) =>
+                  setBulkReclassifyModal({
+                    ...bulkReclassifyModal,
+                    category: e.target.value as BankImportCategory,
+                  })
+                }
+                className={clsx("select-tan", "w-full text-[12px]")}
+              >
+                {bulkReclassifyCategories.map((category) => (
+                  <option key={category} value={category}>
+                    {BANK_IMPORT_CATEGORY_LABELS[category]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => setBulkReclassifyModal(null)}
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => void confirmBulkReclassify()}
+                disabled={saving || bulkReclassifyCategories.length === 0}
+              >
+                {saving ? "Reclassifying…" : "Reclassify"}
               </button>
             </div>
           </div>
