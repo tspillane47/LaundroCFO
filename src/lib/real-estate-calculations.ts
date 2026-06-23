@@ -1,3 +1,53 @@
+export type Mortgage = {
+  lender_name: string;
+  monthly_payment: number;
+  balance: number;
+};
+
+export function sumMortgagePayments(mortgages: Mortgage[] | null | undefined): number | null {
+  if (!mortgages?.length) return null;
+  const total = mortgages.reduce((sum, m) => sum + (m.monthly_payment ?? 0), 0);
+  return total > 0 ? total : null;
+}
+
+export function sumMortgageBalances(mortgages: Mortgage[] | null | undefined): number | null {
+  if (!mortgages?.length) return null;
+  const total = mortgages.reduce((sum, m) => sum + (m.balance ?? 0), 0);
+  return total > 0 ? total : null;
+}
+
+export function legacyMortgageToArray(record: {
+  mortgage_lender?: string | null;
+  monthly_mortgage_payment?: number | null;
+  current_loan_balance?: number | null;
+}): Mortgage[] {
+  const hasLegacy =
+    record.mortgage_lender ||
+    record.monthly_mortgage_payment != null ||
+    record.current_loan_balance != null;
+  if (!hasLegacy) return [];
+  return [
+    {
+      lender_name: record.mortgage_lender ?? "",
+      monthly_payment: record.monthly_mortgage_payment ?? 0,
+      balance: record.current_loan_balance ?? 0,
+    },
+  ];
+}
+
+export function normalizeMortgages(
+  mortgages: Mortgage[] | null | undefined,
+  record?: {
+    mortgage_lender?: string | null;
+    monthly_mortgage_payment?: number | null;
+    current_loan_balance?: number | null;
+  }
+): Mortgage[] {
+  if (mortgages?.length) return mortgages;
+  if (record) return legacyMortgageToArray(record);
+  return [];
+}
+
 export type RealEstateInputs = {
   estimated_value: number | null;
   current_loan_balance: number | null;
