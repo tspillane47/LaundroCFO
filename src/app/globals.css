@@ -38,7 +38,7 @@
   --card-shadow: 0 1px 4px rgba(17, 27, 16, 0.10);
   --card-shadow-hover: 0 4px 16px rgba(17, 27, 16, 0.14);
   --card-radius: 10px;
-  --hero-bg: linear-gradient(135deg, #0f1e3d 0%, #1e3a5f 100%);
+  --hero-bg: linear-gradient(135deg, #4a7c59 0%, #4a7c59 100%);
 
   /* Semantic */
   --text-info: #1E40AF;
@@ -76,7 +76,7 @@
   --card-shadow: none;
   --card-shadow-hover: none;
   --card-radius: 14px;
-  --hero-bg: linear-gradient(135deg, #0f1e3d 0%, #1e3a5f 100%);
+  --hero-bg: linear-gradient(135deg, #4a7c59 0%, #4a7c59 100%);
 
   --bg-info-tint: rgba(59,130,246,0.1);
   --bg-success-tint: rgba(34,197,94,0.08);
@@ -442,7 +442,7 @@ html, body {
   height: 14px;
   border-radius: 50%;
   background: #60a5fa;
-  border: 2px solid #1e293b;
+  border: 2px solid #4a7c59;
   box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.4);
 }
 
@@ -451,7 +451,7 @@ html, body {
   height: 14px;
   border-radius: 50%;
   background: #60a5fa;
-  border: 2px solid #1e293b;
+  border: 2px solid #4a7c59;
   box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.4);
 }
 
@@ -714,7 +714,7 @@ html, body {
 }
 
 .hero-value-card {
-  background: linear-gradient(135deg, #0f1e3d 0%, #1e3a5f 100%);
+  background: linear-gradient(135deg, #4a7c59 0%, #4a7c59 100%);
   border-radius: 20px;
   padding: 32px 40px;
   position: relative;
