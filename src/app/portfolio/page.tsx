@@ -18,12 +18,6 @@ import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
-import {
-  financials as demoFinancials,
-  DEMO_MONTHLY_REVENUE,
-  DEMO_MONTHLY_EXPENSES,
-  DEMO_ANNUAL_DEBT_SERVICE,
-} from "@/lib/data";
 
 type Store = {
   id: string;
@@ -234,28 +228,22 @@ export default function PortfolioPage() {
 
   const storeMetrics = useMemo(() => {
     return (stores as Store[]).map((store) => {
-      const hasRealData = (store.monthly_revenue ?? 0) > 0;
-      const monthlyRevenue = hasRealData ? (store.monthly_revenue ?? 0) : DEMO_MONTHLY_REVENUE;
-      const monthlyExpenses = hasRealData
-        ? (store.monthly_expenses ?? 0)
-        : DEMO_MONTHLY_EXPENSES;
+      const monthlyRevenue = store.monthly_revenue ?? 0;
+      const monthlyExpenses = store.monthly_expenses ?? 0;
       const monthlyEbitda = monthlyRevenue - monthlyExpenses;
       const annualEbitda = monthlyEbitda * 12;
-      const debtService = hasRealData
-        ? (store.annual_debt_service ?? 0)
-        : DEMO_ANNUAL_DEBT_SERVICE;
-      const annualCashFlow = hasRealData ? annualEbitda - debtService : demoFinancials.cashFlow;
+      const debtService = store.annual_debt_service ?? 0;
+      const annualCashFlow = annualEbitda - debtService;
       const dscr = debtService > 0 ? annualCashFlow / debtService : 0;
       const storeValuation = valuationByStoreId.get(store.id);
-      const estimatedValue = hasRealData && storeValuation
-        ? storeValuation.businessValue
-        : demoFinancials.estimatedValue;
+      const hasFinancialData = monthlyRevenue > 0;
+      const estimatedValue = hasFinancialData ? (storeValuation?.businessValue ?? 0) : 0;
       const loanBalance = store.loan_balance ?? 0;
       const storeCash =
         (store.operating_account_balance ?? 0) +
         (store.reserve_account_balance ?? 0) +
         (store.petty_cash ?? 0);
-      const avgMachineAge = store.avg_machine_age ?? 6.1;
+      const avgMachineAge = store.avg_machine_age ?? 0;
 
       const isOwnerOccupied = store.occupancy_type === "owner_occupied";
       const storeLease = leases.find((l) => l.store_id === store.id);
@@ -269,7 +257,6 @@ export default function PortfolioPage() {
 
       return {
         store,
-        hasRealData,
         estimatedValue,
         monthlyRevenue,
         monthlyEbitda,
@@ -283,8 +270,6 @@ export default function PortfolioPage() {
       };
     });
   }, [stores, leases, valuationByStoreId]);
-
-  const usingDemoData = storeMetrics.some((m) => !m.hasRealData);
 
   const aggregates = useMemo(() => {
     const totalPortfolioValue = storeMetrics.reduce((s, m) => s + m.estimatedValue, 0);
@@ -301,31 +286,20 @@ export default function PortfolioPage() {
     );
     const totalAnnualDebtService = totalAnnualDebtServiceFromLoans;
     const totalAnnualCashFlow = totalAnnualEbitda - totalAnnualDebtService;
+    const hasDebtData = totalAnnualDebtServiceFromLoans > 0;
     const globalDSCR =
-      totalAnnualDebtService > 0
-        ? totalAnnualEbitda / totalAnnualDebtService
-        : demoFinancials.cashFlow / demoFinancials.annualDebtService;
+      hasDebtData ? totalAnnualEbitda / totalAnnualDebtService : 0;
     const portfolioNetWorth = totalPortfolioValue - totalDebt + totalCash;
     const ebitdaMargin = totalAnnualRevenue > 0 ? (totalAnnualEbitda / totalAnnualRevenue) * 100 : 0;
     const availableMonthlyCashFlow = Math.max(0, (totalAnnualEbitda - totalAnnualDebtService) / 12);
     const acquisitionCapacity = (availableMonthlyCashFlow * 12) / 0.12;
-
-    const hasDebtData = totalAnnualDebtServiceFromLoans > 0;
-    const resolvedPortfolioValue =
-      usingDemoData && totalPortfolioValue === 0 ? demoFinancials.estimatedValue : totalPortfolioValue;
-    const resolvedAnnualRevenue =
-      usingDemoData && totalAnnualRevenue === 0 ? demoFinancials.annualRevenue : totalAnnualRevenue;
-    const resolvedAnnualEbitda =
-      usingDemoData && totalAnnualEbitda === 0 ? demoFinancials.ebitda : totalAnnualEbitda;
-    const resolvedMonthlyEbitda =
-      usingDemoData && totalAnnualEbitda === 0 ? demoFinancials.ebitda / 12 : totalMonthlyEbitda;
-    const portfolioEquity = resolvedPortfolioValue + totalCash - totalDebt;
+    const portfolioEquity = totalPortfolioValue + totalCash - totalDebt;
 
     return {
-      totalPortfolioValue: resolvedPortfolioValue,
-      totalAnnualRevenue: resolvedAnnualRevenue,
-      totalAnnualEbitda: resolvedAnnualEbitda,
-      totalMonthlyEbitda: resolvedMonthlyEbitda,
+      totalPortfolioValue,
+      totalAnnualRevenue,
+      totalAnnualEbitda,
+      totalMonthlyEbitda,
       totalDebt,
       totalCash,
       totalAnnualDebtService,
@@ -337,7 +311,7 @@ export default function PortfolioPage() {
       hasDebtData,
       portfolioEquity,
     };
-  }, [storeMetrics, stores, usingDemoData, totalDebt, totalAnnualDebtServiceFromLoans]);
+  }, [storeMetrics, stores, totalDebt, totalAnnualDebtServiceFromLoans]);
 
   const allFeedItems = useMemo(() => {
     const items = (stores as Store[]).flatMap((store) => {
@@ -514,11 +488,6 @@ export default function PortfolioPage() {
       <div className="hero-value-card">
         <div style={{ fontSize: '12px', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>
           Portfolio Value
-          {usingDemoData && (
-            <span className="inline-flex items-center ml-3 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/20 text-amber-200 border border-amber-400/30 normal-case tracking-normal">
-              Demo data
-            </span>
-          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
           <AnimatedNumber value={aggregates.totalPortfolioValue} prefix="$" className="hero-value-text" duration={1200} />
@@ -550,7 +519,11 @@ export default function PortfolioPage() {
           <div>
             <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Global DSCR</div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'white' }}>
-              <AnimatedNumber value={aggregates.globalDSCR} decimals={2} suffix="x" duration={1000} />
+              {aggregates.hasDebtData ? (
+                <AnimatedNumber value={aggregates.globalDSCR} decimals={2} suffix="x" duration={1000} />
+              ) : (
+                "—"
+              )}
             </div>
           </div>
         </div>
@@ -675,8 +648,8 @@ export default function PortfolioPage() {
                   { label: "EBITDA", value: fmtDollar(m.monthlyEbitda) },
                   {
                     label: "DSCR",
-                    value: m.store.annual_debt_service || !m.hasRealData ? fmtMultiple(m.dscr) : "—",
-                    color: m.store.annual_debt_service || !m.hasRealData ? dscrColorClass(m.dscr) : undefined,
+                    value: (m.store.annual_debt_service ?? 0) > 0 ? fmtMultiple(m.dscr) : "—",
+                    color: (m.store.annual_debt_service ?? 0) > 0 ? dscrColorClass(m.dscr) : undefined,
                   },
                 ].map((metric) => (
                   <div key={metric.label}>
@@ -794,8 +767,11 @@ export default function PortfolioPage() {
         <div className="space-y-3 mb-4">
           <div className="flex justify-between text-[13px]">
             <span style={{ color: "var(--text-secondary)" }}>Global DSCR</span>
-            <span className={clsx("font-semibold", dscrColorClass(aggregates.globalDSCR))}>
-              {fmtMultiple(aggregates.globalDSCR)}
+            <span
+              className={clsx("font-semibold", aggregates.hasDebtData && dscrColorClass(aggregates.globalDSCR))}
+              style={aggregates.hasDebtData ? undefined : { color: "var(--text-muted)" }}
+            >
+              {aggregates.hasDebtData ? fmtMultiple(aggregates.globalDSCR) : "—"}
             </span>
           </div>
           <div className="flex justify-between text-[13px]">
