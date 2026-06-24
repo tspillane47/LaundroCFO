@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase";
 import { StoreProvider, useStores } from "@/lib/store-context";
 import clsx from "clsx";
 import { NavIcon, SunIcon, MoonIcon, ChevronDownIcon, MenuIcon, CloseIcon } from "@/components/ui/NavIcons";
+import { FeedbackModal } from "@/components/ui/FeedbackModal";
 
 const navSections = [
   {
@@ -60,6 +61,7 @@ const pageTitles: Record<string, string> = {
   "/settings": "Settings",
   "/settings/manage-stores": "Manage Stores",
   "/settings/edit-store": "Edit Store",
+  "/admin/feedback": "Feedback Admin",
 };
 
 const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password", "/auth/callback"];
@@ -73,6 +75,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
   const [storeSearch, setStoreSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
   const sidebarStoreRef = useRef<HTMLDivElement>(null);
@@ -287,6 +290,39 @@ function AppShell({ children }: { children: React.ReactNode }) {
                   </Link>
                 );
               })}
+              {section.label === "ACCOUNT" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFeedbackOpen(true);
+                    setSidebarOpen(false);
+                  }}
+                  className="nav-item"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "7px 20px",
+                    fontSize: "13px",
+                    fontWeight: 400,
+                    color: "var(--text-muted)",
+                    background: "transparent",
+                    border: "none",
+                    width: "100%",
+                    textAlign: "left",
+                    cursor: "pointer",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "color-mix(in srgb, var(--bg-card2) 50%, transparent)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  <NavIcon name="feedback" />
+                  Feedback
+                </button>
+              )}
             </div>
           ))}
         </nav>
@@ -431,6 +467,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </div>
   );
 }
