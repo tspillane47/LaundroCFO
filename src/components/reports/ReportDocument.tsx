@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import { computeEquipmentMetrics, type EquipmentRecord, type TurnsPerDayResult } from "@/lib/equipment";
+import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import {
+  calcDSCR,
   calcGlobalDSCR,
   calcDebtYield,
   calcEbitdaPerSF,
@@ -16,20 +17,6 @@ import {
   fmtPct,
 } from "@/lib/calculations";
 import type { ValuationResult } from "@/lib/valuation";
-import type { ReportFinancialContext } from "@/lib/reportFinancials";
-import type { LaundroCfoScoreResult } from "@/lib/laundroCfoScore";
-import { buildEquitySnapshot } from "@/lib/getStoreReportData";
-import { pdfMetricValueFontSize } from "@/lib/metricStyles";
-import {
-  RevenueExpenseBarChart,
-  CategoryBreakdownBar,
-  BenchmarkBar,
-  StatusIndicator,
-  waterKpiStatusColor,
-  benchmarkStatusColor,
-  UtilityLineChart,
-  PDF_CHART,
-} from "@/components/reports/charts";
 
 export interface ReportProps {
   store: any;
@@ -42,13 +29,11 @@ export interface ReportProps {
   portfolioStores: any[];
   generatedDate: string;
   executiveSummary: string;
-  financial: ReportFinancialContext;
-  laundroCfoScore: LaundroCfoScoreResult;
 }
 
 const styles = StyleSheet.create({
   page: { backgroundColor: "#F8FAFC", padding: 40, fontFamily: "Helvetica" },
-  coverPage: { backgroundColor: "#0f1e3d", padding: 50, height: "100%" },
+  coverPage: { backgroundColor: "#1E3A1E", padding: 50, height: "100%" },
   coverTitle: {
     color: "white",
     fontSize: 30,
@@ -61,22 +46,22 @@ const styles = StyleSheet.create({
   coverSubtitle: { color: "#93c5fd", fontSize: 16, marginBottom: 40 },
   coverMeta: { color: "#94a3b8", fontSize: 12, marginTop: 8 },
   sectionHeader: {
-    backgroundColor: "#0f1e3d",
+    backgroundColor: "#1E3A1E",
     color: "white",
-    padding: "10 14",
+    padding: "8 12",
     fontSize: 11,
     fontWeight: "bold",
     textTransform: "uppercase",
     letterSpacing: 1,
-    marginBottom: 14,
-    marginTop: 28,
+    marginBottom: 12,
+    marginTop: 20,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "bold", color: "#1e293b", marginBottom: 8, marginTop: 4 },
+  sectionTitle: { fontSize: 16, fontWeight: "bold", color: "#1e293b", marginBottom: 4 },
   bodyText: { fontSize: 10, color: "#475569", lineHeight: 1.6, marginBottom: 8 },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 7,
+    paddingVertical: 6,
     borderBottom: "1 solid #e2e8f0",
   },
   rowLabel: { fontSize: 10, color: "#64748b", flex: 1 },
@@ -88,36 +73,13 @@ const styles = StyleSheet.create({
     padding: 12,
     margin: 4,
     flex: 1,
-    overflow: "hidden",
-    minWidth: 100,
-  },
-  ratioCard: {
-    backgroundColor: "white",
-    border: "1 solid #e2e8f0",
-    borderRadius: 6,
-    padding: "10 8",
-    width: "23%",
-    minWidth: 120,
-    marginBottom: 8,
-    overflow: "hidden",
-  },
-  ratioGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
   },
   metricValue: { fontSize: 18, fontWeight: "bold", color: "#1e293b", marginBottom: 2 },
-  ratioValue: { fontSize: 20, fontWeight: "bold", color: "#1e293b", marginTop: 4 },
   metricLabel: {
     fontSize: 8,
     color: "#94a3b8",
     textTransform: "uppercase",
     letterSpacing: 0.5,
-  },
-  ratioLabel: {
-    fontSize: 8,
-    color: "#64748b",
-    letterSpacing: 0.3,
   },
   grid2: { flexDirection: "row", flexWrap: "wrap" },
   positiveText: { color: "#15803d" },
@@ -143,8 +105,8 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 8,
   },
-  pageNumber: { position: "absolute", bottom: 24, right: 40, fontSize: 9, color: "#94a3b8" },
-  footer: { position: "absolute", bottom: 24, left: 40, fontSize: 9, color: "#94a3b8" },
+  pageNumber: { position: "absolute", bottom: 30, right: 40, fontSize: 9, color: "#94a3b8" },
+  footer: { position: "absolute", bottom: 30, left: 40, fontSize: 9, color: "#94a3b8" },
   divider: { borderBottom: "1 solid #e2e8f0", marginVertical: 12 },
   badge: {
     backgroundColor: "#dbeafe",
@@ -168,13 +130,13 @@ const styles = StyleSheet.create({
   tableHeader: {
     flexDirection: "row",
     backgroundColor: "#f1f5f9",
-    paddingVertical: 7,
+    paddingVertical: 6,
     paddingHorizontal: 8,
     borderBottom: "1 solid #e2e8f0",
   },
   tableRow: {
     flexDirection: "row",
-    paddingVertical: 6,
+    paddingVertical: 5,
     paddingHorizontal: 8,
     borderBottom: "1 solid #f1f5f9",
   },
@@ -182,9 +144,6 @@ const styles = StyleSheet.create({
   tableCellBold: { fontSize: 9, color: "#1e293b", fontWeight: "bold" },
   boxText: { fontSize: 9, color: "#475569", lineHeight: 1.5 },
   tocItem: { fontSize: 11, color: "#475569", marginBottom: 6, flexDirection: "row", justifyContent: "space-between" },
-  scoreHeroGrade: { fontSize: 56, fontWeight: "bold", color: "#1d4ed8", lineHeight: 1 },
-  scoreHeroValue: { fontSize: 22, fontWeight: "bold", color: "#1e293b", marginTop: 6 },
-  chartContainer: { marginTop: 8, marginBottom: 4 },
 });
 
 function parseDate(value: string | null | undefined): Date | null {
@@ -232,52 +191,6 @@ function ratioColor(value: number, good: number, warn: number, invert = false): 
 function labelize(value: string | null | undefined): string {
   if (!value) return "—";
   return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-type ServiceMixPct = {
-  selfService: number;
-  wdf: number;
-  commercial: number;
-  pickupDelivery: number;
-};
-
-function resolveServiceMix(
-  store: any,
-  revenueBreakdown: ReportProps["financial"]["revenueBreakdown"]
-): ServiceMixPct | null {
-  const storeMix = {
-    selfService: store?.self_service_pct,
-    wdf: store?.wdf_pct,
-    commercial: store?.commercial_pct,
-    pickupDelivery: store?.pickup_delivery_pct,
-  };
-  const hasStoreMix = Object.values(storeMix).some((v) => v != null && Number(v) > 0);
-  if (hasStoreMix) {
-    const wdf = Number(storeMix.wdf) || 0;
-    const commercial = Number(storeMix.commercial) || 0;
-    const pickupDelivery = Number(storeMix.pickupDelivery) || 0;
-    const selfService =
-      storeMix.selfService != null
-        ? Number(storeMix.selfService)
-        : Math.max(0, 100 - wdf - commercial - pickupDelivery);
-    return { selfService, wdf, commercial, pickupDelivery };
-  }
-
-  if (revenueBreakdown.length === 0) return null;
-
-  const lookup: Record<string, number> = {};
-  for (const line of revenueBreakdown) {
-    lookup[line.label] = line.pctOfTotal;
-  }
-
-  const selfService = lookup["Self-Service"] ?? 0;
-  const wdf = lookup["WDF"] ?? 0;
-  const commercial = lookup["Commercial"] ?? 0;
-  const pickupDelivery = lookup["Other"] ?? lookup["Vending"] ?? 0;
-  const total = selfService + wdf + commercial + pickupDelivery;
-  if (total <= 0) return null;
-
-  return { selfService, wdf, commercial, pickupDelivery };
 }
 
 function PageChrome({ storeName }: { storeName: string }) {
@@ -338,67 +251,30 @@ function MetricTile({
   valueColor?: string;
   width?: string;
 }) {
-  const valueSize = pdfMetricValueFontSize(value);
   return (
     <View style={[styles.metricCard, { width }]}>
       <Text style={styles.metricLabel}>{label}</Text>
-      <Text
-        style={[
-          styles.metricValue,
-          { fontSize: valueSize },
-          valueColor ? { color: valueColor } : {},
-        ]}
-      >
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function RatioMetricTile({
-  label,
-  value,
-  valueColor,
-}: {
-  label: string;
-  value: string;
-  valueColor?: string;
-}) {
-  const valueSize = pdfMetricValueFontSize(value);
-  return (
-    <View style={styles.ratioCard}>
-      <Text style={styles.ratioLabel} hyphenationCallback={(word) => [word]}>
-        {label}
-      </Text>
-      <Text
-        style={[
-          styles.ratioValue,
-          { fontSize: valueSize },
-          valueColor ? { color: valueColor } : {},
-        ]}
-        hyphenationCallback={(word) => [word]}
-      >
-        {value}
-      </Text>
+      <Text style={[styles.metricValue, valueColor ? { color: valueColor } : {}]}>{value}</Text>
     </View>
   );
 }
 
 function computeReportMetrics(props: ReportProps) {
-  const { store, lease, leaseOptions, equipment, valuation, portfolioStores, financial } = props;
+  const { store, lease, leaseOptions, equipment, valuation, portfolioStores } = props;
   const storeName = store?.name ?? "Store";
   const address = store?.address ?? "";
   const sqft = store?.square_footage ?? 3500;
-  const monthlyRevenue = financial.monthlyAverages.revenue;
-  const monthlyExpenses = financial.monthlyAverages.expenses;
-  const monthlyEbitda = financial.monthlyAverages.ebitda;
-  const annualRevenue = financial.revenueTtmTotal;
-  const annualEbitda = financial.ebitdaTtmTotal;
-  const annualDebtService = financial.annualDebtService;
-  const loanBalance = financial.totalOutstandingDebt;
+  const monthlyRevenue = store?.monthly_revenue ?? 0;
+  const monthlyExpenses = store?.monthly_expenses ?? 0;
+  const monthlyEbitda = monthlyRevenue - monthlyExpenses;
+  const annualRevenue = monthlyRevenue * 12;
+  const annualEbitda = monthlyEbitda * 12;
+  const annualDebtService = store?.annual_debt_service ?? 0;
+  const monthlyUtilities = store?.monthly_utilities ?? 0;
+  const loanBalance = store?.loan_balance ?? 0;
   const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
 
-  const dscr = financial.dscr ?? 0;
+  const dscr = annualDebtService > 0 ? calcDSCR(annualEbitda, annualDebtService) : 0;
   const portfolioEbitda = portfolioStores.reduce(
     (s, st) => s + ((st.monthly_revenue ?? 0) - (st.monthly_expenses ?? 0)) * 12,
     0
@@ -410,22 +286,14 @@ function computeReportMetrics(props: ReportProps) {
   const globalDscr =
     portfolioDebtService > 0 ? calcGlobalDSCR(portfolioEbitda, portfolioDebtService) : dscr;
 
-  const ebitdaMargin = financial.ebitdaMargin;
+  const ebitdaMargin = calcEbitdaMargin(annualEbitda, annualRevenue);
   const revenuePerSF = calcRevenuePerSF(annualRevenue, sqft);
   const ebitdaPerSF = calcEbitdaPerSF(annualEbitda, sqft);
-  const utilityRow = financial.benchmarkRows.find((r) => r.metric === "Utility Ratio");
-  const utilityRatio = utilityRow?.store ?? calcUtilityRatio(store?.monthly_utilities ?? 0, monthlyRevenue);
+  const utilityRatio = calcUtilityRatio(monthlyUtilities * 12, annualRevenue);
   const debtYield = loanBalance > 0 ? calcDebtYield(annualEbitda, loanBalance) : 0;
-  const equitySnapshot = buildEquitySnapshot(valuation.businessValue, loanBalance);
 
   const equipRecords = (equipment ?? []) as EquipmentRecord[];
-  const equipMetrics = computeEquipmentMetrics(equipRecords, undefined, {
-    selfServiceTtmRevenue: financial.selfServiceTtmTotal,
-    dryerRevenuePct:
-      store?.dryer_revenue_pct != null ? Number(store.dryer_revenue_pct) : undefined,
-  });
-  const equipmentTurns: TurnsPerDayResult | null =
-    financial.equipmentTurns ?? equipMetrics.turns ?? null;
+  const equipMetrics = computeEquipmentMetrics(equipRecords);
 
   const yearsRemaining = lease ? calcYearsRemaining(lease.lease_end_date) : 0;
   const availableOptions = (leaseOptions ?? []).filter((o) => o.status === "Available");
@@ -435,15 +303,7 @@ function computeReportMetrics(props: ReportProps) {
   const monthlyRent = lease?.monthly_rent ?? props.realEstate?.monthly_rent_charged ?? 0;
   const camCharges = lease?.cam_charges ?? 0;
   const annualOccupancyCost = (monthlyRent + camCharges) * 12;
-  const rentRow = financial.benchmarkRows.find((r) => r.metric === "Rent to Revenue");
-  const ttmRentTotal = financial.expenseBreakdown.find((l) => l.label === "Rent")?.ttmTotal ?? 0;
-  const rentToRevenue =
-    rentRow?.store ??
-    (annualRevenue > 0 && ttmRentTotal > 0
-      ? calcRentToRevenue(ttmRentTotal, annualRevenue)
-      : monthlyRent > 0
-        ? calcRentToRevenue(monthlyRent * 12, annualRevenue)
-        : 0);
+  const rentToRevenue = calcRentToRevenue(monthlyRent * 12, annualRevenue);
   const occupancyCostRatio = calcOccupancyCostRatio(annualOccupancyCost, annualRevenue);
 
   const leaseScore = lease
@@ -491,7 +351,6 @@ function computeReportMetrics(props: ReportProps) {
     debtYield,
     equipRecords,
     equipMetrics,
-    equipmentTurns,
     yearsRemaining,
     availableOptions,
     totalLeaseControl,
@@ -505,64 +364,13 @@ function computeReportMetrics(props: ReportProps) {
     totalInsurancePremium,
     financeRating: financeabilityRating(dscr, globalDscr),
     valuation,
-    equitySnapshot,
-    surplusCashFlow: financial.surplusCashFlow,
-    limitedData: financial.limitedData,
-    hasMonthlyFinancials: financial.hasMonthlyFinancials,
-    monthsUsed: financial.ttm.monthsUsed,
   };
-}
-
-function BreakdownTable({
-  lines,
-  totalLabel,
-  totalTtm,
-  totalMonthly,
-}: {
-  lines: { label: string; ttmTotal: number; monthlyAverage: number; pctOfTotal: number }[];
-  totalLabel: string;
-  totalTtm: number;
-  totalMonthly: number;
-}) {
-  return (
-    <>
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableCellBold, { width: "28%" }]}>Category</Text>
-        <Text style={[styles.tableCellBold, { width: "22%", textAlign: "right" }]}>TTM Total</Text>
-        <Text style={[styles.tableCellBold, { width: "22%", textAlign: "right" }]}>Monthly Avg</Text>
-        <Text style={[styles.tableCellBold, { width: "14%", textAlign: "right" }]}>% Mix</Text>
-      </View>
-      {lines.map((line) => (
-        <View key={line.label} style={styles.tableRow}>
-          <Text style={[styles.tableCell, { width: "28%" }]}>{line.label}</Text>
-          <Text style={[styles.tableCell, { width: "22%", textAlign: "right" }]}>{fmtDollar(line.ttmTotal)}</Text>
-          <Text style={[styles.tableCell, { width: "22%", textAlign: "right" }]}>{fmtDollar(line.monthlyAverage)}</Text>
-          <Text style={[styles.tableCell, { width: "14%", textAlign: "right" }]}>{fmtPct(line.pctOfTotal, 0)}</Text>
-        </View>
-      ))}
-      <View style={[styles.tableRow, { backgroundColor: "#f8fafc" }]}>
-        <Text style={[styles.tableCellBold, { width: "28%" }]}>{totalLabel}</Text>
-        <Text style={[styles.tableCellBold, { width: "22%", textAlign: "right" }]}>{fmtDollar(totalTtm)}</Text>
-        <Text style={[styles.tableCellBold, { width: "22%", textAlign: "right" }]}>{fmtDollar(totalMonthly)}</Text>
-        <Text style={[styles.tableCellBold, { width: "14%", textAlign: "right" }]}>100%</Text>
-      </View>
-    </>
-  );
 }
 
 export function ReportDocument(props: ReportProps) {
   const m = computeReportMetrics(props);
-  const {
-    executiveSummary,
-    generatedDate,
-    lease,
-    realEstate,
-    insurance,
-    portfolioStores,
-    store,
-    financial,
-    laundroCfoScore,
-  } = props;
+  const { executiveSummary, generatedDate, lease, realEstate, insurance, portfolioStores, store } =
+    props;
 
   return (
     <Document
@@ -600,8 +408,6 @@ export function ReportDocument(props: ReportProps) {
             "Executive Summary",
             "Store Overview",
             "Financial Analysis",
-            "Utility Analysis",
-            "Benchmarking",
             "Lease Analysis",
             "Equipment Analysis",
             "Valuation Analysis",
@@ -616,7 +422,6 @@ export function ReportDocument(props: ReportProps) {
             </View>
           ))}
         </View>
-        <PageChrome storeName={m.storeName} />
       </Page>
 
       {/* 2 — Executive Summary */}
@@ -685,19 +490,11 @@ export function ReportDocument(props: ReportProps) {
         {store?.last_retool_year && (
           <DataRow label="Last Retool" value={`${store.last_retool_year}${store.retool_type ? ` — ${store.retool_type}` : ""}`} />
         )}
-        {(() => {
-          const serviceMix = resolveServiceMix(store, financial.revenueBreakdown);
-          if (!serviceMix) return null;
-          return (
-            <>
-              <SectionHeader>Service Mix</SectionHeader>
-              <DataRow label="Self Service" value={fmtPct(serviceMix.selfService, 0)} />
-              <DataRow label="Wash-Dry-Fold" value={fmtPct(serviceMix.wdf, 0)} />
-              <DataRow label="Commercial" value={fmtPct(serviceMix.commercial, 0)} />
-              <DataRow label="Pickup & Delivery" value={fmtPct(serviceMix.pickupDelivery, 0)} />
-            </>
-          );
-        })()}
+        <SectionHeader>Service Mix</SectionHeader>
+        <DataRow label="Self Service" value={fmtPct(store?.self_service_pct ?? 70, 0)} />
+        <DataRow label="Wash-Dry-Fold" value={fmtPct(store?.wdf_pct ?? 0, 0)} />
+        <DataRow label="Commercial" value={fmtPct(store?.commercial_pct ?? 0, 0)} />
+        <DataRow label="Pickup & Delivery" value={fmtPct(store?.pickup_delivery_pct ?? 0, 0)} />
         <View style={styles.successBox}>
           <Text style={styles.boxText}>
             Revenue per SF of ${m.revenuePerSF.toFixed(2)} and EBITDA per SF of ${m.ebitdaPerSF.toFixed(2)}{" "}
@@ -710,178 +507,26 @@ export function ReportDocument(props: ReportProps) {
       {/* 4 — Financial Analysis */}
       <Page size="LETTER" style={styles.page}>
         <Text style={styles.sectionTitle}>Financial Analysis</Text>
-        <Text style={styles.bodyText}>
-          {m.hasMonthlyFinancials
-            ? `Trailing ${m.monthsUsed}-month financial profile from monthly P&L records.`
-            : "Limited data — figures below use owner-reported profile fields until monthly financials are entered."}
-        </Text>
-        {m.limitedData && (
-          <View style={styles.warningBox}>
-            <Text style={styles.boxText}>
-              ⚠ Limited financial history on file. Enter at least 6 months of monthly financials for full TTM accuracy.
-            </Text>
-          </View>
-        )}
-        <SectionHeader>Income Statement — TTM vs Monthly Average</SectionHeader>
-        <View style={styles.tableHeader}>
-          <Text style={[styles.tableCellBold, { width: "40%" }]}>Line Item</Text>
-          <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right" }]}>TTM Total</Text>
-          <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right" }]}>Monthly Avg</Text>
-        </View>
-        <View style={styles.tableRow}>
-          <Text style={[styles.tableCell, { width: "40%" }]}>Revenue</Text>
-          <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right" }]}>{fmtDollar(m.annualRevenue)}</Text>
-          <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right" }]}>{fmtDollar(m.monthlyRevenue)}</Text>
-        </View>
-        <View style={styles.tableRow}>
-          <Text style={[styles.tableCell, { width: "40%" }]}>Operating Expenses</Text>
-          <Text style={[styles.tableCell, { width: "30%", textAlign: "right" }]}>{fmtDollar(financial.expenseTtmTotal)}</Text>
-          <Text style={[styles.tableCell, { width: "30%", textAlign: "right" }]}>{fmtDollar(m.monthlyExpenses)}</Text>
-        </View>
-        <View style={styles.tableRow}>
-          <Text style={[styles.tableCellBold, { width: "40%" }]}>EBITDA</Text>
-          <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right", color: "#15803d" }]}>{fmtDollar(m.annualEbitda)}</Text>
-          <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right", color: "#15803d" }]}>{fmtDollar(m.monthlyEbitda)}</Text>
-        </View>
+        <Text style={styles.bodyText}>Trailing twelve-month financial profile from reported store data.</Text>
+        <SectionHeader>Income Statement</SectionHeader>
+        <DataRow label="Annual Revenue" value={fmtDollar(m.annualRevenue)} />
+        <DataRow label="Annual Expenses" value={fmtDollar(m.monthlyExpenses * 12)} />
+        <DataRow label="Annual EBITDA" value={fmtDollar(m.annualEbitda)} positive />
         <DataRow label="EBITDA Margin" value={fmtPct(m.ebitdaMargin)} valueColor={ratioColor(m.ebitdaMargin, 25, 20)} />
-
-        {financial.revenueBreakdown.length > 0 && (
-          <>
-            <SectionHeader>Revenue Breakdown</SectionHeader>
-            <BreakdownTable
-              lines={financial.revenueBreakdown}
-              totalLabel="Total Revenue"
-              totalTtm={financial.revenueTtmTotal}
-              totalMonthly={m.monthlyRevenue}
-            />
-            <View style={styles.chartContainer} wrap={false}>
-              <CategoryBreakdownBar
-                segments={financial.revenueBreakdown.map((l) => ({
-                  label: l.label,
-                  value: l.ttmTotal,
-                  pct: l.pctOfTotal,
-                }))}
-                title="Revenue Mix"
-                width={500}
-                height={88}
-              />
-            </View>
-          </>
-        )}
-
-        {financial.expenseBreakdown.length > 0 && (
-          <>
-            <SectionHeader>Expense Breakdown</SectionHeader>
-            <BreakdownTable
-              lines={financial.expenseBreakdown}
-              totalLabel="Total Expenses"
-              totalTtm={financial.expenseTtmTotal}
-              totalMonthly={m.monthlyExpenses}
-            />
-            <View style={styles.chartContainer} wrap={false}>
-              <CategoryBreakdownBar
-                segments={financial.expenseBreakdown.map((l) => ({
-                  label: l.label,
-                  value: l.ttmTotal,
-                  pct: l.pctOfTotal,
-                }))}
-                title="Expense Mix"
-                width={500}
-                height={88}
-              />
-            </View>
-          </>
-        )}
-
-        <SectionHeader>Water KPI</SectionHeader>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
-          <StatusIndicator status={waterKpiStatusColor(financial.waterKPI.status)} />
-          <Text style={styles.bodyText}>
-            Water cost is {fmtPct(financial.waterKPI.ratio * 100)} of Self-Service Revenue —{" "}
-            {financial.waterKPI.status} ({financial.waterKPI.status === "Healthy" ? "<15%" : financial.waterKPI.status === "Watch" ? "15–20%" : ">20%"})
-          </Text>
-        </View>
-        <DataRow label="Avg Monthly Water" value={fmtDollar(financial.waterKPI.waterMonthlyAverage)} />
-        <DataRow label="Avg Self-Service Revenue" value={fmtDollar(financial.waterKPI.selfServiceMonthlyAverage)} />
-
-        <SectionHeader>TTM Revenue Trend</SectionHeader>
-        <View style={styles.chartContainer} wrap={false}>
-          <RevenueExpenseBarChart data={financial.ttmChartData} width={500} height={160} />
-        </View>
-        <PageChrome storeName={m.storeName} />
-      </Page>
-
-      {/* 4b — Debt & Underwriting Ratios */}
-      <Page size="LETTER" style={styles.page}>
-        <Text style={styles.sectionTitle}>Financial Analysis — Debt & Coverage</Text>
-        <SectionHeader>Loan Detail</SectionHeader>
-        {financial.loans.length === 0 ? (
-          <Text style={styles.bodyText}>No active loans on file.</Text>
-        ) : (
-          <>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableCellBold, { width: "18%" }]}>Lender</Text>
-              <Text style={[styles.tableCellBold, { width: "14%", textAlign: "right" }]}>Original</Text>
-              <Text style={[styles.tableCellBold, { width: "14%", textAlign: "right" }]}>Balance</Text>
-              <Text style={[styles.tableCellBold, { width: "10%", textAlign: "right" }]}>Rate</Text>
-              <Text style={[styles.tableCellBold, { width: "14%", textAlign: "right" }]}>Payment</Text>
-              <Text style={[styles.tableCellBold, { width: "14%", textAlign: "right" }]}>Term Left</Text>
-            </View>
-            {financial.loans.map((loan) => (
-              <View key={loan.id} style={styles.tableRow}>
-                <Text style={[styles.tableCell, { width: "18%" }]}>{loan.lenderName}</Text>
-                <Text style={[styles.tableCell, { width: "14%", textAlign: "right" }]}>{fmtDollar(loan.originalBalance)}</Text>
-                <Text style={[styles.tableCell, { width: "14%", textAlign: "right" }]}>{fmtDollar(loan.estimatedBalance)}</Text>
-                <Text style={[styles.tableCell, { width: "10%", textAlign: "right" }]}>{loan.interestRate.toFixed(2)}%</Text>
-                <Text style={[styles.tableCell, { width: "14%", textAlign: "right" }]}>{fmtDollar(loan.monthlyPayment)}/mo</Text>
-                <Text style={[styles.tableCell, { width: "14%", textAlign: "right" }]}>{loan.remainingMonths} mo</Text>
-              </View>
-            ))}
-          </>
-        )}
-        <DataRow label="Total Monthly Debt Service" value={fmtDollar(financial.totalMonthlyDebtService)} />
+        <DataRow label="Monthly Revenue" value={fmtDollar(m.monthlyRevenue)} />
+        <DataRow label="Monthly EBITDA" value={fmtDollar(m.monthlyEbitda)} />
         <DataRow label="Annual Debt Service" value={m.annualDebtService > 0 ? fmtDollar(m.annualDebtService) : "Not reported"} />
-        <DataRow
-          label="DSCR"
-          value={m.annualDebtService > 0 ? fmtMultiple(m.dscr) : "N/A"}
-          valueColor={m.annualDebtService > 0 ? ratioColor(m.dscr, 1.5, 1.25) : undefined}
-        />
-        <DataRow label="Surplus Cash Flow" value={fmtDollar(m.surplusCashFlow)} positive={m.surplusCashFlow >= 0} negative={m.surplusCashFlow < 0} />
-
+        <DataRow label="Loan Balance" value={m.loanBalance > 0 ? fmtDollar(m.loanBalance) : "Not reported"} />
         <SectionHeader>Underwriting Ratios</SectionHeader>
-        <View style={styles.ratioGrid}>
-          <RatioMetricTile
-            label="DSCR"
-            value={m.annualDebtService > 0 ? fmtMultiple(m.dscr) : "N/A"}
-            valueColor={m.annualDebtService > 0 ? ratioColor(m.dscr, 1.5, 1.25) : undefined}
-          />
-          <RatioMetricTile
-            label="Global DSCR"
-            value={m.portfolioDebtService > 0 ? fmtMultiple(m.globalDscr) : "N/A"}
-            valueColor={m.portfolioDebtService > 0 ? ratioColor(m.globalDscr, 1.5, 1.25) : undefined}
-          />
-          <RatioMetricTile
-            label="EBITDA Margin"
-            value={fmtPct(m.ebitdaMargin)}
-            valueColor={ratioColor(m.ebitdaMargin, 25, 20)}
-          />
-          <RatioMetricTile
-            label="Debt Yield"
-            value={m.loanBalance > 0 ? fmtPct(m.debtYield) : "N/A"}
-            valueColor={m.loanBalance > 0 ? ratioColor(m.debtYield, 12, 8) : undefined}
-          />
-          <RatioMetricTile
-            label="Rent/Rev"
-            value={fmtPct(m.rentToRevenue)}
-            valueColor={ratioColor(m.rentToRevenue, 0, 15, true)}
-          />
-          <RatioMetricTile
-            label="Util/Rev"
-            value={fmtPct(m.utilityRatio)}
-            valueColor={ratioColor(m.utilityRatio, 0, 17, true)}
-          />
-          <RatioMetricTile label="Rev/SF" value={`$${m.revenuePerSF.toFixed(2)}`} />
-          <RatioMetricTile label="EBITDA/SF" value={`$${m.ebitdaPerSF.toFixed(2)}`} />
+        <View style={styles.grid2}>
+          <MetricTile label="DSCR" value={m.annualDebtService > 0 ? fmtMultiple(m.dscr) : "N/A"} valueColor={m.annualDebtService > 0 ? ratioColor(m.dscr, 1.5, 1.25) : undefined} width="23%" />
+          <MetricTile label="Global DSCR" value={m.portfolioDebtService > 0 ? fmtMultiple(m.globalDscr) : "N/A"} valueColor={m.portfolioDebtService > 0 ? ratioColor(m.globalDscr, 1.5, 1.25) : undefined} width="23%" />
+          <MetricTile label="EBITDA Margin" value={fmtPct(m.ebitdaMargin)} valueColor={ratioColor(m.ebitdaMargin, 25, 20)} width="23%" />
+          <MetricTile label="Rent / Revenue" value={fmtPct(m.rentToRevenue)} valueColor={ratioColor(m.rentToRevenue, 0, 15, true)} width="23%" />
+          <MetricTile label="Utility / Revenue" value={fmtPct(m.utilityRatio)} valueColor={ratioColor(m.utilityRatio, 0, 17, true)} width="23%" />
+          <MetricTile label="Revenue / SF" value={`$${m.revenuePerSF.toFixed(2)}`} width="23%" />
+          <MetricTile label="EBITDA / SF" value={`$${m.ebitdaPerSF.toFixed(2)}`} width="23%" />
+          <MetricTile label="Debt Yield" value={m.loanBalance > 0 ? fmtPct(m.debtYield) : "N/A"} valueColor={m.loanBalance > 0 ? ratioColor(m.debtYield, 12, 8) : undefined} width="23%" />
         </View>
         {m.utilityRatio > 17 && (
           <View style={styles.warningBox}>
@@ -893,150 +538,7 @@ export function ReportDocument(props: ReportProps) {
         <PageChrome storeName={m.storeName} />
       </Page>
 
-      {/* 5 — Utility Analysis */}
-      <Page size="LETTER" style={styles.page}>
-        <Text style={styles.sectionTitle}>Utility Analysis</Text>
-        <Text style={styles.bodyText}>
-          Trailing twelve-month utility costs from monthly utility records, with industry comparison.
-        </Text>
-
-        <SectionHeader>Water KPI</SectionHeader>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <StatusIndicator status={waterKpiStatusColor(financial.waterKPI.status)} />
-          <Text style={styles.bodyText}>
-            Water ÷ Self-Service Revenue = {fmtPct(financial.waterKPI.ratio * 100)} —{" "}
-            {financial.waterKPI.status}
-          </Text>
-        </View>
-
-        {financial.utilityReport.chartSeries.length > 0 ? (
-          <>
-            <SectionHeader>TTM Utility Costs</SectionHeader>
-            {financial.utilityReport.chartSeries.map((series) => (
-              <View key={series.field} style={styles.chartContainer} wrap={false}>
-                <UtilityLineChart
-                  data={series.data}
-                  label={`${series.label} Cost TTM`}
-                  color={
-                    series.field === "water"
-                      ? PDF_CHART.blue
-                      : series.field === "gas"
-                        ? PDF_CHART.amber
-                        : PDF_CHART.greenDark
-                  }
-                  width={500}
-                  height={100}
-                />
-              </View>
-            ))}
-          </>
-        ) : (
-          <Text style={styles.bodyText}>No utility cost data on file for the trailing twelve months.</Text>
-        )}
-
-        {financial.utilityReport.summaryRows.length > 0 && (
-          <>
-            <SectionHeader>Utility Summary</SectionHeader>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableCellBold, { width: "18%" }]}>Utility</Text>
-              <Text style={[styles.tableCellBold, { width: "20%", textAlign: "right" }]}>TTM Total</Text>
-              <Text style={[styles.tableCellBold, { width: "18%", textAlign: "right" }]}>Monthly Avg</Text>
-              <Text style={[styles.tableCellBold, { width: "16%", textAlign: "right" }]}>% Revenue</Text>
-              <Text style={[styles.tableCellBold, { width: "28%", textAlign: "right" }]}>Status</Text>
-            </View>
-            {financial.utilityReport.summaryRows.map((row) => (
-              <View key={row.label} style={styles.tableRow}>
-                <Text style={[styles.tableCell, { width: "18%" }]}>{row.label}</Text>
-                <Text style={[styles.tableCell, { width: "20%", textAlign: "right" }]}>{fmtDollar(row.ttmTotal)}</Text>
-                <Text style={[styles.tableCell, { width: "18%", textAlign: "right" }]}>{fmtDollar(row.monthlyAverage)}</Text>
-                <Text style={[styles.tableCell, { width: "16%", textAlign: "right" }]}>{fmtPct(row.pctOfRevenue)}</Text>
-                <Text style={[styles.tableCell, { width: "28%", textAlign: "right" }]}>{row.status}</Text>
-              </View>
-            ))}
-          </>
-        )}
-        <PageChrome storeName={m.storeName} />
-      </Page>
-
-      {/* 6 — Benchmarking */}
-      <Page size="LETTER" style={styles.page}>
-        <Text style={styles.sectionTitle}>Benchmarking</Text>
-        <Text style={styles.bodyText}>
-          Store performance vs industry benchmarks (median and top quartile).
-        </Text>
-        <SectionHeader>LaundroCFO Score</SectionHeader>
-        <View style={{ flexDirection: "row", gap: 16, marginBottom: 16, alignItems: "center" }}>
-          <View style={[styles.metricCard, { width: "34%", alignItems: "center", paddingVertical: 16 }]}>
-            <Text style={styles.metricLabel}>Overall Grade</Text>
-            <Text style={styles.scoreHeroGrade}>{laundroCfoScore.grade}</Text>
-            <Text style={styles.scoreHeroValue}>{laundroCfoScore.total}/100</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            {(
-              [
-                ["Financial Performance", laundroCfoScore.categories.financialPerformance],
-                ["Debt & Coverage", laundroCfoScore.categories.debtCoverage],
-                ["Asset Quality", laundroCfoScore.categories.assetQuality],
-                ["Profile Completeness", laundroCfoScore.categories.profileCompleteness],
-              ] as const
-            ).map(([label, cat]) => (
-              <DataRow key={label} label={label} value={`${cat.score}/${cat.max}`} />
-            ))}
-          </View>
-        </View>
-        <SectionHeader>Industry Benchmarks</SectionHeader>
-        {financial.benchmarkRows.map((row) =>
-          row.store != null ? (
-            <View key={row.metric} style={{ marginBottom: 6 }}>
-              <BenchmarkBar
-                metric={row.metric}
-                store={row.store}
-                unit={row.unit}
-                median={row.median}
-                top25={row.top25}
-                bottom25={row.bottom25}
-                lowerIsBetter={row.lowerIsBetter}
-                width={500}
-              />
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
-                <StatusIndicator
-                  status={
-                    benchmarkStatusColor(row.store, row.top25, row.bottom25, row.lowerIsBetter) ===
-                    "#15803d"
-                      ? "green"
-                      : benchmarkStatusColor(row.store, row.top25, row.bottom25, row.lowerIsBetter) ===
-                          "#ef4444"
-                        ? "red"
-                        : "amber"
-                  }
-                />
-                <Text style={[styles.boxText, { fontSize: 8 }]}>
-                  {row.lowerIsBetter
-                    ? row.store <= row.top25
-                      ? "Top quartile"
-                      : row.store <= row.median
-                        ? "Above median"
-                        : row.store <= row.bottom25
-                          ? "Below median"
-                          : "Bottom quartile"
-                    : row.store >= row.top25
-                      ? "Top quartile"
-                      : row.store >= row.median
-                        ? "Above median"
-                        : row.store >= row.bottom25
-                          ? "Below median"
-                          : "Bottom quartile"}
-                </Text>
-              </View>
-            </View>
-          ) : (
-            <DataRow key={row.metric} label={row.metric} value="Insufficient data" />
-          )
-        )}
-        <PageChrome storeName={m.storeName} />
-      </Page>
-
-      {/* 6 — Lease Analysis */}
+      {/* 5 — Lease Analysis */}
       <Page size="LETTER" style={styles.page}>
         <Text style={styles.sectionTitle}>Lease Analysis</Text>
         {m.isOwnerOccupied ? (
@@ -1065,7 +567,7 @@ export function ReportDocument(props: ReportProps) {
           <>
             <Text style={styles.bodyText}>Primary lease terms and site control assessment.</Text>
             <SectionHeader>Lease Terms</SectionHeader>
-            <DataRow label="Landlord" value={lease.landlord ?? "—"} />
+            <DataRow label="Landlord" value={lease.landlord_name ?? "—"} />
             <DataRow label="Tenant Entity" value={lease.tenant_entity ?? "—"} />
             <DataRow label="Expires" value={`${m.leaseExpiresStr} (${m.yearsRemaining.toFixed(1)} yrs)`} />
             <DataRow label="Monthly Rent" value={lease.monthly_rent ? fmtDollar(lease.monthly_rent) : "—"} />
@@ -1106,94 +608,19 @@ export function ReportDocument(props: ReportProps) {
         <PageChrome storeName={m.storeName} />
       </Page>
 
-      {/* 7 — Equipment Analysis */}
+      {/* 6 — Equipment Analysis */}
       <Page size="LETTER" style={styles.page}>
         <Text style={styles.sectionTitle}>Equipment Analysis</Text>
         <Text style={styles.bodyText}>Fleet composition and replacement risk for collateral review.</Text>
-        <View style={styles.ratioGrid}>
-          <RatioMetricTile label="Machines" value={String(m.equipMetrics.totalMachines)} />
-          <RatioMetricTile label="Avg Age" value={`${m.equipMetrics.weightedAvgAge.toFixed(1)} yrs`} />
-          <RatioMetricTile
-            label="Equip Score"
-            value={`${m.equipMetrics.qualityScore}/100`}
-            valueColor={m.equipMetrics.qualityScore >= 75 ? "#15803d" : "#b45309"}
-          />
-          <RatioMetricTile label="Grade" value={m.equipMetrics.grade} />
-          <RatioMetricTile label="Under 10yr" value={fmtPct(m.equipMetrics.pctUnder10Years, 0)} />
-          <RatioMetricTile label="200G" value={fmtPct(m.equipMetrics.pct200GWashers, 0)} />
-          <RatioMetricTile label="Replacement" value={fmtDollar(m.equipMetrics.estimatedReplacementValue)} />
-          <RatioMetricTile
-            label="W/D"
-            value={`${m.equipMetrics.totalWashers}/${m.equipMetrics.totalDryers}`}
-          />
+        <View style={styles.grid2}>
+          <MetricTile label="Total Machines" value={String(m.equipMetrics.totalMachines)} width="23%" />
+          <MetricTile label="Avg Age" value={`${m.equipMetrics.weightedAvgAge.toFixed(1)} yrs`} width="23%" />
+          <MetricTile label="Equipment Score" value={`${m.equipMetrics.qualityScore}/100`} valueColor={m.equipMetrics.qualityScore >= 75 ? "#15803d" : "#b45309"} width="23%" />
+          <MetricTile label="Quality Grade" value={m.equipMetrics.grade} width="23%" />
+          <MetricTile label="Under 10yr" value={fmtPct(m.equipMetrics.pctUnder10Years, 0)} width="23%" />
+          <MetricTile label="200G Washers" value={fmtPct(m.equipMetrics.pct200GWashers, 0)} width="23%" />
+          <MetricTile label="Replacement Est." value={fmtDollar(m.equipMetrics.estimatedReplacementValue)} width="48%" />
         </View>
-        {m.equipmentTurns && m.equipmentTurns.totalSelfServiceRevenue > 0 && (
-          <>
-            <SectionHeader>Operating Metrics</SectionHeader>
-            <DataRow
-              label="Self-Service Revenue (TTM)"
-              value={fmtDollar(m.equipmentTurns.totalSelfServiceRevenue)}
-            />
-            <DataRow
-              label="Washer Revenue (est.)"
-              value={fmtDollar(m.equipmentTurns.washerRevenue)}
-            />
-            <DataRow
-              label={`Dryer Revenue (est. @ ${m.equipmentTurns.dryerRevenuePct.toFixed(1)}%)`}
-              value={fmtDollar(m.equipmentTurns.dryerRevenue)}
-            />
-            {m.equipmentTurns.overallTurnsPerDay != null ? (
-              <>
-                <DataRow
-                  label="Avg Turns / Day"
-                  value={m.equipmentTurns.overallTurnsPerDay.toFixed(2)}
-                  valueColor={
-                    m.equipmentTurns.overallTurnsPerDay < 3
-                      ? "#b91c1c"
-                      : m.equipmentTurns.overallTurnsPerDay <= 4.5
-                        ? "#b45309"
-                        : "#15803d"
-                  }
-                />
-                {m.equipmentTurns.weightedAvgVendPrice != null && (
-                  <DataRow
-                    label="Weighted Avg Vend Price"
-                    value={fmtDollar(m.equipmentTurns.weightedAvgVendPrice)}
-                  />
-                )}
-              </>
-            ) : (
-              <Text style={styles.bodyText}>
-                Add vend prices to washer groups to calculate turns per day.
-              </Text>
-            )}
-            {m.equipmentTurns.bySize.length > 0 && (
-              <>
-                <SectionHeader>Turns by Size</SectionHeader>
-                <View style={styles.tableHeader}>
-                  <Text style={[styles.tableCellBold, { width: "25%" }]}>Size</Text>
-                  <Text style={[styles.tableCellBold, { width: "15%" }]}>Qty</Text>
-                  <Text style={[styles.tableCellBold, { width: "25%" }]}>Vend</Text>
-                  <Text style={[styles.tableCellBold, { width: "35%", textAlign: "right" }]}>
-                    Turns/Day
-                  </Text>
-                </View>
-                {m.equipmentTurns.bySize.map((group) => (
-                  <View key={group.size} style={styles.tableRow}>
-                    <Text style={[styles.tableCell, { width: "25%" }]}>{group.size}</Text>
-                    <Text style={[styles.tableCell, { width: "15%" }]}>{group.quantity}</Text>
-                    <Text style={[styles.tableCell, { width: "25%" }]}>
-                      {fmtDollar(group.avgVendPrice)}
-                    </Text>
-                    <Text style={[styles.tableCell, { width: "35%", textAlign: "right" }]}>
-                      {group.turnsPerDay.toFixed(2)}
-                    </Text>
-                  </View>
-                ))}
-              </>
-            )}
-          </>
-        )}
         <SectionHeader>Fleet Detail</SectionHeader>
         {m.equipRecords.length === 0 ? (
           <Text style={styles.bodyText}>No equipment inventory on file.</Text>
@@ -1245,13 +672,6 @@ export function ReportDocument(props: ReportProps) {
         <DataRow label="Final Multiple" value={fmtMultiple(m.valuation.finalMultiple)} valueColor="#1d4ed8" />
         <DataRow label="× Annual EBITDA" value={fmtDollar(m.annualEbitda)} />
         <DataRow label="= Business Value" value={fmtDollar(m.valuation.businessValue)} positive />
-        <SectionHeader>Equity Snapshot</SectionHeader>
-        <DataRow label="Store Value" value={fmtDollar(m.equitySnapshot.storeValue)} />
-        <DataRow label="Total Debt" value={fmtDollar(m.equitySnapshot.debt)} />
-        <DataRow label="Equity (Value − Debt)" value={fmtDollar(m.equitySnapshot.equity)} positive={m.equitySnapshot.equity >= 0} />
-        <DataRow label="Monthly EBITDA" value={fmtDollar(m.monthlyEbitda)} />
-        <DataRow label="Monthly Debt Service" value={fmtDollar(financial.totalMonthlyDebtService)} />
-        <DataRow label="Surplus Cash Flow" value={fmtDollar(m.surplusCashFlow)} positive={m.surplusCashFlow >= 0} negative={m.surplusCashFlow < 0} />
         {m.isOwnerOccupied && m.valuation.realEstateValue > 0 && (
           <>
             <DataRow label="Real Estate Value" value={fmtDollar(m.valuation.realEstateValue)} />
@@ -1366,10 +786,7 @@ export function ReportDocument(props: ReportProps) {
               <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right" }]}>Est. Value</Text>
             </View>
             {portfolioStores.map((ps: any) => {
-              const psEbitda =
-                ps.id === store?.id
-                  ? m.annualEbitda
-                  : ((ps.monthly_revenue ?? 0) - (ps.monthly_expenses ?? 0)) * 12;
+              const psEbitda = ((ps.monthly_revenue ?? 0) - (ps.monthly_expenses ?? 0)) * 12;
               const psDscr = (ps.annual_debt_service ?? 0) > 0 ? psEbitda / ps.annual_debt_service : 0;
               return (
                 <View key={ps.id} style={styles.tableRow}>
@@ -1404,7 +821,7 @@ export function ReportDocument(props: ReportProps) {
         </Text>
         <SectionHeader>Data Sources</SectionHeader>
         <Text style={styles.bodyText}>
-          Financial data: monthly_financials P&L records and monthly_utilities breakdown from LaundroCFO, with TTM aggregation where available. Debt: active store_loans records. Lease data: Occupancy module. Equipment: equipment inventory records. Insurance: active policy records. All figures should be independently verified during lender due diligence.
+          Financial data: owner-reported monthly revenue, expenses, utilities, and debt service from LaundroCFO store settings. Lease data: Occupancy module. Equipment: equipment inventory records. Insurance: active policy records. All figures should be independently verified during lender due diligence.
         </Text>
         <SectionHeader>Glossary</SectionHeader>
         <DataRow label="EBITDA" value="Earnings before interest, taxes, depreciation, and amortization" />

@@ -10,9 +10,8 @@ import {
   getStoreValuation,
   invalidateValuationCache,
   type StoreValuationContext,
-  type StoreValuationResult,
 } from "@/lib/getStoreValuation";
-import type { ValuationInputs, ValuationResult } from "@/lib/valuation";
+import type { ValuationResult } from "@/lib/valuation";
 import {
   computeEquipmentMetrics,
   formatAdjustment,
@@ -116,69 +115,7 @@ const RETOOL_TYPES = [
   "Other",
 ];
 
-type ValuationOverrides = {
-  marketDensity: MarketDensity;
-  storeCondition: StoreCondition;
-  revenueTrend: RevenueTrend;
-  competitionLevel: CompetitionLevel;
-  selfServicePct: number;
-  wdfPct: number;
-  commercialPct: number;
-  pickupDeliveryPct: number;
-  lastRetoolYear: string;
-  retoolInvestment: string;
-  retoolType: string;
-  realEstateValue: number;
-};
-
-function buildValuationOverrides(params: {
-  marketDensity: MarketDensity;
-  storeCondition: StoreCondition;
-  revenueTrend: RevenueTrend;
-  competitionLevel: CompetitionLevel;
-  selfServicePct: number;
-  wdfPct: number;
-  commercialPct: number;
-  pickupDeliveryPct: number;
-  lastRetoolYear: string;
-  retoolInvestment: string;
-  retoolType: string;
-  isOwnerOccupied: boolean;
-  realEstateValue: number;
-}): Partial<ValuationInputs> {
-  return {
-    marketDensity: params.marketDensity,
-    storeCondition: params.storeCondition,
-    revenueTrend: params.revenueTrend,
-    competitionLevel: params.competitionLevel,
-    selfServicePct: params.selfServicePct,
-    wdfPct: params.wdfPct,
-    commercialPct: params.commercialPct,
-    pickupDeliveryPct: params.pickupDeliveryPct,
-    lastRetoolYear: params.lastRetoolYear ? parseInt(params.lastRetoolYear, 10) : undefined,
-    retoolInvestment: params.retoolInvestment ? parseFloat(params.retoolInvestment) : undefined,
-    retoolType: params.retoolType || undefined,
-    realEstateValue: params.isOwnerOccupied ? params.realEstateValue : undefined,
-  };
-}
-
-function overridesMatchSaved(current: ValuationOverrides, saved: ValuationOverrides): boolean {
-  return (
-    current.marketDensity === saved.marketDensity &&
-    current.storeCondition === saved.storeCondition &&
-    current.revenueTrend === saved.revenueTrend &&
-    current.competitionLevel === saved.competitionLevel &&
-    current.selfServicePct === saved.selfServicePct &&
-    current.wdfPct === saved.wdfPct &&
-    current.commercialPct === saved.commercialPct &&
-    current.pickupDeliveryPct === saved.pickupDeliveryPct &&
-    current.lastRetoolYear === saved.lastRetoolYear &&
-    current.retoolInvestment === saved.retoolInvestment &&
-    current.retoolType === saved.retoolType &&
-    current.realEstateValue === saved.realEstateValue
-  );
-}
-const EMPTY_VALUATION: StoreValuationResult = {
+const EMPTY_VALUATION: ValuationResult = {
   baseMultiple: 4,
   adjustments: [],
   finalMultiple: 4,
@@ -188,26 +125,11 @@ const EMPTY_VALUATION: StoreValuationResult = {
   valueDrivers: [],
   valueRisks: [],
   improvements: [],
-  annualEbitda: 0,
-  ttmMonthsUsed: 0,
-  ttmRevenue: 0,
-  ttmEbitda: 0,
-  ttmDscr: 0,
-  ttmDebtService: 0,
-  debtServiceMonthsWithData: 0,
-  store: {},
-  context: {
-    store: {},
-    equipment: [],
-    lease: null,
-    leaseOptions: [],
-    realEstate: null,
-  },
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
   equipment: "bg-purple-500/15 text-purple-300 border-purple-500/30",
-  lease: "bg-blue-500/15 text-adaptive-info border-blue-500/30",
+  lease: "bg-blue-500/15 text-blue-300 border-blue-500/30",
   market: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
   operations: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   revenue_mix: "bg-green-500/15 text-green-300 border-green-500/30",
@@ -377,7 +299,7 @@ function PillSelector<T extends string>({
   showAdj?: boolean;
 }) {
   return (
-    <div className="card overflow-hidden min-w-0">
+    <div className="card">
       <div className="metric-label mb-3">{label}</div>
       <div className="flex flex-wrap gap-2">
         {options.map((opt) => (
@@ -388,8 +310,8 @@ function PillSelector<T extends string>({
             className={clsx(
               "px-3 py-1.5 rounded-full text-[12px] font-medium border transition-all",
               value === opt.value
-                ? "bg-blue-500/15 border-blue-500/40 text-adaptive-info"
-                : "bg-[#1e2a3a] border-white/[0.08] text-slate-400 hover:border-white/20 hover:text-slate-200"
+                ? "bg-blue-500/15 border-blue-500/40 text-blue-300"
+                : "bg-[#1E3A1E] dark:bg-[#1e2a3a] border-white/[0.08] text-slate-400 hover:border-white/20 hover:text-slate-200"
             )}
           >
             {opt.label}
@@ -436,7 +358,6 @@ export default function ValuationPage() {
   const [retoolType, setRetoolType] = useState("");
 
   const [annualEbitda, setAnnualEbitda] = useState(0);
-  const [ttmMonthsUsed, setTtmMonthsUsed] = useState(0);
   const [monthlyRevenue, setMonthlyRevenue] = useState(0);
   const [squareFootage, setSquareFootage] = useState(3500);
   const [isOwnerOccupied, setIsOwnerOccupied] = useState(false);
@@ -447,8 +368,6 @@ export default function ValuationPage() {
   const [totalLeaseControl, setTotalLeaseControl] = useState(0);
   const [calcExpanded, setCalcExpanded] = useState(false);
   const [valuationContext, setValuationContext] = useState<StoreValuationContext | null>(null);
-  const [fetchedValuation, setFetchedValuation] = useState<StoreValuationResult | null>(null);
-  const [savedOverrides, setSavedOverrides] = useState<ValuationOverrides | null>(null);
 
   const loadValuationData = useCallback(async () => {
     if (!selectedStore?.id) {
@@ -464,65 +383,42 @@ export default function ValuationPage() {
       const valuationResult = await getStoreValuation(selectedStore.id);
       const store = valuationResult.store as StoreRow;
       if (!store?.id) throw new Error("Store not found");
-
-      const ctx = valuationResult.context;
-      const ownerOccupied = store.occupancy_type === "owner_occupied";
-      const loadedMarketDensity = normalizeMarketDensity(store.market_density ?? store.location_type);
-      const loadedStoreCondition = normalizeStoreCondition(store.store_condition);
-      const loadedRevenueTrend = (store.revenue_trend as RevenueTrend) ?? "stable";
-      const loadedCompetitionLevel = (store.competition_level as CompetitionLevel) ?? "normal";
-      const loadedWdfPct = store.wdf_pct ?? 18;
-      const loadedCommercialPct = store.commercial_pct ?? 12;
-      const loadedPickupDeliveryPct = store.pickup_delivery_pct ?? 0;
-      const loadedSelfServicePct =
-        store.self_service_pct ??
-        Math.max(0, 100 - loadedWdfPct - loadedCommercialPct - loadedPickupDeliveryPct);
-      const loadedLastRetoolYear = store.last_retool_year ? String(store.last_retool_year) : "";
-      const loadedRetoolInvestment = store.retool_investment ? String(store.retool_investment) : "";
-      const loadedRetoolType = store.retool_type ?? "";
-      const loadedRealEstateValue = ownerOccupied
-        ? Number(ctx.realEstate?.estimated_value) || 0
-        : 0;
-
-      setFetchedValuation(valuationResult);
-      setValuationContext(ctx);
       setStore(store);
       setStoreId(store.id);
       setStoreName(store.name ?? "Your Store");
       setSquareFootage(store.square_footage ?? 3500);
-      setMarketDensity(loadedMarketDensity);
-      setRevenueTrend(loadedRevenueTrend);
-      setStoreCondition(loadedStoreCondition);
-      setCompetitionLevel(loadedCompetitionLevel);
-      setSelfServicePct(loadedSelfServicePct);
-      setWdfPct(loadedWdfPct);
-      setCommercialPct(loadedCommercialPct);
-      setPickupDeliveryPct(loadedPickupDeliveryPct);
-      setLastRetoolYear(loadedLastRetoolYear);
-      setRetoolInvestment(loadedRetoolInvestment);
-      setRetoolType(loadedRetoolType);
-      setSavedOverrides({
-        marketDensity: loadedMarketDensity,
-        storeCondition: loadedStoreCondition,
-        revenueTrend: loadedRevenueTrend,
-        competitionLevel: loadedCompetitionLevel,
-        selfServicePct: loadedSelfServicePct,
-        wdfPct: loadedWdfPct,
-        commercialPct: loadedCommercialPct,
-        pickupDeliveryPct: loadedPickupDeliveryPct,
-        lastRetoolYear: loadedLastRetoolYear,
-        retoolInvestment: loadedRetoolInvestment,
-        retoolType: loadedRetoolType,
-        realEstateValue: loadedRealEstateValue,
-      });
+
+      setMarketDensity(
+        normalizeMarketDensity(store.market_density ?? store.location_type)
+      );
+      setRevenueTrend((store.revenue_trend as RevenueTrend) ?? "stable");
+      setStoreCondition(normalizeStoreCondition(store.store_condition));
+      setCompetitionLevel((store.competition_level as CompetitionLevel) ?? "normal");
+
+      setSelfServicePct(store.self_service_pct ?? 70);
+      setWdfPct(store.wdf_pct ?? 18);
+      setCommercialPct(store.commercial_pct ?? 12);
+      setPickupDeliveryPct(store.pickup_delivery_pct ?? 0);
+
+      if (store.last_retool_year) setLastRetoolYear(String(store.last_retool_year));
+      if (store.retool_investment) setRetoolInvestment(String(store.retool_investment));
+      if (store.retool_type) setRetoolType(store.retool_type);
 
       const revenue = store.monthly_revenue ?? DEMO_MONTHLY_REVENUE;
+      const expenses = store.monthly_expenses ?? DEMO_MONTHLY_EXPENSES;
       setMonthlyRevenue(revenue);
-      setAnnualEbitda(valuationResult.annualEbitda);
-      setTtmMonthsUsed(valuationResult.ttmMonthsUsed);
+      setAnnualEbitda((revenue - expenses) * 12);
+
+      const ownerOccupied = store.occupancy_type === "owner_occupied";
       setIsOwnerOccupied(ownerOccupied);
-      setRealEstateValue(loadedRealEstateValue);
-      setEquipment(ctx.equipment);
+
+      const { data: equipmentData, error: equipmentError } = await supabase
+        .from("equipment_inventory")
+        .select("id, user_id, store_id, machine_type, manufacturer, machine_size, quantity, installation_year, high_speed_extract, condition, notes")
+        .eq("store_id", store.id);
+
+      if (equipmentError) throw equipmentError;
+      setEquipment((equipmentData ?? []) as EquipmentRecord[]);
 
       const { count: insCount } = await supabase
         .from("insurance_policies")
@@ -532,34 +428,78 @@ export default function ValuationPage() {
       setInsuranceCount(insCount ?? 0);
 
       if (ownerOccupied) {
+        const { data: reData } = await supabase
+          .from("real_estate")
+          .select("estimated_value")
+          .eq("store_id", store.id)
+          .limit(1)
+          .maybeSingle();
+        setRealEstateValue(reData?.estimated_value ?? 0);
         setTotalLeaseControl(15);
         setYearsRemaining(15);
         setHasLease(false);
         setLeaseScore(85);
-      } else if (ctx.lease) {
-        setHasLease(true);
-        const remaining = calcYearsRemaining(ctx.lease.lease_end_date as string);
-        setYearsRemaining(remaining);
-        const available = ctx.leaseOptions.filter((o) => o.status === "Available");
-        const optionYears = available.reduce((s, o) => s + (Number(o.option_years) || 0), 0);
-        setTotalLeaseControl(remaining + optionYears);
-        setLeaseScore(
-          calcLeaseScore({
-            yearsRemaining: remaining,
-            availableOptions: available.length,
-            exclusivityClause: Boolean(ctx.lease.exclusivity_clause),
-            personalGuaranty: Boolean(ctx.lease.personal_guaranty),
-            assignmentRights: (ctx.lease.assignment_rights as string) ?? null,
-            monthlyRent: Number(ctx.lease.monthly_rent) || null,
-            monthlyRevenue: store.monthly_revenue ?? null,
-          })
-        );
       } else {
-        setHasLease(false);
-        setYearsRemaining(0);
-        setTotalLeaseControl(0);
-        setLeaseScore(50);
+        const { data: leaseData } = await supabase
+          .from("leases")
+          .select("id, lease_end_date, monthly_rent, exclusivity_clause, personal_guaranty, assignment_rights")
+          .eq("store_id", store.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (leaseData) {
+          setHasLease(true);
+          const remaining = calcYearsRemaining(leaseData.lease_end_date);
+          setYearsRemaining(remaining);
+
+          const { data: optionsData } = await supabase
+            .from("lease_options")
+            .select("option_years, status")
+            .eq("lease_id", leaseData.id)
+            .order("option_number", { ascending: true });
+
+          const available = (optionsData ?? []).filter((o) => o.status === "Available");
+          const optionYears = available.reduce((s, o) => s + (o.option_years ?? 0), 0);
+          setTotalLeaseControl(remaining + optionYears);
+          setLeaseScore(
+            calcLeaseScore({
+              yearsRemaining: remaining,
+              availableOptions: available.length,
+              exclusivityClause: leaseData.exclusivity_clause ?? false,
+              personalGuaranty: leaseData.personal_guaranty ?? false,
+              assignmentRights: leaseData.assignment_rights ?? null,
+              monthlyRent: leaseData.monthly_rent ?? null,
+              monthlyRevenue: store.monthly_revenue ?? null,
+            })
+          );
+        } else {
+          setHasLease(false);
+          setYearsRemaining(0);
+          setTotalLeaseControl(0);
+          setLeaseScore(50);
+        }
+        setRealEstateValue(0);
       }
+
+      const { data: leaseRow } = await supabase
+        .from("leases")
+        .select("*")
+        .eq("store_id", store.id)
+        .maybeSingle();
+      const { data: leaseOpts } = leaseRow
+        ? await supabase.from("lease_options").select("*").eq("lease_id", leaseRow.id)
+        : { data: [] };
+      const { data: reRow } = ownerOccupied
+        ? await supabase.from("real_estate").select("*").eq("store_id", store.id).maybeSingle()
+        : { data: null };
+
+      setValuationContext({
+        store: store as unknown as Record<string, unknown>,
+        equipment: (equipmentData ?? []) as EquipmentRecord[],
+        lease: leaseRow ?? null,
+        leaseOptions: leaseOpts ?? [],
+        realEstate: reRow ?? null,
+      });
 
     } catch {
       setLoadError(true);
@@ -577,65 +517,38 @@ export default function ValuationPage() {
     [equipment]
   );
 
-  const currentOverrides = useMemo<ValuationOverrides>(
-    () => ({
-      marketDensity,
-      storeCondition,
-      revenueTrend,
-      competitionLevel,
-      selfServicePct,
-      wdfPct,
-      commercialPct,
-      pickupDeliveryPct,
-      lastRetoolYear,
-      retoolInvestment,
-      retoolType,
-      realEstateValue,
-    }),
-    [
-      marketDensity,
-      storeCondition,
-      revenueTrend,
-      competitionLevel,
-      selfServicePct,
-      wdfPct,
-      commercialPct,
-      pickupDeliveryPct,
-      lastRetoolYear,
-      retoolInvestment,
-      retoolType,
-      realEstateValue,
-    ]
-  );
-
-  const hasUnsavedOverrides = useMemo(
-    () => savedOverrides != null && !overridesMatchSaved(currentOverrides, savedOverrides),
-    [currentOverrides, savedOverrides]
-  );
-
   const valuation = useMemo(() => {
     if (!valuationContext) return EMPTY_VALUATION;
 
-    if (!hasUnsavedOverrides && fetchedValuation) {
-      return fetchedValuation;
-    }
-
-    const computed = computeStoreValuation(
-      valuationContext,
-      {
-        ebitda: annualEbitda,
-        ...buildValuationOverrides({ ...currentOverrides, isOwnerOccupied }),
-      }
-    );
-
-    return computed;
+    return computeStoreValuation(valuationContext, {
+      marketDensity,
+      storeCondition,
+      revenueTrend,
+      competitionLevel,
+      selfServicePct,
+      wdfPct,
+      commercialPct,
+      pickupDeliveryPct,
+      lastRetoolYear: lastRetoolYear ? parseInt(lastRetoolYear, 10) : undefined,
+      retoolInvestment: retoolInvestment ? parseFloat(retoolInvestment) : undefined,
+      retoolType: retoolType || undefined,
+      realEstateValue: isOwnerOccupied ? realEstateValue : undefined,
+    });
   }, [
     valuationContext,
-    fetchedValuation,
-    hasUnsavedOverrides,
-    currentOverrides,
+    marketDensity,
+    storeCondition,
+    revenueTrend,
+    competitionLevel,
+    selfServicePct,
+    wdfPct,
+    commercialPct,
+    pickupDeliveryPct,
+    lastRetoolYear,
+    retoolInvestment,
+    retoolType,
     isOwnerOccupied,
-    annualEbitda,
+    realEstateValue,
   ]);
 
   const equipmentValAdj = sumCategoryAdj(valuation, "equipment");
@@ -693,47 +606,27 @@ export default function ValuationPage() {
       setError(updateError.message);
     } else {
       invalidateValuationCache(storeId);
-      const updatedContext = valuationContext
-        ? {
-            ...valuationContext,
-            store: {
-              ...valuationContext.store,
-              market_density: marketDensity,
-              revenue_trend: revenueTrend,
-              store_condition: storeCondition,
-              competition_level: competitionLevel,
-              self_service_pct: selfServicePct,
-              wdf_pct: wdfPct,
-              commercial_pct: commercialPct,
-              pickup_delivery_pct: pickupDeliveryPct,
-              last_retool_year: lastRetoolYear ? parseInt(lastRetoolYear, 10) : null,
-              retool_investment: retoolInvestment ? parseFloat(retoolInvestment) : null,
-              retool_type: retoolType || null,
-            },
-          }
-        : null;
-      if (updatedContext) {
-        setValuationContext(updatedContext);
-        setFetchedValuation({
-          ...computeStoreValuation(
-            updatedContext,
-            {
-              ebitda: annualEbitda,
-              ...buildValuationOverrides({ ...currentOverrides, isOwnerOccupied }),
+      setValuationContext((prev) =>
+        prev
+          ? {
+              ...prev,
+              store: {
+                ...prev.store,
+                market_density: marketDensity,
+                revenue_trend: revenueTrend,
+                store_condition: storeCondition,
+                competition_level: competitionLevel,
+                self_service_pct: selfServicePct,
+                wdf_pct: wdfPct,
+                commercial_pct: commercialPct,
+                pickup_delivery_pct: pickupDeliveryPct,
+                last_retool_year: lastRetoolYear ? parseInt(lastRetoolYear, 10) : null,
+                retool_investment: retoolInvestment ? parseFloat(retoolInvestment) : null,
+                retool_type: retoolType || null,
+              },
             }
-          ),
-          store: updatedContext.store,
-          context: updatedContext,
-          annualEbitda,
-          ttmMonthsUsed,
-          ttmRevenue: fetchedValuation?.ttmRevenue ?? 0,
-          ttmEbitda: fetchedValuation?.ttmEbitda ?? annualEbitda,
-          ttmDscr: fetchedValuation?.ttmDscr ?? 0,
-          ttmDebtService: fetchedValuation?.ttmDebtService ?? 0,
-          debtServiceMonthsWithData: fetchedValuation?.debtServiceMonthsWithData ?? 0,
-        });
-      }
-      setSavedOverrides(currentOverrides);
+          : prev
+      );
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     }
@@ -759,7 +652,7 @@ export default function ValuationPage() {
 
   if (stores.length === 0 || isAllStores || !selectedStore) {
     return (
-      <div className="card overflow-hidden min-w-0 text-center py-10">
+      <div className="card text-center py-10">
         <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
           Select a store from the dropdown above to view valuation details.
         </p>
@@ -770,8 +663,8 @@ export default function ValuationPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-[15px] font-semibold text-adaptive-primary">Valuation Engine</h1>
-        <p className="text-adaptive-muted text-[13px] mt-0.5">
+        <h1 className="text-[15px] font-semibold text-slate-100">Valuation Engine</h1>
+        <p className="text-slate-500 text-[13px] mt-0.5">
           EBITDA multiple model with equipment, lease, market, and revenue mix adjustments
         </p>
       </div>
@@ -842,7 +735,7 @@ export default function ValuationPage() {
       {isOwnerOccupied && realEstateValue > 0 && (
         <div
           className="rounded-xl px-6 py-4"
-          style={{ background: "linear-gradient(135deg, #0f1e3d 0%, #1a3050 100%)", border: "1px solid rgba(59,130,246,0.2)" }}
+          style={{ background: "linear-gradient(135deg, #1E3A1E 0%, #1E3A1E 100%)", border: "1px solid rgba(59,130,246,0.2)" }}
         >
           <div style={{ fontSize: '12px', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
             Combined Value (Business + Real Estate)
@@ -854,7 +747,7 @@ export default function ValuationPage() {
       )}
 
       {/* Store Value History */}
-      <div className="card overflow-hidden min-w-0">
+      <div className="card">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div className="section-title mb-0">Store Value History</div>
           <div className="flex gap-1 flex-wrap">
@@ -871,8 +764,8 @@ export default function ValuationPage() {
                 className={clsx(
                   "px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors",
                   historyPeriod === key
-                    ? "bg-blue-500/20 text-adaptive-info border border-blue-500/40"
-                    : "text-adaptive-muted border border-white/[0.08] hover:border-white/20"
+                    ? "bg-blue-500/20 text-blue-300 border border-blue-500/40"
+                    : "text-slate-400 border border-white/[0.08] hover:border-white/20"
                 )}
               >
                 {label}
@@ -932,20 +825,20 @@ export default function ValuationPage() {
       </div>
 
       {/* Section 2 — Valuation Breakdown */}
-      <div className="card overflow-hidden min-w-0 !p-3.5">
+      <div className="card !p-3.5">
         <div
           className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-3 lg:gap-4"
           style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}
         >
           {/* Left — adjustment waterfall */}
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-adaptive-muted mb-1.5">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
               How We Arrived At This Value
             </div>
 
             <div className="flex items-center h-9 text-[11px] border-b border-white/[0.06]">
-              <span className="text-adaptive-muted flex-shrink-0">Base Multiple</span>
-              <span className="ml-auto font-semibold text-adaptive-primary tabular-nums">
+              <span className="text-slate-400 flex-shrink-0">Base Multiple</span>
+              <span className="ml-auto font-semibold text-slate-100 tabular-nums">
                 {fmtMultiple(valuation.baseMultiple)}
               </span>
             </div>
@@ -956,11 +849,11 @@ export default function ValuationPage() {
                 className="flex flex-col justify-center min-h-9 py-1 text-[11px] border-b border-white/[0.06] min-w-0"
               >
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-adaptive-secondary font-medium flex-shrink-0">{adj.label}</span>
+                  <span className="text-slate-300 font-medium flex-shrink-0">{adj.label}</span>
                   <span
                     className={clsx(
                       "text-[9px] px-1 py-px rounded border uppercase tracking-wide flex-shrink-0",
-                      CATEGORY_COLORS[adj.category] ?? "bg-slate-500/15 text-adaptive-muted border-slate-500/30"
+                      CATEGORY_COLORS[adj.category] ?? "bg-slate-500/15 text-slate-400 border-slate-500/30"
                     )}
                   >
                     {adj.category.replace("_", " ")}
@@ -974,19 +867,19 @@ export default function ValuationPage() {
                     {formatAdj(adj.value)}
                   </span>
                 </div>
-                <div className="text-[10px] text-adaptive-muted truncate pl-0.5">{adj.reason}</div>
+                <div className="text-[10px] text-slate-500 truncate pl-0.5">{adj.reason}</div>
               </div>
             ))}
 
             <div className="mt-2 pt-2 space-y-0.5 text-right">
-              <div className="text-[17px] font-bold text-adaptive-info tabular-nums">
+              <div className="text-[17px] font-bold text-blue-400 tabular-nums">
                 Final Multiple: {fmtMultiple(valuation.finalMultiple)}
               </div>
               <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px", textAlign: "right" }}>
                 Laundromat multiples typically range from 2.5x to 6.0x depending on lease,
                 equipment, location, and revenue quality.
               </div>
-              <div className="text-[11px] text-adaptive-muted tabular-nums">
+              <div className="text-[11px] text-slate-500 tabular-nums">
                 × Annual EBITDA: {fmtDollar(annualEbitda)}
               </div>
               <div className="text-[17px] font-bold text-green-400 tabular-nums">
@@ -1001,58 +894,58 @@ export default function ValuationPage() {
 
           {/* Right — key metrics & drivers */}
           <div className="flex flex-col gap-2 min-w-0">
-            <div className="card2 overflow-hidden min-w-0 !p-2.5 space-y-1.5">
-              <div className="text-[10px] uppercase tracking-wider text-adaptive-muted font-semibold">
+            <div className="card2 !p-2.5 space-y-1.5">
+              <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
                 Key Metrics
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[10px] text-adaptive-muted">Store Value</span>
+                <span className="text-[10px] text-slate-500">Store Value</span>
                 <span className="text-[15px] font-bold text-green-400 tabular-nums">
                   {fmtDollar(valuation.businessValue)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[10px] text-adaptive-muted">
+                <span className="text-[10px] text-slate-500">
                   <MetricTooltip
                     label="Final Multiple"
                     explanation="Applied to annual EBITDA to estimate store value. Higher multiples reflect better lease, equipment, and market factors."
                   />
                 </span>
-                <span className="text-[13px] font-bold text-adaptive-info tabular-nums">
+                <span className="text-[13px] font-bold text-blue-400 tabular-nums">
                   {fmtMultiple(valuation.finalMultiple)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[10px] text-adaptive-muted">
+                <span className="text-[10px] text-slate-500">
                   <MetricTooltip
                     label="Annual EBITDA"
                     explanation="Earnings Before Interest, Taxes, Depreciation & Amortization. The primary profit metric for laundromat valuation."
                   />
                 </span>
-                <span className="text-[12px] font-semibold text-adaptive-secondary tabular-nums">
+                <span className="text-[12px] font-semibold text-slate-200 tabular-nums">
                   {fmtDollar(annualEbitda)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[10px] text-adaptive-muted">EBITDA Margin</span>
-                <span className="text-[12px] font-semibold text-adaptive-secondary tabular-nums">
+                <span className="text-[10px] text-slate-500">EBITDA Margin</span>
+                <span className="text-[12px] font-semibold text-slate-200 tabular-nums">
                   {ebitdaMargin.toFixed(1)}%
                 </span>
               </div>
             </div>
 
-            <div className="card2 overflow-hidden min-w-0 !p-2.5 border-green-500/25 bg-green-500/[0.06]">
+            <div className="card2 !p-2.5 border-green-500/25 bg-green-500/[0.06]">
               <div className="text-[10px] font-semibold text-green-400/90 mb-1.5">
                 Helping Value ✓
               </div>
               {valuation.valueDrivers.length === 0 ? (
-                <p className="text-[10px] text-adaptive-muted">No major drivers identified.</p>
+                <p className="text-[10px] text-slate-500">No major drivers identified.</p>
               ) : (
                 <ul className="space-y-1">
                   {valuation.valueDrivers.slice(0, 3).map((driver) => (
                     <li
                       key={driver}
-                      className="flex items-center gap-1.5 text-[10px] text-adaptive-secondary min-w-0"
+                      className="flex items-center gap-1.5 text-[10px] text-slate-300 min-w-0"
                     >
                       <span className="text-green-400 flex-shrink-0">✓</span>
                       <span className="truncate">{driver}</span>
@@ -1062,18 +955,18 @@ export default function ValuationPage() {
               )}
             </div>
 
-            <div className="card2 overflow-hidden min-w-0 !p-2.5 border-amber-500/25 bg-amber-500/[0.06]">
+            <div className="card2 !p-2.5 border-amber-500/25 bg-amber-500/[0.06]">
               <div className="text-[10px] font-semibold text-amber-400/90 mb-1.5">
                 Hurting Value ⚠
               </div>
               {valuation.valueRisks.length === 0 ? (
-                <p className="text-[10px] text-adaptive-muted">No significant risks flagged.</p>
+                <p className="text-[10px] text-slate-500">No significant risks flagged.</p>
               ) : (
                 <ul className="space-y-1">
                   {valuation.valueRisks.slice(0, 3).map((risk) => (
                     <li
                       key={risk}
-                      className="flex items-center gap-1.5 text-[10px] text-adaptive-secondary min-w-0"
+                      className="flex items-center gap-1.5 text-[10px] text-slate-300 min-w-0"
                     >
                       <span className="text-amber-400 flex-shrink-0">⚠</span>
                       <span className="truncate">{risk}</span>
@@ -1089,14 +982,14 @@ export default function ValuationPage() {
       <button
         type="button"
         onClick={() => setCalcExpanded((v) => !v)}
-        className="card2 overflow-hidden min-w-0 w-full text-left !p-3.5 hover:opacity-90 transition-opacity"
+        className="card2 w-full text-left !p-3.5 hover:opacity-90 transition-opacity"
       >
         <div className="flex items-center justify-between">
-          <span className="text-[13px] font-semibold text-adaptive-secondary">How is this calculated?</span>
-          <span className="text-adaptive-muted text-[12px]">{calcExpanded ? "▲" : "▼"}</span>
+          <span className="text-[13px] font-semibold text-slate-200">How is this calculated?</span>
+          <span className="text-slate-400 text-[12px]">{calcExpanded ? "▲" : "▼"}</span>
         </div>
         {calcExpanded && (
-          <p className="text-[12px] text-adaptive-muted mt-3 leading-relaxed">
+          <p className="text-[12px] text-slate-400 mt-3 leading-relaxed">
             LaundroCFO uses an EBITDA multiple approach, which is the standard valuation
             method used by laundromat brokers, SBA lenders, and industry buyers. We start
             with a base multiple of 4.0x and apply positive and negative adjustments based
@@ -1139,7 +1032,7 @@ export default function ValuationPage() {
         />
       </div>
 
-      <div className="card overflow-hidden min-w-0">
+      <div className="card">
         <div className="section-title mb-4">Service Mix & Retool</div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {[
@@ -1149,7 +1042,7 @@ export default function ValuationPage() {
             { label: "Pickup & Delivery %", value: pickupDeliveryPct, set: setPickupDeliveryPct },
           ].map((field) => (
             <div key={field.label}>
-              <label className="block text-[11px] text-adaptive-muted mb-1.5">{field.label}</label>
+              <label className="block text-[11px] text-slate-500 mb-1.5">{field.label}</label>
               <input
                 type="number"
                 min={0}
@@ -1163,7 +1056,7 @@ export default function ValuationPage() {
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div>
-            <label className="block text-[11px] text-adaptive-muted mb-1.5">Last Retool Year</label>
+            <label className="block text-[11px] text-slate-500 mb-1.5">Last Retool Year</label>
             <input
               type="number"
               min={1990}
@@ -1175,7 +1068,7 @@ export default function ValuationPage() {
             />
           </div>
           <div>
-            <label className="block text-[11px] text-adaptive-muted mb-1.5">Investment Amount</label>
+            <label className="block text-[11px] text-slate-500 mb-1.5">Investment Amount</label>
             <input
               type="number"
               min={0}
@@ -1186,7 +1079,7 @@ export default function ValuationPage() {
             />
           </div>
           <div>
-            <label className="block text-[11px] text-adaptive-muted mb-1.5">Retool Type</label>
+            <label className="block text-[11px] text-slate-500 mb-1.5">Retool Type</label>
             <select
               value={retoolType}
               onChange={(e) => setRetoolType(e.target.value)}
@@ -1217,10 +1110,10 @@ export default function ValuationPage() {
       </div>
 
       {/* Section 4 — Improvement Opportunities */}
-      <div className="card overflow-hidden min-w-0">
+      <div className="card">
           <div className="section-title mb-3">Improvement Opportunities</div>
           {valuation.improvements.length === 0 ? (
-            <p className="text-[12px] text-adaptive-muted">Store is well-optimized across key factors.</p>
+            <p className="text-[12px] text-slate-500">Store is well-optimized across key factors.</p>
           ) : (
             <ul className="space-y-3">
               {valuation.improvements.map((item) => (
@@ -1229,14 +1122,14 @@ export default function ValuationPage() {
                   className="flex items-start justify-between gap-3 text-[12px] border-b border-white/[0.04] pb-3 last:border-0 last:pb-0"
                 >
                   <div>
-                    <div className="text-adaptive-secondary font-medium">{item.action}</div>
+                    <div className="text-slate-200 font-medium">{item.action}</div>
                     <div className="text-green-400 font-semibold mt-0.5">
                       +{fmtDollar(item.estimatedGain)} potential
                     </div>
                   </div>
                   <Link
                     href="/scenarios"
-                    className="text-[11px] text-adaptive-info hover:text-adaptive-info whitespace-nowrap flex-shrink-0"
+                    className="text-[11px] text-blue-400 hover:text-blue-300 whitespace-nowrap flex-shrink-0"
                   >
                     Model This →
                   </Link>
@@ -1248,12 +1141,12 @@ export default function ValuationPage() {
 
       {/* Section 5 — Equipment & Lease summary */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="card overflow-hidden min-w-0">
+        <div className="card">
           <div className="section-title mb-4">Equipment Summary</div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="metric-label">Avg Age</div>
-              <div className="text-[20px] font-bold text-adaptive-primary">
+              <div className="text-[20px] font-bold text-slate-100">
                 {equipMetrics.weightedAvgAge.toFixed(1)} yrs
               </div>
             </div>
@@ -1265,19 +1158,19 @@ export default function ValuationPage() {
             </div>
             <div>
               <div className="metric-label">Under 10 Years</div>
-              <div className="text-[20px] font-bold text-adaptive-primary">
+              <div className="text-[20px] font-bold text-slate-100">
                 {equipMetrics.pctUnder10Years.toFixed(0)}%
               </div>
             </div>
             <div>
               <div className="metric-label">200G Washers</div>
-              <div className="text-[20px] font-bold text-adaptive-primary">
+              <div className="text-[20px] font-bold text-slate-100">
                 {equipMetrics.pct200GWashers.toFixed(0)}%
               </div>
             </div>
           </div>
           <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center justify-between">
-            <span className="text-[13px] text-adaptive-muted">Equipment Valuation Adjustment</span>
+            <span className="text-[13px] text-slate-400">Equipment Valuation Adjustment</span>
             <span
               className={clsx(
                 "text-[16px] font-bold",
@@ -1289,30 +1182,30 @@ export default function ValuationPage() {
           </div>
         </div>
 
-        <div className="card overflow-hidden min-w-0">
+        <div className="card">
           <div className="section-title mb-4">Lease Summary</div>
           {isOwnerOccupied ? (
-            <div className="text-[13px] text-adaptive-muted">
+            <div className="text-[13px] text-slate-400">
               Owner-occupied — fee-simple real estate ownership applies instead of lease term control.
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <div className="metric-label">Years Remaining</div>
-                <div className="text-[20px] font-bold text-adaptive-primary">
+                <div className="text-[20px] font-bold text-slate-100">
                   {yearsRemaining.toFixed(1)} yrs
                 </div>
               </div>
               <div>
                 <div className="metric-label">Total Control</div>
-                <div className="text-[20px] font-bold text-adaptive-primary">
+                <div className="text-[20px] font-bold text-slate-100">
                   {totalLeaseControl.toFixed(1)} yrs
                 </div>
               </div>
             </div>
           )}
           <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center justify-between">
-            <span className="text-[13px] text-adaptive-muted">Lease Valuation Adjustment</span>
+            <span className="text-[13px] text-slate-400">Lease Valuation Adjustment</span>
             <span
               className={clsx(
                 "text-[16px] font-bold",

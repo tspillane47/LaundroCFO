@@ -27,16 +27,8 @@ import { ReportDocument, type ReportProps } from "@/components/reports/ReportDoc
 import {
   PortfolioReportDocument,
 } from "@/components/reports/PortfolioReportDocument";
-import { MonthlyOperatingReport } from "@/components/reports/MonthlyOperatingReport";
 import { generateExecutiveSummary } from "@/components/reports/generateExecutiveSummary";
 import { getPortfolioReport, type PortfolioReportData } from "@/lib/getPortfolioReport";
-import { getStoreReportData, type StoreReportData } from "@/lib/getStoreReportData";
-import {
-  getMonthlyOperatingReportData,
-  getLatestFinancialMonth,
-  monthSelectLabel,
-  type MonthlyOperatingReportData,
-} from "@/lib/getMonthlyOperatingReportData";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
@@ -80,7 +72,7 @@ function scoreLabel(score: number): string {
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[11px] font-bold text-adaptive-muted uppercase tracking-widest mb-3 pb-2.5 border-b border-white/[0.06]">
+    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 pb-2.5 border-b border-white/[0.06]">
       {children}
     </div>
   );
@@ -88,19 +80,14 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 function PreviewRow({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
-    <div className="flex justify-between gap-3 py-2 min-w-0">
-      <span className="text-adaptive-muted shrink-0">{label}</span>
-      <span
-        className={clsx("font-semibold tabular-nums whitespace-nowrap shrink-0", className ?? "text-adaptive-primary")}
-        title={value}
-      >
-        {value}
-      </span>
+    <div className="flex justify-between py-2">
+      <span className="text-slate-400">{label}</span>
+      <span className={clsx("font-semibold", className ?? "text-slate-100")}>{value}</span>
     </div>
   );
 }
 
-type ReportMode = "store" | "portfolio" | "monthly";
+type ReportMode = "store" | "portfolio";
 
 function parseMachineCapacity(size: string): number {
   const match = size.match(/(\d+)/);
@@ -154,11 +141,6 @@ export default function ReportsPage() {
   const [portfolioData, setPortfolioData] = useState<PortfolioReportData | null>(null);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [storeReportData, setStoreReportData] = useState<StoreReportData | null>(null);
-  const [monthlyReportData, setMonthlyReportData] = useState<MonthlyOperatingReportData | null>(null);
-  const [monthlyReportLoading, setMonthlyReportLoading] = useState(false);
-  const [selectedReportMonth, setSelectedReportMonth] = useState<{ year: number; month: number } | null>(null);
-  const [availableMonths, setAvailableMonths] = useState<{ year: number; month: number }[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -206,29 +188,25 @@ export default function ReportsPage() {
 
       const ownerOccupied = storeData.occupancy_type === "owner_occupied";
 
-      let leaseData: any = null;
-      let reData: any = null;
       if (ownerOccupied) {
-        const { data: fetchedRe } = await supabase
+        const { data: reData } = await supabase
           .from("real_estate")
           .select("*")
           .eq("store_id", storeData.id)
           .limit(1)
           .maybeSingle();
-        reData = fetchedRe;
         setRealEstate(reData);
         setLease(null);
         setLeaseOptions([]);
         setTotalLeaseControl(15);
       } else {
         setRealEstate(null);
-        const { data: fetchedLease } = await supabase
+        const { data: leaseData } = await supabase
           .from("leases")
           .select("*")
           .eq("store_id", storeData.id)
           .limit(1)
           .maybeSingle();
-        leaseData = fetchedLease;
 
         if (leaseData) {
           setLease(leaseData);
@@ -248,23 +226,6 @@ export default function ReportsPage() {
           setLeaseOptions([]);
           setTotalLeaseControl(0);
         }
-      }
-
-      try {
-        const reportData = await getStoreReportData({
-          storeId: storeData.id,
-          store: storeData,
-          equipment: (equipmentData ?? []) as EquipmentRecord[],
-          lease: leaseData,
-          realEstate: ownerOccupied ? reData : null,
-        });
-        setStoreReportData(reportData);
-        setAvailableMonths(reportData.financial.availableMonths);
-        const latest = getLatestFinancialMonth(reportData.financial.availableMonths);
-        setSelectedReportMonth(latest);
-      } catch {
-        setStoreReportData(null);
-        setAvailableMonths([]);
       }
 
       setLoading(false);
@@ -305,36 +266,6 @@ export default function ReportsPage() {
     ensureUser();
   }, [reportMode, supabase]);
 
-  useEffect(() => {
-    async function loadMonthlyReport() {
-      if (reportMode !== "monthly" || !selectedStore?.id || !selectedReportMonth || !store) {
-        setMonthlyReportData(null);
-        return;
-      }
-
-      setMonthlyReportLoading(true);
-      setError("");
-      try {
-        const data = await getMonthlyOperatingReportData({
-          storeId: selectedStore.id,
-          year: selectedReportMonth.year,
-          month: selectedReportMonth.month,
-          store,
-          equipment,
-          lease,
-        });
-        setMonthlyReportData(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load monthly report");
-        setMonthlyReportData(null);
-      } finally {
-        setMonthlyReportLoading(false);
-      }
-    }
-
-    loadMonthlyReport();
-  }, [reportMode, selectedStore?.id, selectedReportMonth, store, equipment, lease]);
-
   const equipMetrics = useMemo(() => computeEquipmentMetrics(equipment), [equipment]);
 
   const generatedDate = useMemo(
@@ -348,34 +279,25 @@ export default function ReportsPage() {
   );
 
   const executiveSummary = useMemo(() => {
-    if (!store || !valuation || !storeReportData) return "";
-    return generateExecutiveSummary({
-      store,
-      lease,
-      leaseOptions,
-      equipment,
-      valuation,
-      financial: storeReportData.financial,
-    });
-  }, [store, lease, leaseOptions, equipment, valuation, storeReportData]);
-
-  const financial = storeReportData?.financial;
+    if (!store || !valuation) return "";
+    return generateExecutiveSummary({ store, lease, leaseOptions, equipment, valuation });
+  }, [store, lease, leaseOptions, equipment, valuation]);
 
   const metrics = useMemo(() => {
-    if (!store || !valuation || !financial) return null;
+    if (!store || !valuation) return null;
 
-    const monthlyRevenue = financial.monthlyAverages.revenue;
-    const monthlyExpenses = financial.monthlyAverages.expenses;
-    const monthlyEbitda = financial.monthlyAverages.ebitda;
-    const annualRevenue = financial.revenueTtmTotal;
-    const annualEbitda = financial.ebitdaTtmTotal;
-    const annualDebtService = financial.annualDebtService;
+    const monthlyRevenue = store.monthly_revenue ?? 0;
+    const monthlyExpenses = store.monthly_expenses ?? 0;
+    const monthlyEbitda = monthlyRevenue - monthlyExpenses;
+    const annualRevenue = monthlyRevenue * 12;
+    const annualEbitda = monthlyEbitda * 12;
+    const annualDebtService = store.annual_debt_service ?? 0;
     const monthlyUtilities = store.monthly_utilities ?? 0;
-    const loanBalance = financial.totalOutstandingDebt;
+    const loanBalance = store.loan_balance ?? 0;
     const sqft = store.square_footage ?? 3500;
     const isOwnerOccupied = store.occupancy_type === "owner_occupied";
 
-    const dscr = financial.dscr ?? 0;
+    const dscr = annualDebtService > 0 ? calcDSCR(annualEbitda, annualDebtService) : 0;
     const portfolioEbitda = stores.reduce(
       (s, st) => s + ((st.monthly_revenue ?? 0) - (st.monthly_expenses ?? 0)) * 12,
       0
@@ -385,10 +307,7 @@ export default function ReportsPage() {
       portfolioDebtService > 0 ? calcGlobalDSCR(portfolioEbitda, portfolioDebtService) : dscr;
 
     const ebitdaMargin = calcEbitdaMargin(annualEbitda, annualRevenue);
-    const utilityRow = financial.benchmarkRows.find((r) => r.metric === "Utility Ratio");
-    const utilityRatio =
-      utilityRow?.store ??
-      (monthlyRevenue > 0 ? calcUtilityRatio(monthlyUtilities * 12, annualRevenue) : 0);
+    const utilityRatio = calcUtilityRatio(monthlyUtilities * 12, annualRevenue);
     const rentToRevenue = calcRentToRevenue((lease?.monthly_rent ?? 0) * 12, annualRevenue);
     const revenuePerSF = calcRevenuePerSF(annualRevenue, sqft);
     const ebitdaPerSF = calcEbitdaPerSF(annualEbitda, sqft);
@@ -439,10 +358,10 @@ export default function ReportsPage() {
       financeRating: financeabilityRating(dscr, globalDscr),
       isOwnerOccupied,
     };
-  }, [store, valuation, stores, lease, leaseOptions, totalLeaseControl, financial]);
+  }, [store, valuation, stores, lease, leaseOptions, totalLeaseControl]);
 
   const reportProps: ReportProps | null = useMemo(() => {
-    if (!store || !valuation || !storeReportData) return null;
+    if (!store || !valuation) return null;
     return {
       store,
       lease,
@@ -454,8 +373,6 @@ export default function ReportsPage() {
       portfolioStores: stores,
       generatedDate,
       executiveSummary,
-      financial: storeReportData.financial,
-      laundroCfoScore: storeReportData.laundroCfoScore,
     };
   }, [
     store,
@@ -468,7 +385,6 @@ export default function ReportsPage() {
     stores,
     generatedDate,
     executiveSummary,
-    storeReportData,
   ]);
 
   const buildPdfBlob = useCallback(async () => {
@@ -482,25 +398,13 @@ export default function ReportsPage() {
         />
       ).toBlob();
     }
-    if (reportMode === "monthly") {
-      if (!monthlyReportData) throw new Error("Monthly report data not ready");
-      return pdf(
-        <MonthlyOperatingReport
-          data={monthlyReportData}
-          storeName={store?.name ?? "Store"}
-          generatedDate={generatedDate}
-        />
-      ).toBlob();
-    }
     if (!reportProps) throw new Error("Report data not ready");
     return pdf(<ReportDocument {...reportProps} />).toBlob();
-  }, [reportMode, portfolioData, monthlyReportData, store, generatedDate, userEmail, reportProps]);
+  }, [reportMode, portfolioData, generatedDate, userEmail, reportProps]);
 
   async function handleGeneratePdf() {
     if (reportMode === "portfolio") {
       if (!portfolioData) return;
-    } else if (reportMode === "monthly") {
-      if (!monthlyReportData) return;
     } else if (!reportProps || !store) {
       return;
     }
@@ -515,9 +419,7 @@ export default function ReportsPage() {
       a.download =
         reportMode === "portfolio"
           ? "portfolio-underwriting-report.pdf"
-          : reportMode === "monthly"
-            ? `${(store!.name ?? "store").replace(/\s+/g, "-").toLowerCase()}-monthly-operating-${selectedReportMonth?.year}-${String(selectedReportMonth?.month).padStart(2, "0")}.pdf`
-            : `${(store!.name ?? "store").replace(/\s+/g, "-").toLowerCase()}-underwriting-report.pdf`;
+          : `${(store!.name ?? "store").replace(/\s+/g, "-").toLowerCase()}-underwriting-report.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -535,7 +437,6 @@ export default function ReportsPage() {
       return;
     }
     if (reportMode === "portfolio" && !portfolioData) return;
-    if (reportMode === "monthly" && !monthlyReportData) return;
     if (reportMode === "store" && (!reportProps || !store)) return;
 
     setSharing(true);
@@ -605,8 +506,7 @@ export default function ReportsPage() {
   }
 
   const storeName = store?.name ?? "Your Store";
-  const isStoreReady = Boolean(store && valuation && metrics && storeReportData);
-  const monthlyReady = Boolean(monthlyReportData && selectedReportMonth);
+  const isStoreReady = Boolean(store && valuation && metrics);
   const portfolioReady = Boolean(portfolioData && portfolioData.totals.storeCount > 0);
   const totals = portfolioData?.totals;
   const cashFlow = portfolioData?.cashFlow;
@@ -615,75 +515,38 @@ export default function ReportsPage() {
   const pdfDisabled =
     generatingPdf ||
     sharing ||
-    (reportMode === "portfolio"
-      ? !portfolioReady
-      : reportMode === "monthly"
-        ? !monthlyReady || monthlyReportLoading
-        : !isStoreReady);
+    (reportMode === "portfolio" ? !portfolioReady : !isStoreReady);
 
   return (
     <div className="space-y-4 max-w-4xl">
       <div className="flex gap-1 p-1 rounded-full w-fit" style={{ background: "var(--bg-card2)", border: "1px solid var(--border)" }}>
-        {(["store", "portfolio", "monthly"] as ReportMode[]).map((mode) => (
+        {(["store", "portfolio"] as ReportMode[]).map((mode) => (
           <button
             key={mode}
             type="button"
             onClick={() => setReportMode(mode)}
             className={clsx(
               "px-4 py-1.5 rounded-full text-[12px] font-medium transition-colors",
-              reportMode === mode ? "text-white" : "text-adaptive-muted hover:text-adaptive-secondary"
+              reportMode === mode ? "text-white" : "text-slate-400 hover:text-slate-200"
             )}
             style={reportMode === mode ? { background: "var(--accent)" } : undefined}
           >
-            {mode === "store"
-              ? "Store Report"
-              : mode === "portfolio"
-                ? "Portfolio Report"
-                : "Monthly Operating Report"}
+            {mode === "store" ? "Store Report" : "Portfolio Report"}
           </button>
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[15px] font-semibold text-adaptive-primary">
-            {reportMode === "portfolio"
-              ? "Portfolio Underwriting Report"
-              : reportMode === "monthly"
-                ? "Monthly Operating Report"
-                : "Underwriting Report"}
+          <h1 className="text-[15px] font-semibold text-slate-100">
+            {reportMode === "portfolio" ? "Portfolio Underwriting Report" : "Underwriting Report"}
           </h1>
-          <p className="text-adaptive-muted text-[12px] mt-0.5">
+          <p className="text-slate-500 text-[12px] mt-0.5">
             {reportMode === "portfolio"
               ? `${totals?.storeCount ?? stores.length} store${(totals?.storeCount ?? stores.length) !== 1 ? "s" : ""} — ${generatedDate}`
-              : reportMode === "monthly"
-                ? `${storeName} — ${monthlyReportData?.reportMonthLabel ?? "Select month"} — ${generatedDate}`
-                : `${storeName} — ${generatedDate}`}
+              : `${storeName} — ${generatedDate}`}
           </p>
         </div>
-        <div className="flex items-center gap-2.5 ml-auto">
-        {reportMode === "monthly" && availableMonths.length > 0 && (
-          <select
-            className="bg-[#1e2a3a] border border-white/[0.08] rounded-lg px-3 py-1.5 text-[12px] text-slate-300"
-            value={
-              selectedReportMonth
-                ? `${selectedReportMonth.year}-${selectedReportMonth.month}`
-                : ""
-            }
-            onChange={(e) => {
-              const [year, month] = e.target.value.split("-").map(Number);
-              setSelectedReportMonth({ year, month });
-            }}
-          >
-            {[...availableMonths]
-              .sort((a, b) => (a.year !== b.year ? b.year - a.year : b.month - a.month))
-              .map((m) => (
-                <option key={`${m.year}-${m.month}`} value={`${m.year}-${m.month}`}>
-                  {monthSelectLabel(m.year, m.month)}
-                </option>
-              ))}
-          </select>
-        )}
         <div className="flex gap-2.5">
           <button
             type="button"
@@ -702,7 +565,6 @@ export default function ReportsPage() {
             {sharing ? "Sharing..." : "Share with Lender"}
           </button>
         </div>
-        </div>
       </div>
 
       {error && (
@@ -713,7 +575,7 @@ export default function ReportsPage() {
 
       {reportMode === "portfolio" && (portfolioLoading || storesLoading) && (
         <div className="flex items-center justify-center py-20">
-          <div className="text-adaptive-muted text-[13px]">Loading portfolio report...</div>
+          <div className="text-slate-500 text-[13px]">Loading portfolio report...</div>
         </div>
       )}
 
@@ -727,7 +589,7 @@ export default function ReportsPage() {
 
       {reportMode === "store" && (storesLoading || loading) && (
         <div className="flex items-center justify-center py-20">
-          <div className="text-adaptive-muted text-[13px]">Loading report data...</div>
+          <div className="text-slate-500 text-[13px]">Loading report data...</div>
         </div>
       )}
 
@@ -748,7 +610,7 @@ export default function ReportsPage() {
               Portfolio Net Worth
             </div>
             <AnimatedNumber value={totals.portfolioNetWorth} prefix="$" className="hero-value-text" duration={1200} />
-            <p className="text-[13px] text-adaptive-muted mt-4">
+            <p className="text-[13px] text-slate-400 mt-4">
               Portfolio Value {fmtDollar(totals.portfolioValue)} − Debt {fmtDollar(totals.portfolioDebt)} + Cash {fmtDollar(totals.portfolioCash)}
             </p>
           </div>
@@ -783,55 +645,38 @@ export default function ReportsPage() {
           <div className="card">
             <SectionHeading>Store Summary</SectionHeading>
             <div className="table-scroll">
-              <table className="w-full text-[12px]" style={{ minWidth: "1090px" }}>
-                <colgroup>
-                  <col className="col-store-name" style={{ minWidth: "160px" }} />
-                  <col className="col-address" style={{ minWidth: "140px" }} />
-                  <col style={{ minWidth: "90px" }} />
-                  <col style={{ minWidth: "90px" }} />
-                  <col style={{ minWidth: "90px" }} />
-                  <col style={{ minWidth: "90px" }} />
-                  <col style={{ minWidth: "90px" }} />
-                  <col style={{ minWidth: "90px" }} />
-                  <col style={{ minWidth: "90px" }} />
-                  <col className="col-score" style={{ minWidth: "80px" }} />
-                  <col className="col-score" style={{ minWidth: "80px" }} />
-                </colgroup>
+              <table className="w-full text-[12px] min-w-[900px]">
                 <thead>
-                  <tr className="text-left text-adaptive-muted border-b border-white/[0.06]">
-                    <th className="pb-3 pr-3 font-medium col-store-name">Store Name</th>
-                    <th className="pb-3 pr-3 font-medium col-address">Address</th>
-                    <th className="pb-3 pr-3 font-medium text-right col-money">Revenue</th>
-                    <th className="pb-3 pr-3 font-medium text-right col-money">EBITDA</th>
-                    <th className="pb-3 pr-3 font-medium text-right col-money">DSCR</th>
-                    <th className="pb-3 pr-3 font-medium text-right col-money">Value</th>
-                    <th className="pb-3 pr-3 font-medium text-right col-money">Debt</th>
-                    <th className="pb-3 pr-3 font-medium text-right col-money">Cash</th>
-                    <th className="pb-3 pr-3 font-medium text-right col-money">Equity</th>
-                    <th className="pb-3 pr-3 font-medium text-right col-score">Lease Score</th>
-                    <th className="pb-3 font-medium text-right col-score">Equip. Grade</th>
+                  <tr className="text-left text-slate-500 border-b border-white/[0.06]">
+                    <th className="pb-3 pr-3 font-medium">Store Name</th>
+                    <th className="pb-3 pr-3 font-medium">Address</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Revenue</th>
+                    <th className="pb-3 pr-3 font-medium text-right">EBITDA</th>
+                    <th className="pb-3 pr-3 font-medium text-right">DSCR</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Value</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Debt</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Cash</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Equity</th>
+                    <th className="pb-3 pr-3 font-medium text-right">Lease Score</th>
+                    <th className="pb-3 font-medium text-right">Equip. Grade</th>
                   </tr>
                 </thead>
                 <tbody>
                   {storeDetails.map((d) => (
                     <tr key={d.store.id} className="border-b border-white/[0.04]">
-                      <td className="py-2.5 pr-3 text-adaptive-secondary truncate max-w-0" title={d.store.name ?? "Store"}>
-                        {d.store.name ?? "Store"}
-                      </td>
-                      <td className="py-2.5 pr-3 text-adaptive-muted truncate max-w-0" title={d.store.address ?? "—"}>
-                        {d.store.address ?? "—"}
-                      </td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary col-money whitespace-nowrap" title={fmtDollar(d.annualRevenue)}>{fmtDollar(d.annualRevenue)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-400 col-money whitespace-nowrap" title={fmtDollar(d.annualEbitda)}>{fmtDollar(d.annualEbitda)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary col-money whitespace-nowrap">
+                      <td className="py-2.5 pr-3 text-slate-200">{d.store.name ?? "Store"}</td>
+                      <td className="py-2.5 pr-3 text-slate-400">{d.store.address ?? "—"}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-200">{fmtDollar(d.annualRevenue)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-400">{fmtDollar(d.annualEbitda)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">
                         {d.annualDebtService > 0 ? fmtMultiple(d.dscr) : "—"}
                       </td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary col-money whitespace-nowrap" title={fmtDollar(d.valuation.businessValue)}>{fmtDollar(d.valuation.businessValue)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary col-money whitespace-nowrap" title={fmtDollar(d.debt)}>{fmtDollar(d.debt)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary col-money whitespace-nowrap" title={fmtDollar(d.cash)}>{fmtDollar(d.cash)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-400 col-money whitespace-nowrap" title={fmtDollar(d.equity)}>{fmtDollar(d.equity)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary col-score whitespace-nowrap">{d.leaseScore}</td>
-                      <td className="py-2.5 text-right tabular-nums text-adaptive-secondary col-score whitespace-nowrap">{d.equipmentGrade}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-200">{fmtDollar(d.valuation.businessValue)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{fmtDollar(d.debt)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{fmtDollar(d.cash)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-400">{fmtDollar(d.equity)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{d.leaseScore}</td>
+                      <td className="py-2.5 text-right tabular-nums text-slate-200">{d.equipmentGrade}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -855,13 +700,13 @@ export default function ReportsPage() {
                   ["Cash Flow After Debt", cashFlow.cashFlowAfterDebt],
                 ].map(([label, amount]) => (
                   <tr key={label as string}>
-                    <td className="py-2.5 text-adaptive-muted">{label}</td>
+                    <td className="py-2.5 text-slate-400">{label}</td>
                     <td
                       className={clsx(
                         "py-2.5 text-right font-semibold tabular-nums",
                         label === "EBITDA" || label === "Cash Flow After Debt"
                           ? "text-green-400"
-                          : "text-adaptive-primary"
+                          : "text-slate-100"
                       )}
                     >
                       {fmtDollar(amount as number)}
@@ -912,18 +757,12 @@ export default function ReportsPage() {
                   explanation: "Portfolio value minus debt plus cash on hand.",
                 },
               ].map((item) => (
-                <div key={item.label} className="card2 p-4 overflow-hidden min-w-0">
+                <div key={item.label} className="card2 p-4">
                   <div className="metric-label mb-1">
                     <MetricTooltip label={item.label} explanation={item.explanation} />
                   </div>
-                  <div
-                    className="metric-value text-adaptive-primary"
-                    style={{ fontSize: item.value.length > 7 ? "16px" : "18px" }}
-                    title={item.value}
-                  >
-                    {item.value}
-                  </div>
-                  <p className="text-[11px] text-adaptive-muted mt-2 leading-relaxed">{item.explanation}</p>
+                  <div className="text-[18px] font-bold text-slate-100">{item.value}</div>
+                  <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">{item.explanation}</p>
                 </div>
               ))}
             </div>
@@ -934,7 +773,7 @@ export default function ReportsPage() {
             <div className="table-scroll">
               <table className="w-full text-[12px] min-w-[640px]">
                 <thead>
-                  <tr className="text-left text-adaptive-muted border-b border-white/[0.06]">
+                  <tr className="text-left text-slate-500 border-b border-white/[0.06]">
                     <th className="pb-3 pr-3 font-medium">Store</th>
                     <th className="pb-3 pr-3 font-medium">Lease Expiration</th>
                     <th className="pb-3 pr-3 font-medium text-right">Years Remaining</th>
@@ -945,17 +784,17 @@ export default function ReportsPage() {
                 <tbody>
                   {storeDetails.map((d) => (
                     <tr key={`lease-${d.store.id}`} className="border-b border-white/[0.04]">
-                      <td className="py-2.5 pr-3 text-adaptive-secondary">{d.store.name ?? "Store"}</td>
-                      <td className="py-2.5 pr-3 text-adaptive-muted">
+                      <td className="py-2.5 pr-3 text-slate-200">{d.store.name ?? "Store"}</td>
+                      <td className="py-2.5 pr-3 text-slate-400">
                         {formatLeaseExpiration(d.lease, d.store.occupancy_type === "owner_occupied")}
                       </td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary">
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">
                         {d.lease ? d.yearsRemaining.toFixed(1) : "—"}
                       </td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary">
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">
                         {d.availableLeaseOptions > 0 ? d.availableLeaseOptions : "—"}
                       </td>
-                      <td className="py-2.5 text-right tabular-nums text-adaptive-secondary">{d.leaseScore}</td>
+                      <td className="py-2.5 text-right tabular-nums text-slate-200">{d.leaseScore}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -968,7 +807,7 @@ export default function ReportsPage() {
             <div className="table-scroll">
               <table className="w-full text-[12px] min-w-[720px]">
                 <thead>
-                  <tr className="text-left text-adaptive-muted border-b border-white/[0.06]">
+                  <tr className="text-left text-slate-500 border-b border-white/[0.06]">
                     <th className="pb-3 pr-3 font-medium">Store</th>
                     <th className="pb-3 pr-3 font-medium text-right">Equipment Grade</th>
                     <th className="pb-3 pr-3 font-medium text-right">Avg Age</th>
@@ -983,13 +822,13 @@ export default function ReportsPage() {
                     const equipMetrics = computeEquipmentMetrics(d.equipment as EquipmentRecord[]);
                     return (
                       <tr key={`equip-${d.store.id}`} className="border-b border-white/[0.04]">
-                        <td className="py-2.5 pr-3 text-adaptive-secondary">{d.store.name ?? "Store"}</td>
-                        <td className="py-2.5 pr-3 text-right text-adaptive-secondary">{d.equipmentGrade}</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary">{d.avgEquipmentAge.toFixed(1)} yrs</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary">{equipMetrics.totalWashers}</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums text-adaptive-secondary">{equipMetrics.totalDryers}</td>
-                        <td className="py-2.5 pr-3 text-adaptive-secondary">{getLargestMachine(d.equipment as EquipmentRecord[])}</td>
-                        <td className="py-2.5 text-right tabular-nums text-adaptive-secondary">{equipMetrics.qualityScore}</td>
+                        <td className="py-2.5 pr-3 text-slate-200">{d.store.name ?? "Store"}</td>
+                        <td className="py-2.5 pr-3 text-right text-slate-200">{d.equipmentGrade}</td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{d.avgEquipmentAge.toFixed(1)} yrs</td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{equipMetrics.totalWashers}</td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{equipMetrics.totalDryers}</td>
+                        <td className="py-2.5 pr-3 text-slate-300">{getLargestMachine(d.equipment as EquipmentRecord[])}</td>
+                        <td className="py-2.5 text-right tabular-nums text-slate-200">{equipMetrics.qualityScore}</td>
                       </tr>
                     );
                   })}
@@ -1001,103 +840,36 @@ export default function ReportsPage() {
           <div className="card">
             <SectionHeading>Portfolio Net Worth</SectionHeading>
             <div className="text-[14px] space-y-2 font-mono">
-              <div className="flex justify-between text-adaptive-secondary">
+              <div className="flex justify-between text-slate-300">
                 <span>Portfolio Value:</span>
                 <span>{fmtDollar(totals.portfolioValue)}</span>
               </div>
-              <div className="flex justify-between text-adaptive-secondary">
+              <div className="flex justify-between text-slate-300">
                 <span>+ Cash:</span>
                 <span>{fmtDollar(totals.portfolioCash)}</span>
               </div>
-              <div className="flex justify-between text-adaptive-secondary">
+              <div className="flex justify-between text-slate-300">
                 <span>− Debt:</span>
                 <span className="text-red-400">−{fmtDollar(totals.portfolioDebt).replace("$", "")}</span>
               </div>
               <div className="border-t border-white/[0.06] pt-3 flex justify-between items-baseline">
-                <span className="text-adaptive-secondary font-semibold">= Portfolio Net Worth:</span>
+                <span className="text-slate-200 font-semibold">= Portfolio Net Worth:</span>
                 <span className="text-[28px] font-bold text-green-400">{fmtDollar(totals.portfolioNetWorth)}</span>
               </div>
             </div>
           </div>
 
-          <div className="text-[11px] text-adaptive-muted pb-4">
+          <div className="text-[11px] text-slate-600 pb-4">
             Report generated by LaundroCFO — Portfolio — {generatedDate}
           </div>
         </>
       )}
 
-      {reportMode === "monthly" && (storesLoading || loading || monthlyReportLoading) && (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-adaptive-muted text-[13px]">Loading monthly report...</div>
-        </div>
-      )}
-
-      {reportMode === "monthly" && !storesLoading && !loading && !monthlyReportLoading && availableMonths.length === 0 && (
-        <div className="card text-center py-10">
-          <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
-            Add monthly financials to generate a Monthly Operating Report.
-          </p>
-        </div>
-      )}
-
-      {reportMode === "monthly" && monthlyReady && monthlyReportData && (
+      {reportMode === "store" && isStoreReady && store && valuation && metrics && (
         <>
-          <div className="card">
-            <SectionHeading>{monthlyReportData.reportMonthLabel} Summary</SectionHeading>
-            <div className="grid grid-cols-3 gap-4 text-[13px]">
-              <PreviewRow label="Revenue" value={fmtDollar(monthlyReportData.summary.revenue.current)} />
-              <PreviewRow label="EBITDA" value={fmtDollar(monthlyReportData.summary.ebitda.current)} className="text-green-400" />
-              <PreviewRow label="EBITDA Margin" value={fmtPct(monthlyReportData.summary.ebitdaMargin)} />
-              <PreviewRow
-                label="MoM Revenue Change"
-                value={
-                  monthlyReportData.summary.revenue.changePct != null
-                    ? `${monthlyReportData.summary.revenue.changeDollar >= 0 ? "+" : "−"}${fmtDollar(Math.abs(monthlyReportData.summary.revenue.changeDollar)).replace("$", "")} (${monthlyReportData.summary.revenue.changePct.toFixed(1)}%)`
-                    : "—"
-                }
-              />
-              <PreviewRow label="YTD Revenue" value={fmtDollar(monthlyReportData.ytdTotals.revenue)} />
-              <PreviewRow label="YTD EBITDA" value={fmtDollar(monthlyReportData.ytdTotals.ebitda)} className="text-green-400" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="card">
-              <SectionHeading>Utilities</SectionHeading>
-              {monthlyReportData.utilityLines.map((u) => (
-                <PreviewRow key={u.label} label={u.label} value={`${fmtDollar(u.amount)} (${fmtPct(u.pctOfRevenue)})`} />
-              ))}
-              <PreviewRow
-                label="Water KPI"
-                value={`${fmtPct(monthlyReportData.financial.waterKPI.ratio * 100)} — ${monthlyReportData.financial.waterKPI.status}`}
-              />
-            </div>
-            <div className="card">
-              <SectionHeading>Key Metrics</SectionHeading>
-              <PreviewRow label="DSCR" value={monthlyReportData.keyMetrics.dscr != null ? fmtMultiple(monthlyReportData.keyMetrics.dscr) : "N/A"} />
-              <PreviewRow label="Rent / Revenue" value={monthlyReportData.keyMetrics.rentToRevenue != null ? fmtPct(monthlyReportData.keyMetrics.rentToRevenue) : "N/A"} />
-              <PreviewRow label="Utility Ratio" value={monthlyReportData.keyMetrics.utilityRatio != null ? fmtPct(monthlyReportData.keyMetrics.utilityRatio) : "N/A"} />
-              <PreviewRow label="Rev / Machine" value={monthlyReportData.keyMetrics.revenuePerMachine != null ? fmtDollar(monthlyReportData.keyMetrics.revenuePerMachine) : "N/A"} />
-              <PreviewRow label="Surplus Cash Flow" value={fmtDollar(monthlyReportData.financial.surplusCashFlow)} className={monthlyReportData.financial.surplusCashFlow >= 0 ? "text-green-400" : "text-red-400"} />
-            </div>
-          </div>
-          <div className="text-[11px] text-adaptive-muted pb-4">
-            Report generated by LaundroCFO — {storeName} — {monthlyReportData.reportMonthLabel} — {generatedDate}
-          </div>
-        </>
-      )}
-
-      {reportMode === "store" && isStoreReady && store && valuation && metrics && storeReportData && (
-        <>
-      {storeReportData.financial.limitedData && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-[12px] text-amber-300">
-          {storeReportData.financial.hasMonthlyFinancials
-            ? "Limited trailing financial history — report uses available monthly_financials data."
-            : "No monthly financials on file — report falls back to owner-reported profile fields."}
-        </div>
-      )}
       <div className="card">
         <SectionHeading>Executive Summary</SectionHeading>
-        <p className="text-[13px] text-adaptive-secondary leading-relaxed">{executiveSummary}</p>
+        <p className="text-[13px] text-slate-300 leading-relaxed">{executiveSummary}</p>
       </div>
 
       {/* Three-column summary */}
@@ -1106,7 +878,7 @@ export default function ReportsPage() {
           <SectionHeading>Valuation</SectionHeading>
           <div className="divide-y divide-white/[0.04] text-[13px]">
             <PreviewRow label="EBITDA" value={fmtDollar(metrics.annualEbitda)} />
-            <PreviewRow label="Multiple Applied" value={fmtMultiple(valuation.finalMultiple)} className="text-adaptive-info" />
+            <PreviewRow label="Multiple Applied" value={fmtMultiple(valuation.finalMultiple)} className="text-blue-300" />
             <PreviewRow label="Est. Store Value" value={fmtDollar(valuation.businessValue)} className="text-green-400 text-[15px] font-bold" />
           </div>
         </div>
@@ -1115,7 +887,7 @@ export default function ReportsPage() {
           <div className="divide-y divide-white/[0.04] text-[13px]">
             <PreviewRow
               label="DSCR"
-              value={financial && financial.annualDebtService > 0 ? `${fmtMultiple(metrics.dscr)} ✓` : "N/A"}
+              value={store.annual_debt_service ? `${fmtMultiple(metrics.dscr)} ✓` : "N/A"}
               className={ratioColorClass(metrics.dscr, 1.25, 1.0)}
             />
             <PreviewRow
@@ -1132,14 +904,14 @@ export default function ReportsPage() {
             {metrics.utilityRatio > 17 ? (
               <div className="py-2 text-amber-400">⚠ Utility ratio {fmtPct(metrics.utilityRatio)}</div>
             ) : (
-              <div className="py-2 text-adaptive-secondary">✅ Utility ratio {fmtPct(metrics.utilityRatio)}</div>
+              <div className="py-2 text-slate-300">✅ Utility ratio {fmtPct(metrics.utilityRatio)}</div>
             )}
-            <div className="py-2 text-adaptive-secondary">
+            <div className="py-2 text-slate-300">
               {metrics.isOwnerOccupied
                 ? "✅ Owner-occupied — fee simple"
                 : `✅ Lease — ${metrics.totalLeaseControl.toFixed(1)}yr control`}
             </div>
-            <div className="py-2 text-adaptive-secondary">
+            <div className="py-2 text-slate-300">
               {equipMetrics.weightedAvgAge < 10 ? "✅" : "⚠"} Equipment — {equipMetrics.weightedAvgAge.toFixed(1)}yr avg
             </div>
           </div>
@@ -1150,12 +922,12 @@ export default function ReportsPage() {
       <div className="grid grid-cols-2 gap-4">
         <div className="card">
           <SectionHeading>{metrics.isOwnerOccupied ? "Real Estate" : "Lease Summary"}</SectionHeading>
-          <div className="text-[13px] text-adaptive-muted space-y-2">
+          <div className="text-[13px] text-slate-400 space-y-2">
             {metrics.isOwnerOccupied ? (
               <>
                 <div>
                   Value:{" "}
-                  <span className="text-adaptive-primary">
+                  <span className="text-slate-100">
                     {realEstate?.estimated_value ? fmtDollar(realEstate.estimated_value) : "—"}
                   </span>
                 </div>
@@ -1172,27 +944,27 @@ export default function ReportsPage() {
               <>
                 <div>
                   Expires:{" "}
-                  <span className="text-adaptive-primary">
+                  <span className="text-slate-100">
                     {metrics.leaseExpiresStr} — {metrics.yearsRemaining.toFixed(1)} years remaining
                   </span>
                 </div>
                 <div>
                   Renewals:{" "}
-                  <span className="text-adaptive-primary">
+                  <span className="text-slate-100">
                     {metrics.availableOptions.length} option{metrics.availableOptions.length !== 1 ? "s" : ""} (total{" "}
                     {metrics.totalLeaseControl.toFixed(1)}yr)
                   </span>
                 </div>
                 <div>
                   Monthly Rent:{" "}
-                  <span className="text-adaptive-primary">
+                  <span className="text-slate-100">
                     {metrics.monthlyRent ? fmtDollar(metrics.monthlyRent) : "—"}
                     {metrics.camCharges > 0 ? " + CAM" : ""}
                   </span>
                 </div>
                 <div>
                   Occupancy Cost:{" "}
-                  <span className="text-adaptive-primary">
+                  <span className="text-slate-100">
                     {fmtPct(metrics.occupancyCostRatio)} of revenue
                   </span>
                 </div>
@@ -1210,26 +982,26 @@ export default function ReportsPage() {
         </div>
         <div className="card">
           <SectionHeading>Equipment Summary</SectionHeading>
-          <div className="text-[13px] text-adaptive-muted space-y-2">
+          <div className="text-[13px] text-slate-400 space-y-2">
             <div>
               Total Machines:{" "}
-              <span className="text-adaptive-primary">
+              <span className="text-slate-100">
                 {equipMetrics.totalMachines} ({equipMetrics.totalWashers} washers, {equipMetrics.totalDryers} dryers)
               </span>
             </div>
             <div>
               Average Age:{" "}
-              <span className="text-adaptive-primary">
+              <span className="text-slate-100">
                 {equipMetrics.weightedAvgAge.toFixed(1)} years — {scoreLabel(equipMetrics.qualityScore)}
               </span>
             </div>
             <div>
               Fleet Under 10yr:{" "}
-              <span className="text-adaptive-primary">{equipMetrics.pctUnder10Years.toFixed(0)}% of machines</span>
+              <span className="text-slate-100">{equipMetrics.pctUnder10Years.toFixed(0)}% of machines</span>
             </div>
             <div>
               Replacement Estimate:{" "}
-              <span className="text-adaptive-primary">{fmtDollar(equipMetrics.estimatedReplacementValue)}</span>
+              <span className="text-slate-100">{fmtDollar(equipMetrics.estimatedReplacementValue)}</span>
             </div>
             <div>
               Equipment Score:{" "}
@@ -1246,62 +1018,33 @@ export default function ReportsPage() {
         <SectionHeading>Financial Ratios</SectionHeading>
         <div className="grid grid-cols-4 gap-3">
           {[
-            ["DSCR", financial && financial.annualDebtService > 0 ? fmtMultiple(metrics.dscr) : "N/A", ratioColorClass(metrics.dscr, 1.25, 1.0)],
+            ["DSCR", store.annual_debt_service ? fmtMultiple(metrics.dscr) : "N/A", ratioColorClass(metrics.dscr, 1.25, 1.0)],
             ["Global DSCR", stores.some((s) => s.annual_debt_service) ? fmtMultiple(metrics.globalDscr) : "N/A", ratioColorClass(metrics.globalDscr, 1.25, 1.0)],
             ["EBITDA Margin", fmtPct(metrics.ebitdaMargin), ratioColorClass(metrics.ebitdaMargin, 25, 20)],
             ["Rent / Revenue", fmtPct(metrics.rentToRevenue), ratioColorClass(metrics.rentToRevenue, 0, 15, true)],
             ["Utility / Revenue", fmtPct(metrics.utilityRatio), ratioColorClass(metrics.utilityRatio, 0, 17, true)],
-            ["Revenue / SF", `$${metrics.revenuePerSF.toFixed(2)}`, "text-adaptive-primary"],
-            ["EBITDA / SF", `$${metrics.ebitdaPerSF.toFixed(2)}`, "text-adaptive-primary"],
-            ["Debt Yield", financial && financial.totalOutstandingDebt > 0 ? fmtPct(metrics.debtYield) : "N/A", ratioColorClass(metrics.debtYield, 12, 8)],
+            ["Revenue / SF", `$${metrics.revenuePerSF.toFixed(2)}`, "text-slate-100"],
+            ["EBITDA / SF", `$${metrics.ebitdaPerSF.toFixed(2)}`, "text-slate-100"],
+            ["Debt Yield", store.loan_balance ? fmtPct(metrics.debtYield) : "N/A", ratioColorClass(metrics.debtYield, 12, 8)],
           ].map(([label, val, color]) => (
-            <div key={label as string} className="card2 overflow-hidden min-w-0">
+            <div key={label as string} className="card2">
               <div className="metric-label">{label}</div>
-              <div
-                className={clsx("metric-value", color)}
-                style={{ fontSize: (val as string).length > 7 ? "14px" : "16px" }}
-                title={val as string}
-              >
-                {val}
-              </div>
+              <div className={clsx("text-[16px] font-bold", color)}>{val}</div>
             </div>
           ))}
         </div>
       </div>
-
-      {storeReportData && (
-        <div className="card">
-          <SectionHeading>LaundroCFO Score — {storeReportData.laundroCfoScore.grade}</SectionHeading>
-          <div className="grid grid-cols-4 gap-3 text-[13px]">
-            {(
-              [
-                ["Financial", storeReportData.laundroCfoScore.categories.financialPerformance],
-                ["Debt", storeReportData.laundroCfoScore.categories.debtCoverage],
-                ["Assets", storeReportData.laundroCfoScore.categories.assetQuality],
-                ["Profile", storeReportData.laundroCfoScore.categories.profileCompleteness],
-              ] as const
-            ).map(([label, cat]) => (
-              <div key={label} className="card2 p-3 overflow-hidden min-w-0">
-                <div className="metric-label">{label}</div>
-                <div className="metric-value text-adaptive-primary" title={`${cat.score}/${cat.max}`}>
-                  {cat.score}/{cat.max}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Value Drivers & Risks */}
       <div className="grid grid-cols-2 gap-4">
         <div className="card">
           <SectionHeading>Value Drivers</SectionHeading>
           {valuation.valueDrivers.length === 0 ? (
-            <p className="text-[12px] text-adaptive-muted">No major drivers identified.</p>
+            <p className="text-[12px] text-slate-500">No major drivers identified.</p>
           ) : (
             <ul className="space-y-2">
               {valuation.valueDrivers.slice(0, 5).map((d) => (
-                <li key={d} className="text-[12px] text-adaptive-secondary flex gap-2">
+                <li key={d} className="text-[12px] text-slate-300 flex gap-2">
                   <span className="text-green-400">✓</span>
                   <span>{d}</span>
                 </li>
@@ -1312,11 +1055,11 @@ export default function ReportsPage() {
         <div className="card">
           <SectionHeading>Value Risks</SectionHeading>
           {valuation.valueRisks.length === 0 ? (
-            <p className="text-[12px] text-adaptive-muted">No significant risks flagged.</p>
+            <p className="text-[12px] text-slate-500">No significant risks flagged.</p>
           ) : (
             <ul className="space-y-2">
               {valuation.valueRisks.slice(0, 5).map((r) => (
-                <li key={r} className="text-[12px] text-adaptive-secondary flex gap-2">
+                <li key={r} className="text-[12px] text-slate-300 flex gap-2">
                   <span className="text-amber-400">⚠</span>
                   <span>{r}</span>
                 </li>
@@ -1330,10 +1073,10 @@ export default function ReportsPage() {
       {insurance.length > 0 && (
         <div className="card">
           <SectionHeading>Insurance ({insurance.length} active policies)</SectionHeading>
-          <div className="text-[13px] text-adaptive-muted space-y-1">
+          <div className="text-[13px] text-slate-400 space-y-1">
             {insurance.map((p) => (
               <div key={p.id}>
-                <span className="text-adaptive-secondary">{p.policy_type ?? "Policy"}</span>
+                <span className="text-slate-200">{p.policy_type ?? "Policy"}</span>
                 {" — "}
                 {p.carrier ?? "Unknown carrier"}
                 {p.annual_premium ? ` — ${fmtDollar(p.annual_premium)}/yr` : ""}
@@ -1343,7 +1086,7 @@ export default function ReportsPage() {
         </div>
       )}
 
-      <div className="text-[11px] text-adaptive-muted pb-4">
+      <div className="text-[11px] text-slate-600 pb-4">
         Report generated by LaundroCFO — {storeName} — {generatedDate}
       </div>
         </>
@@ -1353,8 +1096,8 @@ export default function ReportsPage() {
       {shareModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
           <div className="card max-w-lg w-full">
-            <div className="text-[15px] font-semibold text-adaptive-primary mb-1">Share with Lender</div>
-            <p className="text-[12px] text-adaptive-muted mb-4">
+            <div className="text-[15px] font-semibold text-slate-100 mb-1">Share with Lender</div>
+            <p className="text-[12px] text-slate-400 mb-4">
               This secure link expires on {shareExpires} (7 days).
             </p>
             <div className="flex gap-2">
@@ -1362,7 +1105,7 @@ export default function ReportsPage() {
                 type="text"
                 readOnly
                 value={shareUrl}
-                className="flex-1 bg-[#1e2a3a] border border-white/[0.08] rounded-lg px-3 py-2 text-[12px] text-slate-300"
+                className="flex-1 bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/[0.08] rounded-lg px-3 py-2 text-[12px] text-slate-300"
               />
               <button type="button" className="btn-primary text-[12px] px-4" onClick={handleCopyLink}>
                 {copied ? "Copied!" : "Copy"}

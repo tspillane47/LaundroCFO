@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase";
 import { getStoreValuation, getStoreDebt } from "@/lib/getStoreValuation";
-import { totalUtilities, type MonthlyUtilityRow } from "@/lib/utilities";
 
 export interface PortfolioReportData {
   stores: any[];
@@ -22,11 +21,6 @@ export interface PortfolioReportData {
     avgEquipmentAge: number;
     availableLeaseOptions: number;
     yearsRemaining: number;
-    utilityWater: number;
-    utilityGas: number;
-    utilityElectric: number;
-    utilityTotal: number;
-    utilityPctOfRevenue: number;
   }[];
   totals: {
     portfolioValue: number;
@@ -42,11 +36,6 @@ export interface PortfolioReportData {
     debtYield: number;
     debtToEbitda: number;
     storeCount: number;
-    portfolioWater: number;
-    portfolioGas: number;
-    portfolioElectric: number;
-    portfolioTotalUtilities: number;
-    portfolioUtilityPctOfRevenue: number;
   };
   cashFlow: {
     revenue: number;
@@ -88,11 +77,6 @@ export async function getPortfolioReport(userId: string): Promise<PortfolioRepor
         debtYield: 0,
         debtToEbitda: 0,
         storeCount: 0,
-        portfolioWater: 0,
-        portfolioGas: 0,
-        portfolioElectric: 0,
-        portfolioTotalUtilities: 0,
-        portfolioUtilityPctOfRevenue: 0,
       },
       cashFlow: {
         revenue: 0,
@@ -106,21 +90,6 @@ export async function getPortfolioReport(userId: string): Promise<PortfolioRepor
         cashFlowAfterDebt: 0,
       },
     };
-  }
-
-  const storeIds = stores.map((s) => s.id);
-  const { data: allUtilities } = await supabase
-    .from("monthly_utilities")
-    .select("*")
-    .in("store_id", storeIds);
-
-  function getLatestUtilityForStore(storeId: string): MonthlyUtilityRow | null {
-    const rows = (allUtilities ?? []).filter((u) => u.store_id === storeId) as MonthlyUtilityRow[];
-    if (rows.length === 0) return null;
-    return [...rows].sort((a, b) => {
-      if (a.year !== b.year) return b.year - a.year;
-      return b.month - a.month;
-    })[0];
   }
 
   const storeDetails = await Promise.all(
@@ -157,7 +126,7 @@ export async function getPortfolioReport(userId: string): Promise<PortfolioRepor
         .eq("is_active", true);
 
       const annualRevenue = (store.monthly_revenue ?? 0) * 12;
-      const annualEbitda = valuation.annualEbitda;
+      const annualEbitda = ((store.monthly_revenue ?? 0) - (store.monthly_expenses ?? 0)) * 12;
       const annualDebtService = (loans ?? []).reduce((s, l) => s + (l.monthly_payment ?? 0) * 12, 0);
       const dscr = annualDebtService > 0 ? annualEbitda / annualDebtService : 0;
 
@@ -199,15 +168,6 @@ export async function getPortfolioReport(userId: string): Promise<PortfolioRepor
 
       const availableLeaseOptions = (leaseOptions ?? []).filter((o) => o.status === "Available").length;
 
-      const latestUtility = getLatestUtilityForStore(store.id);
-      const utilityWater = latestUtility?.water ?? 0;
-      const utilityGas = latestUtility?.gas ?? 0;
-      const utilityElectric = latestUtility?.electric ?? 0;
-      const utilityTotal = latestUtility ? totalUtilities(latestUtility) : 0;
-      const monthlyRevenue = store.monthly_revenue ?? 0;
-      const utilityPctOfRevenue =
-        monthlyRevenue > 0 ? (utilityTotal / monthlyRevenue) * 100 : 0;
-
       return {
         store,
         valuation,
@@ -226,11 +186,6 @@ export async function getPortfolioReport(userId: string): Promise<PortfolioRepor
         avgEquipmentAge,
         availableLeaseOptions,
         yearsRemaining,
-        utilityWater,
-        utilityGas,
-        utilityElectric,
-        utilityTotal,
-        utilityPctOfRevenue,
       };
     })
   );
@@ -248,18 +203,10 @@ export async function getPortfolioReport(userId: string): Promise<PortfolioRepor
   const debtYield = portfolioDebt > 0 ? (annualEbitda / portfolioDebt) * 100 : 0;
   const debtToEbitda = annualEbitda > 0 ? portfolioDebt / annualEbitda : 0;
 
-  const portfolioWater = storeDetails.reduce((s, d) => s + d.utilityWater, 0);
-  const portfolioGas = storeDetails.reduce((s, d) => s + d.utilityGas, 0);
-  const portfolioElectric = storeDetails.reduce((s, d) => s + d.utilityElectric, 0);
-  const portfolioTotalUtilities = storeDetails.reduce((s, d) => s + d.utilityTotal, 0);
-  const totalMonthlyRevenue = stores.reduce((s, store) => s + (store.monthly_revenue ?? 0), 0);
-  const portfolioUtilityPctOfRevenue =
-    totalMonthlyRevenue > 0 ? (portfolioTotalUtilities / totalMonthlyRevenue) * 100 : 0;
-
   const cashFlow = {
     revenue: annualRevenue,
-    utilities: portfolioTotalUtilities > 0 ? portfolioTotalUtilities * 12 : storeDetails.reduce((s, d) => s + ((d.store.monthly_expenses ?? 0) * 0.25) * 12, 0),
-    rent: storeDetails.reduce((s, d) => s + (d.lease?.monthly_rent ?? 0) * 12, 0),
+    utilities: storeDetails.reduce((s, d) => s + ((d.store.monthly_expenses ?? 0) * 0.25) * 12, 0),
+    rent: storeDetails.reduce((s, d) => s + (d.store.monthly_rent ?? 0) * 12, 0),
     payroll: storeDetails.reduce((s, d) => s + ((d.store.monthly_expenses ?? 0) * 0.35) * 12, 0),
     repairs: storeDetails.reduce((s, d) => s + ((d.store.monthly_expenses ?? 0) * 0.05) * 12, 0),
     otherExpenses: storeDetails.reduce((s, d) => s + ((d.store.monthly_expenses ?? 0) * 0.35) * 12, 0),
@@ -285,11 +232,6 @@ export async function getPortfolioReport(userId: string): Promise<PortfolioRepor
       debtYield,
       debtToEbitda,
       storeCount: stores.length,
-      portfolioWater,
-      portfolioGas,
-      portfolioElectric,
-      portfolioTotalUtilities,
-      portfolioUtilityPctOfRevenue,
     },
     cashFlow,
   };

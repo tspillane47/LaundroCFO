@@ -34,11 +34,11 @@ export function OccupancySelector({ saving, onSelect }: Props) {
   const [hovered, setHovered] = useState<OccupancyType | null>(null);
 
   return (
-    <div className="card overflow-hidden min-w-0 max-w-3xl mx-auto">
-      <h2 className="text-[16px] font-semibold text-adaptive-primary text-center mb-1">
+    <div className="card max-w-3xl mx-auto">
+      <h2 className="text-[16px] font-semibold text-slate-100 text-center mb-1">
         How does this laundromat occupy its space?
       </h2>
-      <p className="text-adaptive-muted text-[13px] text-center mb-6">
+      <p className="text-slate-500 text-[13px] text-center mb-6">
         This determines which occupancy module we show — lease analysis or real estate ownership.
       </p>
 
@@ -52,21 +52,21 @@ export function OccupancySelector({ saving, onSelect }: Props) {
             onMouseEnter={() => setHovered(opt.type)}
             onMouseLeave={() => setHovered(null)}
             className={clsx(
-              "card2 overflow-hidden min-w-0 text-left p-6 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+              "card2 text-left p-6 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
               hovered === opt.type
                 ? "border-blue-500/40 bg-blue-500/5"
                 : "hover:border-white/20 hover:bg-white/[0.02]"
             )}
           >
             <div className="text-2xl mb-3">{opt.emoji}</div>
-            <div className="text-[14px] font-semibold text-adaptive-primary mb-1.5">{opt.title}</div>
-            <p className="text-[12px] text-adaptive-muted leading-relaxed">{opt.description}</p>
+            <div className="text-[14px] font-semibold text-slate-100 mb-1.5">{opt.title}</div>
+            <p className="text-[12px] text-slate-500 leading-relaxed">{opt.description}</p>
           </button>
         ))}
       </div>
 
       {saving && (
-        <p className="text-center text-adaptive-muted text-[12px] mt-4">Saving selection...</p>
+        <p className="text-center text-slate-500 text-[12px] mt-4">Saving selection...</p>
       )}
     </div>
   );

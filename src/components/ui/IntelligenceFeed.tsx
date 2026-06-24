@@ -24,7 +24,7 @@ const severityStyles = {
   danger: { border: "border-l-red-500", bg: "bg-red-500/5", text: "text-red-400" },
   warning: { border: "border-l-amber-500", bg: "bg-amber-500/5", text: "text-amber-400" },
   success: { border: "border-l-green-500", bg: "bg-green-500/5", text: "text-green-400" },
-  info: { border: "border-l-blue-500", bg: "bg-blue-500/5", text: "text-adaptive-info" },
+  info: { border: "border-l-blue-500", bg: "bg-blue-500/5", text: "text-blue-400" },
 };
 
 export function IntelligenceFeed({

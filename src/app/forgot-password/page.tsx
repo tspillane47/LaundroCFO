@@ -19,11 +19,11 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d1520] flex items-center justify-center">
+    <div className="min-h-screen bg-[#1E3A1E] dark:bg-[#0d1520] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="text-[22px] font-bold text-adaptive-info mb-1">LaundroCFO</div>
-          <div className="text-adaptive-muted text-[13px]">Reset your password</div>
+          <div className="text-[22px] font-bold text-blue-300 mb-1">LaundroCFO</div>
+          <div className="text-slate-500 text-[13px]">Reset your password</div>
         </div>
         <div className="card space-y-4">
           {sent ? (
@@ -39,7 +39,7 @@ export default function ForgotPasswordPage() {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleReset()}
-                  className="w-full bg-[#1e2a3a] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-blue-500"
+                  className="w-full bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-blue-500"
                   placeholder="you@example.com"
                 />
               </div>
@@ -52,8 +52,8 @@ export default function ForgotPasswordPage() {
               </button>
             </>
           )}
-          <div className="text-center text-[12px] text-adaptive-muted pt-1">
-            <Link href="/login" className="text-adaptive-info hover:text-adaptive-info">Back to sign in</Link>
+          <div className="text-center text-[12px] text-slate-500 pt-1">
+            <Link href="/login" className="text-blue-400 hover:text-blue-300">Back to sign in</Link>
           </div>
         </div>
       </div>

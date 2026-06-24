@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
-import { toBool, toNullableDate, toNullableNum, toNullableText } from "@/lib/formHelpers";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -276,6 +275,12 @@ function policyToForm(policy: InsurancePolicy): PolicyForm {
   };
 }
 
+function parseNum(value: string): number | null {
+  if (!value.trim()) return null;
+  const n = parseFloat(value.replace(/,/g, ""));
+  return Number.isNaN(n) ? null : n;
+}
+
 function calcDaysRemaining(expirationDate: string | null): number | null {
   const exp = parseDate(expirationDate);
   if (!exp) return null;
@@ -287,7 +292,7 @@ function calcDaysRemaining(expirationDate: string | null): number | null {
 }
 
 function daysColor(days: number | null): string {
-  if (days == null) return "text-adaptive-muted";
+  if (days == null) return "text-slate-400";
   if (days < 0) return "text-red-400";
   if (days < 60) return "text-red-400";
   if (days < 90) return "text-amber-400";
@@ -360,7 +365,7 @@ function calcCoverageStatus(policies: InsurancePolicy[]): {
 function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-3">
-      <div className="text-[13px] font-semibold text-adaptive-secondary border-b border-white/[0.06] pb-2">
+      <div className="text-[13px] font-semibold text-slate-200 border-b border-white/[0.06] pb-2">
         {title}
       </div>
       {children}
@@ -396,13 +401,13 @@ function ToggleField({
 }) {
   return (
     <div className="flex items-center justify-between py-2">
-      <span className="text-[13px] text-adaptive-secondary">{label}</span>
+      <span className="text-[13px] text-slate-300">{label}</span>
       <button
         type="button"
         onClick={() => onChange(!value)}
         className={clsx(
           "relative w-10 h-5 rounded-full transition-colors",
-          value ? "bg-blue-600" : "bg-[#243347]"
+          value ? "bg-blue-600" : "bg-[#1E3A1E] dark:bg-[#243347]"
         )}
       >
         <span
@@ -652,42 +657,42 @@ export default function InsurancePage() {
         user_id: userId,
         store_id: store.id,
         is_active: true,
-        policy_type: toNullableText(policyForm.policy_type),
-        carrier: toNullableText(policyForm.carrier),
-        policy_number: toNullableText(policyForm.policy_number),
-        agent_name: toNullableText(policyForm.agent_name),
-        agency_name: toNullableText(policyForm.agency_name),
-        agent_email: toNullableText(policyForm.agent_email),
-        agent_phone: toNullableText(policyForm.agent_phone),
-        effective_date: toNullableDate(policyForm.effective_date),
-        expiration_date: toNullableDate(policyForm.expiration_date),
-        auto_renewal: toBool(policyForm.auto_renewal),
-        annual_premium: toNullableNum(policyForm.annual_premium),
-        monthly_premium: toNullableNum(policyForm.monthly_premium),
-        payment_frequency: toNullableText(policyForm.payment_frequency),
-        building_coverage: toNullableNum(policyForm.building_coverage),
-        contents_coverage: toNullableNum(policyForm.contents_coverage),
-        equipment_coverage: toNullableNum(policyForm.equipment_coverage),
-        replacement_cost: toBool(policyForm.replacement_cost),
-        liability_per_occurrence: toNullableNum(policyForm.liability_per_occurrence),
-        liability_aggregate: toNullableNum(policyForm.liability_aggregate),
-        business_interruption: toBool(policyForm.business_interruption),
-        business_interruption_amount: toNullableNum(policyForm.business_interruption_amount),
-        flood_coverage: toBool(policyForm.flood_coverage),
-        flood_amount: toNullableNum(policyForm.flood_amount),
-        equipment_breakdown: toBool(policyForm.equipment_breakdown),
-        equipment_breakdown_amount: toNullableNum(policyForm.equipment_breakdown_amount),
-        sewer_backup: toBool(policyForm.sewer_backup),
-        water_damage: toBool(policyForm.water_damage),
-        employee_theft: toBool(policyForm.employee_theft),
-        cyber_coverage: toBool(policyForm.cyber_coverage),
-        utility_interruption: toBool(policyForm.utility_interruption),
-        ordinance_law: toBool(policyForm.ordinance_law),
-        property_deductible: toNullableNum(policyForm.property_deductible),
-        wind_deductible: toNullableNum(policyForm.wind_deductible),
-        flood_deductible: toNullableNum(policyForm.flood_deductible),
-        equipment_deductible: toNullableNum(policyForm.equipment_deductible),
-        notes: toNullableText(policyForm.notes),
+        policy_type: policyForm.policy_type || null,
+        carrier: policyForm.carrier || null,
+        policy_number: policyForm.policy_number || null,
+        agent_name: policyForm.agent_name || null,
+        agency_name: policyForm.agency_name || null,
+        agent_email: policyForm.agent_email || null,
+        agent_phone: policyForm.agent_phone || null,
+        effective_date: policyForm.effective_date || null,
+        expiration_date: policyForm.expiration_date || null,
+        auto_renewal: policyForm.auto_renewal,
+        annual_premium: parseNum(policyForm.annual_premium),
+        monthly_premium: parseNum(policyForm.monthly_premium),
+        payment_frequency: policyForm.payment_frequency || null,
+        building_coverage: parseNum(policyForm.building_coverage),
+        contents_coverage: parseNum(policyForm.contents_coverage),
+        equipment_coverage: parseNum(policyForm.equipment_coverage),
+        replacement_cost: policyForm.replacement_cost,
+        liability_per_occurrence: parseNum(policyForm.liability_per_occurrence),
+        liability_aggregate: parseNum(policyForm.liability_aggregate),
+        business_interruption: policyForm.business_interruption,
+        business_interruption_amount: parseNum(policyForm.business_interruption_amount),
+        flood_coverage: policyForm.flood_coverage,
+        flood_amount: parseNum(policyForm.flood_amount),
+        equipment_breakdown: policyForm.equipment_breakdown,
+        equipment_breakdown_amount: parseNum(policyForm.equipment_breakdown_amount),
+        sewer_backup: policyForm.sewer_backup,
+        water_damage: policyForm.water_damage,
+        employee_theft: policyForm.employee_theft,
+        cyber_coverage: policyForm.cyber_coverage,
+        utility_interruption: policyForm.utility_interruption,
+        ordinance_law: policyForm.ordinance_law,
+        property_deductible: parseNum(policyForm.property_deductible),
+        wind_deductible: parseNum(policyForm.wind_deductible),
+        flood_deductible: parseNum(policyForm.flood_deductible),
+        equipment_deductible: parseNum(policyForm.equipment_deductible),
+        notes: policyForm.notes || null,
       };
 
       if (editingPolicyId) {
@@ -749,11 +754,11 @@ export default function InsurancePage() {
 
     const payload = {
       policy_id: claimForm.policy_id,
-      claim_date: toNullableDate(claimForm.claim_date),
-      claim_type: toNullableText(claimForm.claim_type),
-      description: toNullableText(claimForm.description),
-      amount: toNullableNum(claimForm.amount),
-      status: toNullableText(claimForm.status) ?? "Open",
+      claim_date: claimForm.claim_date || null,
+      claim_type: claimForm.claim_type || null,
+      description: claimForm.description || null,
+      amount: parseNum(claimForm.amount),
+      status: claimForm.status || "Open",
     };
 
     const { error: insertError } = await supabase.from("insurance_claims").insert(payload);
@@ -796,8 +801,8 @@ export default function InsurancePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[15px] font-semibold text-adaptive-primary">Insurance Management</h1>
-          <p className="text-adaptive-muted text-[13px] mt-0.5">
+          <h1 className="text-[15px] font-semibold text-slate-100">Insurance Management</h1>
+          <p className="text-slate-500 text-[13px] mt-0.5">
             {store?.name ?? "Store"} · {store?.address ?? "Address not set"}
           </p>
         </div>
@@ -877,8 +882,8 @@ export default function InsurancePage() {
               <div className={clsx("text-[18px] font-bold", metrics.risk.color)}>
                 {metrics.risk.label}
               </div>
-              <div className="text-[12px] text-adaptive-muted mt-1">Score: {metrics.risk.score}/100</div>
-              <div className="text-[11px] text-adaptive-muted mt-2 leading-relaxed">
+              <div className="text-[12px] text-slate-500 mt-1">Score: {metrics.risk.score}/100</div>
+              <div className="text-[11px] text-slate-600 mt-2 leading-relaxed">
                 Based on coverage completeness, renewal timing, and liability limits.
               </div>
             </div>
@@ -1130,13 +1135,13 @@ export default function InsurancePage() {
                   {ADDITIONAL_COVERAGE_FIELDS.map(({ key, label }) => (
                     <label
                       key={key}
-                      className="flex items-center gap-2 text-[13px] text-adaptive-secondary cursor-pointer"
+                      className="flex items-center gap-2 text-[13px] text-slate-300 cursor-pointer"
                     >
                       <input
                         type="checkbox"
                         checked={policyForm[key] as boolean}
                         onChange={(e) => updatePolicyForm(key, e.target.checked as PolicyForm[typeof key])}
-                        className="rounded border-white/20 bg-[#1e2a3a] text-blue-500"
+                        className="rounded border-white/20 bg-[#1E3A1E] dark:bg-[#1e2a3a] text-blue-500"
                       />
                       {label}
                     </label>
@@ -1215,8 +1220,8 @@ export default function InsurancePage() {
         <div className="section-title">Policies</div>
         {policies.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-[15px] font-semibold text-adaptive-secondary mb-2">No insurance policies on file</div>
-            <div className="text-[13px] text-adaptive-muted mb-6 max-w-sm mx-auto">
+            <div className="text-[15px] font-semibold text-slate-200 mb-2">No insurance policies on file</div>
+            <div className="text-[13px] text-slate-500 mb-6 max-w-sm mx-auto">
               Track policies, renewals, and coverage gaps to protect your store and satisfy lenders.
             </div>
             <button type="button" onClick={openAddPolicy} className="btn-primary px-8 py-3 text-[14px]">
@@ -1240,10 +1245,10 @@ export default function InsurancePage() {
                       <span className={clsx("badge", typeColor)}>
                         {policy.policy_type ?? "Policy"}
                       </span>
-                      <div className="text-[13px] font-semibold text-adaptive-primary mt-2">
+                      <div className="text-[13px] font-semibold text-slate-100 mt-2">
                         {policy.carrier ?? "Unknown Carrier"}
                       </div>
-                      <div className="text-[11px] text-adaptive-muted">
+                      <div className="text-[11px] text-slate-500">
                         #{policy.policy_number ?? "—"}
                       </div>
                     </div>
@@ -1257,23 +1262,23 @@ export default function InsurancePage() {
 
                   <div className="space-y-1 text-[12px] border-t border-white/[0.04] pt-3">
                     <div className="flex justify-between">
-                      <span className="text-adaptive-muted">Effective</span>
-                      <span className="text-adaptive-secondary">{formatDate(policy.effective_date)}</span>
+                      <span className="text-slate-500">Effective</span>
+                      <span className="text-slate-200">{formatDate(policy.effective_date)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-adaptive-muted">Expiration</span>
-                      <span className="text-adaptive-secondary">{formatDate(policy.expiration_date)}</span>
+                      <span className="text-slate-500">Expiration</span>
+                      <span className="text-slate-200">{formatDate(policy.expiration_date)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-adaptive-muted">Annual Premium</span>
-                      <span className="text-adaptive-primary font-semibold">
+                      <span className="text-slate-500">Annual Premium</span>
+                      <span className="text-slate-100 font-semibold">
                         {formatCurrency(policy.annual_premium)}
                       </span>
                     </div>
                     {(policy.building_coverage || policy.contents_coverage || policy.equipment_coverage) && (
                       <div className="flex justify-between">
-                        <span className="text-adaptive-muted">Property Coverage</span>
-                        <span className="text-adaptive-secondary">
+                        <span className="text-slate-500">Property Coverage</span>
+                        <span className="text-slate-200">
                           {formatCurrency(
                             (policy.building_coverage ?? 0) +
                               (policy.contents_coverage ?? 0) +
@@ -1284,8 +1289,8 @@ export default function InsurancePage() {
                     )}
                     {policy.liability_per_occurrence != null && (
                       <div className="flex justify-between">
-                        <span className="text-adaptive-muted">Liability / Occurrence</span>
-                        <span className="text-adaptive-secondary">
+                        <span className="text-slate-500">Liability / Occurrence</span>
+                        <span className="text-slate-200">
                           {formatCurrency(policy.liability_per_occurrence)}
                         </span>
                       </div>
@@ -1317,7 +1322,7 @@ export default function InsurancePage() {
                     <div className="mt-3 pt-3 border-t border-white/[0.04] space-y-2">
                       {policyClaims.map((c) => (
                         <div key={c.id} className="text-[11px] flex justify-between items-center">
-                          <span className="text-adaptive-muted">
+                          <span className="text-slate-400">
                             {formatDate(c.claim_date)} · {c.claim_type}
                           </span>
                           <span className={clsx("badge", claimStatusBadge(c.status))}>
@@ -1347,7 +1352,7 @@ export default function InsurancePage() {
 
         {showClaimForm && (
           <div className="card2 mb-4 space-y-3">
-            <div className="text-[13px] font-semibold text-adaptive-secondary">New Claim</div>
+            <div className="text-[13px] font-semibold text-slate-200">New Claim</div>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
               <FormField label="Policy">
                 <select
@@ -1433,7 +1438,7 @@ export default function InsurancePage() {
         )}
 
         {claims.length === 0 ? (
-          <div className="text-adaptive-muted text-[13px] py-4">No claims on file.</div>
+          <div className="text-slate-500 text-[13px] py-4">No claims on file.</div>
         ) : (
           <div className="space-y-5">
             {policies.map((policy) => {
@@ -1441,7 +1446,7 @@ export default function InsurancePage() {
               if (!policyClaims || policyClaims.length === 0) return null;
               return (
                 <div key={policy.id}>
-                  <div className="text-[12px] font-semibold text-adaptive-muted mb-2 uppercase tracking-wider">
+                  <div className="text-[12px] font-semibold text-slate-400 mb-2 uppercase tracking-wider">
                     {policy.policy_type} — {policy.carrier}
                   </div>
                   <div className="space-y-2">
@@ -1451,15 +1456,15 @@ export default function InsurancePage() {
                         className="card2 flex items-center justify-between gap-4"
                       >
                         <div className="min-w-0">
-                          <div className="text-[13px] text-adaptive-secondary">
+                          <div className="text-[13px] text-slate-200">
                             {formatDate(claim.claim_date)} · {claim.claim_type}
                           </div>
-                          <div className="text-[12px] text-adaptive-muted truncate">
+                          <div className="text-[12px] text-slate-500 truncate">
                             {claim.description ?? "No description"}
                           </div>
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
-                          <span className="text-[13px] font-semibold text-adaptive-primary">
+                          <span className="text-[13px] font-semibold text-slate-100">
                             {formatCurrency(claim.amount)}
                           </span>
                           <span className={clsx("badge", claimStatusBadge(claim.status))}>
@@ -1491,7 +1496,7 @@ export default function InsurancePage() {
               className="card2 text-center py-6 border-dashed border-white/[0.12] relative overflow-hidden"
             >
               <div className="text-2xl mb-2 opacity-40">{doc.icon}</div>
-              <div className="text-[12px] font-semibold text-adaptive-muted">{doc.label}</div>
+              <div className="text-[12px] font-semibold text-slate-400">{doc.label}</div>
               <div className="mt-2">
                 <span className="badge badge-amber">Coming Soon</span>
               </div>

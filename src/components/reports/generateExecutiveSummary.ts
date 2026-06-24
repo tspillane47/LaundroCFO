@@ -1,7 +1,6 @@
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
-import { calcDSCR, calcEbitdaMargin, fmtDollar, fmtMultiple, fmtPct } from "@/lib/calculations";
+import { calcDSCR, calcEbitdaMargin, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import type { ValuationResult } from "@/lib/valuation";
-import type { ReportFinancialContext } from "@/lib/reportFinancials";
 
 function parseDate(value: string | null | undefined): Date | null {
   if (!value) return null;
@@ -36,29 +35,24 @@ export function generateExecutiveSummary({
   leaseOptions = [],
   equipment,
   valuation,
-  financial,
 }: {
   store: any;
   lease: any | null;
   leaseOptions?: any[];
   equipment: any[];
   valuation: ValuationResult;
-  financial: ReportFinancialContext;
 }): string {
   const storeName = store?.name ?? "This store";
   const address = store?.address ?? "its market area";
   const sqft = store?.square_footage ?? 0;
-  const annualRevenue = financial.revenueTtmTotal;
-  const annualEbitda = financial.ebitdaTtmTotal;
+  const monthlyRevenue = store?.monthly_revenue ?? 0;
+  const monthlyExpenses = store?.monthly_expenses ?? 0;
+  const annualRevenue = monthlyRevenue * 12;
+  const annualEbitda = (monthlyRevenue - monthlyExpenses) * 12;
   const ebitdaMargin = calcEbitdaMargin(annualEbitda, annualRevenue);
-  const annualDebtService = financial.annualDebtService;
-  const dscr = financial.dscr ?? 0;
+  const annualDebtService = store?.annual_debt_service ?? 0;
+  const dscr = annualDebtService > 0 ? calcDSCR(annualEbitda, annualDebtService) : 0;
   const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
-  const dataNote = financial.limitedData
-    ? financial.hasMonthlyFinancials
-      ? " (based on limited trailing financial history)"
-      : " (based on owner-reported profile data — enter monthly financials for TTM accuracy)"
-    : " (trailing twelve-month financials)";
 
   const equipMetrics = computeEquipmentMetrics((equipment ?? []) as EquipmentRecord[]);
   const totalMachines = equipMetrics.totalMachines;
@@ -95,7 +89,7 @@ export function generateExecutiveSummary({
 
   let dscrSentence: string;
   if (annualDebtService <= 0) {
-    dscrSentence = "No active loan debt service on file — enter loan details to complete DSCR analysis.";
+    dscrSentence = "Debt service data has not been reported — enter loan details to complete DSCR analysis.";
   } else if (dscr >= 1.5) {
     dscrSentence = `DSCR of ${fmtMultiple(dscr)} reflects a strong debt coverage position well above the 1.25x lender minimum.`;
   } else if (dscr >= 1.25) {
@@ -110,7 +104,7 @@ export function generateExecutiveSummary({
 
   const parts = [
     `${storeName} is a ${perf} laundromat located at ${address}${sqft > 0 ? ` with ${sqft.toLocaleString()} SF` : ""}${totalMachines > 0 ? ` and ${totalMachines} machines` : ""}.`,
-    `The store generates ${fmtDollar(annualRevenue)} in annual revenue with a ${fmtPct(ebitdaMargin)} EBITDA margin, ${marginVs} the industry median of ~22%${dataNote}.`,
+    `The store generates ${fmtDollar(annualRevenue)} in annual revenue with a ${ebitdaMargin.toFixed(1)}% EBITDA margin, ${marginVs} the industry median of ~22%.`,
     `Estimated business value of ${fmtDollar(valuation.businessValue)} at ${fmtMultiple(valuation.finalMultiple)} reflects ${topDriver.toLowerCase().replace(/\.$/, "")}.`,
     leaseSentence,
     equipSentence,

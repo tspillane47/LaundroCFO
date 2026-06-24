@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase";
 import { StoreProvider, useStores } from "@/lib/store-context";
 import clsx from "clsx";
 import { NavIcon, SunIcon, MoonIcon, ChevronDownIcon, MenuIcon, CloseIcon } from "@/components/ui/NavIcons";
-import Logo from '@/components/Logo'
 
 const navSections = [
   {
@@ -20,8 +19,6 @@ const navSections = [
       { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
       { href: "/valuation", label: "Valuation", icon: "valuation" },
       { href: "/financials", label: "Financials", icon: "financials" },
-      { href: "/transactions", label: "Transactions", icon: "transactions" },
-      { href: "/utilities", label: "Utilities", icon: "utilities" },
       { href: "/lease", label: "Occupancy", icon: "occupancy" },
       { href: "/equipment", label: "Equipment", icon: "equipment" },
       { href: "/insurance", label: "Insurance", icon: "insurance" },
@@ -50,8 +47,6 @@ const pageTitles: Record<string, string> = {
   "/portfolio": "Portfolio",
   "/dashboard": "Store Dashboard",
   "/financials": "Financials",
-  "/transactions": "Transaction Review",
-  "/utilities": "Utilities",
   "/lease": "Occupancy & Real Estate",
   "/equipment": "Equipment",
   "/valuation": "Valuation Engine",
@@ -229,13 +224,22 @@ function AppShell({ children }: { children: React.ReactNode }) {
           "app-sidebar w-[220px] flex flex-col flex-shrink-0 border-r transition-colors duration-300",
           sidebarOpen && "open"
         )}
-        style={{ background: "var(--bg-sidebar)", borderColor: "var(--sidebar-border, var(--border))" }}
+        style={{ background: "var(--bg-sidebar)", borderColor: "var(--border)" }}
       >
         <div
           className="px-5 py-4 border-b"
-          style={{ borderColor: "var(--sidebar-border, var(--border))" }}
+          style={{ borderColor: "var(--border)" }}
         >
-          <Logo color="white" />
+          <div
+            style={{
+              fontSize: "15px",
+              fontWeight: 700,
+              color: "var(--text-primary)",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            LaundroCFO
+          </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto">
@@ -244,7 +248,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
               <div
                 style={{
                   fontSize: "10px",
-                  color: "var(--sidebar-text-muted, var(--text-muted))",
+                  color: "var(--text-muted)",
                   padding: "16px 20px 4px",
                   letterSpacing: "0.08em",
                   fontWeight: 600,
@@ -259,7 +263,24 @@ function AppShell({ children }: { children: React.ReactNode }) {
                     key={item.href}
                     href={item.href}
                     onClick={() => setSidebarOpen(false)}
-                    className={clsx("nav-item", active && "nav-item-active")}
+                    className="nav-item"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      padding: "7px 20px",
+                      fontSize: "13px",
+                      textDecoration: "none",
+                      fontWeight: active ? 500 : 400,
+                      color: active ? "var(--text-primary)" : "var(--text-muted)",
+                      background: active ? "var(--bg-card2)" : "transparent",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!active) e.currentTarget.style.background = "color-mix(in srgb, var(--bg-card2) 50%, transparent)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active) e.currentTarget.style.background = "transparent";
+                    }}
                   >
                     <NavIcon name={item.icon} />
                     {item.label}
@@ -271,7 +292,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Store switcher */}
-        <div className="p-4 border-t relative" style={{ borderColor: "var(--sidebar-border, var(--border))" }} ref={sidebarStoreRef}>
+        <div className="p-4 border-t relative" style={{ borderColor: "var(--border)" }} ref={sidebarStoreRef}>
           <button
             type="button"
             onClick={() => setShowStoreDropdown((v) => !v)}
@@ -292,8 +313,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
           {showStoreDropdown && (
             <div
-              className="absolute bottom-full left-4 right-4 mb-1 rounded-lg overflow-hidden z-50"
-              style={{ background: "var(--bg-card2)", border: "1px solid var(--border)" }}
+              className="absolute bottom-full left-4 right-4 mb-1 rounded-lg overflow-hidden z-50 surface-panel"
+              style={{ border: "1px solid var(--border)" }}
             >
               <button
                 type="button"
@@ -352,8 +373,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
                   {showStoreDropdown && (
                     <div
-                      className="absolute top-full left-0 mt-1 min-w-[200px] rounded-lg overflow-hidden z-50"
-                      style={{ background: "var(--bg-card2)", border: "1px solid var(--border)" }}
+                      className="absolute top-full left-0 mt-1 min-w-[200px] rounded-lg overflow-hidden z-50 surface-panel"
+                      style={{ border: "1px solid var(--border)" }}
                     >
                       <button
                         type="button"

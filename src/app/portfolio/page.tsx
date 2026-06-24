@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
-import { getStoreValuation, getStoreDebt, type StoreValuationResult } from "@/lib/getStoreValuation";
+import { getStoreValuation, getStoreDebt } from "@/lib/getStoreValuation";
+import type { ValuationResult } from "@/lib/valuation";
 import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
@@ -17,11 +18,10 @@ import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
-import { resolveEquipmentFromInventory } from "@/lib/storeCanonical";
-import type { EquipmentRecord } from "@/lib/equipment";
-import { totalUtilities, type MonthlyUtilityRow } from "@/lib/utilities";
 import {
   financials as demoFinancials,
+  DEMO_MONTHLY_REVENUE,
+  DEMO_MONTHLY_EXPENSES,
   DEMO_ANNUAL_DEBT_SERVICE,
 } from "@/lib/data";
 
@@ -106,19 +106,10 @@ export default function PortfolioPage() {
   const [deleting, setDeleting] = useState(false);
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [storeValuations, setStoreValuations] = useState<
-    { store: Store; valuation: StoreValuationResult }[]
+    { store: Store; valuation: ValuationResult & { store: Record<string, unknown> } }[]
   >([]);
   const [totalDebt, setTotalDebt] = useState(0);
   const [totalAnnualDebtServiceFromLoans, setTotalAnnualDebtServiceFromLoans] = useState(0);
-  const [loanBalanceByStore, setLoanBalanceByStore] = useState<Record<string, number>>({});
-  const [debtServiceByStore, setDebtServiceByStore] = useState<Record<string, number>>({});
-  const [portfolioUtilities, setPortfolioUtilities] = useState({
-    portfolioWater: 0,
-    portfolioGas: 0,
-    portfolioElectric: 0,
-    portfolioTotalUtilities: 0,
-    portfolioUtilityPctOfRevenue: 0,
-  });
 
   useEffect(() => {
     if (localStorage.getItem("laundrocfo_show_welcome") === "true") {
@@ -165,17 +156,15 @@ export default function PortfolioPage() {
         { data: equipmentData, error: equipmentError },
         { data: insuranceData, error: insuranceError },
         { data: loansData, error: loansError },
-        { data: utilitiesData, error: utilitiesError },
       ] = await Promise.all([
         supabase.from("leases").select("id, store_id, lease_end_date, monthly_rent").in("store_id", storeIds),
         supabase.from("real_estate").select("store_id, estimated_value").in("store_id", storeIds),
         supabase.from("equipment_inventory").select("*").in("store_id", storeIds),
         supabase.from("insurance_policies").select("*").in("store_id", storeIds).eq("is_active", true),
-        supabase.from("store_loans").select("store_id, monthly_payment, current_balance").in("store_id", storeIds).eq("is_active", true),
-        supabase.from("monthly_utilities").select("*").in("store_id", storeIds),
+        supabase.from("store_loans").select("store_id, monthly_payment").in("store_id", storeIds).eq("is_active", true),
       ]);
 
-      const errors = [leasesError, reError, equipmentError, insuranceError, loansError, utilitiesError].filter(Boolean);
+      const errors = [leasesError, reError, equipmentError, insuranceError, loansError].filter(Boolean);
       if (errors.length > 0) throw errors[0];
 
       setLeases((leasesData ?? []) as Lease[]);
@@ -208,50 +197,11 @@ export default function PortfolioPage() {
       );
       setTotalDebt(debtTotal.reduce((s, d) => s + d, 0));
 
-      const balanceMap: Record<string, number> = {};
-      const debtServiceMap: Record<string, number> = {};
-      for (const loan of loansData ?? []) {
-        const sid = loan.store_id as string;
-        balanceMap[sid] = (balanceMap[sid] ?? 0) + (loan.current_balance ?? 0);
-        debtServiceMap[sid] = (debtServiceMap[sid] ?? 0) + (loan.monthly_payment ?? 0) * 12;
-      }
-      setLoanBalanceByStore(balanceMap);
-      setDebtServiceByStore(debtServiceMap);
-
       const annualDebtServiceFromLoans = (loansData ?? []).reduce(
         (s, loan) => s + (loan.monthly_payment ?? 0) * 12,
         0
       );
       setTotalAnnualDebtServiceFromLoans(annualDebtServiceFromLoans);
-
-      const latestByStore = new Map<string, MonthlyUtilityRow & { store_id: string }>();
-      for (const row of utilitiesData ?? []) {
-        const util = row as MonthlyUtilityRow & { store_id: string };
-        const existing = latestByStore.get(util.store_id);
-        if (!existing || util.year > existing.year || (util.year === existing.year && util.month > existing.month)) {
-          latestByStore.set(util.store_id, util);
-        }
-      }
-
-      let portfolioWater = 0;
-      let portfolioGas = 0;
-      let portfolioElectric = 0;
-      let portfolioTotalUtilities = 0;
-      for (const util of Array.from(latestByStore.values())) {
-        portfolioWater += util.water ?? 0;
-        portfolioGas += util.gas ?? 0;
-        portfolioElectric += util.electric ?? 0;
-        portfolioTotalUtilities += totalUtilities(util);
-      }
-      const totalMonthlyRevenue = (stores as Store[]).reduce((s, store) => s + (store.monthly_revenue ?? 0), 0);
-      setPortfolioUtilities({
-        portfolioWater,
-        portfolioGas,
-        portfolioElectric,
-        portfolioTotalUtilities,
-        portfolioUtilityPctOfRevenue:
-          totalMonthlyRevenue > 0 ? (portfolioTotalUtilities / totalMonthlyRevenue) * 100 : 0,
-      });
 
       const totalPortfolioValue = valuations.reduce((s, sv) => s + sv.valuation.businessValue, 0);
       if (stores.length === 1 && valuations.length === 1) {
@@ -275,7 +225,7 @@ export default function PortfolioPage() {
   }, [loadPortfolioData]);
 
   const valuationByStoreId = useMemo(() => {
-    const map = new Map<string, StoreValuationResult>();
+    const map = new Map<string, ValuationResult & { store: Record<string, unknown> }>();
     for (const sv of storeValuations) {
       map.set(sv.store.id, sv.valuation);
     }
@@ -284,28 +234,28 @@ export default function PortfolioPage() {
 
   const storeMetrics = useMemo(() => {
     return (stores as Store[]).map((store) => {
-      const storeValuation = valuationByStoreId.get(store.id);
-      const hasFinancials = (storeValuation?.ttmMonthsUsed ?? 0) > 0;
-      const monthlyRevenue = hasFinancials ? (storeValuation!.ttmRevenue ?? 0) / 12 : 0;
-      const monthlyEbitda = hasFinancials ? (storeValuation!.ttmEbitda ?? 0) / 12 : 0;
-      const annualEbitda = hasFinancials ? (storeValuation!.annualEbitda ?? 0) : 0;
-      const debtService = hasFinancials
-        ? (debtServiceByStore[store.id] ?? 0)
+      const hasRealData = (store.monthly_revenue ?? 0) > 0;
+      const monthlyRevenue = hasRealData ? (store.monthly_revenue ?? 0) : DEMO_MONTHLY_REVENUE;
+      const monthlyExpenses = hasRealData
+        ? (store.monthly_expenses ?? 0)
+        : DEMO_MONTHLY_EXPENSES;
+      const monthlyEbitda = monthlyRevenue - monthlyExpenses;
+      const annualEbitda = monthlyEbitda * 12;
+      const debtService = hasRealData
+        ? (store.annual_debt_service ?? 0)
         : DEMO_ANNUAL_DEBT_SERVICE;
-      const dscr = hasFinancials
-        ? (storeValuation!.ttmDscr ?? 0)
-        : debtService > 0
-          ? demoFinancials.cashFlow / debtService
-          : 0;
-      const estimatedValue = storeValuation?.businessValue ?? demoFinancials.estimatedValue;
-      const loanBalance = loanBalanceByStore[store.id] ?? 0;
+      const annualCashFlow = hasRealData ? annualEbitda - debtService : demoFinancials.cashFlow;
+      const dscr = debtService > 0 ? annualCashFlow / debtService : 0;
+      const storeValuation = valuationByStoreId.get(store.id);
+      const estimatedValue = hasRealData && storeValuation
+        ? storeValuation.businessValue
+        : demoFinancials.estimatedValue;
+      const loanBalance = store.loan_balance ?? 0;
       const storeCash =
         (store.operating_account_balance ?? 0) +
         (store.reserve_account_balance ?? 0) +
         (store.petty_cash ?? 0);
-      const storeEquipment = (equipmentByStore[store.id] ?? []) as EquipmentRecord[];
-      const equipResolved = resolveEquipmentFromInventory(storeEquipment);
-      const avgMachineAge = equipResolved.weightedAvgAge ?? store.avg_machine_age ?? 6.1;
+      const avgMachineAge = store.avg_machine_age ?? 6.1;
 
       const isOwnerOccupied = store.occupancy_type === "owner_occupied";
       const storeLease = leases.find((l) => l.store_id === store.id);
@@ -319,7 +269,7 @@ export default function PortfolioPage() {
 
       return {
         store,
-        hasFinancials,
+        hasRealData,
         estimatedValue,
         monthlyRevenue,
         monthlyEbitda,
@@ -329,12 +279,12 @@ export default function PortfolioPage() {
         leaseYearsRemaining,
         avgMachineAge,
         storeCash,
-        hasDscrWarning: hasFinancials && dscr > 0 && dscr < 1.25,
+        hasDscrWarning: debtService > 0 && dscr < 1.25,
       };
     });
-  }, [stores, leases, valuationByStoreId, equipmentByStore, loanBalanceByStore, debtServiceByStore]);
+  }, [stores, leases, valuationByStoreId]);
 
-  const usingDemoData = !storeMetrics.some((m) => m.hasFinancials);
+  const usingDemoData = storeMetrics.some((m) => !m.hasRealData);
 
   const aggregates = useMemo(() => {
     const totalPortfolioValue = storeMetrics.reduce((s, m) => s + m.estimatedValue, 0);
@@ -411,12 +361,6 @@ export default function PortfolioPage() {
     setSelectedStore(store);
     setIsAllStores(false);
     router.push("/dashboard");
-  }
-
-  function openStoreFinancials(store: Store) {
-    setSelectedStore(store);
-    setIsAllStores(false);
-    router.push("/financials");
   }
 
   async function handleArchive(store: Store) {
@@ -695,44 +639,6 @@ export default function PortfolioPage() {
         />
       </div>
 
-      {/* Portfolio Utilities */}
-      <div className="card">
-        <h3 className="text-[14px] font-semibold mb-4" style={{ color: "var(--text-primary)" }}>
-          Portfolio Utilities
-        </h3>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-            gap: "16px",
-          }}
-        >
-          <KpiCard
-            label="Total Utilities"
-            value={<AnimatedNumber value={portfolioUtilities.portfolioTotalUtilities} prefix="$" duration={900} />}
-            sub={`${portfolioUtilities.portfolioUtilityPctOfRevenue.toFixed(1)}% of revenue`}
-          />
-          <KpiCard
-            label="Water"
-            value={<AnimatedNumber value={portfolioUtilities.portfolioWater} prefix="$" duration={900} />}
-            sub="most recent month"
-          />
-          <KpiCard
-            label="Gas"
-            value={<AnimatedNumber value={portfolioUtilities.portfolioGas} prefix="$" duration={900} />}
-            sub="most recent month"
-          />
-          <KpiCard
-            label="Electric"
-            value={<AnimatedNumber value={portfolioUtilities.portfolioElectric} prefix="$" duration={900} />}
-            sub="most recent month"
-          />
-        </div>
-        <p className="text-[11px] mt-3" style={{ color: "var(--text-muted)" }}>
-          Aggregated from each store&apos;s most recent monthly_utilities entry.
-        </p>
-      </div>
-
       {/* Store Cards */}
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -744,7 +650,7 @@ export default function PortfolioPage() {
           style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}
         >
           {storeMetrics.map((m) => (
-            <div key={m.store.id} className="card relative overflow-hidden min-w-0">
+            <div key={m.store.id} className="card relative">
               {m.hasDscrWarning && (
                 <span className="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-red-500" />
               )}
@@ -762,53 +668,28 @@ export default function PortfolioPage() {
                 {m.store.address ?? "No address"}
               </div>
 
-              <div className="pt-2 border-t mb-4" style={{ borderColor: "var(--border)" }}>
-                <div className="metric-label mb-1">Value</div>
-                <div
-                  className="text-[14px] font-semibold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis"
-                  style={{ color: "var(--text-primary)" }}
-                  title={fmtDollar(m.estimatedValue)}
-                >
-                  {fmtDollar(m.estimatedValue)}
-                </div>
-              </div>
-
-              {m.hasFinancials ? (
-                <div className="grid grid-cols-3 gap-3 mb-4 min-w-0" style={{ borderColor: "var(--border)" }}>
-                  {[
-                    { label: "Revenue", value: fmtDollar(m.monthlyRevenue) },
-                    { label: "EBITDA", value: fmtDollar(m.monthlyEbitda) },
-                    {
-                      label: "DSCR",
-                      value: m.dscr > 0 ? fmtMultiple(m.dscr) : "—",
-                      color: m.dscr > 0 ? dscrColorClass(m.dscr) : undefined,
-                    },
-                  ].map((metric) => (
-                    <div key={metric.label} className="min-w-0 overflow-hidden">
-                      <div className="metric-label mb-1">{metric.label}</div>
-                      <div
-                        className={clsx(
-                          "text-[14px] font-semibold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis",
-                          metric.color,
-                        )}
-                        style={metric.color ? undefined : { color: "var(--text-primary)" }}
-                        title={metric.value}
-                      >
-                        {metric.value}
-                      </div>
+              <div className="grid grid-cols-4 gap-3 mb-4 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+                {[
+                  { label: "Value", value: fmtDollar(m.estimatedValue) },
+                  { label: "Revenue", value: fmtDollar(m.monthlyRevenue) },
+                  { label: "EBITDA", value: fmtDollar(m.monthlyEbitda) },
+                  {
+                    label: "DSCR",
+                    value: m.store.annual_debt_service || !m.hasRealData ? fmtMultiple(m.dscr) : "—",
+                    color: m.store.annual_debt_service || !m.hasRealData ? dscrColorClass(m.dscr) : undefined,
+                  },
+                ].map((metric) => (
+                  <div key={metric.label}>
+                    <div className="metric-label mb-1">{metric.label}</div>
+                    <div
+                      className={clsx("text-[14px] font-semibold tabular-nums", metric.color)}
+                      style={metric.color ? undefined : { color: "var(--text-primary)" }}
+                    >
+                      {metric.value}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => openStoreFinancials(m.store)}
-                  className="text-[12px] font-medium mb-4 hover:opacity-80"
-                  style={{ color: "var(--accent)", background: "none", border: "none", padding: 0 }}
-                >
-                  Add financials →
-                </button>
-              )}
+                  </div>
+                ))}
+              </div>
 
               <div className="text-[11px] mb-4" style={{ color: "var(--text-muted)" }}>
                 Cash: {fmtDollar(m.storeCash)}

@@ -1,7 +1,6 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import type { PortfolioReportData } from "@/lib/getPortfolioReport";
-import { pdfMetricValueFontSize } from "@/lib/metricStyles";
 
 export interface PortfolioReportProps {
   data: PortfolioReportData;
@@ -72,7 +71,7 @@ const styles = StyleSheet.create({
   },
   coverFooter: { fontSize: 9, color: "#64748b", marginTop: 30 },
   sectionHeader: {
-    backgroundColor: "#0f1e3d",
+    backgroundColor: "#1E3A1E",
     color: "white",
     padding: "8 12",
     fontSize: 11,
@@ -100,8 +99,6 @@ const styles = StyleSheet.create({
     padding: "10 12",
     marginBottom: 10,
     marginRight: "2%",
-    overflow: "hidden",
-    minWidth: 100,
   },
   metricCardGrid: {
     flexDirection: "row",
@@ -230,19 +227,10 @@ function MetricTile({
   value: string;
   valueColor?: string;
 }) {
-  const valueSize = pdfMetricValueFontSize(value);
   return (
     <View style={styles.metricCard}>
       <Text style={styles.metricLabel}>{label}</Text>
-      <Text
-        style={[
-          styles.metricValue,
-          { fontSize: valueSize },
-          valueColor ? { color: valueColor } : {},
-        ]}
-      >
-        {value}
-      </Text>
+      <Text style={[styles.metricValue, valueColor ? { color: valueColor } : {}]}>{value}</Text>
     </View>
   );
 }
@@ -401,29 +389,6 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
         <Text style={[styles.bodyText, { fontSize: 8, marginTop: -4 }]}>
           Total debt relative to annual EBITDA — lower is better.
         </Text>
-        <SectionHeader>Utility Summary</SectionHeader>
-        <Text style={styles.bodyText}>
-          Most recent monthly utility costs per store. Portfolio total: {fmtCurrency(totals.portfolioTotalUtilities)} (
-          {fmtPercent(totals.portfolioUtilityPctOfRevenue)} of monthly revenue).
-        </Text>
-        <View style={styles.tableHeader}>
-          <Text style={[styles.tableHeaderCell, { width: "22%" }]}>Store</Text>
-          <Text style={[styles.tableHeaderCell, { width: "13%", textAlign: "right" }]}>Water</Text>
-          <Text style={[styles.tableHeaderCell, { width: "13%", textAlign: "right" }]}>Gas</Text>
-          <Text style={[styles.tableHeaderCell, { width: "13%", textAlign: "right" }]}>Electric</Text>
-          <Text style={[styles.tableHeaderCell, { width: "13%", textAlign: "right" }]}>Total</Text>
-          <Text style={[styles.tableHeaderCell, { width: "13%", textAlign: "right" }]}>% Rev</Text>
-        </View>
-        {storeDetails.map((d) => (
-          <View key={`util-${d.store.id}`} style={styles.tableRow}>
-            <Text style={[styles.tableCellBold, { width: "22%" }]}>{d.store.name ?? "Store"}</Text>
-            <Text style={[styles.tableCellRight, { width: "13%" }]}>{fmtCurrency(d.utilityWater)}</Text>
-            <Text style={[styles.tableCellRight, { width: "13%" }]}>{fmtCurrency(d.utilityGas)}</Text>
-            <Text style={[styles.tableCellRight, { width: "13%" }]}>{fmtCurrency(d.utilityElectric)}</Text>
-            <Text style={[styles.tableCellRight, { width: "13%" }]}>{fmtCurrency(d.utilityTotal)}</Text>
-            <Text style={[styles.tableCellRight, { width: "13%" }]}>{fmtPercent(d.utilityPctOfRevenue)}</Text>
-          </View>
-        ))}
         <PageChrome />
       </Page>
 

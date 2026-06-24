@@ -36,14 +36,14 @@ export function CashCard({ store, onUpdate }: CashCardProps) {
     setEditing(false);
   }
 
-  const inputClass = "w-full bg-[var(--bg-card2)] border border-[var(--border2)] rounded-md px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-blue-500";
+  const inputClass = "w-full bg-[var(--bg-input)] border border-white/10 rounded-md px-3 py-2 text-[13px] text-slate-100 outline-none focus:border-[#4a7c59] dark:focus:border-blue-500";
 
   const lastUpdated = store?.cash_last_updated
     ? new Date(store.cash_last_updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : null;
 
   return (
-    <div className="card overflow-hidden min-w-0">
+    <div className="card">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
         <div className="metric-label">Cash Position</div>
         <button
@@ -57,7 +57,7 @@ export function CashCard({ store, onUpdate }: CashCardProps) {
 
       {!editing ? (
         <div>
-          <div className="metric-value" style={{ color: 'var(--text-primary)' }} title={`$${totalCash.toLocaleString()}`}>
+          <div className="metric-value" style={{ color: 'var(--text-primary)' }}>
             ${totalCash.toLocaleString()}
           </div>
           {lastUpdated && (

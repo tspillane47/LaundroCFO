@@ -1,27 +1,10 @@
 "use client";
-import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
-import { toNullableText } from "@/lib/formHelpers";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { preventEnterSubmit } from "@/components/occupancy/shared";
-
-const MARKET_OPTIONS = [
-  { value: "urban", label: "Dense Urban" },
-  { value: "suburban", label: "Suburban" },
-  { value: "average", label: "Small City" },
-  { value: "rural", label: "Rural" },
-];
-
-const CONDITION_OPTIONS = ["excellent", "good", "fair", "poor"];
-const TREND_OPTIONS = ["growing", "stable", "declining"];
-const COMPETITION_OPTIONS = ["protected", "normal", "heavy"];
-
-function labelize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
 
 function EditStoreForm() {
   const router = useRouter();
@@ -35,14 +18,20 @@ function EditStoreForm() {
   const [form, setForm] = useState({
     name: "",
     address: "",
-    market_density: "suburban",
-    store_condition: "fair",
-    revenue_trend: "stable",
-    competition_level: "normal",
+    square_footage: "",
+    monthly_revenue: "",
+    monthly_expenses: "",
+    monthly_rent: "",
+    annual_debt_service: "",
+    loan_balance: "",
+    lease_expiration: "",
+    washers: "",
+    dryers: "",
+    avg_machine_age: "",
   });
 
   const inputClass =
-    "w-full bg-[#1e2a3a] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-blue-500";
+    "w-full bg-[var(--bg-input)] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-[#4a7c59] dark:focus:border-blue-500";
 
   function set(field: string, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -78,10 +67,16 @@ function EditStoreForm() {
         setForm({
           name: data.name ?? "",
           address: data.address ?? "",
-          market_density: data.market_density ?? data.location_type ?? "suburban",
-          store_condition: data.store_condition ?? "fair",
-          revenue_trend: data.revenue_trend ?? "stable",
-          competition_level: data.competition_level ?? "normal",
+          square_footage: data.square_footage != null ? String(data.square_footage) : "",
+          monthly_revenue: data.monthly_revenue != null ? String(data.monthly_revenue) : "",
+          monthly_expenses: data.monthly_expenses != null ? String(data.monthly_expenses) : "",
+          monthly_rent: data.monthly_rent != null ? String(data.monthly_rent) : "",
+          annual_debt_service: data.annual_debt_service != null ? String(data.annual_debt_service) : "",
+          loan_balance: data.loan_balance != null ? String(data.loan_balance) : "",
+          lease_expiration: data.lease_expiration ? data.lease_expiration.split("T")[0] : "",
+          washers: data.washers != null ? String(data.washers) : "",
+          dryers: data.dryers != null ? String(data.dryers) : "",
+          avg_machine_age: data.avg_machine_age != null ? String(data.avg_machine_age) : "",
         });
       }
       setFetching(false);
@@ -99,12 +94,18 @@ function EditStoreForm() {
       const { error: updateError } = await supabase
         .from("stores")
         .update({
-          name: toNullableText(form.name),
-          address: toNullableText(form.address),
-          market_density: form.market_density,
-          store_condition: form.store_condition,
-          revenue_trend: form.revenue_trend,
-          competition_level: form.competition_level,
+          name: form.name,
+          address: form.address,
+          square_footage: Number(form.square_footage),
+          monthly_revenue: Number(form.monthly_revenue),
+          monthly_expenses: Number(form.monthly_expenses),
+          monthly_rent: Number(form.monthly_rent),
+          annual_debt_service: Number(form.annual_debt_service),
+          loan_balance: Number(form.loan_balance),
+          lease_expiration: form.lease_expiration,
+          washers: Number(form.washers),
+          dryers: Number(form.dryers),
+          avg_machine_age: Number(form.avg_machine_age),
         })
         .eq("id", storeId);
 
@@ -119,7 +120,6 @@ function EditStoreForm() {
       invalidateValuationCache(storeId);
       setSaveStatus("success");
       setMessage({ type: "success", text: "Saved successfully." });
-      setSaving(false);
     } catch (err) {
       console.error("Unexpected store profile save error:", err);
       setSaveStatus("error");
@@ -131,7 +131,7 @@ function EditStoreForm() {
   if (fetching) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="text-adaptive-muted text-[13px]">Loading store data...</div>
+        <div className="text-slate-500 text-[13px]">Loading store data...</div>
       </div>
     );
   }
@@ -139,8 +139,8 @@ function EditStoreForm() {
   return (
     <div className="max-w-md mx-auto">
       <div className="mb-6">
-        <h1 className="text-[15px] font-semibold text-adaptive-primary">Edit Store</h1>
-        <p className="text-adaptive-muted text-[13px] mt-1">Update your store identity and valuation profile</p>
+        <h1 className="text-[15px] font-semibold text-slate-100">Edit Store</h1>
+        <p className="text-slate-500 text-[13px] mt-1">Update your store profile and financials</p>
       </div>
 
       <FormBanner message={message} />
@@ -154,7 +154,7 @@ function EditStoreForm() {
             onChange={(e) => set("name", e.target.value)}
             className={inputClass}
             placeholder="Sunnyvale Super Wash"
-            onKeyDown={preventEnterSubmit}
+          onKeyDown={preventEnterSubmit}
           />
         </div>
         <div>
@@ -165,65 +165,124 @@ function EditStoreForm() {
             onChange={(e) => set("address", e.target.value)}
             className={inputClass}
             placeholder="445 W Olive Ave, Sunnyvale, CA"
-            onKeyDown={preventEnterSubmit}
+          onKeyDown={preventEnterSubmit}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <div className="metric-label mb-1.5">Market Density</div>
-            <select
-              value={form.market_density}
-              onChange={(e) => set("market_density", e.target.value)}
+            <div className="metric-label mb-1.5">Square Footage</div>
+            <input
+              type="number"
+              value={form.square_footage}
+              onChange={(e) => set("square_footage", e.target.value)}
               className={inputClass}
-            >
-              {MARKET_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              placeholder="4450"
+            onKeyDown={preventEnterSubmit}
+            />
           </div>
           <div>
-            <div className="metric-label mb-1.5">Store Condition</div>
-            <select
-              value={form.store_condition}
-              onChange={(e) => set("store_condition", e.target.value)}
+            <div className="metric-label mb-1.5">Lease Expiration</div>
+            <input
+              type="date"
+              value={form.lease_expiration}
+              onChange={(e) => set("lease_expiration", e.target.value)}
               className={inputClass}
-            >
-              {CONDITION_OPTIONS.map((c) => (
-                <option key={c} value={c}>
-                  {labelize(c)}
-                </option>
-              ))}
-            </select>
+            onKeyDown={preventEnterSubmit}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="metric-label mb-1.5">Monthly Revenue</div>
+            <input
+              type="number"
+              value={form.monthly_revenue}
+              onChange={(e) => set("monthly_revenue", e.target.value)}
+              className={inputClass}
+              placeholder="69250"
+            onKeyDown={preventEnterSubmit}
+            />
           </div>
           <div>
-            <div className="metric-label mb-1.5">Revenue Trend</div>
-            <select
-              value={form.revenue_trend}
-              onChange={(e) => set("revenue_trend", e.target.value)}
+            <div className="metric-label mb-1.5">Monthly Expenses</div>
+            <input
+              type="number"
+              value={form.monthly_expenses}
+              onChange={(e) => set("monthly_expenses", e.target.value)}
               className={inputClass}
-            >
-              {TREND_OPTIONS.map((t) => (
-                <option key={t} value={t}>
-                  {labelize(t)}
-                </option>
-              ))}
-            </select>
+              placeholder="49430"
+            onKeyDown={preventEnterSubmit}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="metric-label mb-1.5">Monthly Rent</div>
+            <input
+              type="number"
+              value={form.monthly_rent}
+              onChange={(e) => set("monthly_rent", e.target.value)}
+              className={inputClass}
+              placeholder="6200"
+            onKeyDown={preventEnterSubmit}
+            />
           </div>
           <div>
-            <div className="metric-label mb-1.5">Competition Level</div>
-            <select
-              value={form.competition_level}
-              onChange={(e) => set("competition_level", e.target.value)}
+            <div className="metric-label mb-1.5">Annual Debt Service</div>
+            <input
+              type="number"
+              value={form.annual_debt_service}
+              onChange={(e) => set("annual_debt_service", e.target.value)}
               className={inputClass}
-            >
-              {COMPETITION_OPTIONS.map((c) => (
-                <option key={c} value={c}>
-                  {labelize(c)}
-                </option>
-              ))}
-            </select>
+              placeholder="100000"
+            onKeyDown={preventEnterSubmit}
+            />
+          </div>
+        </div>
+        <div>
+          <div className="metric-label mb-1.5">Loan Balance</div>
+          <input
+            type="number"
+            value={form.loan_balance}
+            onChange={(e) => set("loan_balance", e.target.value)}
+            className={inputClass}
+            placeholder="850000"
+          onKeyDown={preventEnterSubmit}
+          />
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <div className="metric-label mb-1.5">Washers</div>
+            <input
+              type="number"
+              value={form.washers}
+              onChange={(e) => set("washers", e.target.value)}
+              className={inputClass}
+              placeholder="28"
+            onKeyDown={preventEnterSubmit}
+            />
+          </div>
+          <div>
+            <div className="metric-label mb-1.5">Dryers</div>
+            <input
+              type="number"
+              value={form.dryers}
+              onChange={(e) => set("dryers", e.target.value)}
+              className={inputClass}
+              placeholder="32"
+            onKeyDown={preventEnterSubmit}
+            />
+          </div>
+          <div>
+            <div className="metric-label mb-1.5">Avg Machine Age</div>
+            <input
+              type="number"
+              value={form.avg_machine_age}
+              onChange={(e) => set("avg_machine_age", e.target.value)}
+              className={inputClass}
+              placeholder="6"
+            onKeyDown={preventEnterSubmit}
+            />
           </div>
         </div>
         <button
@@ -234,26 +293,6 @@ function EditStoreForm() {
           {saveStatus === "success" ? "Saved ✓" : saving ? "Saving..." : "Save Changes"}
         </button>
       </div>
-
-      <p className="text-[12px] text-adaptive-muted mt-5 leading-relaxed">
-        Financial data is managed in{" "}
-        <Link href="/financials" className="text-adaptive-info hover:underline">
-          Financials
-        </Link>
-        . Equipment is managed in{" "}
-        <Link href="/equipment" className="text-adaptive-info hover:underline">
-          Equipment
-        </Link>
-        . Lease and rent data is managed in{" "}
-        <Link href="/lease" className="text-adaptive-info hover:underline">
-          Occupancy
-        </Link>
-        . Debt is managed in{" "}
-        <Link href="/debt" className="text-adaptive-info hover:underline">
-          Debt
-        </Link>
-        .
-      </p>
     </div>
   );
 }
@@ -263,7 +302,7 @@ export default function EditStorePage() {
     <Suspense
       fallback={
         <div className="flex items-center justify-center py-20">
-          <div className="text-adaptive-muted text-[13px]">Loading store data...</div>
+          <div className="text-slate-500 text-[13px]">Loading store data...</div>
         </div>
       }
     >

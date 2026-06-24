@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from "react";
 
 export const INPUT_CLASS =
-  "w-full bg-[#1e2a3a] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-blue-500";
+  "w-full bg-[var(--bg-input)] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-[#4a7c59] dark:focus:border-blue-500";
 
 export function preventEnterSubmit(e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) {
   if (e.key === "Enter") {
@@ -47,11 +47,11 @@ export function LabelValue({
 }) {
   return (
     <div className="flex items-center justify-between py-2.5 text-[13px] border-b border-white/[0.04] last:border-b-0">
-      <span className="text-adaptive-muted">{label}</span>
+      <span className="text-slate-400">{label}</span>
       {badge ? (
         <span className={`badge ${badge}`}>{value}</span>
       ) : (
-        <span className="font-semibold text-adaptive-primary text-right max-w-[60%]">{value}</span>
+        <span className="font-semibold text-slate-100 text-right max-w-[60%]">{value}</span>
       )}
     </div>
   );
@@ -75,8 +75,8 @@ export function YesNoToggle({
           onClick={() => onChange(true)}
           className={
             value
-              ? "flex-1 py-2 rounded-lg text-[13px] font-semibold bg-blue-600/20 border border-blue-500/40 text-adaptive-info"
-              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[#1e2a3a] border border-white/10 text-slate-400 hover:border-white/20"
+              ? "flex-1 py-2 rounded-lg text-[13px] font-semibold bg-blue-600/20 border border-blue-500/40 text-blue-300"
+              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/10 text-slate-400 hover:border-white/20"
           }
         >
           Yes
@@ -86,8 +86,8 @@ export function YesNoToggle({
           onClick={() => onChange(false)}
           className={
             !value
-              ? "flex-1 py-2 rounded-lg text-[13px] font-semibold bg-blue-600/20 border border-blue-500/40 text-adaptive-info"
-              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[#1e2a3a] border border-white/10 text-slate-400 hover:border-white/20"
+              ? "flex-1 py-2 rounded-lg text-[13px] font-semibold bg-blue-600/20 border border-blue-500/40 text-blue-300"
+              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/10 text-slate-400 hover:border-white/20"
           }
         >
           No

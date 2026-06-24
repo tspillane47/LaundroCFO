@@ -12,6 +12,7 @@ import {
   formatBool,
   formatCurrency,
   formatDate,
+  formatPct,
   parseDate,
 } from "./shared";
 import {
@@ -23,10 +24,6 @@ import {
   calcRentPerSquareFoot,
   flagStyle,
   getUnderwritingFlags,
-  normalizeMortgages,
-  sumMortgageBalances,
-  sumMortgagePayments,
-  type Mortgage,
 } from "@/lib/real-estate-calculations";
 
 type RealEstate = {
@@ -45,7 +42,6 @@ type RealEstate = {
   laundromat_square_footage: number | null;
   other_tenants: boolean | null;
   ownership_notes: string | null;
-  mortgages: Mortgage[] | null;
   mortgage_lender: string | null;
   original_loan_amount: number | null;
   current_loan_balance: number | null;
@@ -83,38 +79,20 @@ type RealEstateForm = {
   laundromat_square_footage: string;
   other_tenants: boolean;
   ownership_notes: string;
+  mortgage_lender: string;
+  original_loan_amount: string;
+  current_loan_balance: string;
+  interest_rate: string;
+  monthly_mortgage_payment: string;
+  annual_debt_service: string;
+  maturity_date: string;
+  amortization_term: string;
+  balloon_payment: boolean;
+  balloon_date: string;
+  mortgage_notes: string;
   monthly_rent_charged: string;
   market_rent_estimate: string;
 };
-
-type MortgageForm = {
-  lender_name: string;
-  monthly_payment: string;
-  balance: string;
-};
-
-function emptyMortgageForm(): MortgageForm {
-  return { lender_name: "", monthly_payment: "", balance: "" };
-}
-
-function mortgagesToForms(mortgages: Mortgage[]): MortgageForm[] {
-  if (!mortgages.length) return [emptyMortgageForm()];
-  return mortgages.map((m) => ({
-    lender_name: m.lender_name ?? "",
-    monthly_payment: m.monthly_payment != null ? String(m.monthly_payment) : "",
-    balance: m.balance != null ? String(m.balance) : "",
-  }));
-}
-
-function formsToMortgages(forms: MortgageForm[]): Mortgage[] {
-  return forms
-    .filter((f) => f.lender_name.trim() || f.monthly_payment || f.balance)
-    .map((f) => ({
-      lender_name: f.lender_name.trim(),
-      monthly_payment: Number(f.monthly_payment) || 0,
-      balance: Number(f.balance) || 0,
-    }));
-}
 
 function emptyForm(storeAddress: string | null): RealEstateForm {
   return {
@@ -131,6 +109,17 @@ function emptyForm(storeAddress: string | null): RealEstateForm {
     laundromat_square_footage: "",
     other_tenants: false,
     ownership_notes: "",
+    mortgage_lender: "",
+    original_loan_amount: "",
+    current_loan_balance: "",
+    interest_rate: "",
+    monthly_mortgage_payment: "",
+    annual_debt_service: "",
+    maturity_date: "",
+    amortization_term: "",
+    balloon_payment: false,
+    balloon_date: "",
+    mortgage_notes: "",
     monthly_rent_charged: "",
     market_rent_estimate: "",
   };
@@ -154,6 +143,21 @@ function recordToForm(record: RealEstate): RealEstateForm {
       record.laundromat_square_footage != null ? String(record.laundromat_square_footage) : "",
     other_tenants: record.other_tenants ?? false,
     ownership_notes: record.ownership_notes ?? "",
+    mortgage_lender: record.mortgage_lender ?? "",
+    original_loan_amount:
+      record.original_loan_amount != null ? String(record.original_loan_amount) : "",
+    current_loan_balance:
+      record.current_loan_balance != null ? String(record.current_loan_balance) : "",
+    interest_rate: record.interest_rate != null ? String(record.interest_rate) : "",
+    monthly_mortgage_payment:
+      record.monthly_mortgage_payment != null ? String(record.monthly_mortgage_payment) : "",
+    annual_debt_service:
+      record.annual_debt_service != null ? String(record.annual_debt_service) : "",
+    maturity_date: record.maturity_date?.split("T")[0] ?? "",
+    amortization_term: record.amortization_term != null ? String(record.amortization_term) : "",
+    balloon_payment: record.balloon_payment ?? false,
+    balloon_date: record.balloon_date?.split("T")[0] ?? "",
+    mortgage_notes: record.mortgage_notes ?? "",
     monthly_rent_charged:
       record.monthly_rent_charged != null ? String(record.monthly_rent_charged) : "",
     market_rent_estimate:
@@ -222,16 +226,9 @@ export function RealEstateModule({ store }: Props) {
 
   const [record, setRecord] = useState<RealEstate | null>(null);
   const [form, setForm] = useState<RealEstateForm>(emptyForm(store.address));
-  const [mortgageForms, setMortgageForms] = useState<MortgageForm[]>([emptyMortgageForm()]);
 
   function setField<K extends keyof RealEstateForm>(field: K, value: RealEstateForm[K]) {
     setForm((f) => ({ ...f, [field]: value }));
-  }
-
-  function setMortgageField(index: number, field: keyof MortgageForm, value: string) {
-    setMortgageForms((forms) =>
-      forms.map((f, i) => (i === index ? { ...f, [field]: value } : f))
-    );
   }
 
   async function loadData() {
@@ -254,11 +251,9 @@ export function RealEstateModule({ store }: Props) {
     if (data) {
       setRecord(data);
       setForm(recordToForm(data));
-      setMortgageForms(mortgagesToForms(normalizeMortgages(data.mortgages, data)));
     } else {
       setRecord(null);
       setForm(emptyForm(store.address));
-      setMortgageForms([emptyMortgageForm()]);
     }
 
     setLoading(false);
@@ -270,9 +265,7 @@ export function RealEstateModule({ store }: Props) {
 
   const metrics = useMemo(() => {
     const estimatedValue = record?.estimated_value ?? null;
-    const mortgages = normalizeMortgages(record?.mortgages, record ?? undefined);
-    const loanBalance = sumMortgageBalances(mortgages);
-    const totalMonthlyPayment = sumMortgagePayments(mortgages);
+    const loanBalance = record?.current_loan_balance ?? null;
     const monthlyRentCharged = record?.monthly_rent_charged ?? null;
     const marketRentEstimate = record?.market_rent_estimate ?? null;
     const laundromatSqft = record?.laundromat_square_footage ?? null;
@@ -293,8 +286,7 @@ export function RealEstateModule({ store }: Props) {
 
     const yearsOwned = calcYearsOwned(record?.date_purchased ?? null);
     const annualRevenue = monthlyRevenue * 12;
-    const debtService =
-      totalMonthlyPayment != null ? totalMonthlyPayment * 12 : record?.annual_debt_service ?? null;
+    const debtService = record?.annual_debt_service ?? null;
     const debtServiceToRevenue =
       debtService != null && annualRevenue > 0 ? (debtService / annualRevenue) * 100 : null;
 
@@ -319,7 +311,7 @@ export function RealEstateModule({ store }: Props) {
       monthlyRentCharged,
       marketRentEstimate,
       sameEntityAsLaundromat: record?.same_entity_as_laundromat ?? null,
-      monthlyMortgagePayment: totalMonthlyPayment,
+      monthlyMortgagePayment: record?.monthly_mortgage_payment ?? null,
       buildingEquity: equity,
     });
 
@@ -336,19 +328,14 @@ export function RealEstateModule({ store }: Props) {
       score,
       risk,
       flags,
-      mortgages,
-      totalMonthlyPayment,
-      totalBalance: loanBalance,
     };
   }, [record, store]);
 
   function enterEditMode() {
     if (record) {
       setForm(recordToForm(record));
-      setMortgageForms(mortgagesToForms(normalizeMortgages(record.mortgages, record)));
     } else {
       setForm(emptyForm(store.address));
-      setMortgageForms([emptyMortgageForm()]);
     }
     setMode("edit");
     setError("");
@@ -358,9 +345,6 @@ export function RealEstateModule({ store }: Props) {
   function cancelEdit() {
     if (record) {
       setForm(recordToForm(record));
-      setMortgageForms(mortgagesToForms(normalizeMortgages(record.mortgages, record)));
-    } else {
-      setMortgageForms([emptyMortgageForm()]);
     }
     setMode("view");
     setError("");
@@ -380,11 +364,6 @@ export function RealEstateModule({ store }: Props) {
       setSaving(false);
       return;
     }
-
-    const mortgages = formsToMortgages(mortgageForms);
-    const totalMonthlyPayment = sumMortgagePayments(mortgages);
-    const totalBalance = sumMortgageBalances(mortgages);
-    const annualDebtService = totalMonthlyPayment != null ? totalMonthlyPayment * 12 : null;
 
     const payload = {
       store_id: store.id,
@@ -406,11 +385,19 @@ export function RealEstateModule({ store }: Props) {
         : null,
       other_tenants: form.other_tenants,
       ownership_notes: form.ownership_notes || null,
-      mortgages,
-      mortgage_lender: mortgages[0]?.lender_name || null,
-      current_loan_balance: totalBalance,
-      monthly_mortgage_payment: totalMonthlyPayment,
-      annual_debt_service: annualDebtService,
+      mortgage_lender: form.mortgage_lender || null,
+      original_loan_amount: form.original_loan_amount ? Number(form.original_loan_amount) : null,
+      current_loan_balance: form.current_loan_balance ? Number(form.current_loan_balance) : null,
+      interest_rate: form.interest_rate ? Number(form.interest_rate) : null,
+      monthly_mortgage_payment: form.monthly_mortgage_payment
+        ? Number(form.monthly_mortgage_payment)
+        : null,
+      annual_debt_service: form.annual_debt_service ? Number(form.annual_debt_service) : null,
+      maturity_date: form.maturity_date || null,
+      amortization_term: form.amortization_term ? Number(form.amortization_term) : null,
+      balloon_payment: form.balloon_payment,
+      balloon_date: form.balloon_payment ? form.balloon_date || null : null,
+      mortgage_notes: form.mortgage_notes || null,
       monthly_rent_charged: form.monthly_rent_charged
         ? Number(form.monthly_rent_charged)
         : null,
@@ -444,6 +431,7 @@ export function RealEstateModule({ store }: Props) {
   }
 
   const entityBadge = record?.same_entity_as_laundromat ? "badge-green" : "badge-amber";
+  const balloonBadge = record?.balloon_payment ? "badge-amber" : "badge-green";
 
   return (
     <div className="space-y-5">
@@ -666,40 +654,42 @@ export function RealEstateModule({ store }: Props) {
 
           <div className="card">
             <div className="section-title">Mortgage & Debt</div>
-            {metrics.mortgages.length > 0 ? (
-              <div>
-                {metrics.mortgages.map((mortgage, i) => (
-                  <div
-                    key={i}
-                    className={clsx(
-                      "py-3",
-                      i > 0 && "border-t border-white/[0.06]"
-                    )}
-                  >
-                    <LabelValue label="Lender" value={mortgage.lender_name || "—"} />
-                    <LabelValue
-                      label="Monthly Payment"
-                      value={formatCurrency(mortgage.monthly_payment)}
-                    />
-                    <LabelValue label="Balance" value={formatCurrency(mortgage.balance)} />
-                  </div>
-                ))}
-                {metrics.mortgages.length > 1 && (
-                  <div className="pt-3 mt-1 border-t border-white/[0.08]">
-                    <LabelValue
-                      label="Total Monthly Payments"
-                      value={formatCurrency(metrics.totalMonthlyPayment)}
-                    />
-                    <LabelValue
-                      label="Total Loan Balance"
-                      value={formatCurrency(metrics.totalBalance)}
-                    />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-[13px] text-slate-500">No mortgages on file</div>
-            )}
+            <div>
+              <LabelValue label="Mortgage Lender" value={record.mortgage_lender ?? "—"} />
+              <LabelValue
+                label="Original Loan Amount"
+                value={formatCurrency(record.original_loan_amount)}
+              />
+              <LabelValue
+                label="Current Loan Balance"
+                value={formatCurrency(record.current_loan_balance)}
+              />
+              <LabelValue label="Interest Rate" value={formatPct(record.interest_rate)} />
+              <LabelValue
+                label="Monthly Mortgage Payment"
+                value={formatCurrency(record.monthly_mortgage_payment)}
+              />
+              <LabelValue
+                label="Annual Debt Service"
+                value={formatCurrency(record.annual_debt_service)}
+              />
+              <LabelValue label="Maturity Date" value={formatDate(record.maturity_date)} />
+              <LabelValue
+                label="Amortization Term"
+                value={
+                  record.amortization_term != null ? record.amortization_term + " years" : "—"
+                }
+              />
+              <LabelValue
+                label="Balloon Payment"
+                value={formatBool(record.balloon_payment)}
+                badge={balloonBadge}
+              />
+              {record.balloon_payment && (
+                <LabelValue label="Balloon Date" value={formatDate(record.balloon_date)} />
+              )}
+              <LabelValue label="Mortgage Notes" value={record.mortgage_notes ?? "—"} />
+            </div>
           </div>
 
           <div className="card">
@@ -864,59 +854,128 @@ export function RealEstateModule({ store }: Props) {
           </div>
 
           <div className="card space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="section-title mb-0">Mortgage & Debt</div>
-              <button
-                type="button"
-                onClick={() => setMortgageForms((f) => [...f, emptyMortgageForm()])}
-                className="btn-outline text-[11px]"
-              >
-                + Add Mortgage
-              </button>
+            <div className="section-title mb-0">Mortgage & Debt</div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="metric-label mb-1.5">Mortgage Lender</div>
+                <input
+                  type="text"
+                  value={form.mortgage_lender}
+                  onChange={(e) => setField("mortgage_lender", e.target.value)}
+                  className={INPUT_CLASS}
+                  placeholder="Bank or lender name"
+                />
+              </div>
+              <div>
+                <div className="metric-label mb-1.5">Interest Rate (%)</div>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={form.interest_rate}
+                  onChange={(e) => setField("interest_rate", e.target.value)}
+                  className={INPUT_CLASS}
+                  placeholder="6.25"
+                />
+              </div>
             </div>
 
-            {mortgageForms.map((mortgageForm, i) => (
-              <div key={i} className="card2 grid grid-cols-4 gap-3 items-end">
-                <div>
-                  <div className="metric-label mb-1.5">Lender Name</div>
-                  <input
-                    type="text"
-                    value={mortgageForm.lender_name}
-                    onChange={(e) => setMortgageField(i, "lender_name", e.target.value)}
-                    className={INPUT_CLASS}
-                    placeholder="Bank or lender name"
-                  />
-                </div>
-                <div>
-                  <div className="metric-label mb-1.5">Monthly Payment</div>
-                  <input
-                    type="number"
-                    value={mortgageForm.monthly_payment}
-                    onChange={(e) => setMortgageField(i, "monthly_payment", e.target.value)}
-                    className={INPUT_CLASS}
-                    placeholder="4200"
-                  />
-                </div>
-                <div>
-                  <div className="metric-label mb-1.5">Balance</div>
-                  <input
-                    type="number"
-                    value={mortgageForm.balance}
-                    onChange={(e) => setMortgageField(i, "balance", e.target.value)}
-                    className={INPUT_CLASS}
-                    placeholder="520000"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setMortgageForms((f) => f.filter((_, idx) => idx !== i))}
-                  className="btn-outline text-[11px] text-red-400 border-red-500/20 hover:bg-red-500/10"
-                  disabled={mortgageForms.length <= 1}
-                >
-                  Remove
-                </button>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="metric-label mb-1.5">Original Loan Amount</div>
+                <input
+                  type="number"
+                  value={form.original_loan_amount}
+                  onChange={(e) => setField("original_loan_amount", e.target.value)}
+                  className={INPUT_CLASS}
+                  placeholder="680000"
+                />
               </div>
-            ))}
+              <div>
+                <div className="metric-label mb-1.5">Current Loan Balance</div>
+                <input
+                  type="number"
+                  value={form.current_loan_balance}
+                  onChange={(e) => setField("current_loan_balance", e.target.value)}
+                  className={INPUT_CLASS}
+                  placeholder="520000"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <div className="metric-label mb-1.5">Monthly Mortgage Payment</div>
+                <input
+                  type="number"
+                  value={form.monthly_mortgage_payment}
+                  onChange={(e) => setField("monthly_mortgage_payment", e.target.value)}
+                  className={INPUT_CLASS}
+                  placeholder="4200"
+                />
+              </div>
+              <div>
+                <div className="metric-label mb-1.5">Annual Debt Service</div>
+                <input
+                  type="number"
+                  value={form.annual_debt_service}
+                  onChange={(e) => setField("annual_debt_service", e.target.value)}
+                  className={INPUT_CLASS}
+                  placeholder="50400"
+                />
+              </div>
+              <div>
+                <div className="metric-label mb-1.5">Amortization Term (Years)</div>
+                <input
+                  type="number"
+                  value={form.amortization_term}
+                  onChange={(e) => setField("amortization_term", e.target.value)}
+                  className={INPUT_CLASS}
+                  placeholder="25"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="metric-label mb-1.5">Maturity Date</div>
+                <input
+                  type="date"
+                  value={form.maturity_date}
+                  onChange={(e) => setField("maturity_date", e.target.value)}
+                  className={INPUT_CLASS}
+                />
+              </div>
+              <div>
+                <YesNoToggle
+                  label="Balloon Payment"
+                  value={form.balloon_payment}
+                  onChange={(v) => setField("balloon_payment", v)}
+                />
+              </div>
+            </div>
+
+            {form.balloon_payment && (
+              <div>
+                <div className="metric-label mb-1.5">Balloon Date</div>
+                <input
+                  type="date"
+                  value={form.balloon_date}
+                  onChange={(e) => setField("balloon_date", e.target.value)}
+                  className={INPUT_CLASS}
+                />
+              </div>
+            )}
+
+            <div>
+              <div className="metric-label mb-1.5">Mortgage Notes</div>
+              <textarea
+                value={form.mortgage_notes}
+                onChange={(e) => setField("mortgage_notes", e.target.value)}
+                className={INPUT_CLASS + " min-h-[80px] resize-y"}
+                placeholder="Prepayment penalties, rate adjustments, covenants..."
+              />
+            </div>
           </div>
 
           <div className="card space-y-4">
