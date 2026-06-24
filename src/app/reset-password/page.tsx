@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { INPUT_CLASS } from "@/components/occupancy/shared";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
@@ -38,7 +39,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1E3A1E] dark:bg-[#0d1520] flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0d1520] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="text-[22px] font-bold text-blue-300 mb-1">LaundroCFO</div>
@@ -62,7 +63,7 @@ export default function ResetPasswordPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-blue-500"
+                  className={INPUT_CLASS}
                   placeholder="Min 8 characters"
                 />
               </div>
@@ -73,7 +74,7 @@ export default function ResetPasswordPage() {
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleReset()}
-                  className="w-full bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-blue-500"
+                  className={INPUT_CLASS}
                   placeholder="Confirm password"
                 />
               </div>

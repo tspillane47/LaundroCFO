@@ -1105,7 +1105,7 @@ export default function ReportsPage() {
                 type="text"
                 readOnly
                 value={shareUrl}
-                className="flex-1 bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/[0.08] rounded-lg px-3 py-2 text-[12px] text-slate-300"
+                className="flex-1 bg-[var(--bg-input)] dark:bg-[#1e2a3a] border border-[var(--border2)] dark:border-white/[0.08] rounded-lg px-3 py-2 text-[12px] text-[var(--text-primary)] dark:text-slate-300"
               />
               <button type="button" className="btn-primary text-[12px] px-4" onClick={handleCopyLink}>
                 {copied ? "Copied!" : "Copy"}

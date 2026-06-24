@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase";
 import Link from "next/link";
+import { INPUT_CLASS } from "@/components/occupancy/shared";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -19,7 +20,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1E3A1E] dark:bg-[#0d1520] flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0d1520] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="text-[22px] font-bold text-blue-300 mb-1">LaundroCFO</div>
@@ -39,7 +40,7 @@ export default function ForgotPasswordPage() {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleReset()}
-                  className="w-full bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-blue-500"
+                  className={INPUT_CLASS}
                   placeholder="you@example.com"
                 />
               </div>

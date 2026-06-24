@@ -6,9 +6,9 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { INPUT_CLASS } from "@/components/occupancy/shared";
 
-const inputClass =
-  "w-full bg-[var(--bg-input)] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-[#4a7c59] dark:focus:border-blue-500";
+const inputClass = INPUT_CLASS;
 
 type StoreForm = {
   name: string;
@@ -516,7 +516,7 @@ export default function SettingsPage() {
                       type="checkbox"
                       checked={notifications[key]}
                       onChange={(e) => setNotifications((n) => ({ ...n, [key]: e.target.checked }))}
-                      className="rounded border-white/20 bg-[#1E3A1E] dark:bg-[#1e2a3a]"
+                      className="rounded border-[var(--border2)] dark:border-white/20 bg-[var(--bg-input)] dark:bg-[#1e2a3a]"
                     />
                   </label>
                 ))}

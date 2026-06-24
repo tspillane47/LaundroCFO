@@ -34,7 +34,7 @@ function LineItem({
   badge?: string;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 py-1 text-[12px] border-b border-white/[0.04] last:border-0 min-w-0">
+    <div className="flex items-baseline justify-between gap-3 py-1 text-[12px] border-b border-[var(--border)] last:border-0 min-w-0">
       <span className="text-adaptive-muted truncate" title={label}>{label}</span>
       <span className="flex items-center gap-1.5 shrink-0">
         {badge && (
@@ -50,7 +50,7 @@ function LineItem({
 
 function TotalLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 pt-2 mt-1 border-t border-white/[0.08] min-w-0">
+    <div className="flex items-baseline justify-between gap-3 pt-2 mt-1 border-t border-[var(--border)] min-w-0">
       <span className="text-[12px] font-semibold text-adaptive-secondary truncate" title={label}>{label}</span>
       <span className="text-[13px] font-bold text-adaptive-primary tabular-nums shrink-0 whitespace-nowrap" title={value}>{value}</span>
     </div>
@@ -202,12 +202,12 @@ export function CurrentMonthlyAveragesPanel({
         </div>
       </div>
 
-      <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] px-4 py-1">
+      <div className="rounded-lg bg-[var(--bg-page)] dark:bg-white/[0.03] border border-[var(--border)] dark:border-white/[0.06] px-4 py-1">
         <HeroMetric
           label="Average Monthly EBITDA"
           value={fmtDollar(data.ebitda.monthly)}
           sub={`EBITDA Margin ${fmtPct(data.ebitda.margin * 100)}`}
-          valueClassName="text-green-400"
+          valueClassName="positive"
         />
       </div>
 
@@ -232,7 +232,7 @@ export function CurrentMonthlyAveragesPanel({
         )}
       </div>
 
-      <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] px-4 py-1">
+      <div className="rounded-lg bg-[var(--bg-page)] dark:bg-white/[0.03] border border-[var(--border)] dark:border-white/[0.06] px-4 py-1">
         <HeroMetric
           label="Surplus Cash Flow"
           value={fmtDollar(data.surplusCashFlow)}
@@ -242,7 +242,7 @@ export function CurrentMonthlyAveragesPanel({
       </div>
 
       {data.dscr != null && (
-        <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] px-4 py-1">
+        <div className="rounded-lg bg-[var(--bg-page)] dark:bg-white/[0.03] border border-[var(--border)] dark:border-white/[0.06] px-4 py-1">
           <HeroMetric
             label="Current DSCR (based on active loan terms)"
             value={fmtMultiple(data.dscr)}
@@ -262,7 +262,7 @@ export function CurrentMonthlyAveragesPanel({
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3 pt-1 border-t border-white/[0.06]">
+      <div className="flex items-center justify-between gap-3 pt-1 border-t border-[var(--border)] dark:border-white/[0.06]">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-adaptive-muted mb-1">
             Water KPI

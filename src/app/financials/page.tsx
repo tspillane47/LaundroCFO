@@ -156,13 +156,13 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
   const fmt = formatter ?? ((v: number) => fmtDollar(v));
   return (
-    <div className="bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/10 rounded-lg p-3 text-xs">
-      <div className="text-slate-400 mb-1">{label}</div>
+    <div className="bg-[var(--bg-card)] dark:bg-[#1e2a3a] border border-[var(--border)] dark:border-white/10 rounded-lg p-3 text-xs shadow-sm">
+      <div className="text-[var(--text-secondary)] dark:text-slate-400 mb-1">{label}</div>
       {payload.map((entry) => (
         <div key={entry.name} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full" style={{ background: entry.color }} />
-          <span className="text-slate-300">{entry.name}:</span>
-          <span className="text-slate-100 font-semibold">{fmt(entry.value)}</span>
+          <span className="text-[var(--text-secondary)] dark:text-slate-300">{entry.name}:</span>
+          <span className="text-[var(--text-primary)] dark:text-slate-100 font-semibold">{fmt(entry.value)}</span>
         </div>
       ))}
     </div>
@@ -844,8 +844,8 @@ export default function FinancialsPage() {
                             isSelected
                               ? "bg-blue-600/20 border-blue-500/40 text-blue-300"
                               : hasData
-                                ? "bg-[#1E3A1E] dark:bg-[#243347] border-white/10 text-slate-300 hover:border-blue-500/30"
-                                : "bg-transparent border-white/[0.06] text-slate-600 hover:text-slate-400"
+                                ? "bg-[var(--bg-page)] dark:bg-[#243347] border-[var(--border2)] dark:border-white/10 text-[var(--text-primary)] dark:text-slate-300 hover:border-blue-500/30"
+                                : "bg-transparent border-[var(--border)] dark:border-white/[0.06] text-[var(--text-secondary)] dark:text-slate-600 hover:text-[var(--text-primary)] dark:hover:text-slate-400"
                           )}
                         >
                           {label}
@@ -961,7 +961,7 @@ export default function FinancialsPage() {
                   </tr>
                 ))}
                 {yearTotals && (
-                  <tr className="font-semibold bg-[#1E3A1E]/50 dark:bg-[#243347]/50">
+                  <tr className="font-semibold bg-[var(--bg-page)] dark:bg-[#243347]/50">
                     <td className="py-3 pr-3 text-slate-100">Total</td>
                     <td className="py-3 pr-3 text-right tabular-nums">{fmtDollar(yearTotals.revenue)}</td>
                     <td className="py-3 pr-3 text-right tabular-nums text-red-400">

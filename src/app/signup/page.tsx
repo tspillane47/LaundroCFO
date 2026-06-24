@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase";
 import Link from "next/link";
+import { INPUT_CLASS } from "@/components/occupancy/shared";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -50,7 +51,7 @@ export default function SignupPage() {
 
   if (pending) {
     return (
-      <div className="min-h-screen bg-[#1E3A1E] dark:bg-[#0d1520] flex items-center justify-center px-4">
+      <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0d1520] flex items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
           <div className="text-[64px] mb-6">✉️</div>
           <h1 className="text-[28px] font-bold text-slate-100 mb-3">Check your email</h1>
@@ -93,7 +94,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1E3A1E] dark:bg-[#0d1520] flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0d1520] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="text-[22px] font-bold text-blue-300 mb-1">LaundroCFO</div>
@@ -111,7 +112,7 @@ export default function SignupPage() {
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-blue-500"
+              className={INPUT_CLASS}
               placeholder="you@example.com"
             />
           </div>
@@ -122,7 +123,7 @@ export default function SignupPage() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSignup()}
-              className="w-full bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-blue-500"
+              className={INPUT_CLASS}
               placeholder="Min 8 characters"
             />
           </div>

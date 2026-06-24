@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormBanner } from "@/components/ui/FormBanner";
-import { preventEnterSubmit } from "@/components/occupancy/shared";
+import { preventEnterSubmit, INPUT_CLASS } from "@/components/occupancy/shared";
 
 function EditStoreForm() {
   const router = useRouter();
@@ -30,8 +30,7 @@ function EditStoreForm() {
     avg_machine_age: "",
   });
 
-  const inputClass =
-    "w-full bg-[var(--bg-input)] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-[#4a7c59] dark:focus:border-blue-500";
+  const inputClass = INPUT_CLASS;
 
   function set(field: string, value: string) {
     setForm((f) => ({ ...f, [field]: value }));

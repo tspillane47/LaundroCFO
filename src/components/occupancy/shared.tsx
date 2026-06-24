@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from "react";
 
 export const INPUT_CLASS =
-  "w-full bg-[var(--bg-input)] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-[#4a7c59] dark:focus:border-blue-500";
+  "w-full bg-[var(--bg-input)] border border-[var(--border2)] rounded-lg px-3 py-2.5 text-[13px] text-[var(--text-primary)] outline-none focus:border-[#1a2b3c] dark:border-white/10 dark:text-slate-100 dark:focus:border-blue-500";
 
 export function preventEnterSubmit(e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) {
   if (e.key === "Enter") {
@@ -46,12 +46,12 @@ export function LabelValue({
   badge?: string;
 }) {
   return (
-    <div className="flex items-center justify-between py-2.5 text-[13px] border-b border-white/[0.04] last:border-b-0">
-      <span className="text-slate-400">{label}</span>
+    <div className="flex items-center justify-between py-2.5 text-[13px] border-b border-[var(--border)] last:border-b-0">
+      <span className="text-[var(--text-secondary)]">{label}</span>
       {badge ? (
         <span className={`badge ${badge}`}>{value}</span>
       ) : (
-        <span className="font-semibold text-slate-100 text-right max-w-[60%]">{value}</span>
+        <span className="font-semibold text-[var(--text-primary)] text-right max-w-[60%]">{value}</span>
       )}
     </div>
   );
@@ -76,7 +76,7 @@ export function YesNoToggle({
           className={
             value
               ? "flex-1 py-2 rounded-lg text-[13px] font-semibold bg-blue-600/20 border border-blue-500/40 text-blue-300"
-              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/10 text-slate-400 hover:border-white/20"
+              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[var(--bg-input)] dark:bg-[#1e2a3a] border border-[var(--border2)] dark:border-white/10 text-[var(--text-secondary)] dark:text-slate-400 hover:border-[var(--border)] dark:hover:border-white/20"
           }
         >
           Yes
@@ -87,7 +87,7 @@ export function YesNoToggle({
           className={
             !value
               ? "flex-1 py-2 rounded-lg text-[13px] font-semibold bg-blue-600/20 border border-blue-500/40 text-blue-300"
-              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/10 text-slate-400 hover:border-white/20"
+              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[var(--bg-input)] dark:bg-[#1e2a3a] border border-[var(--border2)] dark:border-white/10 text-[var(--text-secondary)] dark:text-slate-400 hover:border-[var(--border)] dark:hover:border-white/20"
           }
         >
           No

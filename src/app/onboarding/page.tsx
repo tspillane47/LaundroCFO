@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { FormBanner } from "@/components/ui/FormBanner";
-import { preventEnterSubmit } from "@/components/occupancy/shared";
+import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 
 const STORAGE_KEY = "laundrocfo_onboarding";
 const VALUATION_MULTIPLE = 3.47;
@@ -79,11 +79,9 @@ const FEATURES = [
   { icon: "🛡️", label: "Insurance" },
 ];
 
-const inputClass =
-  "w-full bg-[var(--bg-input)] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-[#4a7c59] dark:focus:border-blue-500";
+const inputClass = INPUT_CLASS;
 
-const largeInputClass =
-  "w-full bg-[var(--bg-input)] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-[#4a7c59] dark:focus:border-blue-500";
+const largeInputClass = INPUT_CLASS;
 
 function parseDate(value: string): Date | null {
   if (!value) return null;
@@ -314,7 +312,7 @@ export default function OnboardingPage() {
 
   if (!hydrated) {
     return (
-      <div className="min-h-screen bg-[#1E3A1E] dark:bg-[#0f1e3d] flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0f1e3d] flex items-center justify-center">
         <div className="text-slate-400 text-[13px]">Loading...</div>
       </div>
     );
@@ -323,7 +321,7 @@ export default function OnboardingPage() {
   const progressPct = (data.step / TOTAL_STEPS) * 100;
 
   return (
-    <div className="min-h-screen bg-[#1E3A1E] dark:bg-[#0f1e3d] flex flex-col">
+    <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0f1e3d] flex flex-col">
       {/* Progress bar */}
       <div className="w-full h-1 bg-white/10 flex-shrink-0">
         <div
@@ -367,10 +365,10 @@ export default function OnboardingPage() {
                 {FEATURES.map((f) => (
                   <div
                     key={f.label}
-                    className="rounded-xl p-4 bg-white/5 border border-white/10"
+                    className="rounded-xl p-4 bg-[var(--bg-page)] dark:bg-white/5 border border-[var(--border)] dark:border-white/10"
                   >
                     <div className="text-[28px] mb-2">{f.icon}</div>
-                    <div className="text-[12px] sm:text-[13px] text-slate-300 font-medium">
+                    <div className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] dark:text-slate-300 font-medium">
                       {f.label}
                     </div>
                   </div>
@@ -515,24 +513,24 @@ export default function OnboardingPage() {
                 </div>
 
                 <div className="lg:col-span-2">
-                  <div className="card bg-blue-500/5 border-blue-500/20 sticky top-4">
-                    <div className="text-[13px] font-semibold text-blue-300 mb-4">Based on your numbers:</div>
+                  <div className="card card-info sticky top-4">
+                    <div className="text-[13px] font-semibold text-[var(--text-info)] dark:text-blue-300 mb-4">Based on your numbers:</div>
                     <div className="space-y-3">
                       <div>
                         <div className="text-[11px] text-slate-500 uppercase tracking-wider">Estimated EBITDA</div>
-                        <div className="text-[22px] font-bold text-white">
+                        <div className="text-[22px] font-bold text-[var(--text-primary)] dark:text-white">
                           {fmtDollar(financialPreview.monthlyEbitda)}/mo
                         </div>
                       </div>
                       <div>
                         <div className="text-[11px] text-slate-500 uppercase tracking-wider">Estimated Annual EBITDA</div>
-                        <div className="text-[18px] font-bold text-slate-200">
+                        <div className="text-[18px] font-bold text-[var(--text-primary)] dark:text-slate-200">
                           {fmtDollar(financialPreview.annualEbitda)}
                         </div>
                       </div>
                       <div>
                         <div className="text-[11px] text-slate-500 uppercase tracking-wider">Estimated Store Value</div>
-                        <div className="text-[18px] font-bold text-green-400">
+                        <div className="text-[18px] font-bold positive">
                           {fmtDollar(financialPreview.storeValue)}
                         </div>
                       </div>
@@ -635,12 +633,12 @@ export default function OnboardingPage() {
                 </div>
 
                 <div className="lg:col-span-2">
-                  <div className="card bg-white/5 sticky top-4">
-                    <div className="text-[13px] font-semibold text-slate-200 mb-4">Your Lease Position:</div>
+                  <div className="card sticky top-4">
+                    <div className="text-[13px] font-semibold text-[var(--text-primary)] dark:text-slate-200 mb-4">Your Lease Position:</div>
                     <div className="space-y-3">
                       <div>
                         <div className="text-[11px] text-slate-500 uppercase tracking-wider">Years Remaining</div>
-                        <div className="text-[22px] font-bold text-white">
+                        <div className="text-[22px] font-bold text-[var(--text-primary)] dark:text-white">
                           {data.lease_expiration ? `${leasePreview.years.toFixed(1)} years` : "—"}
                         </div>
                       </div>

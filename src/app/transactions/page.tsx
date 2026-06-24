@@ -1876,7 +1876,7 @@ export default function TransactionsPage() {
         </div>
 
         {showManageRules && (
-          <div className="mb-4 p-4 rounded-lg bg-[#243347]/50 border border-white/[0.06]">
+          <div className="mb-4 p-4 rounded-lg bg-[var(--bg-page)] dark:bg-[#243347]/50 border border-[var(--border)] dark:border-white/[0.06]">
             <div className="text-[13px] font-medium text-adaptive-secondary mb-3">Categorization Rules</div>
             {categorizationRules.length === 0 ? (
               <p className="text-[12px] text-adaptive-muted">

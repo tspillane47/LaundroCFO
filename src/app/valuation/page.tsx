@@ -311,7 +311,7 @@ function PillSelector<T extends string>({
               "px-3 py-1.5 rounded-full text-[12px] font-medium border transition-all",
               value === opt.value
                 ? "bg-blue-500/15 border-blue-500/40 text-blue-300"
-                : "bg-[#1E3A1E] dark:bg-[#1e2a3a] border-white/[0.08] text-slate-400 hover:border-white/20 hover:text-slate-200"
+                : "bg-[var(--bg-input)] dark:bg-[#1e2a3a] border-[var(--border2)] dark:border-white/[0.08] text-[var(--text-secondary)] dark:text-slate-400 hover:border-[var(--border)] dark:hover:border-white/20 hover:text-[var(--text-primary)] dark:hover:text-slate-200"
             )}
           >
             {opt.label}
@@ -735,7 +735,7 @@ export default function ValuationPage() {
       {isOwnerOccupied && realEstateValue > 0 && (
         <div
           className="rounded-xl px-6 py-4"
-          style={{ background: "linear-gradient(135deg, #1E3A1E 0%, #1E3A1E 100%)", border: "1px solid rgba(59,130,246,0.2)" }}
+          style={{ background: "var(--hero-bg)", border: "1px solid rgba(59,130,246,0.2)" }}
         >
           <div style={{ fontSize: '12px', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
             Combined Value (Business + Real Estate)

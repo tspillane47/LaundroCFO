@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
   },
   coverFooter: { fontSize: 9, color: "#64748b", marginTop: 30 },
   sectionHeader: {
-    backgroundColor: "#1E3A1E",
+    backgroundColor: "#1a2b3c",
     color: "white",
     padding: "8 12",
     fontSize: 11,

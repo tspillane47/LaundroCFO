@@ -5,25 +5,25 @@
 
 /* ============ LIGHT MODE (default) ============ */
 :root {
-  --bg-page: #F4F6F9;
-  --bg-card: #1E3A1E;
-  --bg-card2: #1E3A1E;
-  --bg-sidebar: #1E3A1E;
-  --bg-sidebar-hover: #254825;
-  --bg-nav-active: #254825;
-  --bg-input: #1E3A1E;
+  --bg-page: #f4f6f9;
+  --bg-card: #ffffff;
+  --bg-card2: #ffffff;
+  --bg-sidebar: #1a2b3c;
+  --bg-sidebar-hover: #243548;
+  --bg-nav-active: #243548;
+  --bg-input: #ffffff;
   --nav-active-border: transparent;
-  --nav-active-text: #f1f5f9;
-  --text-primary: #111827;
-  --text-secondary: #4B5563;
-  --text-muted: #9CA3AF;
-  --border: rgba(255,255,255,0.08);
-  --border2: rgba(255,255,255,0.12);
-  --accent: #4a7c59;
+  --nav-active-text: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --border: #e2e8f0;
+  --border2: #cbd5e1;
+  --accent: #1a2b3c;
   --card-shadow: 0 1px 2px rgba(0,0,0,0.04);
-  --card-shadow-hover: 0 1px 2px rgba(0,0,0,0.04);
+  --card-shadow-hover: 0 1px 3px rgba(0,0,0,0.08);
   --card-radius: 10px;
-  --hero-bg: linear-gradient(135deg, #1E3A1E 0%, #1E3A1E 100%);
+  --hero-bg: linear-gradient(135deg, #1a2b3c 0%, #243548 100%);
 
   /* Semantic tints */
   --bg-info-tint: #EFF6FF;
@@ -31,9 +31,9 @@
   --bg-warning-tint: #FFFBEB;
   --bg-danger-tint: #FEF2F2;
   --text-info: #1D4ED8;
-  --text-success: #15803D;
+  --text-success: #16a34a;
   --text-warning: #B45309;
-  --text-danger: #B91C1C;
+  --text-danger: #dc2626;
 }
 
 /* ============ DARK MODE ============ */
@@ -93,9 +93,9 @@ html, body {
   .card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: var(--card-radius);
     padding: 20px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    box-shadow: var(--card-shadow);
   }
   .card2 {
     background: var(--bg-card2);
@@ -527,76 +527,54 @@ html, body {
   border-color: rgba(59,130,246,0.3);
 }
 
-/* ============ LIGHT MODE — unified #1E3A1E surfaces ============ */
-:root:not(.dark) .card,
-:root:not(.dark) .card2 {
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  color: #e2e8f0;
-}
-
-:root:not(.dark) .card .metric-label,
-:root:not(.dark) .card2 .metric-label {
-  color: #94a3b8;
-}
-
-:root:not(.dark) .card .metric-value,
-:root:not(.dark) .card .section-title {
-  color: #f1f5f9;
-}
-
-:root:not(.dark) .card .muted {
-  color: #94a3b8;
-}
-
+/* ============ LIGHT MODE — sidebar & dropdown surfaces ============ */
 :root:not(.dark) .app-sidebar {
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.75);
+  --text-muted: rgba(255, 255, 255, 0.55);
+  color: #ffffff;
 }
 
 :root:not(.dark) .app-sidebar .nav-item {
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 :root:not(.dark) .app-sidebar .nav-item:hover,
 :root:not(.dark) .app-sidebar .nav-item-active {
-  color: #f1f5f9;
+  color: #ffffff;
 }
 
 :root:not(.dark) .nav-item-active {
-  background: #254825;
+  background: var(--bg-nav-active);
 }
 
 :root:not(.dark) .nav-item:hover {
-  background: color-mix(in srgb, #254825 50%, transparent);
+  background: color-mix(in srgb, var(--bg-sidebar-hover) 50%, transparent);
 }
 
 :root:not(.dark) .btn-outline:hover {
-  background: #254825;
+  background: var(--bg-page);
 }
 
 :root:not(.dark) .select-tan {
-  background-color: #1E3A1E;
-  color: #f1f5f9;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: #ffffff;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
 }
 
 :root:not(.dark) .select-tan:focus {
-  border-color: #4a7c59;
+  border-color: #1a2b3c;
 }
 
 :root:not(.dark) .select-tan option {
-  background: #1E3A1E;
-  color: #f1f5f9;
+  background: #ffffff;
+  color: #0f172a;
 }
 
 :root:not(.dark) .surface-panel {
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  background: #1E3A1E;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .dark .hero-value-card {

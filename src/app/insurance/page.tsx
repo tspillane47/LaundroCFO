@@ -407,7 +407,7 @@ function ToggleField({
         onClick={() => onChange(!value)}
         className={clsx(
           "relative w-10 h-5 rounded-full transition-colors",
-          value ? "bg-blue-600" : "bg-[#1E3A1E] dark:bg-[#243347]"
+          value ? "bg-blue-600" : "bg-[var(--border)] dark:bg-[#243347]"
         )}
       >
         <span
@@ -1141,7 +1141,7 @@ export default function InsurancePage() {
                         type="checkbox"
                         checked={policyForm[key] as boolean}
                         onChange={(e) => updatePolicyForm(key, e.target.checked as PolicyForm[typeof key])}
-                        className="rounded border-white/20 bg-[#1E3A1E] dark:bg-[#1e2a3a] text-blue-500"
+                        className="rounded border-[var(--border2)] dark:border-white/20 bg-[var(--bg-input)] dark:bg-[#1e2a3a] text-blue-500"
                       />
                       {label}
                     </label>

@@ -95,13 +95,13 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-[#1e2a3a] border border-white/10 rounded-lg p-3 text-xs">
-      <div className="text-slate-400 mb-1">{label}</div>
+    <div className="bg-[var(--bg-card)] dark:bg-[#1e2a3a] border border-[var(--border)] dark:border-white/10 rounded-lg p-3 text-xs shadow-sm">
+      <div className="text-[var(--text-secondary)] dark:text-slate-400 mb-1">{label}</div>
       {payload.map((entry) => (
         <div key={entry.name} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full" style={{ background: entry.color }} />
-          <span className="text-slate-300">{entry.name}:</span>
-          <span className="text-slate-100 font-semibold">{fmtDollar(entry.value)}</span>
+          <span className="text-[var(--text-secondary)] dark:text-slate-300">{entry.name}:</span>
+          <span className="text-[var(--text-primary)] dark:text-slate-100 font-semibold">{fmtDollar(entry.value)}</span>
         </div>
       ))}
     </div>

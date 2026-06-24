@@ -390,7 +390,7 @@ export default function EquipmentPage() {
                 {metrics.ageBuckets.map((bucket) => (
                   <div key={bucket.label} className="flex items-center gap-3 py-3">
                     <div className="text-[12px] text-slate-400 w-28 flex-shrink-0">{bucket.label}</div>
-                    <div className="flex-1 h-2 bg-[#1E3A1E] dark:bg-[#243347] rounded-full overflow-hidden">
+                    <div className="flex-1 h-2 bg-[var(--border)] dark:bg-[#243347] rounded-full overflow-hidden">
                       <div
                         className={clsx("h-full rounded-full transition-all", bucket.color)}
                         style={{ width: `${Math.max(bucket.pct, bucket.count > 0 ? 2 : 0)}%` }}
@@ -564,7 +564,7 @@ export default function EquipmentPage() {
                         type="checkbox"
                         checked={form.high_speed_extract}
                         onChange={(e) => updateForm("high_speed_extract", e.target.checked)}
-                        className="rounded border-white/20 bg-[#1E3A1E] dark:bg-[#1e2a3a]"
+                        className="rounded border-[var(--border2)] dark:border-white/20 bg-[var(--bg-input)] dark:bg-[#1e2a3a]"
                       />
                       <label htmlFor="high_speed_extract" className="text-[13px] text-slate-300">
                         High Speed Extract (200G+)
@@ -654,7 +654,7 @@ export default function EquipmentPage() {
                   <span>0.00x</span>
                   <span>+0.60x</span>
                 </div>
-                <div className="relative h-2 bg-[#1E3A1E] dark:bg-[#243347] rounded-full">
+                <div className="relative h-2 bg-[var(--border)] dark:bg-[#243347] rounded-full">
                   <div className="absolute inset-y-0 left-1/2 w-px bg-white/20" />
                   <div
                     className={clsx(
@@ -694,7 +694,7 @@ export default function EquipmentPage() {
                   <span className="text-slate-400">200G Washers</span>
                   <span className="font-semibold text-slate-200">{metrics.pct200GWashers.toFixed(0)}%</span>
                 </div>
-                <div className="h-1.5 bg-[#1E3A1E] dark:bg-[#243347] rounded-full overflow-hidden">
+                <div className="h-1.5 bg-[var(--border)] dark:bg-[#243347] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full bg-green-500"
                     style={{ width: `${Math.min(100, metrics.pct200GWashers)}%` }}
@@ -706,7 +706,7 @@ export default function EquipmentPage() {
                   <span className="text-slate-400">Under 10 Years</span>
                   <span className="font-semibold text-slate-200">{metrics.pctUnder10Years.toFixed(0)}%</span>
                 </div>
-                <div className="h-1.5 bg-[#1E3A1E] dark:bg-[#243347] rounded-full overflow-hidden">
+                <div className="h-1.5 bg-[var(--border)] dark:bg-[#243347] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full bg-blue-500"
                     style={{ width: `${Math.min(100, metrics.pctUnder10Years)}%` }}

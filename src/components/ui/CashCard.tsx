@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { INPUT_CLASS } from "@/components/occupancy/shared";
 
 interface CashCardProps {
   store: any;
@@ -36,7 +37,7 @@ export function CashCard({ store, onUpdate }: CashCardProps) {
     setEditing(false);
   }
 
-  const inputClass = "w-full bg-[var(--bg-input)] border border-white/10 rounded-md px-3 py-2 text-[13px] text-slate-100 outline-none focus:border-[#4a7c59] dark:focus:border-blue-500";
+  const inputClass = INPUT_CLASS;
 
   const lastUpdated = store?.cash_last_updated
     ? new Date(store.cash_last_updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })

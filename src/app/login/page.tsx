@@ -3,6 +3,7 @@ import { useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { INPUT_CLASS } from "@/components/occupancy/shared";
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -26,7 +27,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1E3A1E] dark:bg-[#0d1520] flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0d1520] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="text-[22px] font-bold text-blue-300 mb-1">LaundroCFO</div>
@@ -54,7 +55,7 @@ function LoginForm() {
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-blue-500"
+              className={INPUT_CLASS}
               placeholder="you@example.com"
             />
           </div>
@@ -65,7 +66,7 @@ function LoginForm() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleLogin()}
-              className="w-full bg-[#1E3A1E] dark:bg-[#1e2a3a] border border-white/10 rounded-lg px-3 py-2.5 text-[13px] text-slate-100 outline-none focus:border-blue-500"
+              className={INPUT_CLASS}
               placeholder="••••••••"
             />
           </div>
@@ -79,7 +80,7 @@ function LoginForm() {
           <div className="flex justify-between text-[12px] text-slate-500 pt-1">
             <Link href="/forgot-password" className="hover:text-slate-300">Forgot password?</Link>
           </div>
-          <div className="text-center pt-2 border-t border-white/[0.06]">
+          <div className="text-center pt-2 border-t border-[var(--border)]">
             <Link href="/signup" className="text-[13px] text-blue-400 hover:text-blue-300 font-medium">
               Don&apos;t have an account? Sign up free →
             </Link>
@@ -93,7 +94,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#1E3A1E] dark:bg-[#0d1520] flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0d1520] flex items-center justify-center">
         <div className="text-slate-500 text-[13px]">Loading...</div>
       </div>
     }>

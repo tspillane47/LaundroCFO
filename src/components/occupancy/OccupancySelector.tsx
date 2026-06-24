@@ -55,11 +55,11 @@ export function OccupancySelector({ saving, onSelect }: Props) {
               "card2 text-left p-6 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
               hovered === opt.type
                 ? "border-blue-500/40 bg-blue-500/5"
-                : "hover:border-white/20 hover:bg-white/[0.02]"
+                : "hover:border-[var(--border2)] dark:hover:border-white/20 hover:bg-[var(--bg-page)] dark:hover:bg-white/[0.02]"
             )}
           >
             <div className="text-2xl mb-3">{opt.emoji}</div>
-            <div className="text-[14px] font-semibold text-slate-100 mb-1.5">{opt.title}</div>
+            <div className="text-[14px] font-semibold text-[var(--text-primary)] dark:text-slate-100 mb-1.5">{opt.title}</div>
             <p className="text-[12px] text-slate-500 leading-relaxed">{opt.description}</p>
           </button>
         ))}

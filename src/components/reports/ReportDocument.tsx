@@ -33,7 +33,7 @@ export interface ReportProps {
 
 const styles = StyleSheet.create({
   page: { backgroundColor: "#F8FAFC", padding: 40, fontFamily: "Helvetica" },
-  coverPage: { backgroundColor: "#1E3A1E", padding: 50, height: "100%" },
+  coverPage: { backgroundColor: "#1a2b3c", padding: 50, height: "100%" },
   coverTitle: {
     color: "white",
     fontSize: 30,
@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
   coverSubtitle: { color: "#93c5fd", fontSize: 16, marginBottom: 40 },
   coverMeta: { color: "#94a3b8", fontSize: 12, marginTop: 8 },
   sectionHeader: {
-    backgroundColor: "#1E3A1E",
+    backgroundColor: "#1a2b3c",
     color: "white",
     padding: "8 12",
     fontSize: 11,
