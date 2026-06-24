@@ -13,6 +13,34 @@ export type EquipmentRecord = {
   high_speed_extract: boolean | null;
   condition: MachineCondition;
   notes: string | null;
+  avg_vend_price: number | null;
+};
+
+export const DEFAULT_DRYER_REVENUE_PCT = 35;
+
+export type TurnsPerDayBySize = {
+  size: string;
+  quantity: number;
+  avgVendPrice: number;
+  turnsPerDay: number;
+};
+
+export type TurnsPerDayResult = {
+  washerRevenue: number;
+  dryerRevenue: number;
+  totalSelfServiceRevenue: number;
+  dryerRevenuePct: number;
+  overallTurnsPerDay: number | null;
+  bySize: TurnsPerDayBySize[];
+  missingVendPrices: boolean;
+  weightedAvgVendPrice: number | null;
+};
+
+export type ComputeEquipmentMetricsOptions = {
+  /** Trailing self-service revenue total (sum of monthly_financials.self_service_revenue). */
+  selfServiceTtmRevenue?: number;
+  /** Dryer revenue as % of washer revenue (e.g. 35 for 35%). */
+  dryerRevenuePct?: number | null;
 };
 
 export const MANUFACTURERS = [
@@ -73,6 +101,8 @@ export type EquipmentMetrics = {
   bonus200GAdjustment: number;
   totalEquipmentAdjustment: number;
   estimatedReplacementValue: number;
+  /** Present when self-service TTM revenue is supplied to computeEquipmentMetrics. */
+  turns?: TurnsPerDayResult | null;
 };
 
 function getBaseEquipmentAdjustment(avgAge: number): number {
@@ -116,9 +146,114 @@ export function getEquipmentGrade(score: number): "A" | "B" | "C" | "D" {
   return "D";
 }
 
+/** Convert stored dryer_revenue_pct (whole number, e.g. 35) to decimal ratio (0.35). */
+export function normalizeDryerRevenuePct(pct: number | null | undefined): number {
+  const value = pct ?? DEFAULT_DRYER_REVENUE_PCT;
+  return value / 100;
+}
+
+export function computeWeightedAvgVendPrice(
+  equipment: Pick<EquipmentRecord, "machine_type" | "quantity" | "avg_vend_price">[]
+): number | null {
+  const washers = equipment.filter((e) => e.machine_type === "Washer");
+  let weightedSum = 0;
+  let totalQty = 0;
+
+  for (const item of washers) {
+    if (item.avg_vend_price == null || item.avg_vend_price <= 0) continue;
+    weightedSum += item.quantity * item.avg_vend_price;
+    totalQty += item.quantity;
+  }
+
+  return totalQty > 0 ? weightedSum / totalQty : null;
+}
+
+export function turnsPerDayColor(turns: number): string {
+  if (turns < 3) return "text-red-400";
+  if (turns <= 4.5) return "text-amber-400";
+  return "text-green-400";
+}
+
+export function computeTurnsPerDay(
+  equipment: EquipmentRecord[],
+  selfServiceTtmRevenue: number,
+  dryerRevenuePct: number | null | undefined = DEFAULT_DRYER_REVENUE_PCT
+): TurnsPerDayResult {
+  const pctDecimal = normalizeDryerRevenuePct(dryerRevenuePct);
+  const pctDisplay = pctDecimal * 100;
+  const totalSelfServiceRevenue = selfServiceTtmRevenue;
+  const washerRevenue =
+    totalSelfServiceRevenue > 0 ? totalSelfServiceRevenue / (1 + pctDecimal) : 0;
+  const dryerRevenue = washerRevenue * pctDecimal;
+
+  const washerGroups = equipment.filter((e) => e.machine_type === "Washer");
+  const missingVendPrices = washerGroups.some(
+    (e) => e.avg_vend_price == null || e.avg_vend_price <= 0
+  );
+
+  const totalWeightedVendCapacity = washerGroups.reduce((sum, item) => {
+    if (item.avg_vend_price == null || item.avg_vend_price <= 0) return sum;
+    return sum + item.quantity * item.avg_vend_price;
+  }, 0);
+
+  const annualVendCapacityAtOneTurn = totalWeightedVendCapacity * 365;
+  const overallTurnsPerDay =
+    !missingVendPrices &&
+    washerGroups.length > 0 &&
+    annualVendCapacityAtOneTurn > 0 &&
+    washerRevenue > 0
+      ? washerRevenue / annualVendCapacityAtOneTurn
+      : missingVendPrices || washerGroups.length === 0
+        ? null
+        : 0;
+
+  const sizeMap = new Map<string, { quantity: number; weightedPriceSum: number }>();
+  for (const item of washerGroups) {
+    if (item.avg_vend_price == null || item.avg_vend_price <= 0) continue;
+    const existing = sizeMap.get(item.machine_size) ?? { quantity: 0, weightedPriceSum: 0 };
+    existing.quantity += item.quantity;
+    existing.weightedPriceSum += item.quantity * item.avg_vend_price;
+    sizeMap.set(item.machine_size, existing);
+  }
+
+  const bySize: TurnsPerDayBySize[] = [];
+  if (
+    !missingVendPrices &&
+    totalWeightedVendCapacity > 0 &&
+    washerRevenue > 0
+  ) {
+    for (const [size, group] of Array.from(sizeMap.entries())) {
+      const avgVendPrice = group.weightedPriceSum / group.quantity;
+      const groupShare = (group.quantity * avgVendPrice) / totalWeightedVendCapacity;
+      const groupAnnualCapacity = group.quantity * avgVendPrice * 365;
+      const turnsPerDay =
+        groupAnnualCapacity > 0 ? (washerRevenue * groupShare) / groupAnnualCapacity : 0;
+      bySize.push({
+        size,
+        quantity: group.quantity,
+        avgVendPrice,
+        turnsPerDay,
+      });
+    }
+    bySize.sort((a, b) => a.size.localeCompare(b.size));
+  }
+
+  return {
+    washerRevenue,
+    dryerRevenue,
+    totalSelfServiceRevenue,
+    dryerRevenuePct: pctDisplay,
+    overallTurnsPerDay,
+    bySize,
+    missingVendPrices,
+    weightedAvgVendPrice: computeWeightedAvgVendPrice(equipment),
+  };
+}
+
 export function computeEquipmentMetrics(
   equipment: EquipmentRecord[],
-  currentYear = new Date().getFullYear()
+  currentYear = new Date().getFullYear(),
+  options?: ComputeEquipmentMetricsOptions
 ): EquipmentMetrics {
   const totalWashers = equipment
     .filter((e) => e.machine_type === "Washer")
@@ -176,7 +311,7 @@ export function computeEquipmentMetrics(
     0
   );
 
-  return {
+  const baseMetrics = {
     totalWashers,
     totalDryers,
     totalMachines,
@@ -221,6 +356,19 @@ export function computeEquipmentMetrics(
     totalEquipmentAdjustment: baseEquipmentAdjustment + bonus200GAdjustment,
     estimatedReplacementValue,
   };
+
+  if (options?.selfServiceTtmRevenue != null) {
+    return {
+      ...baseMetrics,
+      turns: computeTurnsPerDay(
+        equipment,
+        options.selfServiceTtmRevenue,
+        options.dryerRevenuePct
+      ),
+    };
+  }
+
+  return baseMetrics;
 }
 
 export function computeWeightedAvgAge(

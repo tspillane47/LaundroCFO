@@ -39,7 +39,9 @@ import {
   MONTH_NAMES,
   MONTH_SHORT,
   PL_CATEGORY_FIELDS,
+  BANK_IMPORT_CATEGORY_LABELS,
   buildRatioBenchmarks,
+  mapBankCategoryToPlField,
   calcMonthly,
   calcRatios,
   calcTtmMetrics,
@@ -108,6 +110,9 @@ const CATEGORY_LABELS: Record<PlCategoryField, string> = {
   supplies: "Supplies",
   marketing: "Marketing",
   professional_fees: "Professional Fees",
+  software_subscriptions: "Software Subscriptions",
+  cc_processing_fees: "CC Processing Fees",
+  bank_charges: "Bank Charges",
   other_expenses: "Other Expenses",
   debt_service: "Debt Service",
 };
@@ -229,7 +234,8 @@ function parseCSVTransactions(text: string): StagedTransaction[] {
       ? new Date().toISOString().slice(0, 10)
       : parsed.toISOString().slice(0, 10);
 
-    const suggested = suggestTransactionCategory(description);
+    const suggestedRaw = suggestTransactionCategory(description);
+    const suggested = mapBankCategoryToPlField(suggestedRaw) ?? "other_expenses";
     return {
       tempId: `csv-${i}-${Date.now()}`,
       transaction_date,
@@ -1337,14 +1343,23 @@ export default function FinancialsPage() {
                           </select>
                         </td>
                         <td className="py-3 pr-3">
-                          <span className="badge badge-blue text-[10px]">{CATEGORY_LABELS[suggested]}</span>
+                          <span className="badge badge-blue text-[10px]">{BANK_IMPORT_CATEGORY_LABELS[suggested]}</span>
                         </td>
                         <td className="py-3 text-right whitespace-nowrap">
                           <button
                             type="button"
                             className="btn-primary text-[11px] mr-1.5"
                             onClick={() =>
-                              postTransactionToPL({ ...txn, category: txn.category ?? suggested }, false)
+                              postTransactionToPL(
+                                {
+                                  ...txn,
+                                  category:
+                                    (txn.category as PlCategoryField | null) ??
+                                    mapBankCategoryToPlField(suggested) ??
+                                    "other_expenses",
+                                },
+                                false
+                              )
                             }
                           >
                             Post to P&L
