@@ -541,3 +541,17 @@ export function calcOccupancyCost(ratios: FinancialRatios, ttm: TtmMetrics): {
     insurancePct: 0,
   };
 }
+
+export const BANK_IMPORT_CATEGORY_LABELS: Record<string, string> = {
+  income: "Income",
+  utilities: "Utilities",
+  supplies: "Supplies",
+  maintenance: "Maintenance",
+  payroll: "Payroll",
+  rent: "Rent",
+  debt_service: "Debt Service",
+  insurance: "Insurance",
+  taxes: "Taxes",
+  other: "Other",
+  uncategorized: "Uncategorized",
+};
