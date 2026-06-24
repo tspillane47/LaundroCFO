@@ -236,8 +236,7 @@ export default function PortfolioPage() {
       const annualCashFlow = annualEbitda - debtService;
       const dscr = debtService > 0 ? annualCashFlow / debtService : 0;
       const storeValuation = valuationByStoreId.get(store.id);
-      const hasFinancialData = monthlyRevenue > 0;
-      const estimatedValue = hasFinancialData ? (storeValuation?.businessValue ?? 0) : 0;
+      const estimatedValue = storeValuation?.businessValue ?? 0;
       const loanBalance = store.loan_balance ?? 0;
       const storeCash =
         (store.operating_account_balance ?? 0) +

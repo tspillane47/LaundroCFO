@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
-import { getStoreValuation, getStoreDebt } from "@/lib/getStoreValuation";
-import type { ValuationResult } from "@/lib/valuation";
+import { getStoreValuation, getStoreDebt, type StoreValuationResult } from "@/lib/getStoreValuation";
 import {
   calcBuildingEquity,
   calcOccupancyCostRatioFromRent,
@@ -33,15 +32,7 @@ import { CashCard } from "@/components/ui/CashCard";
 import { PageError } from "@/components/ui/PageError";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
-import {
-  financials as demoFinancials,
-  store as demoStore,
-  scores as demoScores,
-  valueTrend as demoValueTrend,
-  DEMO_MONTHLY_REVENUE,
-  DEMO_MONTHLY_EXPENSES,
-  DEMO_ANNUAL_DEBT_SERVICE,
-} from "@/lib/data";
+import { scores as demoScores } from "@/lib/data";
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -154,7 +145,7 @@ export default function DashboardPage() {
   const [insurancePolicies, setInsurancePolicies] = useState<any[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [valuation, setValuation] = useState<(ValuationResult & { store: Record<string, unknown> }) | null>(null);
+  const [valuation, setValuation] = useState<StoreValuationResult | null>(null);
   const [totalDebt, setTotalDebt] = useState(0);
   const supabase = createClient();
 
@@ -304,51 +295,47 @@ export default function DashboardPage() {
     };
   }, [realEstate, store]);
 
-  const revenue = store?.monthly_revenue ?? DEMO_MONTHLY_REVENUE;
-  const expenses = store?.monthly_expenses ?? DEMO_MONTHLY_EXPENSES;
+  const resolvedFinancials = valuation?.resolvedFinancials;
+  const hasFinancialData = (resolvedFinancials?.annualEbitda ?? 0) > 0;
+
+  const revenue = resolvedFinancials?.monthlyRevenue ?? 0;
+  const expenses = resolvedFinancials?.monthlyExpenses ?? 0;
   const ebitda = revenue - expenses;
-  const annualEbitda = ebitda * 12;
-  const debtService = store?.annual_debt_service ?? DEMO_ANNUAL_DEBT_SERVICE;
-  const annualCashFlow = store?.monthly_revenue != null
-    ? annualEbitda - debtService
-    : demoFinancials.cashFlow;
+  const annualEbitda = resolvedFinancials?.annualEbitda ?? 0;
+  const debtService = store?.annual_debt_service ?? 0;
+  const annualCashFlow = hasFinancialData ? annualEbitda - debtService : 0;
   const monthlyCashFlow = annualCashFlow / 12;
   const dscrNum = debtService > 0 ? annualCashFlow / debtService : 0;
   const ebitdaMargin = revenue > 0 ? (ebitda / revenue) * 100 : 0;
   const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
-  const utilities = store?.monthly_utilities ?? 12340;
+  const utilities = store?.monthly_utilities ?? 0;
   const utilityRatio = revenue > 0 ? (utilities / revenue) * 100 : 0;
-  const sqft = store?.square_footage ?? 4450;
+  const sqft = store?.square_footage ?? 0;
   const revenuePerSF = sqft > 0 ? (revenue * 12) / sqft : 0;
-  const avgEquipmentAge = store?.avg_machine_age ?? 6.1;
+  const avgEquipmentAge = store?.avg_machine_age ?? 0;
   const equipmentScore = calcEquipmentScore(avgEquipmentAge);
-  const machines = (store?.washers ?? 28) + (store?.dryers ?? 32);
+  const machines = (store?.washers ?? 0) + (store?.dryers ?? 0);
 
-  const estimatedValue = store?.monthly_revenue != null && valuation
-    ? Math.round(valuation.businessValue)
-    : demoFinancials.estimatedValue;
-  const finalMultiple = store?.monthly_revenue != null && valuation
-    ? valuation.finalMultiple
-    : demoFinancials.valuationMultiple;
+  const estimatedValue =
+    valuation && hasFinancialData ? Math.round(valuation.businessValue) : 0;
+  const finalMultiple = valuation && hasFinancialData ? valuation.finalMultiple : 0;
 
   const totalCash = (storeData?.operating_account_balance ?? 0) + (storeData?.reserve_account_balance ?? 0) + (storeData?.petty_cash ?? 0);
-  const businessValue = store?.monthly_revenue != null && valuation
-    ? Math.round(valuation.businessValue)
-    : demoFinancials.estimatedValue;
+  const businessValue = estimatedValue;
   const equity = businessValue + totalCash - totalDebt;
 
   const valuationTrend = useMemo(
-    () =>
-      store?.monthly_revenue != null
-        ? generateValuationTrend(estimatedValue)
-        : demoValueTrend,
-    [estimatedValue, store?.monthly_revenue]
+    () => (hasFinancialData && estimatedValue > 0 ? generateValuationTrend(estimatedValue) : []),
+    [estimatedValue, hasFinancialData]
   );
   const revenueEbitdaData = useMemo(() => generateRevenueEbitdaData(revenue, ebitda), [revenue, ebitda]);
 
-  const monthlyChange = valuationTrend[11].value - valuationTrend[10].value;
+  const monthlyChange =
+    valuationTrend.length >= 2
+      ? valuationTrend[valuationTrend.length - 1].value - valuationTrend[valuationTrend.length - 2].value
+      : 0;
   const yearChangePct =
-    valuationTrend[0].value > 0
+    valuationTrend.length > 0 && valuationTrend[0].value > 0
       ? ((estimatedValue - valuationTrend[0].value) / valuationTrend[0].value) * 100
       : 0;
 
@@ -1009,9 +996,9 @@ export default function DashboardPage() {
               value: fmtMultiple(finalMultiple),
               tooltip: "Applied to annual EBITDA to estimate store value. Higher multiples reflect better lease, equipment, and market factors.",
             },
-            { label: "Annual EBITDA", value: fmtDollar(store?.monthly_revenue != null ? annualEbitda : demoFinancials.ebitda) },
-            { label: "Annual Revenue", value: fmtDollar(store?.monthly_revenue != null ? revenue * 12 : demoFinancials.annualRevenue) },
-            { label: "NOI", value: fmtDollar(store?.monthly_revenue != null ? annualEbitda - (store?.monthly_rent ?? demoFinancials.monthlyRent) * 12 : demoFinancials.noi) },
+            { label: "Annual EBITDA", value: fmtDollar(annualEbitda) },
+            { label: "Annual Revenue", value: fmtDollar(revenue * 12) },
+            { label: "NOI", value: fmtDollar(hasFinancialData ? annualEbitda - (store?.monthly_rent ?? 0) * 12 : 0) },
             { label: "DSCR", value: `${dscrNum.toFixed(2)}x` },
             { label: "Cash Flow", value: fmtDollar(annualCashFlow) },
           ].map((item) => (

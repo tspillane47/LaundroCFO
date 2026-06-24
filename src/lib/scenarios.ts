@@ -73,8 +73,8 @@ export function buildValuationInputs(
   const monthlyRevenue = overrides.monthlyRevenue ?? (Number(store.monthly_revenue) || 0);
   const monthlyExpenses = overrides.monthlyExpenses ?? (Number(store.monthly_expenses) || 0);
   const equipMetrics = computeEquipmentMetrics(ctx.equipment);
-  const wdfPct = overrides.wdfPct ?? (Number(store.wdf_pct) || 18);
-  const commercialPct = overrides.commercialPct ?? (Number(store.commercial_pct) || 12);
+  const wdfPct = overrides.wdfPct ?? (store.wdf_pct != null ? Number(store.wdf_pct) : 18);
+  const commercialPct = overrides.commercialPct ?? (store.commercial_pct != null ? Number(store.commercial_pct) : 12);
   const pickupDeliveryPct = overrides.pickupDeliveryPct ?? (Number(store.pickup_delivery_pct) || 0);
   const selfServicePct =
     overrides.selfServicePct ??
@@ -145,8 +145,8 @@ export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
   const monthlyRevenue = Number(store.monthly_revenue) || 0;
   const monthlyExpenses = Number(store.monthly_expenses) || 0;
   const annualEbitda = (monthlyRevenue - monthlyExpenses) * 12;
-  const commercialPct = Number(store.commercial_pct) || 12;
-  const wdfPct = Number(store.wdf_pct) || 18;
+  const commercialPct = store.commercial_pct != null ? Number(store.commercial_pct) : 12;
+  const wdfPct = store.wdf_pct != null ? Number(store.wdf_pct) : 18;
   const currentYear = new Date().getFullYear();
 
   const baseline = runValuation(ctx);

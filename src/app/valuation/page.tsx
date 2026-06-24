@@ -33,11 +33,6 @@ import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
-import {
-  DEMO_MONTHLY_REVENUE,
-  DEMO_MONTHLY_EXPENSES,
-  DEMO_ANNUAL_DEBT_SERVICE,
-} from "@/lib/data";
 
 type MarketDensity = "urban" | "suburban" | "average" | "rural";
 type RevenueTrend = "growing" | "stable" | "declining";
@@ -404,10 +399,9 @@ export default function ValuationPage() {
       if (store.retool_investment) setRetoolInvestment(String(store.retool_investment));
       if (store.retool_type) setRetoolType(store.retool_type);
 
-      const revenue = store.monthly_revenue ?? DEMO_MONTHLY_REVENUE;
-      const expenses = store.monthly_expenses ?? DEMO_MONTHLY_EXPENSES;
-      setMonthlyRevenue(revenue);
-      setAnnualEbitda((revenue - expenses) * 12);
+      const { monthlyRevenue, monthlyExpenses, annualEbitda } = valuationResult.resolvedFinancials;
+      setMonthlyRevenue(monthlyRevenue);
+      setAnnualEbitda(annualEbitda);
 
       const ownerOccupied = store.occupancy_type === "owner_occupied";
       setIsOwnerOccupied(ownerOccupied);
@@ -499,6 +493,7 @@ export default function ValuationPage() {
         lease: leaseRow ?? null,
         leaseOptions: leaseOpts ?? [],
         realEstate: reRow ?? null,
+        resolvedFinancials: valuationResult.resolvedFinancials,
       });
 
     } catch {
@@ -560,7 +555,7 @@ export default function ValuationPage() {
   }, [annualEbitda, monthlyRevenue]);
 
   const equipmentGrade = equipMetrics.grade;
-  const annualDebtService = store?.annual_debt_service ?? DEMO_ANNUAL_DEBT_SERVICE;
+  const annualDebtService = store?.annual_debt_service ?? 0;
   const dscr = annualDebtService > 0 ? annualEbitda / annualDebtService : 0;
   const totalCash =
     (store?.operating_account_balance ?? 0) +

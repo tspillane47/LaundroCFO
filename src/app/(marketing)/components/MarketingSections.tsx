@@ -180,9 +180,9 @@ function KnowValueMockup() {
     >
       <div className="grid grid-cols-2 gap-3 mb-4">
         {[
-          { label: "Store Value", value: "$825,000", color: "#4ade80" },
-          { label: "Debt", value: "$320,000", color: "#f87171" },
-          { label: "Equity", value: "$505,000", color: "#60a5fa" },
+          { label: "Store Value", value: "$328,000", color: "#4ade80" },
+          { label: "Debt", value: "$95,000", color: "#f87171" },
+          { label: "Equity", value: "$233,000", color: "#60a5fa" },
           { label: "Multiple", value: "4.1×", color: "#f1f5f9" },
         ].map((m) => (
           <div key={m.label} className="rounded-lg p-2.5" style={{ background: "rgba(30,41,59,0.5)" }}>
@@ -194,7 +194,7 @@ function KnowValueMockup() {
         ))}
       </div>
       <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1">EBITDA</div>
-      <div className="text-[18px] font-bold text-white tabular-nums mb-3">$201,000</div>
+      <div className="text-[18px] font-bold text-white tabular-nums mb-3">$80,000</div>
       <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-2">Equity vs Debt</div>
       <div className="h-3 rounded-full overflow-hidden flex" style={{ background: "rgba(30,41,59,0.8)" }}>
         <div className="h-full rounded-l-full" style={{ width: `${equityPct}%`, background: "linear-gradient(90deg, #1d4ed8, #4ade80)" }} />
@@ -261,8 +261,8 @@ function GrowPortfolioMockup() {
     >
       <div className="space-y-2 mb-4">
         {[
-          { name: "Waterbury Laundromat", value: "$825k", dscr: "1.82×" },
-          { name: "Mountain View Laundry", value: "$1.15M", dscr: "2.05×" },
+          { name: "Waterbury Laundromat", value: "$374k", dscr: "1.62×" },
+          { name: "Mountain View Laundry", value: "$612k", dscr: "1.84×" },
         ].map((store) => (
           <div
             key={store.name}
@@ -282,9 +282,9 @@ function GrowPortfolioMockup() {
         style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(59,130,246,0.2)" }}
       >
         {[
-          { label: "Value", value: "$2.9M" },
-          { label: "Equity", value: "$1.6M" },
-          { label: "Global DSCR", value: "1.86×" },
+          { label: "Value", value: "$986k" },
+          { label: "Equity", value: "$591k" },
+          { label: "Global DSCR", value: "1.74×" },
         ].map((t) => (
           <div key={t.label}>
             <div className="text-[9px] uppercase tracking-wider text-slate-500">{t.label}</div>

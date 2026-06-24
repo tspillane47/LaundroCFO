@@ -1,10 +1,26 @@
 import { createClient } from "@/lib/supabase";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
+import {
+  buildUtilitiesLookup,
+  calcTtmMetrics,
+  enrichMonthlyRecords,
+  sortRecordsDesc,
+  type MonthlyFinancialRecord,
+  type MonthlyUtilityRecord,
+} from "@/lib/financials";
 import { calcValuation, type ValuationInputs, type ValuationResult } from "@/lib/valuation";
+
+export type ResolvedStoreFinancials = {
+  monthlyRevenue: number;
+  monthlyExpenses: number;
+  annualEbitda: number;
+  source: "profile" | "ttm" | "none";
+};
 
 export type StoreValuationResult = ValuationResult & {
   store: Record<string, unknown>;
   context: StoreValuationContext;
+  resolvedFinancials: ResolvedStoreFinancials;
 };
 
 const valuationCache = new Map<string, { result: StoreValuationResult; timestamp: number }>();
@@ -44,7 +60,78 @@ export type StoreValuationContext = {
   lease: Record<string, unknown> | null;
   leaseOptions: Record<string, unknown>[];
   realEstate: Record<string, unknown> | null;
+  resolvedFinancials?: ResolvedStoreFinancials;
 };
+
+export function resolveStoreFinancials(
+  store: Record<string, unknown>,
+  ttm: { ttmRevenue: number; ttmEbitda: number; monthsUsed: number } | null = null
+): ResolvedStoreFinancials {
+  const profileRevenue = Number(store.monthly_revenue) || 0;
+  const profileExpenses = Number(store.monthly_expenses) || 0;
+
+  if (profileRevenue > 0) {
+    return {
+      monthlyRevenue: profileRevenue,
+      monthlyExpenses: profileExpenses,
+      annualEbitda: (profileRevenue - profileExpenses) * 12,
+      source: "profile",
+    };
+  }
+
+  if (ttm && ttm.monthsUsed > 0 && ttm.ttmRevenue > 0) {
+    const monthlyRevenue = ttm.ttmRevenue / ttm.monthsUsed;
+    const monthlyExpenses = (ttm.ttmRevenue - ttm.ttmEbitda) / ttm.monthsUsed;
+    return {
+      monthlyRevenue,
+      monthlyExpenses,
+      annualEbitda: ttm.ttmEbitda,
+      source: "ttm",
+    };
+  }
+
+  return {
+    monthlyRevenue: 0,
+    monthlyExpenses: 0,
+    annualEbitda: 0,
+    source: "none",
+  };
+}
+
+async function fetchStoreTtmMetrics(
+  supabase: ReturnType<typeof createClient>,
+  storeId: string
+): Promise<{ ttmRevenue: number; ttmEbitda: number; monthsUsed: number } | null> {
+  const [{ data: financialsData }, { data: utilitiesData }] = await Promise.all([
+    supabase
+      .from("monthly_financials")
+      .select("*")
+      .eq("store_id", storeId)
+      .order("year", { ascending: false })
+      .order("month", { ascending: false }),
+    supabase
+      .from("monthly_utilities")
+      .select("year, month, water, gas, electric, sewer, trash, internet")
+      .eq("store_id", storeId),
+  ]);
+
+  if (!financialsData?.length) return null;
+
+  const utilitiesLookup = buildUtilitiesLookup((utilitiesData ?? []) as MonthlyUtilityRecord[]);
+  const records = enrichMonthlyRecords(
+    sortRecordsDesc(financialsData as MonthlyFinancialRecord[]),
+    utilitiesLookup
+  );
+  const ttm = calcTtmMetrics(records);
+
+  if (ttm.monthsUsed === 0 || ttm.ttmRevenue <= 0) return null;
+
+  return {
+    ttmRevenue: ttm.ttmRevenue,
+    ttmEbitda: ttm.ttmEbitda,
+    monthsUsed: ttm.monthsUsed,
+  };
+}
 
 export function buildStoreValuationInputs(
   ctx: StoreValuationContext,
@@ -65,18 +152,19 @@ export function buildStoreValuationInputs(
     totalLeaseControl = yearsRemaining + optionYears;
   }
 
-  const monthlyRevenue = Number(store.monthly_revenue) || 0;
-  const monthlyExpenses = Number(store.monthly_expenses) || 0;
-  const wdfPct = Number(store.wdf_pct) || 18;
-  const commercialPct = Number(store.commercial_pct) || 12;
-  const pickupDeliveryPct = Number(store.pickup_delivery_pct) || 0;
+  const resolved = ctx.resolvedFinancials ?? resolveStoreFinancials(store);
+  const monthlyRevenue = resolved.monthlyRevenue;
+  const monthlyExpenses = resolved.monthlyExpenses;
+  const wdfPct = store.wdf_pct != null ? Number(store.wdf_pct) : 18;
+  const commercialPct = store.commercial_pct != null ? Number(store.commercial_pct) : 12;
+  const pickupDeliveryPct = store.pickup_delivery_pct != null ? Number(store.pickup_delivery_pct) : 0;
   const selfServicePct =
     store.self_service_pct != null
       ? Number(store.self_service_pct)
       : Math.max(0, 100 - wdfPct - commercialPct - pickupDeliveryPct);
 
   const base: ValuationInputs = {
-    ebitda: (monthlyRevenue - monthlyExpenses) * 12,
+    ebitda: resolved.annualEbitda,
     monthlyRevenue,
     squareFootage: Number(store.square_footage) || 3500,
     avgEquipmentAge:
@@ -127,38 +215,37 @@ export async function getStoreValuation(
 
   const supabase = createClient();
 
-  const { data: store } = await supabase.from("stores").select("*").eq("id", storeId).single();
-  const { data: lease } = await supabase
-    .from("leases")
-    .select("*")
-    .eq("store_id", storeId)
-    .maybeSingle();
+  const [{ data: store }, { data: lease }, { data: equipment }, { data: realEstate }, ttmMetrics] =
+    await Promise.all([
+      supabase.from("stores").select("*").eq("id", storeId).single(),
+      supabase.from("leases").select("*").eq("store_id", storeId).maybeSingle(),
+      supabase.from("equipment_inventory").select("*").eq("store_id", storeId),
+      supabase.from("real_estate").select("*").eq("store_id", storeId).maybeSingle(),
+      fetchStoreTtmMetrics(supabase, storeId),
+    ]);
+
   const { data: leaseOptions } = await supabase
     .from("lease_options")
     .select("*")
     .eq("lease_id", lease?.id ?? "");
-  const { data: equipment } = await supabase
-    .from("equipment_inventory")
-    .select("*")
-    .eq("store_id", storeId);
-  const { data: realEstate } = await supabase
-    .from("real_estate")
-    .select("*")
-    .eq("store_id", storeId)
-    .maybeSingle();
+
+  const storeRecord = store ?? {};
+  const resolvedFinancials = resolveStoreFinancials(storeRecord, ttmMetrics);
 
   const ctx: StoreValuationContext = {
-    store: store ?? {},
+    store: storeRecord,
     equipment: (equipment ?? []) as EquipmentRecord[],
     lease: lease ?? null,
     leaseOptions: leaseOptions ?? [],
     realEstate: realEstate ?? null,
+    resolvedFinancials,
   };
 
   const result: StoreValuationResult = {
     ...computeStoreValuation(ctx),
-    store: store ?? {},
+    store: storeRecord,
     context: ctx,
+    resolvedFinancials,
   };
 
   valuationCache.set(storeId, { result, timestamp: Date.now() });

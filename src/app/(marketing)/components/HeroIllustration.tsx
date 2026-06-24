@@ -22,11 +22,11 @@ export default function HeroIllustration() {
         {/* Metric cards row */}
         <rect x="60" y="68" width="88" height="52" rx="4" fill="#161f30" stroke="#1e3a5f" strokeWidth="0.75" />
         <text x="68" y="82" fill="#64748b" fontSize="8" fontWeight="500" fontFamily="system-ui, sans-serif">STORE VALUE</text>
-        <text x="68" y="104" fill="#e2e8f0" fontSize="16" fontWeight="700" fontFamily="system-ui, sans-serif">$824,817</text>
+        <text x="68" y="104" fill="#e2e8f0" fontSize="16" fontWeight="700" fontFamily="system-ui, sans-serif">$374,000</text>
 
         <rect x="160" y="68" width="88" height="52" rx="4" fill="#161f30" stroke="#1e3a5f" strokeWidth="0.75" />
         <text x="168" y="82" fill="#64748b" fontSize="8" fontWeight="500" fontFamily="system-ui, sans-serif">EBITDA</text>
-        <text x="168" y="104" fill="#e2e8f0" fontSize="16" fontWeight="700" fontFamily="system-ui, sans-serif">$237,843</text>
+        <text x="168" y="104" fill="#e2e8f0" fontSize="16" fontWeight="700" fontFamily="system-ui, sans-serif">$80,000</text>
 
         <rect x="260" y="68" width="88" height="52" rx="4" fill="#161f30" stroke="#1e3a5f" strokeWidth="0.75" />
         <text x="268" y="82" fill="#64748b" fontSize="8" fontWeight="500" fontFamily="system-ui, sans-serif">DSCR</text>

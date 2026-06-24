@@ -134,7 +134,7 @@ function WashingMachineGauge() {
           className="hero-gauge-value text-[22px] lg:text-[30px] font-bold tabular-nums leading-none mb-1.5"
           style={{ color: "#4ade80", textShadow: "0 0 20px rgba(74,222,128,0.4)" }}
         >
-          <AnimatedNumber value={824817} prefix="$" duration={1500} />
+          <AnimatedNumber value={374000} prefix="$" duration={1500} />
         </span>
         <span className="text-[7px] lg:text-[8px] uppercase tracking-[0.12em] text-slate-500 mb-0.5">
           Current Multiple
@@ -288,9 +288,9 @@ function FloatIcon({ type }: { type: "chart" | "dollar" | "star" | "washer" | "l
 
 export default function HeroDashboard() {
   const kpis = [
-    { label: "Store Value", numericValue: 824817, prefix: "$", decimals: 0, suffix: "", sub: "↗ 12.2%", valueColor: "#4ade80", delay: 0.1 },
-    { label: "EBITDA", numericValue: 237843, prefix: "$", decimals: 0, suffix: "", sub: "↗ 8.7%", valueColor: "#f1f5f9", delay: 0.2 },
-    { label: "DSCR", numericValue: 2.18, prefix: "", decimals: 2, suffix: "x", sub: "↗ 0.18x", valueColor: "#f1f5f9", delay: 0.3 },
+    { label: "Store Value", numericValue: 374000, prefix: "$", decimals: 0, suffix: "", sub: "↗ 8.4%", valueColor: "#4ade80", delay: 0.1 },
+    { label: "EBITDA", numericValue: 80000, prefix: "$", decimals: 0, suffix: "", sub: "↗ 6.2%", valueColor: "#f1f5f9", delay: 0.2 },
+    { label: "DSCR", numericValue: 1.62, prefix: "", decimals: 2, suffix: "x", sub: "↗ 0.12x", valueColor: "#f1f5f9", delay: 0.3 },
     { label: "Store Score", numericValue: 89, prefix: "", decimals: 0, suffix: "/100", sub: "Excellent", valueColor: "#f1f5f9", delay: 0.4 },
   ];
 
@@ -311,7 +311,7 @@ export default function HeroDashboard() {
         icon={<FloatIcon type="dollar" />}
         iconColor="#4ade80"
         label="DSCR"
-        value="2.18x Strong"
+        value="1.62x Strong"
         valueColor="text-emerald-400"
         className="top-[38%] -left-1 lg:-left-6 xl:-left-10 z-20 hide-mobile"
         delay={0.5}
