@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
-import { getStoreValuation, getStoreDebt } from "@/lib/getStoreValuation";
-import type { ValuationResult } from "@/lib/valuation";
+import { getStoreValuation, getStoreDebt, type StoreValuationResult } from "@/lib/getStoreValuation";
 import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
@@ -100,7 +99,7 @@ export default function PortfolioPage() {
   const [deleting, setDeleting] = useState(false);
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [storeValuations, setStoreValuations] = useState<
-    { store: Store; valuation: ValuationResult & { store: Record<string, unknown> } }[]
+    { store: Store; valuation: StoreValuationResult }[]
   >([]);
   const [totalDebt, setTotalDebt] = useState(0);
   const [totalAnnualDebtServiceFromLoans, setTotalAnnualDebtServiceFromLoans] = useState(0);
@@ -219,7 +218,7 @@ export default function PortfolioPage() {
   }, [loadPortfolioData]);
 
   const valuationByStoreId = useMemo(() => {
-    const map = new Map<string, ValuationResult & { store: Record<string, unknown> }>();
+    const map = new Map<string, StoreValuationResult>();
     for (const sv of storeValuations) {
       map.set(sv.store.id, sv.valuation);
     }
@@ -228,15 +227,19 @@ export default function PortfolioPage() {
 
   const storeMetrics = useMemo(() => {
     return (stores as Store[]).map((store) => {
-      const monthlyRevenue = store.monthly_revenue ?? 0;
-      const monthlyExpenses = store.monthly_expenses ?? 0;
+      const storeValuation = valuationByStoreId.get(store.id);
+      const resolved = storeValuation?.resolvedFinancials;
+      const monthlyRevenue = resolved?.monthlyRevenue ?? store.monthly_revenue ?? 0;
+      const monthlyExpenses = resolved?.monthlyExpenses ?? store.monthly_expenses ?? 0;
       const monthlyEbitda = monthlyRevenue - monthlyExpenses;
-      const annualEbitda = monthlyEbitda * 12;
+      const annualEbitda = resolved?.annualEbitda ?? monthlyEbitda * 12;
       const debtService = store.annual_debt_service ?? 0;
       const annualCashFlow = annualEbitda - debtService;
       const dscr = debtService > 0 ? annualCashFlow / debtService : 0;
-      const storeValuation = valuationByStoreId.get(store.id);
-      const estimatedValue = storeValuation?.businessValue ?? 0;
+      const hasFinancialData = resolved
+        ? resolved.source !== "none"
+        : (store.monthly_revenue ?? 0) > 0;
+      const estimatedValue = hasFinancialData ? (storeValuation?.businessValue ?? 0) : 0;
       const loanBalance = store.loan_balance ?? 0;
       const storeCash =
         (store.operating_account_balance ?? 0) +
@@ -266,6 +269,7 @@ export default function PortfolioPage() {
         avgMachineAge,
         storeCash,
         hasDscrWarning: debtService > 0 && dscr < 1.25,
+        hasFinancialData,
       };
     });
   }, [stores, leases, valuationByStoreId]);
@@ -555,7 +559,7 @@ export default function PortfolioPage() {
           style={{ animationDelay: "0.1s" }}
           label="Annual EBITDA"
           value={<AnimatedNumber value={aggregates.totalAnnualEbitda} prefix="$" duration={1000} />}
-          sub={`${aggregates.ebitdaMargin.toFixed(1)}% margin`}
+          sub={aggregates.totalAnnualRevenue > 0 ? `${aggregates.ebitdaMargin.toFixed(1)}% margin` : undefined}
         />
 
         <KpiCard
@@ -794,7 +798,9 @@ export default function PortfolioPage() {
         <p className="text-[11px] mb-2" style={{ color: "var(--text-muted)" }}>
           Based on 12% cap rate assumption. Actual capacity depends on lender terms.
         </p>
-        <p className="text-[13px] mb-4" style={{ color: "var(--text-secondary)" }}>{acquisitionMessage}</p>
+        <p className="text-[13px] mb-4" style={{ color: "var(--text-secondary)" }}>
+          {aggregates.hasDebtData ? acquisitionMessage : "Add debt data to assess acquisition readiness."}
+        </p>
         <Link href="/scenarios" className="btn-primary inline-flex text-[13px]">
           Run Scenarios →
         </Link>

@@ -39,19 +39,22 @@ function calcYearsRemaining(endDate: string | null | undefined): number {
 }
 
 function normalizeMarketDensity(raw: string | null | undefined): string {
-  const v = (raw ?? "average").toLowerCase();
+  if (!raw) return "";
+  const v = raw.toLowerCase();
   if (v === "urban" || v === "dense_urban" || v === "prime_dense_urban") return "urban";
   if (v === "suburban" || v === "strong_suburban") return "suburban";
   if (v === "rural") return "rural";
-  return "average";
+  return "";
 }
 
 function normalizeStoreCondition(raw: string | null | undefined): string {
-  const v = (raw ?? "fair").toLowerCase();
+  if (!raw) return "";
+  const v = raw.toLowerCase();
   if (v === "excellent" || v === "remodeled") return "excellent";
   if (v === "good") return "good";
   if (v === "poor" || v === "needs_renovation") return "poor";
-  return "fair";
+  if (v === "fair") return "fair";
+  return "";
 }
 
 export type StoreValuationContext = {
@@ -142,9 +145,7 @@ export function buildStoreValuationInputs(
   const isOwnerOccupied = store.occupancy_type === "owner_occupied";
 
   let totalLeaseControl = 0;
-  if (isOwnerOccupied) {
-    totalLeaseControl = 15;
-  } else if (lease?.lease_end_date) {
+  if (!isOwnerOccupied && lease?.lease_end_date) {
     const yearsRemaining = calcYearsRemaining(lease.lease_end_date as string);
     const optionYears = leaseOptions
       .filter((o) => o.status === "Available")
@@ -155,24 +156,31 @@ export function buildStoreValuationInputs(
   const resolved = ctx.resolvedFinancials ?? resolveStoreFinancials(store);
   const monthlyRevenue = resolved.monthlyRevenue;
   const monthlyExpenses = resolved.monthlyExpenses;
-  const wdfPct = store.wdf_pct != null ? Number(store.wdf_pct) : 18;
-  const commercialPct = store.commercial_pct != null ? Number(store.commercial_pct) : 12;
+  const hasRevenueMix =
+    store.wdf_pct != null ||
+    store.commercial_pct != null ||
+    store.pickup_delivery_pct != null ||
+    store.self_service_pct != null;
+  const wdfPct = store.wdf_pct != null ? Number(store.wdf_pct) : 0;
+  const commercialPct = store.commercial_pct != null ? Number(store.commercial_pct) : 0;
   const pickupDeliveryPct = store.pickup_delivery_pct != null ? Number(store.pickup_delivery_pct) : 0;
   const selfServicePct =
     store.self_service_pct != null
       ? Number(store.self_service_pct)
-      : Math.max(0, 100 - wdfPct - commercialPct - pickupDeliveryPct);
+      : hasRevenueMix
+        ? Math.max(0, 100 - wdfPct - commercialPct - pickupDeliveryPct)
+        : 0;
 
   const base: ValuationInputs = {
     ebitda: resolved.annualEbitda,
     monthlyRevenue,
-    squareFootage: Number(store.square_footage) || 3500,
+    squareFootage: Number(store.square_footage) || 0,
     avgEquipmentAge:
       equipMetrics.totalMachines > 0
         ? equipMetrics.weightedAvgAge
-        : Number(store.avg_machine_age) || 6,
+        : Number(store.avg_machine_age) || 0,
     pct200G: equipMetrics.pct200GWashers,
-    equipmentScore: equipMetrics.totalMachines > 0 ? equipMetrics.qualityScore : 85,
+    equipmentScore: equipMetrics.totalMachines > 0 ? equipMetrics.qualityScore : 0,
     totalLeaseControl,
     occupancyType: isOwnerOccupied ? "owned" : "leased",
     marketDensity: normalizeMarketDensity(
@@ -182,8 +190,8 @@ export function buildStoreValuationInputs(
     lastRetoolYear: store.last_retool_year ? Number(store.last_retool_year) : undefined,
     retoolInvestment: store.retool_investment ? Number(store.retool_investment) : undefined,
     retoolType: (store.retool_type as string) || undefined,
-    revenueTrend: (store.revenue_trend as string) || "stable",
-    competitionLevel: (store.competition_level as string) || "normal",
+    revenueTrend: (store.revenue_trend as string) ?? "",
+    competitionLevel: (store.competition_level as string) ?? "",
     selfServicePct,
     wdfPct,
     commercialPct,
