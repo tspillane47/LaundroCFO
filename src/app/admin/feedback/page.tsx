@@ -29,28 +29,37 @@ type FeedbackPriority = (typeof PRIORITY_OPTIONS)[number]["value"];
 
 type FeedbackRow = {
   id: string;
-  created_at: string;
+  created_at: string | null;
   email: string | null;
   user_id: string | null;
   store_id: string | null;
   page_url: string | null;
-  type: string;
-  message: string;
-  status: FeedbackStatus;
-  priority: FeedbackPriority;
+  feedback_type: string | null;
+  message: string | null;
+  status: FeedbackStatus | null;
+  priority: FeedbackPriority | null;
 };
+
+const EMPTY = "—";
 
 const feedbackTypeLabels = Object.fromEntries(
   FEEDBACK_TYPES.map((item) => [item.value, item.label])
 ) as Record<string, string>;
 
-function formatFeedbackType(value: string): string {
+function displayText(value: string | null | undefined): string {
+  if (value == null || value === "") return EMPTY;
+  return value;
+}
+
+function formatFeedbackType(value: string | null | undefined): string {
+  if (value == null || value === "") return EMPTY;
   return feedbackTypeLabels[value] ?? value.replace(/_/g, " ");
 }
 
-function formatDate(value: string): string {
+function formatDate(value: string | null | undefined): string {
+  if (!value) return EMPTY;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return EMPTY;
   return date.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
@@ -258,7 +267,7 @@ export default function AdminFeedbackPage() {
                     {formatDate(row.created_at)}
                   </td>
                   <td className="py-3 pr-3" style={{ color: "var(--text-primary)" }}>
-                    {row.email ?? "—"}
+                    {displayText(row.email)}
                   </td>
                   <td className="py-3 pr-3" style={{ color: "var(--text-secondary)" }}>
                     {row.store_id ? storeNames[row.store_id] ?? "Unknown store" : "—"}
@@ -278,17 +287,17 @@ export default function AdminFeedbackPage() {
                     )}
                   </td>
                   <td className="py-3 pr-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                    {formatFeedbackType(row.type)}
+                    {formatFeedbackType(row.feedback_type)}
                   </td>
                   <td
                     className="py-3 pr-3 max-w-[280px] whitespace-pre-wrap"
                     style={{ color: "var(--text-primary)" }}
                   >
-                    {row.message}
+                    {displayText(row.message)}
                   </td>
                   <td className="py-3 pr-3">
                     <select
-                      value={row.status}
+                      value={row.status ?? "new"}
                       onChange={(e) =>
                         void updateRow(row.id, {
                           status: e.target.value as FeedbackStatus,
@@ -306,7 +315,7 @@ export default function AdminFeedbackPage() {
                   </td>
                   <td className="py-3 pr-3">
                     <select
-                      value={row.priority}
+                      value={row.priority ?? "normal"}
                       onChange={(e) =>
                         void updateRow(row.id, {
                           priority: e.target.value as FeedbackPriority,
