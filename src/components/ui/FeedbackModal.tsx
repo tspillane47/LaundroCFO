@@ -91,7 +91,7 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
         email: user.email ?? null,
         store_id: !isAllStores && selectedStore?.id ? selectedStore.id : null,
         page_url: pageUrl,
-        type: feedbackType,
+        feedback_type: feedbackType,
         message: trimmed,
         status: "new",
         priority: "normal",
