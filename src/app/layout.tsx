@@ -9,6 +9,8 @@ import clsx from "clsx";
 import { NavIcon, SunIcon, MoonIcon, ChevronDownIcon, MenuIcon, CloseIcon } from "@/components/ui/NavIcons";
 import { FeedbackModal } from "@/components/ui/FeedbackModal";
 
+const ADMIN_EMAIL = "tuckerspillane7@gmail.com";
+
 const navSections = [
   {
     label: "PORTFOLIO",
@@ -76,6 +78,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const [storeSearch, setStoreSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
   const sidebarStoreRef = useRef<HTMLDivElement>(null);
@@ -91,6 +94,20 @@ function AppShell({ children }: { children: React.ReactNode }) {
     if (dark) document.documentElement.classList.add("dark");
     else document.documentElement.classList.remove("dark");
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!cancelled) {
+        setIsAdminUser(user?.email === ADMIN_EMAIL);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   function toggleTheme() {
     const newDark = !isDark;
@@ -148,6 +165,21 @@ function AppShell({ children }: { children: React.ReactNode }) {
     const q = storeSearch.toLowerCase();
     return activeStores.filter((s) => (s.name ?? "").toLowerCase().includes(q));
   }, [activeStores, storeSearch]);
+
+  const visibleNavSections = useMemo(() => {
+    if (!isAdminUser) return navSections;
+
+    return navSections.map((section) => {
+      if (section.label !== "ACCOUNT") return section;
+      return {
+        ...section,
+        items: [
+          ...section.items,
+          { href: "/admin/feedback", label: "Admin", icon: "admin" },
+        ],
+      };
+    });
+  }, [isAdminUser]);
 
   function renderStoreOption(store: (typeof stores)[0]) {
     const isSelected = !isAllStores && selectedStore?.id === store.id;
@@ -246,7 +278,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto">
-          {navSections.map((section) => (
+          {visibleNavSections.map((section) => (
             <div key={section.label}>
               <div
                 style={{
