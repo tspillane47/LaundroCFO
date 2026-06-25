@@ -8,7 +8,7 @@ import { FEEDBACK_TYPES } from "@/components/ui/FeedbackModal";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
 
-const ADMIN_EMAIL = "tspillane47@gmail.com";
+const ADMIN_EMAIL = "tuckerspillane7@gmail.com";
 
 const STATUS_OPTIONS = [
   { value: "new", label: "New" },
