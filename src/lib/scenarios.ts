@@ -1,4 +1,5 @@
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
+import { resolveStoreFinancials, type ResolvedStoreFinancials } from "@/lib/getStoreValuation";
 import { calcValuation, type ValuationInputs, type ValuationResult } from "@/lib/valuation";
 
 export type ScenarioResult = {
@@ -22,6 +23,7 @@ export type StoreScenarioContext = {
   totalLeaseControl: number;
   isOwnerOccupied: boolean;
   realEstateValue: number;
+  resolvedFinancials?: ResolvedStoreFinancials;
 };
 
 function parseDate(value: string | null | undefined): Date | null {
@@ -70,8 +72,9 @@ export function buildValuationInputs(
   } = {}
 ): ValuationInputs {
   const store = ctx.store;
-  const monthlyRevenue = overrides.monthlyRevenue ?? (Number(store.monthly_revenue) || 0);
-  const monthlyExpenses = overrides.monthlyExpenses ?? (Number(store.monthly_expenses) || 0);
+  const resolved = ctx.resolvedFinancials ?? resolveStoreFinancials(store);
+  const monthlyRevenue = overrides.monthlyRevenue ?? resolved.monthlyRevenue;
+  const monthlyExpenses = overrides.monthlyExpenses ?? resolved.monthlyExpenses;
   const equipMetrics = computeEquipmentMetrics(ctx.equipment);
   const wdfPct = overrides.wdfPct ?? (store.wdf_pct != null ? Number(store.wdf_pct) : 18);
   const commercialPct = overrides.commercialPct ?? (store.commercial_pct != null ? Number(store.commercial_pct) : 12);
@@ -142,8 +145,9 @@ function makeScenario(
 
 export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
   const store = ctx.store;
-  const monthlyRevenue = Number(store.monthly_revenue) || 0;
-  const monthlyExpenses = Number(store.monthly_expenses) || 0;
+  const resolved = ctx.resolvedFinancials ?? resolveStoreFinancials(store);
+  const monthlyRevenue = resolved.monthlyRevenue;
+  const monthlyExpenses = resolved.monthlyExpenses;
   const annualEbitda = (monthlyRevenue - monthlyExpenses) * 12;
   const commercialPct = store.commercial_pct != null ? Number(store.commercial_pct) : 12;
   const wdfPct = store.wdf_pct != null ? Number(store.wdf_pct) : 18;

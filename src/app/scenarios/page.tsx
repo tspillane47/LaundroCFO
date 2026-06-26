@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
+import { fetchStoreTtmMetrics } from "@/lib/financials";
+import { resolveStoreFinancials } from "@/lib/getStoreValuation";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { type EquipmentRecord } from "@/lib/equipment";
@@ -34,25 +36,24 @@ export default function ScenariosPage() {
     setLoadError(false);
 
     try {
-      const { data: storeData, error: storeError } = await supabase
-        .from("stores")
-        .select("*")
-        .eq("id", selectedStore.id)
-        .single();
+      const [
+        { data: storeData, error: storeError },
+        { data: equipmentData, error: equipError },
+        ttmMetrics,
+      ] = await Promise.all([
+        supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
+        supabase.from("equipment_inventory").select("*").eq("store_id", selectedStore.id),
+        fetchStoreTtmMetrics(supabase, selectedStore.id),
+      ]);
 
       if (storeError) throw storeError;
       if (!storeData) throw new Error("Store not found");
+      if (equipError) throw equipError;
 
+      const resolvedFinancials = resolveStoreFinancials(storeData, ttmMetrics);
       const ownerOccupied = storeData.occupancy_type === "owner_occupied";
       let totalLeaseControl = ownerOccupied ? 15 : 0;
       let realEstateValue = 0;
-
-      const { data: equipmentData, error: equipError } = await supabase
-        .from("equipment_inventory")
-        .select("*")
-        .eq("store_id", storeData.id);
-
-      if (equipError) throw equipError;
 
       if (ownerOccupied) {
         const { data: reData, error: reError } = await supabase
@@ -92,6 +93,7 @@ export default function ScenariosPage() {
         totalLeaseControl,
         isOwnerOccupied: ownerOccupied,
         realEstateValue,
+        resolvedFinancials,
       });
     } catch {
       setLoadError(true);
@@ -153,7 +155,11 @@ export default function ScenariosPage() {
     );
   }
 
-  if (!ctx || !selected || (Number(ctx.store.monthly_revenue) || 0) <= 0) {
+  const hasFinancials =
+    ctx?.resolvedFinancials?.source !== "none" &&
+    (ctx?.resolvedFinancials?.monthlyRevenue ?? Number(ctx?.store.monthly_revenue) ?? 0) > 0;
+
+  if (!ctx || !selected || !hasFinancials) {
     return (
       <div className="card text-center py-10">
         <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
