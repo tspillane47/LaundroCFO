@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
-import { getStoreValuation, getStoreDebt, type StoreValuationResult } from "@/lib/getStoreValuation";
+import { getStoreValuation, getStoreDebt, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
 import {
   calcBuildingEquity,
   calcOccupancyCostRatioFromRent,
@@ -242,6 +242,39 @@ export default function DashboardPage() {
     router.push("/dashboard");
   }
 
+  const resolvedFinancials = valuation?.resolvedFinancials;
+  const hasFinancialData = hasMonthlyFinancialRecords(resolvedFinancials);
+
+  const revenue = hasFinancialData ? (resolvedFinancials?.monthlyRevenue ?? 0) : 0;
+  const expenses = hasFinancialData ? (resolvedFinancials?.monthlyExpenses ?? 0) : 0;
+  const ebitda = hasFinancialData ? revenue - expenses : 0;
+  const annualEbitda = hasFinancialData ? (resolvedFinancials?.annualEbitda ?? 0) : 0;
+  const debtService = hasFinancialData ? (store?.annual_debt_service ?? 0) : 0;
+  const annualCashFlow = hasFinancialData ? annualEbitda - debtService : 0;
+  const monthlyCashFlow = hasFinancialData ? annualCashFlow / 12 : 0;
+  const dscrNum = hasFinancialData && debtService > 0 ? annualCashFlow / debtService : 0;
+  const ebitdaMargin = hasFinancialData && revenue > 0 ? (ebitda / revenue) * 100 : 0;
+  const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
+  const utilities = hasFinancialData ? (store?.monthly_utilities ?? 0) : 0;
+  const utilityRatio = hasFinancialData && revenue > 0 ? (utilities / revenue) * 100 : 0;
+  const sqft = store?.square_footage ?? 0;
+  const revenuePerSF = hasFinancialData && sqft > 0 ? (revenue * 12) / sqft : 0;
+  const avgEquipmentAge = store?.avg_machine_age ?? 0;
+  const equipmentScore = calcEquipmentScore(avgEquipmentAge);
+  const machines = (store?.washers ?? 0) + (store?.dryers ?? 0);
+
+  const estimatedValue =
+    valuation && hasFinancialData ? Math.round(valuation.businessValue) : 0;
+  const finalMultiple = valuation && hasFinancialData ? valuation.finalMultiple : 0;
+
+  const totalCash = hasFinancialData
+    ? (storeData?.operating_account_balance ?? 0) +
+      (storeData?.reserve_account_balance ?? 0) +
+      (storeData?.petty_cash ?? 0)
+    : 0;
+  const businessValue = estimatedValue;
+  const equity = hasFinancialData ? businessValue + totalCash - totalDebt : 0;
+
   const leaseMetrics = useMemo(() => {
     if (!lease) return null;
     const yearsRemaining = calcYearsRemaining(lease.lease_end_date);
@@ -254,7 +287,7 @@ export default function DashboardPage() {
       personalGuaranty: lease.personal_guaranty ?? false,
       assignmentRights: lease.assignment_rights ?? null,
       monthlyRent: lease.monthly_rent ?? null,
-      monthlyRevenue: store?.monthly_revenue ?? null,
+      monthlyRevenue: hasFinancialData ? revenue : null,
     });
     const end = parseDate(lease.lease_end_date);
     const expires = end
@@ -269,7 +302,7 @@ export default function DashboardPage() {
       totalControl: yearsRemaining + optionYears,
       expires,
     };
-  }, [lease, leaseOptions, store]);
+  }, [lease, leaseOptions, hasFinancialData, revenue]);
 
   const realEstateMetrics = useMemo(() => {
     if (!realEstate) return null;
@@ -283,7 +316,7 @@ export default function DashboardPage() {
     );
     const occupancyCostRatio = calcOccupancyCostRatioFromRent(
       realEstate.monthly_rent_charged,
-      store?.monthly_revenue ?? null
+      hasFinancialData ? revenue : null
     );
 
     return {
@@ -292,42 +325,16 @@ export default function DashboardPage() {
       ltv,
       occupancyCostRatio,
     };
-  }, [realEstate, store]);
-
-  const resolvedFinancials = valuation?.resolvedFinancials;
-  const hasFinancialData = (resolvedFinancials?.annualEbitda ?? 0) > 0;
-
-  const revenue = resolvedFinancials?.monthlyRevenue ?? 0;
-  const expenses = resolvedFinancials?.monthlyExpenses ?? 0;
-  const ebitda = revenue - expenses;
-  const annualEbitda = resolvedFinancials?.annualEbitda ?? 0;
-  const debtService = store?.annual_debt_service ?? 0;
-  const annualCashFlow = hasFinancialData ? annualEbitda - debtService : 0;
-  const monthlyCashFlow = annualCashFlow / 12;
-  const dscrNum = debtService > 0 ? annualCashFlow / debtService : 0;
-  const ebitdaMargin = revenue > 0 ? (ebitda / revenue) * 100 : 0;
-  const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
-  const utilities = store?.monthly_utilities ?? 0;
-  const utilityRatio = revenue > 0 ? (utilities / revenue) * 100 : 0;
-  const sqft = store?.square_footage ?? 0;
-  const revenuePerSF = sqft > 0 ? (revenue * 12) / sqft : 0;
-  const avgEquipmentAge = store?.avg_machine_age ?? 0;
-  const equipmentScore = calcEquipmentScore(avgEquipmentAge);
-  const machines = (store?.washers ?? 0) + (store?.dryers ?? 0);
-
-  const estimatedValue =
-    valuation && hasFinancialData ? Math.round(valuation.businessValue) : 0;
-  const finalMultiple = valuation && hasFinancialData ? valuation.finalMultiple : 0;
-
-  const totalCash = (storeData?.operating_account_balance ?? 0) + (storeData?.reserve_account_balance ?? 0) + (storeData?.petty_cash ?? 0);
-  const businessValue = estimatedValue;
-  const equity = businessValue + totalCash - totalDebt;
+  }, [realEstate, hasFinancialData, revenue]);
 
   const valuationTrend = useMemo(
     () => (hasFinancialData && estimatedValue > 0 ? generateValuationTrend(estimatedValue) : []),
     [estimatedValue, hasFinancialData]
   );
-  const revenueEbitdaData = useMemo(() => generateRevenueEbitdaData(revenue, ebitda), [revenue, ebitda]);
+  const revenueEbitdaData = useMemo(
+    () => (hasFinancialData ? generateRevenueEbitdaData(revenue, ebitda) : []),
+    [hasFinancialData, revenue, ebitda]
+  );
 
   const monthlyChange =
     valuationTrend.length >= 2
@@ -359,7 +366,7 @@ export default function DashboardPage() {
       });
     }
 
-    if (dscrNum < 1.25) {
+    if (hasFinancialData && dscrNum < 1.25) {
       items.push({
         id: "dscr",
         severity: "urgent",
@@ -370,7 +377,7 @@ export default function DashboardPage() {
       });
     }
 
-    if (utilityRatio > 20) {
+    if (hasFinancialData && utilityRatio > 20) {
       items.push({
         id: "utility",
         severity: "warning",
@@ -403,7 +410,7 @@ export default function DashboardPage() {
       });
     }
 
-    if (monthlyChange > 0) {
+    if (hasFinancialData && monthlyChange > 0) {
       items.push({
         id: "valuation",
         severity: "info",
@@ -417,6 +424,7 @@ export default function DashboardPage() {
     return items;
   }, [
     isOwnerOccupied,
+    hasFinancialData,
     leaseMetrics,
     dscrNum,
     utilityRatio,
@@ -508,7 +516,7 @@ export default function DashboardPage() {
   const benchmarks = [
     {
       label: "EBITDA Margin",
-      value: `${ebitdaMargin.toFixed(1)}%`,
+      value: hasFinancialData ? `${ebitdaMargin.toFixed(1)}%` : "—",
       median: 22,
       storeValue: ebitdaMargin,
       displayMedian: "22%",
@@ -516,7 +524,7 @@ export default function DashboardPage() {
     },
     {
       label: "Revenue/SF",
-      value: `$${revenuePerSF.toFixed(0)}`,
+      value: hasFinancialData ? `$${revenuePerSF.toFixed(0)}` : "—",
       median: 140,
       storeValue: revenuePerSF,
       displayMedian: "$140",
@@ -524,7 +532,7 @@ export default function DashboardPage() {
     },
     {
       label: "DSCR",
-      value: `${dscrNum.toFixed(2)}x`,
+      value: hasFinancialData && debtService > 0 ? `${dscrNum.toFixed(2)}x` : "—",
       median: 1.5,
       storeValue: dscrNum,
       displayMedian: "1.5x",
@@ -532,7 +540,7 @@ export default function DashboardPage() {
     },
     {
       label: "Utility Ratio",
-      value: `${utilityRatio.toFixed(1)}%`,
+      value: hasFinancialData ? `${utilityRatio.toFixed(1)}%` : "—",
       median: 17,
       storeValue: utilityRatio,
       displayMedian: "17%",
@@ -565,19 +573,29 @@ export default function DashboardPage() {
           Estimated Store Value
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
-          <AnimatedNumber value={estimatedValue} prefix="$" className="hero-value-text" duration={1200} />
-          <ValueChangeIndicator value={estimatedValue} />
+          {hasFinancialData ? (
+            <>
+              <AnimatedNumber value={estimatedValue} prefix="$" className="hero-value-text" duration={1200} />
+              <ValueChangeIndicator value={estimatedValue} />
+            </>
+          ) : (
+            <span className="hero-value-text">—</span>
+          )}
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
-          <span style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
-            {monthlyChange >= 0 ? "+" : ""}{fmtDollar(monthlyChange)} this month
-          </span>
-          <span style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
-            {yearChangePct >= 0 ? "+" : ""}{yearChangePct.toFixed(1)}% vs last year
-          </span>
-        </div>
+        {hasFinancialData && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
+            <span style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
+              {monthlyChange >= 0 ? "+" : ""}{fmtDollar(monthlyChange)} this month
+            </span>
+            <span style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
+              {yearChangePct >= 0 ? "+" : ""}{yearChangePct.toFixed(1)}% vs last year
+            </span>
+          </div>
+        )}
         <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', marginTop: '12px', lineHeight: 1.6 }}>
-          Based on {fmtMultiple(finalMultiple)} EBITDA multiple · Equipment grade B · {leaseMetrics ? `${leaseMetrics.yearsRemaining.toFixed(1)}yr lease` : "—"} · {sqft.toLocaleString()} SF
+          {hasFinancialData
+            ? `Based on ${fmtMultiple(finalMultiple)} EBITDA multiple · Equipment grade B · ${leaseMetrics ? `${leaseMetrics.yearsRemaining.toFixed(1)}yr lease` : "—"} · ${sqft.toLocaleString()} SF`
+            : "Add monthly financials to estimate store value."}
         </div>
       </div>
 
@@ -598,16 +616,32 @@ export default function DashboardPage() {
               explanation="Debt Service Coverage Ratio. Measures ability to cover loan payments. Lenders require minimum 1.25x."
             />
           }
-          value={<AnimatedNumber value={dscrNum} decimals={2} suffix="x" duration={1000} />}
+          value={
+            hasFinancialData && debtService > 0 ? (
+              <AnimatedNumber value={dscrNum} decimals={2} suffix="x" duration={1000} />
+            ) : (
+              "—"
+            )
+          }
           sub={
-            dscrNum >= 1.5 ? "Strong coverage" : dscrNum >= 1.25 ? "Adequate" : "Below threshold"
+            !hasFinancialData
+              ? "Add monthly financials"
+              : debtService <= 0
+                ? "Add debt service"
+                : dscrNum >= 1.5
+                  ? "Strong coverage"
+                  : dscrNum >= 1.25
+                    ? "Adequate"
+                    : "Below threshold"
           }
           valueColor={
-            dscrNum >= 1.5
-              ? "var(--text-success)"
-              : dscrNum >= 1.25
-                ? "var(--text-warning)"
-                : "var(--text-danger)"
+            !hasFinancialData || debtService <= 0
+              ? "var(--text-muted)"
+              : dscrNum >= 1.5
+                ? "var(--text-success)"
+                : dscrNum >= 1.25
+                  ? "var(--text-warning)"
+                  : "var(--text-danger)"
           }
         />
 
@@ -620,8 +654,14 @@ export default function DashboardPage() {
               explanation="Earnings Before Interest, Taxes, Depreciation & Amortization. The primary profit metric for laundromat valuation."
             />
           }
-          value={<AnimatedNumber value={ebitdaMargin} decimals={1} suffix="%" duration={1000} />}
-          sub={`${fmtDollar(ebitda)}/mo EBITDA`}
+          value={
+            hasFinancialData ? (
+              <AnimatedNumber value={ebitdaMargin} decimals={1} suffix="%" duration={1000} />
+            ) : (
+              "—"
+            )
+          }
+          sub={hasFinancialData ? `${fmtDollar(ebitda)}/mo EBITDA` : "Add monthly financials"}
         />
 
         <KpiCard
@@ -636,8 +676,14 @@ export default function DashboardPage() {
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.15s" }}
           label="Monthly Cash Flow"
-          value={<AnimatedNumber value={monthlyCashFlow} prefix="$" duration={1000} />}
-          sub={`${fmtDollar(annualCashFlow)}/yr after debt service`}
+          value={
+            hasFinancialData ? (
+              <AnimatedNumber value={monthlyCashFlow} prefix="$" duration={1000} />
+            ) : (
+              "—"
+            )
+          }
+          sub={hasFinancialData ? `${fmtDollar(annualCashFlow)}/yr after debt service` : "Add monthly financials"}
         />
       </div>
 
@@ -653,16 +699,28 @@ export default function DashboardPage() {
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.2s" }}
           label="Business Value"
-          value={<AnimatedNumber value={businessValue} prefix="$" duration={1000} />}
-          sub={`${fmtMultiple(finalMultiple)} EBITDA multiple`}
+          value={
+            hasFinancialData ? (
+              <AnimatedNumber value={businessValue} prefix="$" duration={1000} />
+            ) : (
+              "—"
+            )
+          }
+          sub={hasFinancialData ? `${fmtMultiple(finalMultiple)} EBITDA multiple` : "Add monthly financials"}
         />
 
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.25s" }}
           label="Cash"
-          value={<AnimatedNumber value={totalCash} prefix="$" duration={1000} />}
-          sub="Operating + reserves"
+          value={
+            hasFinancialData ? (
+              <AnimatedNumber value={totalCash} prefix="$" duration={1000} />
+            ) : (
+              "—"
+            )
+          }
+          sub={hasFinancialData ? "Operating + reserves" : "Add monthly financials"}
         />
 
         <KpiCard
@@ -677,9 +735,21 @@ export default function DashboardPage() {
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.35s" }}
           label="Net Equity"
-          value={<AnimatedNumber value={equity} prefix="$" duration={1000} />}
-          sub="Value + cash − debt"
-          valueColor={equity > 0 ? "var(--text-success)" : "var(--text-danger)"}
+          value={
+            hasFinancialData ? (
+              <AnimatedNumber value={equity} prefix="$" duration={1000} />
+            ) : (
+              "—"
+            )
+          }
+          sub={hasFinancialData ? "Value + cash − debt" : "Add monthly financials"}
+          valueColor={
+            hasFinancialData
+              ? equity > 0
+                ? "var(--text-success)"
+                : "var(--text-danger)"
+              : "var(--text-muted)"
+          }
         />
       </div>
 
@@ -692,10 +762,11 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="section-title mb-0">12-Month Valuation Trend</div>
               <div className="text-[20px] font-bold" style={{ color: "var(--accent)" }}>
-                {fmtDollar(estimatedValue)}
+                {hasFinancialData ? fmtDollar(estimatedValue) : "—"}
               </div>
             </div>
             <div className="h-[220px]">
+              {valuationTrend.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={valuationTrend}>
                   <defs>
@@ -729,6 +800,11 @@ export default function DashboardPage() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-[13px]" style={{ color: "var(--text-muted)" }}>
+                  Add monthly financials to see valuation trend.
+                </div>
+              )}
             </div>
           </div>
 
@@ -736,6 +812,7 @@ export default function DashboardPage() {
           <div className="card">
             <div className="section-title">Revenue vs EBITDA</div>
             <div className="h-[220px]">
+              {revenueEbitdaData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={revenueEbitdaData} barGap={4}>
                   <XAxis
@@ -756,6 +833,11 @@ export default function DashboardPage() {
                   <Bar dataKey="ebitda" name="EBITDA" fill="#22c55e" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-[13px]" style={{ color: "var(--text-muted)" }}>
+                  Add monthly financials to see revenue and EBITDA.
+                </div>
+              )}
             </div>
             <div className="flex gap-4 mt-3 text-[11px]" style={{ color: "var(--text-muted)" }}>
               <span className="flex items-center gap-1.5">
@@ -830,7 +912,9 @@ export default function DashboardPage() {
             <div className="section-title">How You Compare</div>
             <div className="space-y-0">
               {benchmarks.map((b) => {
-                const aboveMedian = b.invert ? b.storeValue < b.median : b.storeValue >= b.median;
+                const aboveMedian =
+                  hasFinancialData &&
+                  (b.invert ? b.storeValue < b.median : b.storeValue >= b.median);
                 return (
                   <div
                     key={b.label}
@@ -841,7 +925,13 @@ export default function DashboardPage() {
                     <div className="text-right">
                       <span
                         className="font-semibold tabular-nums"
-                        style={{ color: aboveMedian ? "var(--text-success)" : "var(--text-warning)" }}
+                        style={{
+                          color: !hasFinancialData
+                            ? "var(--text-muted)"
+                            : aboveMedian
+                              ? "var(--text-success)"
+                              : "var(--text-warning)",
+                        }}
                       >
                         {b.value}
                       </span>
@@ -961,6 +1051,7 @@ export default function DashboardPage() {
         {/* Cash Position */}
         <CashCard
           store={storeData}
+          hasFinancialData={hasFinancialData}
           onUpdate={(data) => {
             setStoreData(data);
             setStore(data);
@@ -973,17 +1064,25 @@ export default function DashboardPage() {
         <div className="section-title mb-4">Valuation Summary</div>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {[
-            { label: "Est. Value", value: fmtDollar(estimatedValue) },
+            { label: "Est. Value", value: hasFinancialData ? fmtDollar(estimatedValue) : "—" },
             {
               label: "Multiple",
-              value: fmtMultiple(finalMultiple),
+              value: hasFinancialData ? fmtMultiple(finalMultiple) : "—",
               tooltip: "Applied to annual EBITDA to estimate store value. Higher multiples reflect better lease, equipment, and market factors.",
             },
-            { label: "Annual EBITDA", value: fmtDollar(annualEbitda) },
-            { label: "Annual Revenue", value: fmtDollar(revenue * 12) },
-            { label: "NOI", value: fmtDollar(hasFinancialData ? annualEbitda - (store?.monthly_rent ?? 0) * 12 : 0) },
-            { label: "DSCR", value: `${dscrNum.toFixed(2)}x` },
-            { label: "Cash Flow", value: fmtDollar(annualCashFlow) },
+            { label: "Annual EBITDA", value: hasFinancialData ? fmtDollar(annualEbitda) : "—" },
+            { label: "Annual Revenue", value: hasFinancialData ? fmtDollar(revenue * 12) : "—" },
+            {
+              label: "NOI",
+              value: hasFinancialData
+                ? fmtDollar(annualEbitda - (store?.monthly_rent ?? 0) * 12)
+                : "—",
+            },
+            {
+              label: "DSCR",
+              value: hasFinancialData && debtService > 0 ? `${dscrNum.toFixed(2)}x` : "—",
+            },
+            { label: "Cash Flow", value: hasFinancialData ? fmtDollar(annualCashFlow) : "—" },
           ].map((item) => (
             <div key={item.label}>
               <div className="metric-label">

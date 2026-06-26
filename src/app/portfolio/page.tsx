@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
-import { getStoreValuation, getStoreDebt, type StoreValuationResult } from "@/lib/getStoreValuation";
+import { getStoreValuation, getStoreDebt, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
 import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
@@ -229,22 +229,21 @@ export default function PortfolioPage() {
     return (stores as Store[]).map((store) => {
       const storeValuation = valuationByStoreId.get(store.id);
       const resolved = storeValuation?.resolvedFinancials;
-      const monthlyRevenue = resolved?.monthlyRevenue ?? store.monthly_revenue ?? 0;
-      const monthlyExpenses = resolved?.monthlyExpenses ?? store.monthly_expenses ?? 0;
-      const monthlyEbitda = monthlyRevenue - monthlyExpenses;
-      const annualEbitda = resolved?.annualEbitda ?? monthlyEbitda * 12;
-      const debtService = store.annual_debt_service ?? 0;
-      const annualCashFlow = annualEbitda - debtService;
-      const dscr = debtService > 0 ? annualCashFlow / debtService : 0;
-      const hasFinancialData = resolved
-        ? resolved.source !== "none"
-        : (store.monthly_revenue ?? 0) > 0;
+      const hasFinancialData = hasMonthlyFinancialRecords(resolved);
+      const monthlyRevenue = hasFinancialData ? (resolved?.monthlyRevenue ?? 0) : 0;
+      const monthlyExpenses = hasFinancialData ? (resolved?.monthlyExpenses ?? 0) : 0;
+      const monthlyEbitda = hasFinancialData ? monthlyRevenue - monthlyExpenses : 0;
+      const annualEbitda = hasFinancialData ? (resolved?.annualEbitda ?? 0) : 0;
+      const debtService = hasFinancialData ? (store.annual_debt_service ?? 0) : 0;
+      const annualCashFlow = hasFinancialData ? annualEbitda - debtService : 0;
+      const dscr = hasFinancialData && debtService > 0 ? annualCashFlow / debtService : 0;
       const estimatedValue = hasFinancialData ? (storeValuation?.businessValue ?? 0) : 0;
       const loanBalance = store.loan_balance ?? 0;
-      const storeCash =
-        (store.operating_account_balance ?? 0) +
-        (store.reserve_account_balance ?? 0) +
-        (store.petty_cash ?? 0);
+      const storeCash = hasFinancialData
+        ? (store.operating_account_balance ?? 0) +
+          (store.reserve_account_balance ?? 0) +
+          (store.petty_cash ?? 0)
+        : 0;
       const avgMachineAge = store.avg_machine_age ?? 0;
 
       const isOwnerOccupied = store.occupancy_type === "owner_occupied";
@@ -255,7 +254,9 @@ export default function PortfolioPage() {
           ? calcYearsRemaining(storeLease.lease_end_date)
           : null;
 
-      const healthScore = calcHealthScore(dscr, monthlyRevenue, avgMachineAge, leaseYearsRemaining, loanBalance);
+      const healthScore = hasFinancialData
+        ? calcHealthScore(dscr, monthlyRevenue, avgMachineAge, leaseYearsRemaining, loanBalance)
+        : 0;
 
       return {
         store,
@@ -268,35 +269,29 @@ export default function PortfolioPage() {
         leaseYearsRemaining,
         avgMachineAge,
         storeCash,
-        hasDscrWarning: debtService > 0 && dscr < 1.25,
+        debtService,
+        hasDscrWarning: hasFinancialData && debtService > 0 && dscr < 1.25,
         hasFinancialData,
       };
     });
   }, [stores, leases, valuationByStoreId]);
 
   const aggregates = useMemo(() => {
-    const totalPortfolioValue = storeMetrics.reduce((s, m) => s + m.estimatedValue, 0);
-    const totalAnnualRevenue = storeMetrics.reduce((s, m) => s + m.monthlyRevenue * 12, 0);
-    const totalAnnualEbitda = storeMetrics.reduce((s, m) => s + m.annualEbitda, 0);
-    const totalMonthlyEbitda = totalAnnualEbitda / 12;
-    const totalCash = (stores as Store[]).reduce(
-      (s, store) =>
-        s +
-        (store.operating_account_balance ?? 0) +
-        (store.reserve_account_balance ?? 0) +
-        (store.petty_cash ?? 0),
-      0
-    );
+    const withFinancials = storeMetrics.filter((m) => m.hasFinancialData);
+    const totalPortfolioValue = withFinancials.reduce((s, m) => s + m.estimatedValue, 0);
+    const totalAnnualRevenue = withFinancials.reduce((s, m) => s + m.monthlyRevenue * 12, 0);
+    const totalAnnualEbitda = withFinancials.reduce((s, m) => s + m.annualEbitda, 0);
+    const totalMonthlyEbitda = withFinancials.length > 0 ? totalAnnualEbitda / 12 : 0;
+    const totalCash = withFinancials.reduce((s, m) => s + m.storeCash, 0);
     const totalAnnualDebtService = totalAnnualDebtServiceFromLoans;
-    const totalAnnualCashFlow = totalAnnualEbitda - totalAnnualDebtService;
-    const hasDebtData = totalAnnualDebtServiceFromLoans > 0;
-    const globalDSCR =
-      hasDebtData ? totalAnnualEbitda / totalAnnualDebtService : 0;
+    const hasDebtData = totalAnnualDebtServiceFromLoans > 0 && withFinancials.length > 0;
+    const globalDSCR = hasDebtData ? totalAnnualEbitda / totalAnnualDebtService : 0;
     const portfolioNetWorth = totalPortfolioValue - totalDebt + totalCash;
     const ebitdaMargin = totalAnnualRevenue > 0 ? (totalAnnualEbitda / totalAnnualRevenue) * 100 : 0;
     const availableMonthlyCashFlow = Math.max(0, (totalAnnualEbitda - totalAnnualDebtService) / 12);
     const acquisitionCapacity = (availableMonthlyCashFlow * 12) / 0.12;
     const portfolioEquity = totalPortfolioValue + totalCash - totalDebt;
+    const hasAnyFinancialData = withFinancials.length > 0;
 
     return {
       totalPortfolioValue,
@@ -313,8 +308,9 @@ export default function PortfolioPage() {
       acquisitionCapacity,
       hasDebtData,
       portfolioEquity,
+      hasAnyFinancialData,
     };
-  }, [storeMetrics, stores, totalDebt, totalAnnualDebtServiceFromLoans]);
+  }, [storeMetrics, totalDebt, totalAnnualDebtServiceFromLoans]);
 
   const allFeedItems = useMemo(() => {
     const items = (stores as Store[]).flatMap((store) => {
@@ -493,8 +489,14 @@ export default function PortfolioPage() {
           Portfolio Value
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
-          <AnimatedNumber value={aggregates.totalPortfolioValue} prefix="$" className="hero-value-text" duration={1200} />
-          <ValueChangeIndicator value={aggregates.totalPortfolioValue} />
+          {aggregates.hasAnyFinancialData ? (
+            <>
+              <AnimatedNumber value={aggregates.totalPortfolioValue} prefix="$" className="hero-value-text" duration={1200} />
+              <ValueChangeIndicator value={aggregates.totalPortfolioValue} />
+            </>
+          ) : (
+            <span className="hero-value-text">—</span>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: '24px', marginTop: '28px', flexWrap: 'wrap' }}>
@@ -508,14 +510,22 @@ export default function PortfolioPage() {
           <div>
             <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Cash</div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: '#4ade80' }}>
-              $<AnimatedNumber value={aggregates.totalCash} duration={1000} />
+              {aggregates.hasAnyFinancialData ? (
+                <>$<AnimatedNumber value={aggregates.totalCash} duration={1000} /></>
+              ) : (
+                "—"
+              )}
             </div>
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
             <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>EBITDA</div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'white' }}>
-              $<AnimatedNumber value={aggregates.totalAnnualEbitda} duration={1000} />
+              {aggregates.hasAnyFinancialData ? (
+                <>$<AnimatedNumber value={aggregates.totalAnnualEbitda} duration={1000} /></>
+              ) : (
+                "—"
+              )}
             </div>
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
@@ -544,30 +554,54 @@ export default function PortfolioPage() {
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0s" }}
           label="Total Portfolio Value"
-          value={<AnimatedNumber value={aggregates.totalPortfolioValue} prefix="$" duration={1000} />}
+          value={
+            aggregates.hasAnyFinancialData ? (
+              <AnimatedNumber value={aggregates.totalPortfolioValue} prefix="$" duration={1000} />
+            ) : (
+              "—"
+            )
+          }
         />
 
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.05s" }}
           label="Annual Revenue"
-          value={<AnimatedNumber value={aggregates.totalAnnualRevenue} prefix="$" duration={1000} />}
+          value={
+            aggregates.hasAnyFinancialData ? (
+              <AnimatedNumber value={aggregates.totalAnnualRevenue} prefix="$" duration={1000} />
+            ) : (
+              "—"
+            )
+          }
         />
 
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.1s" }}
           label="Annual EBITDA"
-          value={<AnimatedNumber value={aggregates.totalAnnualEbitda} prefix="$" duration={1000} />}
-          sub={aggregates.totalAnnualRevenue > 0 ? `${aggregates.ebitdaMargin.toFixed(1)}% margin` : undefined}
+          value={
+            aggregates.hasAnyFinancialData ? (
+              <AnimatedNumber value={aggregates.totalAnnualEbitda} prefix="$" duration={1000} />
+            ) : (
+              "—"
+            )
+          }
+          sub={aggregates.hasAnyFinancialData && aggregates.totalAnnualRevenue > 0 ? `${aggregates.ebitdaMargin.toFixed(1)}% margin` : undefined}
         />
 
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.15s" }}
           label="Portfolio Cash"
-          value={<AnimatedNumber value={aggregates.totalCash} prefix="$" duration={1000} />}
-          sub="across all stores"
+          value={
+            aggregates.hasAnyFinancialData ? (
+              <AnimatedNumber value={aggregates.totalCash} prefix="$" duration={1000} />
+            ) : (
+              "—"
+            )
+          }
+          sub={aggregates.hasAnyFinancialData ? "stores with P&L data" : "Add monthly financials"}
         />
 
         <KpiCard
@@ -581,9 +615,21 @@ export default function PortfolioPage() {
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.25s" }}
           label="Portfolio Equity"
-          value={<AnimatedNumber value={aggregates.portfolioEquity} prefix="$" duration={1000} />}
+          value={
+            aggregates.hasAnyFinancialData ? (
+              <AnimatedNumber value={aggregates.portfolioEquity} prefix="$" duration={1000} />
+            ) : (
+              "—"
+            )
+          }
           sub="Value + cash − debt"
-          valueColor={aggregates.portfolioEquity > 0 ? "var(--text-success)" : "var(--text-danger)"}
+          valueColor={
+            aggregates.hasAnyFinancialData
+              ? aggregates.portfolioEquity > 0
+                ? "var(--text-success)"
+                : "var(--text-danger)"
+              : "var(--text-muted)"
+          }
         />
 
         <KpiCard
@@ -646,13 +692,23 @@ export default function PortfolioPage() {
 
               <div className="grid grid-cols-4 gap-3 mb-4 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
                 {[
-                  { label: "Value", value: fmtDollar(m.estimatedValue) },
-                  { label: "Revenue", value: fmtDollar(m.monthlyRevenue) },
-                  { label: "EBITDA", value: fmtDollar(m.monthlyEbitda) },
+                  {
+                    label: "Value",
+                    value: m.hasFinancialData ? fmtDollar(m.estimatedValue) : "—",
+                  },
+                  {
+                    label: "Revenue",
+                    value: m.hasFinancialData ? fmtDollar(m.monthlyRevenue) : "—",
+                  },
+                  {
+                    label: "EBITDA",
+                    value: m.hasFinancialData ? fmtDollar(m.monthlyEbitda) : "—",
+                  },
                   {
                     label: "DSCR",
-                    value: (m.store.annual_debt_service ?? 0) > 0 ? fmtMultiple(m.dscr) : "—",
-                    color: (m.store.annual_debt_service ?? 0) > 0 ? dscrColorClass(m.dscr) : undefined,
+                    value: m.hasFinancialData && m.debtService > 0 ? fmtMultiple(m.dscr) : "—",
+                    color:
+                      m.hasFinancialData && m.debtService > 0 ? dscrColorClass(m.dscr) : undefined,
                   },
                 ].map((metric) => (
                   <div key={metric.label}>
@@ -668,7 +724,7 @@ export default function PortfolioPage() {
               </div>
 
               <div className="text-[11px] mb-4" style={{ color: "var(--text-muted)" }}>
-                Cash: {fmtDollar(m.storeCash)}
+                Cash: {m.hasFinancialData ? fmtDollar(m.storeCash) : "—"}
               </div>
 
               <div
@@ -780,7 +836,7 @@ export default function PortfolioPage() {
           <div className="flex justify-between text-[13px]">
             <span style={{ color: "var(--text-secondary)" }}>Available Monthly Cash Flow</span>
             <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-              {fmtDollar(aggregates.availableMonthlyCashFlow)}
+              {aggregates.hasAnyFinancialData ? fmtDollar(aggregates.availableMonthlyCashFlow) : "—"}
             </span>
           </div>
           <div className="flex justify-between text-[13px]">
@@ -791,7 +847,7 @@ export default function PortfolioPage() {
               />
             </span>
             <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-              {fmtDollar(aggregates.acquisitionCapacity)}
+              {aggregates.hasAnyFinancialData ? fmtDollar(aggregates.acquisitionCapacity) : "—"}
             </span>
           </div>
         </div>
@@ -799,7 +855,11 @@ export default function PortfolioPage() {
           Based on 12% cap rate assumption. Actual capacity depends on lender terms.
         </p>
         <p className="text-[13px] mb-4" style={{ color: "var(--text-secondary)" }}>
-          {aggregates.hasDebtData ? acquisitionMessage : "Add debt data to assess acquisition readiness."}
+          {!aggregates.hasAnyFinancialData
+            ? "Add monthly financials to assess acquisition readiness."
+            : aggregates.hasDebtData
+              ? acquisitionMessage
+              : "Add debt data to assess acquisition readiness."}
         </p>
         <Link href="/scenarios" className="btn-primary inline-flex text-[13px]">
           Run Scenarios →
@@ -814,7 +874,9 @@ export default function PortfolioPage() {
         <div className="space-y-2 text-[14px]">
           <div className="flex justify-between">
             <span style={{ color: "var(--text-secondary)" }}>Business Value:</span>
-            <span className="font-medium" style={{ color: "var(--text-primary)" }}>{fmtDollar(aggregates.totalPortfolioValue)}</span>
+            <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+              {aggregates.hasAnyFinancialData ? fmtDollar(aggregates.totalPortfolioValue) : "—"}
+            </span>
           </div>
           <div className="flex justify-between">
             <span style={{ color: "var(--text-secondary)" }}>+ Real Estate:</span>
@@ -822,7 +884,9 @@ export default function PortfolioPage() {
           </div>
           <div className="flex justify-between">
             <span style={{ color: "var(--text-secondary)" }}>+ Cash:</span>
-            <span className="font-medium" style={{ color: "var(--text-primary)" }}>{fmtDollar(aggregates.totalCash)}</span>
+            <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+              {aggregates.hasAnyFinancialData ? fmtDollar(aggregates.totalCash) : "—"}
+            </span>
           </div>
           <div className="flex justify-between">
             <span style={{ color: "var(--text-secondary)" }}>− Total Debt:</span>
@@ -831,7 +895,11 @@ export default function PortfolioPage() {
           <div className="border-t pt-3 mt-3 flex justify-between" style={{ borderColor: "var(--border)" }}>
             <span className="font-semibold" style={{ color: "var(--text-primary)" }}>= Portfolio Net Worth:</span>
             <span className="text-[24px] font-bold text-green-400">
-              {fmtDollar(aggregates.totalPortfolioValue + realEstateTotal - aggregates.totalDebt + aggregates.totalCash)}
+              {aggregates.hasAnyFinancialData
+                ? fmtDollar(
+                    aggregates.totalPortfolioValue + realEstateTotal - aggregates.totalDebt + aggregates.totalCash
+                  )
+                : "—"}
             </span>
           </div>
         </div>

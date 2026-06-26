@@ -5,10 +5,11 @@ import { INPUT_CLASS } from "@/components/occupancy/shared";
 
 interface CashCardProps {
   store: any;
+  hasFinancialData?: boolean;
   onUpdate?: (updatedStore: any) => void;
 }
 
-export function CashCard({ store, onUpdate }: CashCardProps) {
+export function CashCard({ store, hasFinancialData = true, onUpdate }: CashCardProps) {
   const supabase = createClient();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -51,6 +52,7 @@ export function CashCard({ store, onUpdate }: CashCardProps) {
           className="btn-outline"
           style={{ fontSize: '11px', padding: '3px 10px' }}
           onClick={() => setEditing(!editing)}
+          disabled={!hasFinancialData}
         >
           {editing ? 'Cancel' : 'Update'}
         </button>
@@ -59,13 +61,19 @@ export function CashCard({ store, onUpdate }: CashCardProps) {
       {!editing ? (
         <div>
           <div className="metric-value" style={{ color: 'var(--text-primary)' }}>
-            ${totalCash.toLocaleString()}
+            {hasFinancialData ? `$${totalCash.toLocaleString()}` : "—"}
           </div>
-          {lastUpdated && (
+          {hasFinancialData && lastUpdated && (
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
               Updated {lastUpdated} · Manual entry
             </div>
           )}
+          {!hasFinancialData && (
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              Add monthly financials to track cash position.
+            </div>
+          )}
+          {hasFinancialData && (
           <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
               <span style={{ color: 'var(--text-muted)' }}>Operating Account</span>
@@ -82,6 +90,7 @@ export function CashCard({ store, onUpdate }: CashCardProps) {
               </div>
             )}
           </div>
+          )}
           <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)', fontSize: '11px', color: 'var(--text-muted)' }}>
             QuickBooks sync · Plaid integration coming soon
           </div>

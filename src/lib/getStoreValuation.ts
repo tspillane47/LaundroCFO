@@ -14,8 +14,15 @@ export type ResolvedStoreFinancials = {
   monthlyRevenue: number;
   monthlyExpenses: number;
   annualEbitda: number;
-  source: "profile" | "ttm" | "none";
+  source: "ttm" | "none";
 };
+
+/** True when monthly_financials rows exist and drive resolved figures. */
+export function hasMonthlyFinancialRecords(
+  resolved?: ResolvedStoreFinancials | null
+): boolean {
+  return resolved?.source === "ttm";
+}
 
 export type StoreValuationResult = ValuationResult & {
   store: Record<string, unknown>;
@@ -67,21 +74,9 @@ export type StoreValuationContext = {
 };
 
 export function resolveStoreFinancials(
-  store: Record<string, unknown>,
+  _store: Record<string, unknown>,
   ttm: { ttmRevenue: number; ttmEbitda: number; monthsUsed: number } | null = null
 ): ResolvedStoreFinancials {
-  const profileRevenue = Number(store.monthly_revenue) || 0;
-  const profileExpenses = Number(store.monthly_expenses) || 0;
-
-  if (profileRevenue > 0) {
-    return {
-      monthlyRevenue: profileRevenue,
-      monthlyExpenses: profileExpenses,
-      annualEbitda: (profileRevenue - profileExpenses) * 12,
-      source: "profile",
-    };
-  }
-
   if (ttm && ttm.monthsUsed > 0 && ttm.ttmRevenue > 0) {
     const monthlyRevenue = ttm.ttmRevenue / ttm.monthsUsed;
     const monthlyExpenses = (ttm.ttmRevenue - ttm.ttmEbitda) / ttm.monthsUsed;
@@ -154,6 +149,29 @@ export function buildStoreValuationInputs(
   }
 
   const resolved = ctx.resolvedFinancials ?? resolveStoreFinancials(store);
+  if (resolved.source === "none") {
+    return {
+      ebitda: 0,
+      monthlyRevenue: 0,
+      squareFootage: Number(store.square_footage) || 0,
+      avgEquipmentAge: 0,
+      pct200G: 0,
+      equipmentScore: 0,
+      totalLeaseControl: 0,
+      occupancyType: isOwnerOccupied ? "owned" : "leased",
+      marketDensity: "",
+      storeCondition: "",
+      revenueTrend: "",
+      competitionLevel: "",
+      selfServicePct: 0,
+      wdfPct: 0,
+      commercialPct: 0,
+      pickupDeliveryPct: 0,
+      realEstateValue: undefined,
+      ...overrides,
+    };
+  }
+
   const monthlyRevenue = resolved.monthlyRevenue;
   const monthlyExpenses = resolved.monthlyExpenses;
   const hasRevenueMix =
