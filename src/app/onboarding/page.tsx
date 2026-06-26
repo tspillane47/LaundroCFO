@@ -403,7 +403,7 @@ export default function OnboardingPage() {
                     onChange={(e) => set("name", e.target.value)}
                     onKeyDown={preventEnterSubmit}
                     className={largeInputClass}
-                    placeholder="Sunnyvale Super Wash"
+                    placeholder="My Laundromat"
                   />
                 </Field>
                 <Field label="Store Address *">
@@ -413,7 +413,7 @@ export default function OnboardingPage() {
                     onChange={(e) => set("address", e.target.value)}
                     onKeyDown={preventEnterSubmit}
                     className={inputClass}
-                    placeholder="445 W Olive Ave, Sunnyvale, CA"
+                    placeholder="123 Main St, City, ST"
                   />
                 </Field>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

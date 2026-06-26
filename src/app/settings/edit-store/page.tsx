@@ -152,7 +152,7 @@ function EditStoreForm() {
             value={form.name}
             onChange={(e) => set("name", e.target.value)}
             className={inputClass}
-            placeholder="Sunnyvale Super Wash"
+            placeholder="My Laundromat"
           onKeyDown={preventEnterSubmit}
           />
         </div>
@@ -163,7 +163,7 @@ function EditStoreForm() {
             value={form.address}
             onChange={(e) => set("address", e.target.value)}
             className={inputClass}
-            placeholder="445 W Olive Ave, Sunnyvale, CA"
+            placeholder="123 Main St, City, ST"
           onKeyDown={preventEnterSubmit}
           />
         </div>

@@ -32,7 +32,6 @@ import { CashCard } from "@/components/ui/CashCard";
 import { PageError } from "@/components/ui/PageError";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
-import { scores as demoScores } from "@/lib/data";
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -339,14 +338,12 @@ export default function DashboardPage() {
       ? ((estimatedValue - valuationTrend[0].value) / valuationTrend[0].value) * 100
       : 0;
 
-  const leaseScore = leaseMetrics?.score ?? demoScores.lease;
-  const insuranceScore = insuranceCount > 0 ? demoScores.insurance : demoScores.insurance;
-  const financialScore = demoScores.financial;
+  const leaseScore = leaseMetrics?.score ?? 0;
+  const insuranceScore = 0;
+  const financialScore = 0;
   const laundrocfoScore = Math.round(
     (leaseScore + equipmentScore + financialScore + insuranceScore) / 4
   );
-  const leaseYearsDisplay = leaseMetrics?.yearsRemaining ?? 7.3;
-  const totalLeaseControl = leaseMetrics?.totalControl ?? 17.3;
 
   const actions = useMemo(() => {
     const items: ActionItem[] = [];
@@ -580,7 +577,7 @@ export default function DashboardPage() {
           </span>
         </div>
         <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', marginTop: '12px', lineHeight: 1.6 }}>
-          Based on {fmtMultiple(finalMultiple)} EBITDA multiple · Equipment grade B · {leaseYearsDisplay.toFixed(1)}yr lease · {sqft.toLocaleString()} SF
+          Based on {fmtMultiple(finalMultiple)} EBITDA multiple · Equipment grade B · {leaseMetrics ? `${leaseMetrics.yearsRemaining.toFixed(1)}yr lease` : "—"} · {sqft.toLocaleString()} SF
         </div>
       </div>
 
@@ -922,23 +919,9 @@ export default function DashboardPage() {
               </div>
             </div>
           ) : (
-            <div className="space-y-2 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-              <div className="flex justify-between">
-                <span>Lease Score</span>
-                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {demoScores.lease}/100
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Years Remaining</span>
-                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                  7.3 yrs
-                </span>
-              </div>
-              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
-                7.3yr base + 10yr options = 17.3yr total control
-              </div>
-            </div>
+            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
+              Add lease data to see score and term details.
+            </p>
           )}
         </div>
 

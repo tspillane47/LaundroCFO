@@ -1,9 +1,9 @@
 // src/lib/data.ts
-// All mock data for Sunnyvale Super Wash
+// Industry benchmarks and reference mock data
 
 export const store = {
-  name: "Sunnyvale Super Wash",
-  address: "445 W Olive Ave, Sunnyvale, CA 94086",
+  name: "Example Store",
+  address: "123 Main St, City, ST 00000",
   squareFootage: 4450,
   washers: 28,
   dryers: 32,
@@ -302,7 +302,3 @@ export const alerts = [
     resolved: true,
   },
 ];
-
-export const DEMO_MONTHLY_REVENUE = Math.round(financials.annualRevenue / 12);
-export const DEMO_MONTHLY_EXPENSES = Math.round((financials.annualRevenue - financials.ebitda) / 12);
-export const DEMO_ANNUAL_DEBT_SERVICE = financials.annualDebtService;

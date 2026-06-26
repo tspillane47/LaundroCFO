@@ -24,9 +24,6 @@ import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple, fmtPct } from "@/lib/calculations";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
-import {
-  financials as demoFinancials,
-} from "@/lib/data";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import { PageError } from "@/components/ui/PageError";
 import {
@@ -687,6 +684,7 @@ export default function FinancialsPage() {
 
   const occupancyPct = ratios && ttm.ttmRevenue > 0 ? (ratios.annualRent / ttm.ttmRevenue) * 100 : 0;
   const reviewCount = bankTransactions.length + stagedTransactions.length;
+  const displayDscr = ttm.ttmDebtService > 0 ? ttm.dscr : null;
 
   return (
     <div className="space-y-5">
@@ -746,7 +744,7 @@ export default function FinancialsPage() {
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 grid-4">
             <MetricCard
               label="TTM Revenue"
-              value={fmtDollar(ttm.ttmRevenue || demoFinancials.annualRevenue)}
+              value={fmtDollar(ttm.ttmRevenue || 0)}
               sub={ttm.monthsUsed < 12 ? `${ttm.monthsUsed} mo. of data` : "Trailing 12-month gross revenue"}
               subColor="muted"
             />
@@ -757,12 +755,12 @@ export default function FinancialsPage() {
                   explanation="Earnings Before Interest, Taxes, Depreciation & Amortization. The primary profit metric for laundromat valuation."
                 />
               </div>
-              <div className="metric-value">{fmtDollar(ttm.ttmEbitda || demoFinancials.ebitda)}</div>
+              <div className="metric-value">{fmtDollar(ttm.ttmEbitda || 0)}</div>
               <div className="text-[12px] mt-1 text-slate-500">
                 Earnings before interest, taxes, depreciation, amortization
               </div>
             </div>
-            <MetricCard label="EBITDA Margin" value={fmtPct(ttm.ttmEbitdaMargin || (demoFinancials.ebitda / demoFinancials.annualRevenue) * 100)} sub="TTM" subColor="muted" />
+            <MetricCard label="EBITDA Margin" value={fmtPct(ttm.ttmEbitdaMargin || 0)} sub="TTM" subColor="muted" />
             <div className="card">
               <div className="metric-label">
                 <MetricTooltip
@@ -771,29 +769,27 @@ export default function FinancialsPage() {
                 />
               </div>
               <div className="metric-value">
-                {fmtMultiple(
-                  ttm.ttmDebtService > 0
-                    ? ttm.dscr
-                    : demoFinancials.cashFlow / demoFinancials.annualDebtService
-                )}
+                {displayDscr != null ? fmtMultiple(displayDscr) : "—"}
               </div>
               <div className="text-[12px] mt-1 text-slate-500">Net cash flow ÷ annual debt service</div>
-              <div
-                className={clsx(
-                  "text-[12px] mt-1",
-                  (ttm.ttmDebtService > 0 ? ttm.dscr : demoFinancials.cashFlow / demoFinancials.annualDebtService) >= 1.5
-                    ? "text-green-400"
-                    : (ttm.ttmDebtService > 0 ? ttm.dscr : demoFinancials.cashFlow / demoFinancials.annualDebtService) >= 1.25
-                      ? "text-amber-400"
-                      : "text-red-400"
-                )}
-              >
-                {(ttm.ttmDebtService > 0 ? ttm.dscr : demoFinancials.cashFlow / demoFinancials.annualDebtService) >= 1.5
-                  ? "Strong"
-                  : (ttm.ttmDebtService > 0 ? ttm.dscr : demoFinancials.cashFlow / demoFinancials.annualDebtService) >= 1.25
-                    ? "Adequate"
-                    : "Below threshold"}
-              </div>
+              {displayDscr != null && (
+                <div
+                  className={clsx(
+                    "text-[12px] mt-1",
+                    displayDscr >= 1.5
+                      ? "text-green-400"
+                      : displayDscr >= 1.25
+                        ? "text-amber-400"
+                        : "text-red-400"
+                  )}
+                >
+                  {displayDscr >= 1.5
+                    ? "Strong"
+                    : displayDscr >= 1.25
+                      ? "Adequate"
+                      : "Below threshold"}
+                </div>
+              )}
             </div>
             <div className="card">
               <div className="metric-label">
@@ -802,7 +798,7 @@ export default function FinancialsPage() {
                   explanation="Net Operating Income. Revenue minus all operating expenses including rent but before debt service."
                 />
               </div>
-              <div className="metric-value">{fmtDollar(ttm.ttmNoi || demoFinancials.noi)}</div>
+              <div className="metric-value">{fmtDollar(ttm.ttmNoi || 0)}</div>
               <div className="text-[12px] mt-1 text-slate-500">Net operating income after rent and operating expenses</div>
             </div>
           </div>
