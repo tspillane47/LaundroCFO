@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
@@ -9,11 +9,11 @@ import { generatePortfolioAlerts, type AlertItem } from "@/lib/alerts";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
 
-const severityStyles: Record<string, { icon: string; bg: string; border: string }> = {
-  danger: { icon: "bg-red-500/15", bg: "", border: "border-red-500/20" },
-  warning: { icon: "bg-amber-500/15", bg: "", border: "border-amber-500/20" },
-  info: { icon: "bg-blue-500/15", bg: "", border: "border-blue-500/20" },
-  success: { icon: "bg-green-500/15", bg: "", border: "" },
+const severityStyles: Record<string, { bg: string; border: string }> = {
+  danger: { bg: "bg-red-500/15", border: "border-red-500/20" },
+  warning: { bg: "bg-amber-500/15", border: "border-amber-500/20" },
+  info: { bg: "bg-blue-500/15", border: "border-blue-500/20" },
+  success: { bg: "bg-green-500/15", border: "" },
 };
 
 const tagStyles: Record<string, string> = {
@@ -23,9 +23,37 @@ const tagStyles: Record<string, string> = {
   success: "badge-green",
 };
 
+function AlertSeverityIcon({ severity }: { severity: AlertItem["severity"] }) {
+  if (severity === "warning") {
+    return (
+      <svg viewBox="0 0 16 16" className="w-4 h-4" aria-hidden="true">
+        <path
+          d="M8 1.5L15 14H1L8 1.5Z"
+          className="fill-amber-500 stroke-amber-400"
+          strokeWidth="0.75"
+        />
+      </svg>
+    );
+  }
+
+  const color =
+    severity === "danger"
+      ? "fill-red-500"
+      : severity === "success"
+        ? "fill-green-500"
+        : "fill-blue-500";
+
+  return (
+    <svg viewBox="0 0 16 16" className="w-4 h-4" aria-hidden="true">
+      <circle cx="8" cy="8" r="5" className={color} />
+    </svg>
+  );
+}
+
 export default function AlertsPage() {
+  const router = useRouter();
   const supabase = createClient();
-  const { stores, loading: storesLoading } = useStores();
+  const { stores, loading: storesLoading, setSelectedStore, setIsAllStores } = useStores();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
@@ -96,6 +124,16 @@ export default function AlertsPage() {
     return { active: activeItems, resolved: resolvedItems };
   }, [alerts]);
 
+  function navigateToAlert(alert: AlertItem) {
+    if (!alert.action) return;
+    const store = stores.find((s) => String(s.id) === String(alert.storeId));
+    if (store) {
+      setSelectedStore(store);
+      setIsAllStores(false);
+    }
+    router.push(`/${alert.action}`);
+  }
+
   if (storesLoading || loading) {
     return (
       <div className="space-y-5 max-w-3xl">
@@ -158,11 +196,11 @@ export default function AlertsPage() {
               >
                 <div
                   className={clsx(
-                    "w-10 h-10 rounded-xl flex items-center justify-center text-[18px] flex-shrink-0",
-                    style.icon
+                    "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
+                    style.bg
                   )}
                 >
-                  {alert.emoji}
+                  <AlertSeverityIcon severity={alert.severity} />
                 </div>
                 <div className="flex-1 min-w-0">
                   {alert.storeName && (
@@ -181,12 +219,13 @@ export default function AlertsPage() {
                   </div>
                 </div>
                 {alert.action && (
-                  <Link
-                    href={`/${alert.action}`}
+                  <button
+                    type="button"
+                    onClick={() => navigateToAlert(alert)}
                     className="btn-outline flex-shrink-0 text-[11px] whitespace-nowrap"
                   >
                     {alert.actionLabel} →
-                  </Link>
+                  </button>
                 )}
               </div>
             );
@@ -200,8 +239,8 @@ export default function AlertsPage() {
           <div className="space-y-3">
             {resolved.map((alert) => (
               <div key={alert.id} className="card opacity-60 flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[18px] flex-shrink-0 bg-white/5">
-                  {alert.emoji}
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-white/5">
+                  <AlertSeverityIcon severity={alert.severity} />
                 </div>
                 <div className="flex-1">
                   {alert.storeName && (

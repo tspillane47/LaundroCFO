@@ -3,23 +3,14 @@ import { generateStoreFeed, type FeedItem } from "@/lib/intelligence";
 export type AlertItem = {
   id: string;
   severity: "warning" | "info" | "success" | "danger";
-  emoji: string;
   title: string;
   body: string;
   tags: string[];
   action: string | null;
   actionLabel: string | null;
   resolved: boolean;
+  storeId: string;
   storeName?: string;
-};
-
-const CATEGORY_EMOJI: Record<string, string> = {
-  financial: "💰",
-  valuation: "💎",
-  equipment: "⚙️",
-  insurance: "🛡️",
-  lease: "📋",
-  portfolio: "📊",
 };
 
 const CATEGORY_ACTION: Record<string, { action: string; label: string }> = {
@@ -36,13 +27,13 @@ function feedToAlert(item: FeedItem): AlertItem {
   return {
     id: item.id,
     severity: item.severity,
-    emoji: CATEGORY_EMOJI[item.category] ?? item.icon,
-    title: item.headline,
-    body: item.description,
+    title: item.headline.replace(/^⚠\s*/, ""),
+    body: item.description.replace(/⚠\s*/g, ""),
     tags: [item.category, item.severity],
     action: actionMeta?.action ?? null,
     actionLabel: actionMeta?.label ?? null,
     resolved: item.severity === "success",
+    storeId: item.storeId,
     storeName: item.storeName,
   };
 }

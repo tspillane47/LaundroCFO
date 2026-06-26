@@ -6,11 +6,14 @@ export interface FeedItem {
   headline: string;
   description: string;
   severity: 'info' | 'warning' | 'success' | 'danger';
+  storeId: string;
   storeName?: string;
 }
 
+type FeedItemDraft = Omit<FeedItem, "storeId">;
+
 export function generateStoreFeed(store: any, lease?: any, equipment?: any[], insurance?: any[]): FeedItem[] {
-  const items: FeedItem[] = [];
+  const items: FeedItemDraft[] = [];
   const now = new Date();
 
   // Financial items
@@ -239,7 +242,9 @@ export function generateStoreFeed(store: any, lease?: any, equipment?: any[], in
 
   // Sort by severity: danger first, then warning, then success, then info
   const order = { danger: 0, warning: 1, success: 2, info: 3 };
-  return items.sort((a, b) => order[a.severity] - order[b.severity]);
+  return items
+    .sort((a, b) => order[a.severity] - order[b.severity])
+    .map((item) => ({ ...item, storeId: String(store.id) }));
 }
 
 function formatDate(d: Date): string {
