@@ -5,6 +5,16 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { benchmarks as industryBenchmarks } from "@/lib/data";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
+import {
+  calcRatios,
+  calcTtmMetrics,
+  enrichMonthlyRecords,
+  sortRecordsDesc,
+  type CalculatedMonthly,
+  type MonthlyFinancialRecord,
+  type StoreFinancialProfile,
+  type TtmMetrics,
+} from "@/lib/financials";
 import { fmtMultiple, fmtPct } from "@/lib/calculations";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
@@ -85,13 +95,16 @@ export default function BenchmarkingPage() {
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [store, setStore] = useState<Record<string, unknown> | null>(null);
+  const [store, setStore] = useState<StoreFinancialProfile | null>(null);
   const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
-  const [utilityRatio, setUtilityRatio] = useState<number | null>(null);
+  const [records, setRecords] = useState<CalculatedMonthly[]>([]);
+  const [ttm, setTtm] = useState<TtmMetrics | null>(null);
 
   const loadData = useCallback(async () => {
     if (!selectedStore?.id) {
       setStore(null);
+      setRecords([]);
+      setTtm(null);
       setLoading(false);
       return;
     }
@@ -100,37 +113,46 @@ export default function BenchmarkingPage() {
     setLoadError(false);
 
     try {
-      const [{ data: storeData, error: storeError }, { data: equipmentData, error: equipError }, { data: financialsData, error: finError }] =
-        await Promise.all([
-          supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
-          supabase.from("equipment_inventory").select("*").eq("store_id", selectedStore.id),
-          supabase
-            .from("monthly_financials")
-            .select("revenue, utilities")
-            .eq("store_id", selectedStore.id)
-            .order("year", { ascending: false })
-            .order("month", { ascending: false })
-            .limit(12),
-        ]);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      const [
+        { data: storeData, error: storeError },
+        { data: equipmentData, error: equipError },
+        { data: financialsData, error: financialsError },
+      ] = await Promise.all([
+        supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
+        supabase.from("equipment_inventory").select("*").eq("store_id", selectedStore.id),
+        supabase
+          .from("monthly_financials")
+          .select("*")
+          .eq("store_id", selectedStore.id)
+          .order("year", { ascending: false })
+          .order("month", { ascending: false }),
+      ]);
 
       if (storeError) throw storeError;
       if (equipError) throw equipError;
-      if (finError) throw finError;
+      if (financialsError) throw financialsError;
 
-      setStore(storeData);
+      setStore(storeData as StoreFinancialProfile);
       setEquipment((equipmentData ?? []) as EquipmentRecord[]);
 
-      const records = financialsData ?? [];
-      const ttmRevenue = records.reduce((s, r) => s + (r.revenue ?? 0), 0);
-      const ttmUtilities = records.reduce((s, r) => s + (r.utilities ?? 0), 0);
-      if (ttmRevenue > 0 && records.length > 0) {
-        setUtilityRatio((ttmUtilities / ttmRevenue) * 100);
-      } else {
-        setUtilityRatio(null);
-      }
+      const sorted = enrichMonthlyRecords(
+        sortRecordsDesc((financialsData ?? []) as MonthlyFinancialRecord[])
+      );
+      setRecords(sorted);
+      setTtm(sorted.length > 0 ? calcTtmMetrics(sorted) : null);
     } catch {
       setLoadError(true);
       setStore(null);
+      setRecords([]);
+      setTtm(null);
     } finally {
       setLoading(false);
     }
@@ -142,46 +164,29 @@ export default function BenchmarkingPage() {
   }, [storesLoading, loadData]);
 
   const metrics = useMemo(() => {
-    if (!store) return null;
+    if (!store || !ttm || ttm.ttmRevenue <= 0) return null;
 
-    const monthlyRevenue = Number(store.monthly_revenue) || 0;
-    const monthlyExpenses = Number(store.monthly_expenses) || 0;
-    const annualRevenue = monthlyRevenue * 12;
-    const annualEbitda = (monthlyRevenue - monthlyExpenses) * 12;
-    const sqft = Number(store.square_footage) || 0;
-    const washers = Number(store.washers) || 0;
-    const dryers = Number(store.dryers) || 0;
-    const machines = washers + dryers;
-    const debtService = Number(store.annual_debt_service) || 0;
-    const monthlyRent = Number(store.monthly_rent) || 0;
-
+    const ratios = calcRatios(store, records, ttm);
     const equipMetrics = computeEquipmentMetrics(equipment);
     const avgAge =
       equipMetrics.totalMachines > 0
         ? equipMetrics.weightedAvgAge
-        : Number(store.avg_machine_age) || null;
+        : Number((store as Record<string, unknown>).avg_machine_age) || null;
 
-    const ebitdaMargin =
-      monthlyRevenue > 0 ? ((monthlyRevenue - monthlyExpenses) / monthlyRevenue) * 100 : null;
-    const revenuePerSF = sqft > 0 && monthlyRevenue > 0 ? annualRevenue / sqft : null;
-    const dscr = debtService > 0 && annualEbitda > 0 ? annualEbitda / debtService : null;
-    const revenuePerMachine = machines > 0 && monthlyRevenue > 0 ? annualRevenue / machines : null;
-    const rentToRevenue = annualRevenue > 0 && monthlyRent > 0 ? ((monthlyRent * 12) / annualRevenue) * 100 : null;
-
-    const utilityValue = utilityRatio ?? (monthlyRevenue > 0 ? 17.8 : null);
+    const dscr = ttm.ttmDebtService > 0 ? ttm.dscr : null;
 
     return {
-      ebitdaMargin,
-      revenuePerSF,
-      utilityRatio: utilityValue,
-      rentToRevenue,
+      ebitdaMargin: ttm.ttmEbitdaMargin,
+      revenuePerSF: ratios.revenuePerSF > 0 ? ratios.revenuePerSF : null,
+      utilityRatio: ratios.utilityPct > 0 ? ratios.utilityPct : null,
+      rentToRevenue: ratios.rentPct > 0 ? ratios.rentPct : null,
       dscr,
-      revenuePerMachine,
+      revenuePerMachine: ratios.revenuePerMachine > 0 ? ratios.revenuePerMachine : null,
       avgEquipmentAge: avgAge,
       storeName: String(store.name ?? "Your Store"),
-      hasFinancials: monthlyRevenue > 0,
+      hasFinancials: true,
     };
-  }, [store, equipment, utilityRatio]);
+  }, [store, equipment, records, ttm]);
 
   const rows: BenchmarkRowData[] = useMemo(() => {
     if (!metrics) return [];

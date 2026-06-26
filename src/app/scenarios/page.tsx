@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
-import { fetchStoreTtmMetrics } from "@/lib/financials";
+import {
+  calcTtmMetrics,
+  enrichMonthlyRecords,
+  sortRecordsDesc,
+  type MonthlyFinancialRecord,
+} from "@/lib/financials";
 import { resolveStoreFinancials } from "@/lib/getStoreValuation";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
@@ -36,20 +41,38 @@ export default function ScenariosPage() {
     setLoadError(false);
 
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
       const [
         { data: storeData, error: storeError },
         { data: equipmentData, error: equipError },
-        ttmMetrics,
+        { data: financialsData, error: financialsError },
       ] = await Promise.all([
         supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
         supabase.from("equipment_inventory").select("*").eq("store_id", selectedStore.id),
-        fetchStoreTtmMetrics(supabase, selectedStore.id),
+        supabase
+          .from("monthly_financials")
+          .select("*")
+          .eq("store_id", selectedStore.id)
+          .order("year", { ascending: false })
+          .order("month", { ascending: false }),
       ]);
 
       if (storeError) throw storeError;
       if (!storeData) throw new Error("Store not found");
       if (equipError) throw equipError;
+      if (financialsError) throw financialsError;
 
+      const sorted = enrichMonthlyRecords(
+        sortRecordsDesc((financialsData ?? []) as MonthlyFinancialRecord[])
+      );
+      const ttmMetrics = sorted.length > 0 ? calcTtmMetrics(sorted) : null;
       const resolvedFinancials = resolveStoreFinancials(storeData, ttmMetrics);
       const ownerOccupied = storeData.occupancy_type === "owner_occupied";
       let totalLeaseControl = ownerOccupied ? 15 : 0;
@@ -156,8 +179,10 @@ export default function ScenariosPage() {
   }
 
   const hasFinancials =
-    ctx?.resolvedFinancials?.source !== "none" &&
-    (ctx?.resolvedFinancials?.monthlyRevenue ?? Number(ctx?.store.monthly_revenue) ?? 0) > 0;
+    ctx != null &&
+    ctx.resolvedFinancials != null &&
+    ctx.resolvedFinancials.source !== "none" &&
+    ctx.resolvedFinancials.monthlyRevenue > 0;
 
   if (!ctx || !selected || !hasFinancials) {
     return (
