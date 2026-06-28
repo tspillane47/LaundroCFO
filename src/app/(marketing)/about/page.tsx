@@ -20,25 +20,21 @@ const beliefs = [
 
 const audiences = [
   {
-    icon: "🏪",
     title: "Store Owners",
     description:
       "Know your store's value. Maximize it before you sell or refinance. Track every metric that matters to lenders.",
   },
   {
-    icon: "🤝",
     title: "Brokers & Advisors",
     description:
       "Run valuations in minutes. Generate lender-ready reports. Win more listings with professional analysis.",
   },
   {
-    icon: "🏦",
     title: "Lenders & Underwriters",
     description:
       "Underwrite laundromat loans with confidence. See DSCR, lease risk, equipment scores, and valuations in one package.",
   },
   {
-    icon: "🔑",
     title: "Buyers & Investors",
     description:
       "Analyze acquisitions before you buy. Model scenarios. Understand what drives value before you make an offer.",
@@ -99,7 +95,6 @@ export default function AboutPage() {
                 key={item.title}
                 className="p-7 rounded-2xl bg-white border border-slate-200 hover:shadow-lg transition-shadow"
               >
-                <div className="text-[28px] mb-3">{item.icon}</div>
                 <h3 className="text-[16px] font-bold text-slate-900 mb-2">{item.title}</h3>
                 <p className="text-[13px] text-slate-500 leading-relaxed">{item.description}</p>
               </div>

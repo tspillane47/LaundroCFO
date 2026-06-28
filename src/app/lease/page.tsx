@@ -173,7 +173,6 @@ export default function OccupancyPage() {
         <>
           {!hasLease && (
             <div className="card text-center py-16">
-              <div className="text-[40px] mb-4">📋</div>
               <div className="text-slate-200 text-[16px] font-semibold mb-2">No lease on file yet</div>
               <p className="text-slate-500 text-[13px] mb-6 max-w-sm mx-auto">
                 Add your lease terms to calculate risk score and track renewal options.

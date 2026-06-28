@@ -904,7 +904,7 @@ export default function FinancialsPage() {
                   Cancel
                 </button>
                 <button type="button" className="btn-primary" onClick={saveMonthlyRecord} disabled={saving || saveStatus === "success"}>
-                  {saveStatus === "success" ? "Saved ✓" : saving ? "Saving…" : "Save to monthly_financials"}
+                  {saveStatus === "success" ? "Saved" : saving ? "Saving…" : "Save to monthly_financials"}
                 </button>
               </div>
             </div>

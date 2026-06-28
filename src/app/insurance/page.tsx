@@ -433,8 +433,7 @@ function AlertCard({
       ? "bg-red-500/8 border-red-500/20 text-red-400"
       : "bg-amber-500/8 border-amber-500/20 text-amber-400";
   return (
-    <div className={clsx("rounded-lg border p-3 text-[12px] flex items-start gap-2", styles)}>
-      <span className="flex-shrink-0">{severity === "red" ? "⚠" : "◆"}</span>
+    <div className={clsx("rounded-lg border p-3 text-[12px]", styles)}>
       <span>{message}</span>
     </div>
   );
@@ -1203,7 +1202,7 @@ export default function InsurancePage() {
                 className="btn-primary"
               >
                 {saveStatus === "success"
-                  ? "Saved ✓"
+                  ? "Saved"
                   : saving
                     ? "Saving..."
                     : editingPolicyId
@@ -1486,16 +1485,15 @@ export default function InsurancePage() {
         <div className="section-title">Documents</div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            { label: "Policy Documents", icon: "📋" },
-            { label: "Declarations Pages", icon: "📄" },
-            { label: "Certificates of Insurance", icon: "📜" },
-            { label: "Renewal Proposals", icon: "📨" },
+            { label: "Policy Documents" },
+            { label: "Declarations Pages" },
+            { label: "Certificates of Insurance" },
+            { label: "Renewal Proposals" },
           ].map((doc) => (
             <div
               key={doc.label}
               className="card2 text-center py-6 border-dashed border-white/[0.12] relative overflow-hidden"
             >
-              <div className="text-2xl mb-2 opacity-40">{doc.icon}</div>
               <div className="text-[12px] font-semibold text-slate-400">{doc.label}</div>
               <div className="mt-2">
                 <span className="badge badge-amber">Coming Soon</span>

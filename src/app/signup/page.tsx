@@ -53,7 +53,6 @@ export default function SignupPage() {
     return (
       <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0d1520] flex items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
-          <div className="text-[64px] mb-6">✉️</div>
           <h1 className="text-[28px] font-bold text-slate-100 mb-3">Check your email</h1>
           <p className="text-[15px] text-slate-400 leading-relaxed mb-2">
             We sent a confirmation link to{" "}

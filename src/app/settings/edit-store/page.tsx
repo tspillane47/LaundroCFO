@@ -289,7 +289,7 @@ function EditStoreForm() {
           disabled={saving || saveStatus === "success"}
           className="btn-primary w-full py-2.5 text-[13px] disabled:opacity-40"
         >
-          {saveStatus === "success" ? "Saved ✓" : saving ? "Saving..." : "Save Changes"}
+          {saveStatus === "success" ? "Saved" : saving ? "Saving..." : "Save Changes"}
         </button>
       </div>
     </div>

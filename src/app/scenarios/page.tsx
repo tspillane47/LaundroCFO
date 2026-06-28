@@ -221,7 +221,7 @@ export default function ScenariosPage() {
 
         <div className="card xl:sticky xl:top-0">
           <div className="text-[13px] font-bold text-slate-100 mb-4">
-            {selected.emoji} {selected.title}
+            {selected.title}
           </div>
 
           <div className="grid grid-cols-2 gap-2.5 mb-4">
@@ -316,7 +316,7 @@ function ScenarioCard({
       )}
     >
       <div className="text-[13px] font-semibold text-slate-100">
-        {scenario.emoji} {scenario.title}
+        {scenario.title}
       </div>
       <div className="text-[11px] text-slate-500 mt-1">{scenario.description}</div>
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/[0.05]">

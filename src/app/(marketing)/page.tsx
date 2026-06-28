@@ -220,7 +220,7 @@ export default function MarketingHomePage() {
                   color: "#93c5fd",
                 }}
               >
-                🚀 Now in Beta — Free Access
+                Now in Beta — Free Access
               </div>
 
               <h1 className="text-[36px] lg:text-[56px] font-bold text-white tracking-tight leading-[1.08] mb-6">

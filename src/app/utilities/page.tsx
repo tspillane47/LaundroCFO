@@ -631,7 +631,7 @@ export default function UtilitiesPage() {
               onClick={saveUtilityRecord}
               disabled={saving || saveStatus === "success"}
             >
-              {saveStatus === "success" ? "Saved ✓" : saving ? "Saving…" : "Save Utilities"}
+              {saveStatus === "success" ? "Saved" : saving ? "Saving…" : "Save Utilities"}
             </button>
           </div>
         </div>

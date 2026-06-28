@@ -352,27 +352,27 @@ export default function BenchmarkingPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="card border-green-500/20">
-          <div className="text-[12px] text-green-400 font-semibold mb-2">💪 Strengths</div>
+          <div className="text-[12px] text-green-400 font-semibold mb-2">Strengths</div>
           <div className="space-y-1.5 text-[12px] text-slate-400">
             {callouts.strengths.length > 0 ? (
-              callouts.strengths.map((s) => <div key={s}>✅ {s}</div>)
+              callouts.strengths.map((s) => <div key={s}>{s}</div>)
             ) : (
               <div>No standout strengths yet — keep building data.</div>
             )}
           </div>
         </div>
         <div className="card border-amber-500/20">
-          <div className="text-[12px] text-amber-400 font-semibold mb-2">⚠️ Watch</div>
+          <div className="text-[12px] text-amber-400 font-semibold mb-2">Watch</div>
           <div className="space-y-1.5 text-[12px] text-slate-400">
             {callouts.watch.length > 0 ? (
-              callouts.watch.map((s) => <div key={s}>⚠ {s}</div>)
+              callouts.watch.map((s) => <div key={s}>{s}</div>)
             ) : (
               <div>No metrics in watch range.</div>
             )}
           </div>
         </div>
         <div className="card border-blue-500/20">
-          <div className="text-[12px] text-blue-400 font-semibold mb-2">🎯 Opportunities</div>
+          <div className="text-[12px] text-blue-400 font-semibold mb-2">Opportunities</div>
           <div className="space-y-1.5 text-[12px] text-slate-400">
             {callouts.opportunities.map((s) => (
               <div key={s}>{s}</div>

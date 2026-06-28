@@ -887,12 +887,12 @@ export default function ReportsPage() {
           <div className="divide-y divide-white/[0.04] text-[13px]">
             <PreviewRow
               label="DSCR"
-              value={store.annual_debt_service ? `${fmtMultiple(metrics.dscr)} ✓` : "N/A"}
+              value={store.annual_debt_service ? fmtMultiple(metrics.dscr) : "N/A"}
               className={ratioColorClass(metrics.dscr, 1.25, 1.0)}
             />
             <PreviewRow
               label="Global DSCR"
-              value={stores.some((s) => s.annual_debt_service) ? `${fmtMultiple(metrics.globalDscr)} ✓` : "N/A"}
+              value={stores.some((s) => s.annual_debt_service) ? fmtMultiple(metrics.globalDscr) : "N/A"}
               className={ratioColorClass(metrics.globalDscr, 1.25, 1.0)}
             />
             <PreviewRow label="Rating" value={metrics.financeRating} className="text-green-400" />
@@ -902,17 +902,17 @@ export default function ReportsPage() {
           <SectionHeading>Key Risks</SectionHeading>
           <div className="divide-y divide-white/[0.04] text-[13px]">
             {metrics.utilityRatio > 17 ? (
-              <div className="py-2 text-amber-400">⚠ Utility ratio {fmtPct(metrics.utilityRatio)}</div>
+              <div className="py-2 text-amber-400">Utility ratio {fmtPct(metrics.utilityRatio)}</div>
             ) : (
-              <div className="py-2 text-slate-300">✅ Utility ratio {fmtPct(metrics.utilityRatio)}</div>
+              <div className="py-2 text-slate-300">Utility ratio {fmtPct(metrics.utilityRatio)}</div>
             )}
             <div className="py-2 text-slate-300">
               {metrics.isOwnerOccupied
-                ? "✅ Owner-occupied — fee simple"
-                : `✅ Lease — ${metrics.totalLeaseControl.toFixed(1)}yr control`}
+                ? "Owner-occupied — fee simple"
+                : `Lease — ${metrics.totalLeaseControl.toFixed(1)}yr control`}
             </div>
             <div className="py-2 text-slate-300">
-              {equipMetrics.weightedAvgAge < 10 ? "✅" : "⚠"} Equipment — {equipMetrics.weightedAvgAge.toFixed(1)}yr avg
+              Equipment — {equipMetrics.weightedAvgAge.toFixed(1)}yr avg
             </div>
           </div>
         </div>
@@ -1044,9 +1044,8 @@ export default function ReportsPage() {
           ) : (
             <ul className="space-y-2">
               {valuation.valueDrivers.slice(0, 5).map((d) => (
-                <li key={d} className="text-[12px] text-slate-300 flex gap-2">
-                  <span className="text-green-400">✓</span>
-                  <span>{d}</span>
+                <li key={d} className="text-[12px] text-slate-300">
+                  {d}
                 </li>
               ))}
             </ul>
@@ -1059,9 +1058,8 @@ export default function ReportsPage() {
           ) : (
             <ul className="space-y-2">
               {valuation.valueRisks.slice(0, 5).map((r) => (
-                <li key={r} className="text-[12px] text-slate-300 flex gap-2">
-                  <span className="text-amber-400">⚠</span>
-                  <span>{r}</span>
+                <li key={r} className="text-[12px] text-slate-300">
+                  {r}
                 </li>
               ))}
             </ul>

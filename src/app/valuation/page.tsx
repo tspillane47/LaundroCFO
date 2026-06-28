@@ -931,7 +931,7 @@ export default function ValuationPage() {
 
             <div className="card2 !p-2.5 border-green-500/25 bg-green-500/[0.06]">
               <div className="text-[10px] font-semibold text-green-400/90 mb-1.5">
-                Helping Value ✓
+                Helping Value
               </div>
               {valuation.valueDrivers.length === 0 ? (
                 <p className="text-[10px] text-slate-500">No major drivers identified.</p>
@@ -940,10 +940,9 @@ export default function ValuationPage() {
                   {valuation.valueDrivers.slice(0, 3).map((driver) => (
                     <li
                       key={driver}
-                      className="flex items-center gap-1.5 text-[10px] text-slate-300 min-w-0"
+                      className="text-[10px] text-slate-300 min-w-0 truncate"
                     >
-                      <span className="text-green-400 flex-shrink-0">✓</span>
-                      <span className="truncate">{driver}</span>
+                      {driver}
                     </li>
                   ))}
                 </ul>
@@ -952,7 +951,7 @@ export default function ValuationPage() {
 
             <div className="card2 !p-2.5 border-amber-500/25 bg-amber-500/[0.06]">
               <div className="text-[10px] font-semibold text-amber-400/90 mb-1.5">
-                Hurting Value ⚠
+                Hurting Value
               </div>
               {valuation.valueRisks.length === 0 ? (
                 <p className="text-[10px] text-slate-500">No significant risks flagged.</p>
@@ -961,10 +960,9 @@ export default function ValuationPage() {
                   {valuation.valueRisks.slice(0, 3).map((risk) => (
                     <li
                       key={risk}
-                      className="flex items-center gap-1.5 text-[10px] text-slate-300 min-w-0"
+                      className="text-[10px] text-slate-300 min-w-0 truncate"
                     >
-                      <span className="text-amber-400 flex-shrink-0">⚠</span>
-                      <span className="truncate">{risk}</span>
+                      {risk}
                     </li>
                   ))}
                 </ul>

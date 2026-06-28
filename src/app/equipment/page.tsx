@@ -453,7 +453,7 @@ export default function EquipmentPage() {
                           <td className={clsx("py-2.5 font-semibold", ageColor(age))}>{age} yr</td>
                           <td className="py-2.5 text-center text-slate-400">
                             {item.machine_type === "Washer" && item.high_speed_extract ? (
-                              <span className="text-green-400">✓</span>
+                              <span className="text-green-400">Yes</span>
                             ) : (
                               "—"
                             )}
@@ -591,7 +591,7 @@ export default function EquipmentPage() {
                     className="btn-primary py-2 px-5 text-[13px]"
                   >
                     {saveStatus === "success"
-                      ? "Saved ✓"
+                      ? "Saved"
                       : saving
                         ? "Saving..."
                         : editingId

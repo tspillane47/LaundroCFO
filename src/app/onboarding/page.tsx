@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { FormBanner } from "@/components/ui/FormBanner";
+import { NavIcon } from "@/components/ui/NavIcons";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 
 const STORAGE_KEY = "laundrocfo_onboarding";
@@ -73,10 +74,10 @@ const RENEWAL_COUNT: Record<string, number> = {
 };
 
 const FEATURES = [
-  { icon: "💎", label: "Live Valuation" },
-  { icon: "📋", label: "Lease Tracking" },
-  { icon: "⚙️", label: "Equipment Scoring" },
-  { icon: "🛡️", label: "Insurance" },
+  { icon: "valuation", label: "Live Valuation" },
+  { icon: "occupancy", label: "Lease Tracking" },
+  { icon: "equipment", label: "Equipment Scoring" },
+  { icon: "insurance", label: "Insurance" },
 ];
 
 const inputClass = INPUT_CLASS;
@@ -367,7 +368,9 @@ export default function OnboardingPage() {
                     key={f.label}
                     className="rounded-xl p-4 bg-[var(--bg-page)] dark:bg-white/5 border border-[var(--border)] dark:border-white/10"
                   >
-                    <div className="text-[28px] mb-2">{f.icon}</div>
+                    <div className="mb-2 text-blue-400">
+                      <NavIcon name={f.icon} />
+                    </div>
                     <div className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] dark:text-slate-300 font-medium">
                       {f.label}
                     </div>
@@ -672,7 +675,7 @@ export default function OnboardingPage() {
                     style={{ width: "100%" }}
                   >
                     {submitStatus === "success"
-                      ? "Store Created ✓"
+                      ? "Store Created"
                       : submitting
                         ? "Creating store..."
                         : "Finish Setup →"}
