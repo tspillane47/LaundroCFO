@@ -1,7 +1,6 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import {
-  calcDSCR,
   calcGlobalDSCR,
   calcDebtYield,
   calcEbitdaPerSF,
@@ -16,6 +15,7 @@ import {
   fmtMultiple,
   fmtPct,
 } from "@/lib/calculations";
+import type { PortfolioTtmSummary, TtmMetrics } from "@/lib/financials";
 import type { ValuationResult } from "@/lib/valuation";
 
 export interface ReportProps {
@@ -27,6 +27,8 @@ export interface ReportProps {
   realEstate: any;
   valuation: ValuationResult;
   portfolioStores: any[];
+  storeTtm: TtmMetrics | null;
+  portfolioTtm: PortfolioTtmSummary;
   generatedDate: string;
   executiveSummary: string;
 }
@@ -260,33 +262,40 @@ function MetricTile({
 }
 
 function computeReportMetrics(props: ReportProps) {
-  const { store, lease, leaseOptions, equipment, valuation, portfolioStores } = props;
+  const { store, lease, leaseOptions, equipment, valuation, portfolioStores, storeTtm, portfolioTtm } =
+    props;
   const storeName = store?.name ?? "Store";
   const address = store?.address ?? "";
   const sqft = store?.square_footage ?? 3500;
-  const monthlyRevenue = store?.monthly_revenue ?? 0;
-  const monthlyExpenses = store?.monthly_expenses ?? 0;
-  const monthlyEbitda = monthlyRevenue - monthlyExpenses;
-  const annualRevenue = monthlyRevenue * 12;
-  const annualEbitda = monthlyEbitda * 12;
-  const annualDebtService = store?.annual_debt_service ?? 0;
+  const fallbackMonthlyRevenue = store?.monthly_revenue ?? 0;
+  const fallbackMonthlyExpenses = store?.monthly_expenses ?? 0;
+  const hasTtm = (storeTtm?.monthsUsed ?? 0) > 0;
+  const monthlyRevenue = hasTtm
+    ? storeTtm!.ttmRevenue / storeTtm!.monthsUsed
+    : fallbackMonthlyRevenue;
+  const monthlyExpenses = hasTtm
+    ? (storeTtm!.ttmRevenue - storeTtm!.ttmEbitda) / storeTtm!.monthsUsed
+    : fallbackMonthlyExpenses;
+  const monthlyEbitda = hasTtm
+    ? storeTtm!.ttmEbitda / storeTtm!.monthsUsed
+    : monthlyRevenue - monthlyExpenses;
+  const annualRevenue = hasTtm ? storeTtm!.ttmRevenue : monthlyRevenue * 12;
+  const annualEbitda = hasTtm ? storeTtm!.ttmEbitda : monthlyEbitda * 12;
+  const annualOperatingExpenses = hasTtm ? annualRevenue - annualEbitda : monthlyExpenses * 12;
+  const ttmDebtService = storeTtm?.ttmDebtService ?? 0;
   const monthlyUtilities = store?.monthly_utilities ?? 0;
   const loanBalance = store?.loan_balance ?? 0;
   const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
 
-  const dscr = annualDebtService > 0 ? calcDSCR(annualEbitda, annualDebtService) : 0;
-  const portfolioEbitda = portfolioStores.reduce(
-    (s, st) => s + ((st.monthly_revenue ?? 0) - (st.monthly_expenses ?? 0)) * 12,
-    0
-  );
-  const portfolioDebtService = portfolioStores.reduce(
-    (s, st) => s + (st.annual_debt_service ?? 0),
-    0
-  );
+  const dscr = ttmDebtService > 0 ? (storeTtm?.dscr ?? 0) : 0;
+  const portfolioEbitda = portfolioTtm.ttmEbitda;
+  const portfolioDebtService = portfolioTtm.ttmDebtService;
   const globalDscr =
     portfolioDebtService > 0 ? calcGlobalDSCR(portfolioEbitda, portfolioDebtService) : dscr;
 
-  const ebitdaMargin = calcEbitdaMargin(annualEbitda, annualRevenue);
+  const ebitdaMargin = hasTtm
+    ? storeTtm!.ttmEbitdaMargin
+    : calcEbitdaMargin(annualEbitda, annualRevenue);
   const revenuePerSF = calcRevenuePerSF(annualRevenue, sqft);
   const ebitdaPerSF = calcEbitdaPerSF(annualEbitda, sqft);
   const utilityRatio = calcUtilityRatio(monthlyUtilities * 12, annualRevenue);
@@ -337,7 +346,8 @@ function computeReportMetrics(props: ReportProps) {
     monthlyEbitda,
     annualRevenue,
     annualEbitda,
-    annualDebtService,
+    annualOperatingExpenses,
+    ttmDebtService,
     loanBalance,
     isOwnerOccupied,
     dscr,
@@ -369,7 +379,7 @@ function computeReportMetrics(props: ReportProps) {
 
 export function ReportDocument(props: ReportProps) {
   const m = computeReportMetrics(props);
-  const { executiveSummary, generatedDate, lease, realEstate, insurance, portfolioStores, store } =
+  const { executiveSummary, generatedDate, lease, realEstate, insurance, portfolioStores, store, portfolioTtm } =
     props;
 
   return (
@@ -441,8 +451,8 @@ export function ReportDocument(props: ReportProps) {
         <SectionHeader>Financeability Snapshot</SectionHeader>
         <DataRow
           label="Store DSCR"
-          value={m.annualDebtService > 0 ? fmtMultiple(m.dscr) : "N/A"}
-          valueColor={m.annualDebtService > 0 ? ratioColor(m.dscr, 1.5, 1.25) : undefined}
+          value={m.ttmDebtService > 0 ? fmtMultiple(m.dscr) : "N/A"}
+          valueColor={m.ttmDebtService > 0 ? ratioColor(m.dscr, 1.5, 1.25) : undefined}
         />
         <DataRow
           label="Global DSCR"
@@ -456,7 +466,7 @@ export function ReportDocument(props: ReportProps) {
               ✓ Meets minimum 1.25x DSCR threshold — suitable for SBA 7(a) or conventional commercial financing.
             </Text>
           </View>
-        ) : m.annualDebtService > 0 ? (
+        ) : m.ttmDebtService > 0 ? (
           <View style={styles.dangerBox}>
             <Text style={[styles.boxText, styles.negativeText]}>
               ⚠ DSCR below 1.25x — address debt service before lender submission.
@@ -507,19 +517,19 @@ export function ReportDocument(props: ReportProps) {
       {/* 4 — Financial Analysis */}
       <Page size="LETTER" style={styles.page}>
         <Text style={styles.sectionTitle}>Financial Analysis</Text>
-        <Text style={styles.bodyText}>Trailing twelve-month financial profile from reported store data.</Text>
+        <Text style={styles.bodyText}>Trailing twelve-month financial profile from monthly P&L data.</Text>
         <SectionHeader>Income Statement</SectionHeader>
         <DataRow label="Annual Revenue" value={fmtDollar(m.annualRevenue)} />
-        <DataRow label="Annual Expenses" value={fmtDollar(m.monthlyExpenses * 12)} />
+        <DataRow label="Annual Operating Expenses" value={fmtDollar(m.annualOperatingExpenses)} />
         <DataRow label="Annual EBITDA" value={fmtDollar(m.annualEbitda)} positive />
         <DataRow label="EBITDA Margin" value={fmtPct(m.ebitdaMargin)} valueColor={ratioColor(m.ebitdaMargin, 25, 20)} />
-        <DataRow label="Monthly Revenue" value={fmtDollar(m.monthlyRevenue)} />
-        <DataRow label="Monthly EBITDA" value={fmtDollar(m.monthlyEbitda)} />
-        <DataRow label="Annual Debt Service" value={m.annualDebtService > 0 ? fmtDollar(m.annualDebtService) : "Not reported"} />
+        <DataRow label="Monthly Revenue (avg)" value={fmtDollar(m.monthlyRevenue)} />
+        <DataRow label="Monthly EBITDA (avg)" value={fmtDollar(m.monthlyEbitda)} />
+        <DataRow label="TTM Debt Service" value={m.ttmDebtService > 0 ? fmtDollar(m.ttmDebtService) : "Not reported"} />
         <DataRow label="Loan Balance" value={m.loanBalance > 0 ? fmtDollar(m.loanBalance) : "Not reported"} />
         <SectionHeader>Underwriting Ratios</SectionHeader>
         <View style={styles.grid2}>
-          <MetricTile label="DSCR" value={m.annualDebtService > 0 ? fmtMultiple(m.dscr) : "N/A"} valueColor={m.annualDebtService > 0 ? ratioColor(m.dscr, 1.5, 1.25) : undefined} width="23%" />
+          <MetricTile label="DSCR" value={m.ttmDebtService > 0 ? fmtMultiple(m.dscr) : "N/A"} valueColor={m.ttmDebtService > 0 ? ratioColor(m.dscr, 1.5, 1.25) : undefined} width="23%" />
           <MetricTile label="Global DSCR" value={m.portfolioDebtService > 0 ? fmtMultiple(m.globalDscr) : "N/A"} valueColor={m.portfolioDebtService > 0 ? ratioColor(m.globalDscr, 1.5, 1.25) : undefined} width="23%" />
           <MetricTile label="EBITDA Margin" value={fmtPct(m.ebitdaMargin)} valueColor={ratioColor(m.ebitdaMargin, 25, 20)} width="23%" />
           <MetricTile label="Rent / Revenue" value={fmtPct(m.rentToRevenue)} valueColor={ratioColor(m.rentToRevenue, 0, 15, true)} width="23%" />
@@ -716,7 +726,7 @@ export function ReportDocument(props: ReportProps) {
           ))
         )}
         <SectionHeader>Underwriting Risk Matrix</SectionHeader>
-        <DataRow label="DSCR Risk" value={m.dscr >= 1.25 || m.annualDebtService === 0 ? "Low" : "High"} valueColor={m.dscr >= 1.25 || m.annualDebtService === 0 ? "#15803d" : "#b91c1c"} />
+        <DataRow label="DSCR Risk" value={m.dscr >= 1.25 || m.ttmDebtService === 0 ? "Low" : "High"} valueColor={m.dscr >= 1.25 || m.ttmDebtService === 0 ? "#15803d" : "#b91c1c"} />
         <DataRow label="Lease / Site Control" value={m.totalLeaseControl >= 7 ? "Low" : m.totalLeaseControl >= 3 ? "Moderate" : "High"} />
         <DataRow label="Equipment Age Risk" value={m.equipMetrics.weightedAvgAge < 10 ? "Low" : "Moderate"} />
         <DataRow label="Utility Cost Risk" value={m.utilityRatio > 20 ? "High" : m.utilityRatio > 17 ? "Moderate" : "Low"} />
@@ -786,8 +796,10 @@ export function ReportDocument(props: ReportProps) {
               <Text style={[styles.tableCellBold, { width: "30%", textAlign: "right" }]}>Est. Value</Text>
             </View>
             {portfolioStores.map((ps: any) => {
-              const psEbitda = ((ps.monthly_revenue ?? 0) - (ps.monthly_expenses ?? 0)) * 12;
-              const psDscr = (ps.annual_debt_service ?? 0) > 0 ? psEbitda / ps.annual_debt_service : 0;
+              const psTtm = portfolioTtm.byStoreId[ps.id];
+              const psEbitda = psTtm?.ttmEbitda ?? 0;
+              const psDebtService = psTtm?.ttmDebtService ?? 0;
+              const psDscr = psDebtService > 0 ? (psTtm?.dscr ?? 0) : 0;
               return (
                 <View key={ps.id} style={styles.tableRow}>
                   <Text style={[styles.tableCellBold, { width: "30%" }]}>
@@ -795,7 +807,7 @@ export function ReportDocument(props: ReportProps) {
                   </Text>
                   <Text style={[styles.tableCell, { width: "22%" }]}>{fmtDollar(psEbitda)}</Text>
                   <Text style={[styles.tableCell, { width: "18%" }]}>
-                    {(ps.annual_debt_service ?? 0) > 0 ? fmtMultiple(psDscr) : "—"}
+                    {psDebtService > 0 ? fmtMultiple(psDscr) : "—"}
                   </Text>
                   <Text style={[styles.tableCell, { width: "30%", textAlign: "right" }]}>
                     {fmtDollar(psEbitda * m.valuation.finalMultiple)}
@@ -808,7 +820,7 @@ export function ReportDocument(props: ReportProps) {
         <DataRow label="Portfolio EBITDA" value={fmtDollar(m.portfolioEbitda)} />
         <DataRow label="Portfolio Debt Service" value={m.portfolioDebtService > 0 ? fmtDollar(m.portfolioDebtService) : "—"} />
         <DataRow label="Global DSCR" value={m.portfolioDebtService > 0 ? fmtMultiple(m.globalDscr) : "N/A"} valueColor={ratioColor(m.globalDscr, 1.5, 1.25)} />
-        <DataRow label="Combined Est. Value" value={fmtDollar(portfolioStores.reduce((s, ps) => s + (((ps.monthly_revenue ?? 0) - (ps.monthly_expenses ?? 0)) * 12) * m.valuation.finalMultiple, 0))} positive />
+        <DataRow label="Combined Est. Value" value={fmtDollar(portfolioStores.reduce((s, ps) => s + (portfolioTtm.byStoreId[ps.id]?.ttmEbitda ?? 0) * m.valuation.finalMultiple, 0))} positive />
         <PageChrome storeName={m.storeName} />
       </Page>
 
@@ -821,7 +833,7 @@ export function ReportDocument(props: ReportProps) {
         </Text>
         <SectionHeader>Data Sources</SectionHeader>
         <Text style={styles.bodyText}>
-          Financial data: owner-reported monthly revenue, expenses, utilities, and debt service from LaundroCFO store settings. Lease data: Occupancy module. Equipment: equipment inventory records. Insurance: active policy records. All figures should be independently verified during lender due diligence.
+          Financial data: trailing twelve-month P&L from monthly_financials (revenue, operating expenses, and debt service). Lease data: Occupancy module. Equipment: equipment inventory records. Insurance: active policy records. All figures should be independently verified during lender due diligence.
         </Text>
         <SectionHeader>Glossary</SectionHeader>
         <DataRow label="EBITDA" value="Earnings before interest, taxes, depreciation, and amortization" />

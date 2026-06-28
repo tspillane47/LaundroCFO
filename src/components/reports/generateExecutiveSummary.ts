@@ -1,5 +1,6 @@
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
-import { calcDSCR, calcEbitdaMargin, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import { calcEbitdaMargin, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import type { TtmMetrics } from "@/lib/financials";
 import type { ValuationResult } from "@/lib/valuation";
 
 function parseDate(value: string | null | undefined): Date | null {
@@ -35,23 +36,26 @@ export function generateExecutiveSummary({
   leaseOptions = [],
   equipment,
   valuation,
+  storeTtm,
 }: {
   store: any;
   lease: any | null;
   leaseOptions?: any[];
   equipment: any[];
   valuation: ValuationResult;
+  storeTtm?: TtmMetrics | null;
 }): string {
   const storeName = store?.name ?? "This store";
   const address = store?.address ?? "its market area";
   const sqft = store?.square_footage ?? 0;
   const monthlyRevenue = store?.monthly_revenue ?? 0;
   const monthlyExpenses = store?.monthly_expenses ?? 0;
-  const annualRevenue = monthlyRevenue * 12;
-  const annualEbitda = (monthlyRevenue - monthlyExpenses) * 12;
-  const ebitdaMargin = calcEbitdaMargin(annualEbitda, annualRevenue);
-  const annualDebtService = store?.annual_debt_service ?? 0;
-  const dscr = annualDebtService > 0 ? calcDSCR(annualEbitda, annualDebtService) : 0;
+  const hasTtm = (storeTtm?.monthsUsed ?? 0) > 0;
+  const annualRevenue = hasTtm ? storeTtm!.ttmRevenue : monthlyRevenue * 12;
+  const annualEbitda = hasTtm ? storeTtm!.ttmEbitda : (monthlyRevenue - monthlyExpenses) * 12;
+  const ebitdaMargin = hasTtm ? storeTtm!.ttmEbitdaMargin : calcEbitdaMargin(annualEbitda, annualRevenue);
+  const ttmDebtService = storeTtm?.ttmDebtService ?? 0;
+  const dscr = ttmDebtService > 0 ? (storeTtm?.dscr ?? 0) : 0;
   const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
 
   const equipMetrics = computeEquipmentMetrics((equipment ?? []) as EquipmentRecord[]);
@@ -88,8 +92,8 @@ export function generateExecutiveSummary({
   }
 
   let dscrSentence: string;
-  if (annualDebtService <= 0) {
-    dscrSentence = "Debt service data has not been reported — enter loan details to complete DSCR analysis.";
+  if (ttmDebtService <= 0) {
+    dscrSentence = "Debt service data has not been reported in monthly P&L — enter debt service on the Financials page to complete DSCR analysis.";
   } else if (dscr >= 1.5) {
     dscrSentence = `DSCR of ${fmtMultiple(dscr)} reflects a strong debt coverage position well above the 1.25x lender minimum.`;
   } else if (dscr >= 1.25) {

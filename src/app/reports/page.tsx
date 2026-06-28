@@ -9,7 +9,6 @@ import { getStoreValuation } from "@/lib/getStoreValuation";
 import type { ValuationResult } from "@/lib/valuation";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import {
-  calcDSCR,
   calcGlobalDSCR,
   calcDebtYield,
   calcEbitdaMargin,
@@ -29,6 +28,13 @@ import {
 } from "@/components/reports/PortfolioReportDocument";
 import { generateExecutiveSummary } from "@/components/reports/generateExecutiveSummary";
 import { getPortfolioReport, type PortfolioReportData } from "@/lib/getPortfolioReport";
+import {
+  buildPortfolioTtmSummary,
+  EMPTY_TTM_METRICS,
+  type MonthlyFinancialRecord,
+  type PortfolioTtmSummary,
+  type TtmMetrics,
+} from "@/lib/financials";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
@@ -129,6 +135,8 @@ export default function ReportsPage() {
   const [realEstate, setRealEstate] = useState<any>(null);
   const [totalLeaseControl, setTotalLeaseControl] = useState(0);
   const [valuation, setValuation] = useState<ValuationResult | null>(null);
+  const [storeTtm, setStoreTtm] = useState<TtmMetrics | null>(null);
+  const [portfolioTtm, setPortfolioTtm] = useState<PortfolioTtmSummary | null>(null);
 
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -145,6 +153,8 @@ export default function ReportsPage() {
   useEffect(() => {
     async function load() {
       if (!selectedStore?.id) {
+        setStoreTtm(null);
+        setPortfolioTtm(null);
         setLoading(false);
         return;
       }
@@ -185,6 +195,21 @@ export default function ReportsPage() {
 
       setEquipment((equipmentData ?? []) as EquipmentRecord[]);
       setInsurance(policiesData ?? []);
+
+      const storeIds = stores.length > 0 ? stores.map((s) => s.id) : [storeData.id];
+      const { data: portfolioFinancialsData } = await supabase
+        .from("monthly_financials")
+        .select("*")
+        .in("store_id", storeIds)
+        .order("year", { ascending: false })
+        .order("month", { ascending: false });
+
+      const portfolioSummary = buildPortfolioTtmSummary(
+        (portfolioFinancialsData ?? []) as MonthlyFinancialRecord[],
+        storeIds
+      );
+      setStoreTtm(portfolioSummary.byStoreId[storeData.id] ?? EMPTY_TTM_METRICS);
+      setPortfolioTtm(portfolioSummary);
 
       const ownerOccupied = storeData.occupancy_type === "owner_occupied";
 
@@ -232,7 +257,7 @@ export default function ReportsPage() {
     }
 
     load();
-  }, [selectedStore?.id, supabase]);
+  }, [selectedStore?.id, stores, supabase]);
 
   useEffect(() => {
     async function loadPortfolio() {
@@ -280,8 +305,8 @@ export default function ReportsPage() {
 
   const executiveSummary = useMemo(() => {
     if (!store || !valuation) return "";
-    return generateExecutiveSummary({ store, lease, leaseOptions, equipment, valuation });
-  }, [store, lease, leaseOptions, equipment, valuation]);
+    return generateExecutiveSummary({ store, lease, leaseOptions, equipment, valuation, storeTtm });
+  }, [store, lease, leaseOptions, equipment, valuation, storeTtm]);
 
   const metrics = useMemo(() => {
     if (!store || !valuation) return null;
@@ -289,22 +314,23 @@ export default function ReportsPage() {
     const monthlyRevenue = store.monthly_revenue ?? 0;
     const monthlyExpenses = store.monthly_expenses ?? 0;
     const monthlyEbitda = monthlyRevenue - monthlyExpenses;
-    const annualRevenue = monthlyRevenue * 12;
-    const annualEbitda = monthlyEbitda * 12;
-    const annualDebtService = store.annual_debt_service ?? 0;
+    const annualRevenue =
+      storeTtm && storeTtm.monthsUsed > 0 ? storeTtm.ttmRevenue : monthlyRevenue * 12;
+    const annualEbitda =
+      storeTtm && storeTtm.monthsUsed > 0 ? storeTtm.ttmEbitda : monthlyEbitda * 12;
+    const ttmDebtService = storeTtm?.ttmDebtService ?? 0;
     const monthlyUtilities = store.monthly_utilities ?? 0;
     const loanBalance = store.loan_balance ?? 0;
     const sqft = store.square_footage ?? 3500;
     const isOwnerOccupied = store.occupancy_type === "owner_occupied";
 
-    const dscr = annualDebtService > 0 ? calcDSCR(annualEbitda, annualDebtService) : 0;
-    const portfolioEbitda = stores.reduce(
-      (s, st) => s + ((st.monthly_revenue ?? 0) - (st.monthly_expenses ?? 0)) * 12,
-      0
-    );
-    const portfolioDebtService = stores.reduce((s, st) => s + (st.annual_debt_service ?? 0), 0);
+    const dscr = ttmDebtService > 0 ? (storeTtm?.dscr ?? 0) : 0;
+    const portfolioTtmEbitda = portfolioTtm?.ttmEbitda ?? 0;
+    const portfolioTtmDebtService = portfolioTtm?.ttmDebtService ?? 0;
     const globalDscr =
-      portfolioDebtService > 0 ? calcGlobalDSCR(portfolioEbitda, portfolioDebtService) : dscr;
+      portfolioTtmDebtService > 0
+        ? calcGlobalDSCR(portfolioTtmEbitda, portfolioTtmDebtService)
+        : dscr;
 
     const ebitdaMargin = calcEbitdaMargin(annualEbitda, annualRevenue);
     const utilityRatio = calcUtilityRatio(monthlyUtilities * 12, annualRevenue);
@@ -341,6 +367,8 @@ export default function ReportsPage() {
       annualRevenue,
       dscr,
       globalDscr,
+      ttmDebtService,
+      portfolioTtmDebtService,
       ebitdaMargin,
       utilityRatio,
       rentToRevenue,
@@ -358,10 +386,10 @@ export default function ReportsPage() {
       financeRating: financeabilityRating(dscr, globalDscr),
       isOwnerOccupied,
     };
-  }, [store, valuation, stores, lease, leaseOptions, totalLeaseControl]);
+  }, [store, valuation, stores, lease, leaseOptions, totalLeaseControl, storeTtm, portfolioTtm]);
 
   const reportProps: ReportProps | null = useMemo(() => {
-    if (!store || !valuation) return null;
+    if (!store || !valuation || !portfolioTtm) return null;
     return {
       store,
       lease,
@@ -371,6 +399,8 @@ export default function ReportsPage() {
       realEstate,
       valuation,
       portfolioStores: stores,
+      storeTtm,
+      portfolioTtm,
       generatedDate,
       executiveSummary,
     };
@@ -383,6 +413,8 @@ export default function ReportsPage() {
     realEstate,
     valuation,
     stores,
+    storeTtm,
+    portfolioTtm,
     generatedDate,
     executiveSummary,
   ]);
@@ -506,7 +538,7 @@ export default function ReportsPage() {
   }
 
   const storeName = store?.name ?? "Your Store";
-  const isStoreReady = Boolean(store && valuation && metrics);
+  const isStoreReady = Boolean(store && valuation && metrics && portfolioTtm);
   const portfolioReady = Boolean(portfolioData && portfolioData.totals.storeCount > 0);
   const totals = portfolioData?.totals;
   const cashFlow = portfolioData?.cashFlow;
@@ -887,12 +919,12 @@ export default function ReportsPage() {
           <div className="divide-y divide-white/[0.04] text-[13px]">
             <PreviewRow
               label="DSCR"
-              value={store.annual_debt_service ? fmtMultiple(metrics.dscr) : "N/A"}
+              value={metrics.ttmDebtService > 0 ? fmtMultiple(metrics.dscr) : "N/A"}
               className={ratioColorClass(metrics.dscr, 1.25, 1.0)}
             />
             <PreviewRow
               label="Global DSCR"
-              value={stores.some((s) => s.annual_debt_service) ? fmtMultiple(metrics.globalDscr) : "N/A"}
+              value={metrics.portfolioTtmDebtService > 0 ? fmtMultiple(metrics.globalDscr) : "N/A"}
               className={ratioColorClass(metrics.globalDscr, 1.25, 1.0)}
             />
             <PreviewRow label="Rating" value={metrics.financeRating} className="text-green-400" />
@@ -1018,8 +1050,8 @@ export default function ReportsPage() {
         <SectionHeading>Financial Ratios</SectionHeading>
         <div className="grid grid-cols-4 gap-3">
           {[
-            ["DSCR", store.annual_debt_service ? fmtMultiple(metrics.dscr) : "N/A", ratioColorClass(metrics.dscr, 1.25, 1.0)],
-            ["Global DSCR", stores.some((s) => s.annual_debt_service) ? fmtMultiple(metrics.globalDscr) : "N/A", ratioColorClass(metrics.globalDscr, 1.25, 1.0)],
+            ["DSCR", metrics.ttmDebtService > 0 ? fmtMultiple(metrics.dscr) : "N/A", ratioColorClass(metrics.dscr, 1.25, 1.0)],
+            ["Global DSCR", metrics.portfolioTtmDebtService > 0 ? fmtMultiple(metrics.globalDscr) : "N/A", ratioColorClass(metrics.globalDscr, 1.25, 1.0)],
             ["EBITDA Margin", fmtPct(metrics.ebitdaMargin), ratioColorClass(metrics.ebitdaMargin, 25, 20)],
             ["Rent / Revenue", fmtPct(metrics.rentToRevenue), ratioColorClass(metrics.rentToRevenue, 0, 15, true)],
             ["Utility / Revenue", fmtPct(metrics.utilityRatio), ratioColorClass(metrics.utilityRatio, 0, 17, true)],

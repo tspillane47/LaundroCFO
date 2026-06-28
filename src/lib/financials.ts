@@ -325,6 +325,64 @@ export function calcTtmMetrics(records: CalculatedMonthly[]): TtmMetrics {
   };
 }
 
+export const EMPTY_TTM_METRICS: TtmMetrics = {
+  ttmRevenue: 0,
+  ttmEbitda: 0,
+  ttmEbitdaMargin: 0,
+  ttmDebtService: 0,
+  ttmNoi: 0,
+  dscr: 0,
+  monthsUsed: 0,
+};
+
+export function groupFinancialsByStoreId(
+  rows: MonthlyFinancialRecord[]
+): Map<string, MonthlyFinancialRecord[]> {
+  const map = new Map<string, MonthlyFinancialRecord[]>();
+  for (const row of rows) {
+    const list = map.get(row.store_id) ?? [];
+    list.push(row);
+    map.set(row.store_id, list);
+  }
+  return map;
+}
+
+export function calcStoreTtmFromFinancials(records: MonthlyFinancialRecord[]): TtmMetrics {
+  if (records.length === 0) return EMPTY_TTM_METRICS;
+  return calcTtmMetrics(enrichMonthlyRecords(sortRecordsDesc(records)));
+}
+
+export type PortfolioTtmSummary = {
+  byStoreId: Record<string, TtmMetrics>;
+  ttmEbitda: number;
+  ttmDebtService: number;
+  globalDscr: number;
+};
+
+export function buildPortfolioTtmSummary(
+  rows: MonthlyFinancialRecord[],
+  storeIds: string[]
+): PortfolioTtmSummary {
+  const grouped = groupFinancialsByStoreId(rows);
+  const byStoreId: Record<string, TtmMetrics> = {};
+  let ttmEbitda = 0;
+  let ttmDebtService = 0;
+
+  for (const id of storeIds) {
+    const ttm = calcStoreTtmFromFinancials(grouped.get(id) ?? []);
+    byStoreId[id] = ttm;
+    ttmEbitda += ttm.ttmEbitda;
+    ttmDebtService += ttm.ttmDebtService;
+  }
+
+  return {
+    byStoreId,
+    ttmEbitda,
+    ttmDebtService,
+    globalDscr: ttmDebtService > 0 ? ttmEbitda / ttmDebtService : 0,
+  };
+}
+
 import type { createClient } from "@/lib/supabase";
 import { toNum, toNullableText } from "@/lib/formHelpers";
 

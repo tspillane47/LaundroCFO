@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase";
 import { getStoreValuation, getStoreDebt } from "@/lib/getStoreValuation";
+import {
+  buildPortfolioTtmSummary,
+  type MonthlyFinancialRecord,
+} from "@/lib/financials";
 
 export interface PortfolioReportData {
   stores: any[];
@@ -92,6 +96,19 @@ export async function getPortfolioReport(userId: string): Promise<PortfolioRepor
     };
   }
 
+  const storeIds = stores.map((s) => s.id);
+  const { data: financialsData } = await supabase
+    .from("monthly_financials")
+    .select("*")
+    .in("store_id", storeIds)
+    .order("year", { ascending: false })
+    .order("month", { ascending: false });
+
+  const portfolioTtm = buildPortfolioTtmSummary(
+    (financialsData ?? []) as MonthlyFinancialRecord[],
+    storeIds
+  );
+
   const storeDetails = await Promise.all(
     stores.map(async (store) => {
       const valuation = await getStoreValuation(store.id);
@@ -119,16 +136,15 @@ export async function getPortfolioReport(userId: string): Promise<PortfolioRepor
         .select("*")
         .eq("store_id", store.id)
         .eq("is_active", true);
-      const { data: loans } = await supabase
-        .from("store_loans")
-        .select("*")
-        .eq("store_id", store.id)
-        .eq("is_active", true);
 
-      const annualRevenue = (store.monthly_revenue ?? 0) * 12;
-      const annualEbitda = ((store.monthly_revenue ?? 0) - (store.monthly_expenses ?? 0)) * 12;
-      const annualDebtService = (loans ?? []).reduce((s, l) => s + (l.monthly_payment ?? 0) * 12, 0);
-      const dscr = annualDebtService > 0 ? annualEbitda / annualDebtService : 0;
+      const ttm = portfolioTtm.byStoreId[store.id];
+      const hasTtm = (ttm?.monthsUsed ?? 0) > 0;
+      const annualRevenue = hasTtm ? ttm.ttmRevenue : (store.monthly_revenue ?? 0) * 12;
+      const annualEbitda = hasTtm
+        ? ttm.ttmEbitda
+        : ((store.monthly_revenue ?? 0) - (store.monthly_expenses ?? 0)) * 12;
+      const annualDebtService = ttm?.ttmDebtService ?? 0;
+      const dscr = annualDebtService > 0 ? (ttm?.dscr ?? 0) : 0;
 
       const equity = valuation.businessValue - debt + cash;
 
@@ -196,9 +212,9 @@ export async function getPortfolioReport(userId: string): Promise<PortfolioRepor
   const portfolioEquity = portfolioValue - portfolioDebt + portfolioCash;
   const portfolioNetWorth = portfolioValue + portfolioCash - portfolioDebt;
   const annualRevenue = storeDetails.reduce((s, d) => s + d.annualRevenue, 0);
-  const annualEbitda = storeDetails.reduce((s, d) => s + d.annualEbitda, 0);
-  const annualDebtService = storeDetails.reduce((s, d) => s + d.annualDebtService, 0);
-  const globalDSCR = annualDebtService > 0 ? annualEbitda / annualDebtService : 0;
+  const annualEbitda = portfolioTtm.ttmEbitda;
+  const annualDebtService = portfolioTtm.ttmDebtService;
+  const globalDSCR = portfolioTtm.globalDscr;
   const globalLTV = portfolioValue > 0 ? (portfolioDebt / portfolioValue) * 100 : 0;
   const debtYield = portfolioDebt > 0 ? (annualEbitda / portfolioDebt) * 100 : 0;
   const debtToEbitda = annualEbitda > 0 ? portfolioDebt / annualEbitda : 0;
