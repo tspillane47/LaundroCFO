@@ -66,7 +66,8 @@ const pageTitles: Record<string, string> = {
   "/admin/feedback": "Feedback Admin",
 };
 
-const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password", "/auth/callback", "/terms"];
+const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password", "/auth/callback"];
+const publicPages = ["/terms"];
 const marketingPages = ["/", "/pricing", "/about"];
 
 function AppShell({ children }: { children: React.ReactNode }) {
@@ -522,6 +523,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const [isDark, setIsDark] = useState(false);
   const isAuthPage = authPages.includes(pathname);
+  const isPublicPage = publicPages.includes(pathname);
   const isMarketingPage = marketingPages.includes(pathname);
 
   useEffect(() => {
@@ -536,7 +538,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     else document.documentElement.classList.remove("dark");
   }, []);
 
-  if (isAuthPage || isMarketingPage) {
+  if (isAuthPage || isPublicPage || isMarketingPage) {
     return (
       <html lang="en" className={isDark ? "dark" : ""}>
         <body>{children}</body>

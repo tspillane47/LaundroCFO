@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { Disclaimer } from "@/components/ui/Disclaimer";
+import { TermsBackLink } from "@/components/ui/TermsBackLink";
 
 const sections = [
   {
@@ -143,12 +143,7 @@ export default function TermsPage() {
     <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0d1520]">
       <div className="max-w-3xl mx-auto px-6 py-12">
         <div className="mb-8">
-          <Link
-            href="/login"
-            className="text-[13px] text-slate-500 hover:text-slate-300 mb-6 inline-block"
-          >
-            ← Back
-          </Link>
+          <TermsBackLink />
           <h1 className="text-[28px] font-bold text-slate-100 mb-2">Terms of Service</h1>
           <p className="text-[14px] text-slate-400">
             Last updated: June 28, 2026

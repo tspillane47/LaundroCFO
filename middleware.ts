@@ -11,6 +11,7 @@ const PUBLIC_ROUTES = [
   '/forgot-password',
   '/reset-password',
   '/auth/callback',
+  '/terms',
 ]
 
 const PROTECTED_PREFIXES = [
