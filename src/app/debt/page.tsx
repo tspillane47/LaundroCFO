@@ -21,7 +21,12 @@ import {
   calcPayoffDate,
   generatePayoffSchedule,
 } from "@/lib/amortization";
-import { fmtDollar } from "@/lib/calculations";
+import { calcDSCR, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import {
+  calcStoreTtmFromFinancials,
+  type MonthlyFinancialRecord,
+} from "@/lib/financials";
+import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { FormBanner } from "@/components/ui/FormBanner";
@@ -171,6 +176,37 @@ function enrichLoan(loan: StoreLoan): EnrichedLoan {
   };
 }
 
+function variancePct(variance: number, scheduled: number): number {
+  if (scheduled === 0) return variance === 0 ? 0 : 100;
+  return Math.abs(variance / scheduled) * 100;
+}
+
+function varianceColorClass(variance: number, scheduled: number): string {
+  return variancePct(variance, scheduled) > 5 ? "text-red-400" : "text-green-400";
+}
+
+function dscrColorClass(dscr: number): string {
+  if (dscr >= 1.25) return "text-green-400";
+  if (dscr >= 1.0) return "text-amber-400";
+  return "text-red-400";
+}
+
+function fmtVariance(value: number): string {
+  const prefix = value > 0 ? "+" : value < 0 ? "−" : "";
+  return `${prefix}${fmtDollar(Math.abs(value))}`;
+}
+
+function earliestLoanEndDate(loans: EnrichedLoan[]): string {
+  const dates = loans
+    .map((l) => l.loan_end_date)
+    .filter(Boolean)
+    .map((d) => new Date(d!.split("T")[0]))
+    .filter((d) => !Number.isNaN(d.getTime()));
+  if (dates.length === 0) return "—";
+  const earliest = dates.reduce((min, d) => (d < min ? d : min));
+  return earliest.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 function formatAxisValue(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `$${Math.round(value / 1_000)}k`;
@@ -257,6 +293,7 @@ export default function DebtPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<LoanForm>(emptyLoanForm());
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [financialRecords, setFinancialRecords] = useState<MonthlyFinancialRecord[]>([]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -275,11 +312,16 @@ export default function DebtPage() {
       if (!selectedStore?.id) {
         setLoans([]);
         setValuation(null);
+        setFinancialRecords([]);
         setLoading(false);
         return;
       }
 
-      const [{ data: loansData, error: loansError }, storeValuation] = await Promise.all([
+      const [
+        { data: loansData, error: loansError },
+        storeValuation,
+        { data: financialsData, error: financialsError },
+      ] = await Promise.all([
         supabase
           .from("store_loans")
           .select("*")
@@ -287,12 +329,20 @@ export default function DebtPage() {
           .eq("is_active", true)
           .order("current_balance", { ascending: false }),
         getStoreValuation(selectedStore.id),
+        supabase
+          .from("monthly_financials")
+          .select("*")
+          .eq("store_id", selectedStore.id)
+          .order("year", { ascending: false })
+          .order("month", { ascending: false }),
       ]);
 
       if (loansError) throw loansError;
+      if (financialsError) throw financialsError;
 
       setLoans((loansData ?? []) as StoreLoan[]);
       setValuation(storeValuation);
+      setFinancialRecords((financialsData ?? []) as MonthlyFinancialRecord[]);
     } catch {
       setLoadError(true);
     } finally {
@@ -311,6 +361,44 @@ export default function DebtPage() {
   }, [message]);
 
   const enrichedLoans = useMemo(() => loans.map(enrichLoan), [loans]);
+
+  const ttm = useMemo(() => calcStoreTtmFromFinancials(financialRecords), [financialRecords]);
+
+  const debtServiceAnalysis = useMemo(() => {
+    const scheduledMonthly = enrichedLoans.reduce((s, l) => s + (l.monthly_payment ?? 0), 0);
+    const scheduledAnnual = scheduledMonthly * 12;
+    const hasActualData = ttm.monthsUsed > 0;
+    const actualMonthlyAvg = hasActualData ? ttm.ttmDebtService / ttm.monthsUsed : null;
+    const actualAnnualTotal = hasActualData ? ttm.ttmDebtService : null;
+    const monthlyVariance =
+      actualMonthlyAvg != null ? actualMonthlyAvg - scheduledMonthly : null;
+    const annualVariance =
+      actualAnnualTotal != null ? actualAnnualTotal - scheduledAnnual : null;
+    const monthlyVariancePct =
+      monthlyVariance != null ? variancePct(monthlyVariance, scheduledMonthly) : null;
+
+    const scheduledDscr =
+      scheduledAnnual > 0 && ttm.ttmEbitda > 0
+        ? calcDSCR(ttm.ttmEbitda, scheduledAnnual)
+        : null;
+    const actualDscr =
+      actualAnnualTotal != null && actualAnnualTotal > 0 && ttm.ttmEbitda > 0
+        ? calcDSCR(ttm.ttmEbitda, actualAnnualTotal)
+        : null;
+
+    return {
+      scheduledMonthly,
+      scheduledAnnual,
+      actualMonthlyAvg,
+      actualAnnualTotal,
+      monthlyVariance,
+      annualVariance,
+      monthlyVariancePct,
+      scheduledDscr,
+      actualDscr,
+      hasActualData,
+    };
+  }, [enrichedLoans, ttm]);
 
   const totals = useMemo(() => {
     const totalDebt = enrichedLoans.reduce((s, l) => s + l.estimatedCurrentBalance, 0);
@@ -760,7 +848,179 @@ export default function DebtPage() {
         )}
       </div>
 
-      {/* Section 4 — Add/Edit form */}
+      {/* Section 4 — Debt Service Analysis */}
+      <div className="card">
+        <div className="section-title mb-4">Debt Service Analysis</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                {["", "Scheduled", "Actual (TTM)", "Variance"].map((col) => (
+                  <th
+                    key={col}
+                    className={clsx(
+                      "py-2.5 pr-4 font-medium",
+                      col === "" ? "text-left" : "text-right"
+                    )}
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                <td className="py-3 pr-4 font-medium" style={{ color: "var(--text-primary)" }}>
+                  Monthly Debt Service
+                </td>
+                <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "var(--text-primary)" }}>
+                  {fmtDollar(debtServiceAnalysis.scheduledMonthly)}
+                </td>
+                <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>
+                  {debtServiceAnalysis.hasActualData
+                    ? fmtDollar(debtServiceAnalysis.actualMonthlyAvg ?? 0)
+                    : "N/A"}
+                </td>
+                <td
+                  className={clsx(
+                    "py-3 pr-4 text-right tabular-nums font-semibold",
+                    debtServiceAnalysis.monthlyVariance != null
+                      ? varianceColorClass(
+                          debtServiceAnalysis.monthlyVariance,
+                          debtServiceAnalysis.scheduledMonthly
+                        )
+                      : "text-slate-400"
+                  )}
+                >
+                  {debtServiceAnalysis.monthlyVariance != null
+                    ? fmtVariance(debtServiceAnalysis.monthlyVariance)
+                    : "N/A"}
+                </td>
+              </tr>
+              <tr>
+                <td className="py-3 pr-4 font-medium" style={{ color: "var(--text-primary)" }}>
+                  Annual Debt Service
+                </td>
+                <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "var(--text-primary)" }}>
+                  {fmtDollar(debtServiceAnalysis.scheduledAnnual)}
+                </td>
+                <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>
+                  {debtServiceAnalysis.hasActualData
+                    ? fmtDollar(debtServiceAnalysis.actualAnnualTotal ?? 0)
+                    : "N/A"}
+                </td>
+                <td
+                  className={clsx(
+                    "py-3 pr-4 text-right tabular-nums font-semibold",
+                    debtServiceAnalysis.annualVariance != null
+                      ? varianceColorClass(
+                          debtServiceAnalysis.annualVariance,
+                          debtServiceAnalysis.scheduledAnnual
+                        )
+                      : "text-slate-400"
+                  )}
+                >
+                  {debtServiceAnalysis.annualVariance != null
+                    ? fmtVariance(debtServiceAnalysis.annualVariance)
+                    : "N/A"}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {debtServiceAnalysis.monthlyVariancePct != null &&
+          debtServiceAnalysis.monthlyVariancePct > 5 && (
+            <div
+              className="mt-4 px-3 py-2.5 rounded-lg text-[12px]"
+              style={{
+                background: "rgba(245,158,11,0.1)",
+                border: "1px solid rgba(245,158,11,0.25)",
+                color: "#fbbf24",
+              }}
+            >
+              Actual debt service differs from scheduled by{" "}
+              {debtServiceAnalysis.monthlyVariancePct.toFixed(1)}% — review loan statements
+            </div>
+          )}
+      </div>
+
+      {/* Section 5 — DSCR */}
+      <div>
+        <div className="section-title mb-4">DSCR</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="card">
+            <div className="metric-label">
+              <DisclaimerLabel>DSCR (Scheduled)</DisclaimerLabel>
+            </div>
+            <div
+              className={clsx(
+                "text-[28px] font-bold tabular-nums mt-1",
+                debtServiceAnalysis.scheduledDscr != null
+                  ? dscrColorClass(debtServiceAnalysis.scheduledDscr)
+                  : "text-slate-400"
+              )}
+            >
+              {debtServiceAnalysis.scheduledDscr != null
+                ? fmtMultiple(debtServiceAnalysis.scheduledDscr)
+                : "N/A"}
+            </div>
+            <div className="text-[12px] mt-2" style={{ color: "var(--text-muted)" }}>
+              TTM EBITDA {fmtDollar(ttm.ttmEbitda)} ÷ scheduled annual debt service
+            </div>
+          </div>
+          <div className="card">
+            <div className="metric-label">
+              <DisclaimerLabel>DSCR (Actual)</DisclaimerLabel>
+            </div>
+            <div
+              className={clsx(
+                "text-[28px] font-bold tabular-nums mt-1",
+                debtServiceAnalysis.actualDscr != null
+                  ? dscrColorClass(debtServiceAnalysis.actualDscr)
+                  : "text-slate-400"
+              )}
+            >
+              {debtServiceAnalysis.actualDscr != null
+                ? fmtMultiple(debtServiceAnalysis.actualDscr)
+                : "N/A"}
+            </div>
+            <div className="text-[12px] mt-2" style={{ color: "var(--text-muted)" }}>
+              TTM EBITDA {fmtDollar(ttm.ttmEbitda)} ÷ actual TTM debt service
+            </div>
+          </div>
+        </div>
+        <p className="text-[12px] mt-3" style={{ color: "var(--text-muted)" }}>
+          Lenders typically use scheduled debt service for underwriting
+        </p>
+      </div>
+
+      {/* Section 6 — Loan Summary Footer */}
+      <div className="card">
+        <div className="section-title mb-4">Loan Summary</div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <div className="metric-label mb-1">Total Outstanding Balance</div>
+            <div className="text-[18px] font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>
+              {enrichedLoans.length > 0 ? fmtDollar(totals.totalDebt) : "—"}
+            </div>
+          </div>
+          <div>
+            <div className="metric-label mb-1">Weighted Avg Interest Rate</div>
+            <div className="text-[18px] font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>
+              {enrichedLoans.length > 0 ? `${totals.weightedAvgRate.toFixed(2)}%` : "—"}
+            </div>
+          </div>
+          <div>
+            <div className="metric-label mb-1">Earliest Loan End Date</div>
+            <div className="text-[18px] font-bold" style={{ color: "var(--text-primary)" }}>
+              {enrichedLoans.length > 0 ? earliestLoanEndDate(enrichedLoans) : "—"}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 7 — Add/Edit form */}
       {showForm && (
         <div className="card">
           <div className="flex items-center justify-between mb-4">
@@ -924,7 +1184,7 @@ export default function DebtPage() {
         </div>
       )}
 
-      {/* Section 5 — Payoff Projection chart */}
+      {/* Section 8 — Payoff Projection chart */}
       {largestLoan && payoffSchedule.length > 0 && (
         <div className="card">
           <div className="section-title mb-1">Debt Payoff Projection (24 Months)</div>
@@ -969,7 +1229,7 @@ export default function DebtPage() {
         </div>
       )}
 
-      {/* Section 6 — Loan breakdown table */}
+      {/* Section 9 — Loan breakdown table */}
       {enrichedLoans.length > 1 && (
         <div className="card overflow-x-auto">
           <div className="section-title mb-4">Loan Breakdown</div>
