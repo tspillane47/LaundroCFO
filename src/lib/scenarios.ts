@@ -21,6 +21,7 @@ export type StoreScenarioContext = {
   store: Record<string, unknown>;
   equipment: EquipmentRecord[];
   totalLeaseControl: number;
+  leaseYearsRemaining: number;
   isOwnerOccupied: boolean;
   realEstateValue: number;
   resolvedFinancials?: ResolvedStoreFinancials;
@@ -63,6 +64,7 @@ export function buildValuationInputs(
     equipmentScore?: number;
     pct200G?: number;
     totalLeaseControl?: number;
+    leaseYearsRemaining?: number;
     wdfPct?: number;
     commercialPct?: number;
     pickupDeliveryPct?: number;
@@ -95,6 +97,7 @@ export function buildValuationInputs(
       overrides.equipmentScore ??
       (equipMetrics.totalMachines > 0 ? equipMetrics.qualityScore : 85),
     totalLeaseControl: overrides.totalLeaseControl ?? ctx.totalLeaseControl,
+    leaseYearsRemaining: overrides.leaseYearsRemaining ?? ctx.leaseYearsRemaining,
     occupancyType: ctx.isOwnerOccupied ? "owned" : "leased",
     marketDensity: normalizeMarketDensity(
       (store.market_density as string) ?? (store.location_type as string)
@@ -172,6 +175,7 @@ export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
   });
 
   const leaseExt = runValuation(ctx, {
+    leaseYearsRemaining: ctx.leaseYearsRemaining + 5,
     totalLeaseControl: ctx.totalLeaseControl + 5,
   });
 
@@ -271,6 +275,7 @@ export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
       newEbitda: annualEbitda,
       newMultiple: leaseExt.finalMultiple,
       detail: {
+        newYearsRemaining: `${(ctx.leaseYearsRemaining + 5).toFixed(1)} yrs`,
         newTotalControl: `${(ctx.totalLeaseControl + 5).toFixed(1)} yrs`,
         multipleImpact: `+${(leaseExt.finalMultiple - baseline.finalMultiple).toFixed(2)}x`,
       },

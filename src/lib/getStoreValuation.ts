@@ -140,11 +140,13 @@ export function buildStoreValuationInputs(
   const isOwnerOccupied = store.occupancy_type === "owner_occupied";
 
   let totalLeaseControl = 0;
+  let leaseYearsRemaining = 0;
   if (!isOwnerOccupied && lease?.lease_end_date) {
     const yearsRemaining = calcYearsRemaining(lease.lease_end_date as string);
     const optionYears = leaseOptions
       .filter((o) => o.status === "Available")
       .reduce((s, o) => s + (Number(o.option_years) || 0), 0);
+    leaseYearsRemaining = yearsRemaining;
     totalLeaseControl = yearsRemaining + optionYears;
   }
 
@@ -158,6 +160,7 @@ export function buildStoreValuationInputs(
       pct200G: 0,
       equipmentScore: 0,
       totalLeaseControl: 0,
+      leaseYearsRemaining: 0,
       occupancyType: isOwnerOccupied ? "owned" : "leased",
       marketDensity: "",
       storeCondition: "",
@@ -200,6 +203,7 @@ export function buildStoreValuationInputs(
     pct200G: equipMetrics.pct200GWashers,
     equipmentScore: equipMetrics.totalMachines > 0 ? equipMetrics.qualityScore : 0,
     totalLeaseControl,
+    leaseYearsRemaining,
     occupancyType: isOwnerOccupied ? "owned" : "leased",
     marketDensity: normalizeMarketDensity(
       (store.market_density as string) ?? (store.location_type as string)

@@ -6,6 +6,8 @@ export interface ValuationInputs {
   pct200G: number;
   equipmentScore: number;
   totalLeaseControl: number;
+  /** Base lease years remaining; when set, term and option years adjust the multiple separately. */
+  leaseYearsRemaining?: number;
   occupancyType: string;
   marketDensity: string;
   storeCondition: string;
@@ -53,6 +55,24 @@ function pushAdj(
   if (value !== 0) {
     adjustments.push({ label, value, reason, category });
   }
+}
+
+function calcLeaseTermAdjustment(yearsRemaining: number): number {
+  return yearsRemaining >= 15
+    ? 0.5
+    : yearsRemaining >= 10
+      ? 0.25
+      : yearsRemaining >= 7
+        ? 0.1
+        : yearsRemaining >= 5
+          ? 0
+          : yearsRemaining >= 3
+            ? -0.25
+            : -0.75;
+}
+
+function calcLeaseOptionAdjustment(optionYears: number): number {
+  return optionYears >= 10 ? 0.25 : optionYears >= 5 ? 0.15 : optionYears >= 2 ? 0.05 : 0;
 }
 
 function normalizeMarketDensity(value: string): string {
@@ -125,19 +145,46 @@ export function calcValuation(inputs: ValuationInputs): ValuationResult {
   // Lease adjustment
   const isOwned = inputs.occupancyType === "owned" || inputs.occupancyType === "owner_occupied";
   if (!isOwned) {
-    const leaseAdj =
-      inputs.totalLeaseControl >= 15 ? 0.5 :
-      inputs.totalLeaseControl >= 10 ? 0.25 :
-      inputs.totalLeaseControl >= 7 ? 0.1 :
-      inputs.totalLeaseControl >= 5 ? 0 :
-      inputs.totalLeaseControl >= 3 ? -0.25 : -0.75;
-    pushAdj(
-      adjustments,
-      "Lease Term Control",
-      leaseAdj,
-      `${inputs.totalLeaseControl.toFixed(1)} years total control`,
-      "lease"
-    );
+    if (inputs.leaseYearsRemaining != null) {
+      const yearsRemaining = inputs.leaseYearsRemaining;
+      const optionYears = Math.max(0, inputs.totalLeaseControl - yearsRemaining);
+      const termAdj = calcLeaseTermAdjustment(yearsRemaining);
+      const optionAdj = calcLeaseOptionAdjustment(optionYears);
+      pushAdj(
+        adjustments,
+        "Base Lease Term",
+        termAdj,
+        `${yearsRemaining.toFixed(1)} years remaining on current term`,
+        "lease"
+      );
+      pushAdj(
+        adjustments,
+        "Renewal Options",
+        optionAdj,
+        `${optionYears.toFixed(1)} years of available renewal options`,
+        "lease"
+      );
+    } else {
+      const leaseAdj =
+        inputs.totalLeaseControl >= 15
+          ? 0.5
+          : inputs.totalLeaseControl >= 10
+            ? 0.25
+            : inputs.totalLeaseControl >= 7
+              ? 0.1
+              : inputs.totalLeaseControl >= 5
+                ? 0
+                : inputs.totalLeaseControl >= 3
+                  ? -0.25
+                  : -0.75;
+      pushAdj(
+        adjustments,
+        "Lease Term Control",
+        leaseAdj,
+        `${inputs.totalLeaseControl.toFixed(1)} years total control`,
+        "lease"
+      );
+    }
   }
 
   // Real estate ownership

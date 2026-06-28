@@ -76,6 +76,7 @@ export default function ScenariosPage() {
       const resolvedFinancials = resolveStoreFinancials(storeData, ttmMetrics);
       const ownerOccupied = storeData.occupancy_type === "owner_occupied";
       let totalLeaseControl = ownerOccupied ? 15 : 0;
+      let leaseYearsRemaining = ownerOccupied ? 15 : 0;
       let realEstateValue = 0;
 
       if (ownerOccupied) {
@@ -106,6 +107,7 @@ export default function ScenariosPage() {
           const optionYears = (optionsData ?? [])
             .filter((o) => o.status === "Available")
             .reduce((s, o) => s + (o.option_years ?? 0), 0);
+          leaseYearsRemaining = remaining;
           totalLeaseControl = remaining + optionYears;
         }
       }
@@ -114,6 +116,7 @@ export default function ScenariosPage() {
         store: storeData,
         equipment: (equipmentData ?? []) as EquipmentRecord[],
         totalLeaseControl,
+        leaseYearsRemaining,
         isOwnerOccupied: ownerOccupied,
         realEstateValue,
         resolvedFinancials,
