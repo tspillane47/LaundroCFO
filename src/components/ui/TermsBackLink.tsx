@@ -2,15 +2,24 @@
 
 import { useRouter } from "next/navigation";
 
+const TERMS_RETURN_KEY = "laundrocfo_terms_return_to";
+
+export function setTermsReturnPath(path: string) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(TERMS_RETURN_KEY, path);
+}
+
 export function TermsBackLink() {
   const router = useRouter();
 
   function handleBack() {
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      router.back();
+    const returnTo = sessionStorage.getItem(TERMS_RETURN_KEY);
+    sessionStorage.removeItem(TERMS_RETURN_KEY);
+    if (returnTo && returnTo !== "/terms" && returnTo !== "/login") {
+      router.push(returnTo);
       return;
     }
-    router.push("/");
+    router.push("/portfolio");
   }
 
   return (

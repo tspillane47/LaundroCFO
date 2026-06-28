@@ -167,7 +167,8 @@ function formatAdj(value: number): string {
   return `${sign}${Math.abs(value).toFixed(2)}x`;
 }
 
-function financeabilityRating(dscr: number, globalDscr: number): string {
+function financeabilityRating(dscr: number | null, globalDscr: number | null): string {
+  if (dscr == null || globalDscr == null) return "—";
   if (dscr >= 1.5 && globalDscr >= 1.5) return "Strong";
   if (dscr >= 1.25 && globalDscr >= 1.25) return "Acceptable";
   if (dscr >= 1.0) return "Marginal";
@@ -292,11 +293,11 @@ function computeReportMetrics(props: ReportProps) {
   const loanBalance = store?.loan_balance ?? 0;
   const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
 
-  const dscr = ttmDebtService > 0 ? (storeTtm?.dscr ?? 0) : 0;
+  const dscr = ttmDebtService > 0 ? (storeTtm?.dscr ?? null) : null;
   const portfolioEbitda = portfolioTtm.ttmEbitda;
   const portfolioDebtService = portfolioTtm.ttmDebtService;
   const globalDscr =
-    portfolioDebtService > 0 ? calcGlobalDSCR(portfolioEbitda, portfolioDebtService) : dscr;
+    portfolioDebtService > 0 ? calcGlobalDSCR(portfolioEbitda, portfolioDebtService) : null;
 
   const ebitdaMargin =
     annualRevenue > 0
@@ -468,22 +469,26 @@ export function ReportDocument(props: ReportProps) {
         <SectionHeader>Financeability Snapshot</SectionHeader>
         <DataRow
           label="Store DSCR"
-          value={m.ttmDebtService > 0 ? fmtMultiple(m.dscr) : "N/A"}
-          valueColor={m.ttmDebtService > 0 ? ratioColor(m.dscr, 1.5, 1.25) : undefined}
+          value={m.ttmDebtService > 0 && m.dscr != null ? fmtMultiple(m.dscr) : "N/A"}
+          valueColor={m.ttmDebtService > 0 && m.dscr != null ? ratioColor(m.dscr, 1.5, 1.25) : undefined}
         />
         <DataRow
           label="Global DSCR"
-          value={m.portfolioDebtService > 0 ? fmtMultiple(m.globalDscr) : "N/A"}
-          valueColor={m.portfolioDebtService > 0 ? ratioColor(m.globalDscr, 1.5, 1.25) : undefined}
+          value={m.portfolioDebtService > 0 && m.globalDscr != null ? fmtMultiple(m.globalDscr) : "N/A"}
+          valueColor={
+            m.portfolioDebtService > 0 && m.globalDscr != null
+              ? ratioColor(m.globalDscr, 1.5, 1.25)
+              : undefined
+          }
         />
         <DataRow label="Financeability Rating" value={m.financeRating} />
-        {m.dscr >= 1.25 ? (
+        {m.dscr != null && m.dscr >= 1.25 ? (
           <View style={styles.successBox}>
             <Text style={[styles.boxText, styles.positiveText]}>
               ✓ Meets minimum 1.25x DSCR threshold — suitable for SBA 7(a) or conventional commercial financing.
             </Text>
           </View>
-        ) : m.ttmDebtService > 0 ? (
+        ) : m.ttmDebtService > 0 && m.dscr != null ? (
           <View style={styles.dangerBox}>
             <Text style={[styles.boxText, styles.negativeText]}>
               ⚠ DSCR below 1.25x — address debt service before lender submission.
@@ -546,8 +551,8 @@ export function ReportDocument(props: ReportProps) {
         <DataRow label="Loan Balance" value={m.loanBalance > 0 ? fmtDollar(m.loanBalance) : "Not reported"} />
         <SectionHeader>Underwriting Ratios</SectionHeader>
         <View style={styles.grid2}>
-          <MetricTile label="DSCR" value={m.ttmDebtService > 0 ? fmtMultiple(m.dscr) : "N/A"} valueColor={m.ttmDebtService > 0 ? ratioColor(m.dscr, 1.5, 1.25) : undefined} width="23%" />
-          <MetricTile label="Global DSCR" value={m.portfolioDebtService > 0 ? fmtMultiple(m.globalDscr) : "N/A"} valueColor={m.portfolioDebtService > 0 ? ratioColor(m.globalDscr, 1.5, 1.25) : undefined} width="23%" />
+          <MetricTile label="DSCR" value={m.ttmDebtService > 0 && m.dscr != null ? fmtMultiple(m.dscr) : "N/A"} valueColor={m.ttmDebtService > 0 && m.dscr != null ? ratioColor(m.dscr, 1.5, 1.25) : undefined} width="23%" />
+          <MetricTile label="Global DSCR" value={m.portfolioDebtService > 0 && m.globalDscr != null ? fmtMultiple(m.globalDscr) : "N/A"} valueColor={m.portfolioDebtService > 0 && m.globalDscr != null ? ratioColor(m.globalDscr, 1.5, 1.25) : undefined} width="23%" />
           <MetricTile label="EBITDA Margin" value={fmtPct(m.ebitdaMargin)} valueColor={ratioColor(m.ebitdaMargin, 25, 20)} width="23%" />
           <MetricTile label="Rent / Revenue" value={fmtPct(m.rentToRevenue)} valueColor={ratioColor(m.rentToRevenue, 0, 15, true)} width="23%" />
           <MetricTile label="Utility / Revenue" value={fmtPct(m.utilityRatio)} valueColor={ratioColor(m.utilityRatio, 0, 17, true)} width="23%" />
@@ -743,7 +748,7 @@ export function ReportDocument(props: ReportProps) {
           ))
         )}
         <SectionHeader>Underwriting Risk Matrix</SectionHeader>
-        <DataRow label="DSCR Risk" value={m.dscr >= 1.25 || m.ttmDebtService === 0 ? "Low" : "High"} valueColor={m.dscr >= 1.25 || m.ttmDebtService === 0 ? "#15803d" : "#b91c1c"} />
+        <DataRow label="DSCR Risk" value={m.dscr == null || m.dscr >= 1.25 || m.ttmDebtService === 0 ? "Low" : "High"} valueColor={m.dscr == null || m.dscr >= 1.25 || m.ttmDebtService === 0 ? "#15803d" : "#b91c1c"} />
         <DataRow label="Lease / Site Control" value={m.totalLeaseControl >= 7 ? "Low" : m.totalLeaseControl >= 3 ? "Moderate" : "High"} />
         <DataRow label="Equipment Age Risk" value={m.equipMetrics.weightedAvgAge < 10 ? "Low" : "Moderate"} />
         <DataRow label="Utility Cost Risk" value={m.utilityRatio > 20 ? "High" : m.utilityRatio > 17 ? "Moderate" : "Low"} />
@@ -816,7 +821,7 @@ export function ReportDocument(props: ReportProps) {
               const psTtm = portfolioTtm.byStoreId[ps.id];
               const psEbitda = psTtm?.ttmEbitda ?? 0;
               const psDebtService = psTtm?.ttmDebtService ?? 0;
-              const psDscr = psDebtService > 0 ? (psTtm?.dscr ?? 0) : 0;
+              const psDscr = psDebtService > 0 ? (psTtm?.dscr ?? null) : null;
               return (
                 <View key={ps.id} style={styles.tableRow}>
                   <Text style={[styles.tableCellBold, { width: "30%" }]}>
@@ -824,7 +829,7 @@ export function ReportDocument(props: ReportProps) {
                   </Text>
                   <Text style={[styles.tableCell, { width: "22%" }]}>{fmtDollar(psEbitda)}</Text>
                   <Text style={[styles.tableCell, { width: "18%" }]}>
-                    {psDebtService > 0 ? fmtMultiple(psDscr) : "—"}
+                    {psDscr != null ? fmtMultiple(psDscr) : "N/A"}
                   </Text>
                   <Text style={[styles.tableCell, { width: "30%", textAlign: "right" }]}>
                     {fmtDollar(psEbitda * m.valuation.finalMultiple)}
@@ -836,7 +841,7 @@ export function ReportDocument(props: ReportProps) {
         )}
         <DataRow label="Portfolio EBITDA" value={fmtDollar(m.portfolioEbitda)} />
         <DataRow label="Portfolio Debt Service" value={m.portfolioDebtService > 0 ? fmtDollar(m.portfolioDebtService) : "—"} />
-        <DataRow label="Global DSCR" value={m.portfolioDebtService > 0 ? fmtMultiple(m.globalDscr) : "N/A"} valueColor={ratioColor(m.globalDscr, 1.5, 1.25)} />
+        <DataRow label="Global DSCR" value={m.portfolioDebtService > 0 && m.globalDscr != null ? fmtMultiple(m.globalDscr) : "N/A"} valueColor={m.globalDscr != null ? ratioColor(m.globalDscr, 1.5, 1.25) : undefined} />
         <DataRow label="Combined Est. Value" value={fmtDollar(portfolioStores.reduce((s, ps) => s + (portfolioTtm.byStoreId[ps.id]?.ttmEbitda ?? 0) * m.valuation.finalMultiple, 0))} positive />
         <SectionHeader>Global Cash Flow</SectionHeader>
         <Text style={styles.bodyText}>Trailing twelve-month portfolio cash flow from monthly_financials.</Text>

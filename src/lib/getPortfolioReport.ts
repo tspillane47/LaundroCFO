@@ -3,6 +3,7 @@ import { getStoreValuation, getStoreDebt } from "@/lib/getStoreValuation";
 import {
   buildPortfolioTtmCashFlow,
   buildPortfolioTtmSummary,
+  fetchAnnualDebtServiceByStore,
   fetchMonthlyFinancialsForStores,
   type MonthlyFinancialRecord,
   type PortfolioTtmCashFlow,
@@ -22,7 +23,7 @@ export interface PortfolioReportData {
     annualRevenue: number;
     annualEbitda: number;
     annualDebtService: number;
-    dscr: number;
+    dscr: number | null;
     leaseScore: number;
     equipmentGrade: string;
     avgEquipmentAge: number;
@@ -49,7 +50,10 @@ export interface PortfolioReportData {
 
 export async function getPortfolioReport(
   userId: string,
-  options?: { financialsData?: MonthlyFinancialRecord[] }
+  options?: {
+    financialsData?: MonthlyFinancialRecord[];
+    annualDebtByStore?: Record<string, number>;
+  }
 ): Promise<PortfolioReportData> {
   const supabase = createClient();
 
@@ -96,9 +100,12 @@ export async function getPortfolioReport(
   const financialsData =
     options?.financialsData ??
     (await fetchMonthlyFinancialsForStores(supabase, storeIds));
+  const annualDebtByStore =
+    options?.annualDebtByStore ??
+    (await fetchAnnualDebtServiceByStore(supabase, storeIds));
 
-  const portfolioTtm = buildPortfolioTtmSummary(financialsData, storeIds);
-  const cashFlow = buildPortfolioTtmCashFlow(financialsData, storeIds);
+  const portfolioTtm = buildPortfolioTtmSummary(financialsData, storeIds, annualDebtByStore);
+  const cashFlow = buildPortfolioTtmCashFlow(financialsData, storeIds, annualDebtByStore);
 
   const storeDetails = await Promise.all(
     stores.map(async (store) => {
@@ -135,7 +142,7 @@ export async function getPortfolioReport(
         ? ttm.ttmEbitda
         : ((store.monthly_revenue ?? 0) - (store.monthly_expenses ?? 0)) * 12;
       const annualDebtService = ttm?.ttmDebtService ?? 0;
-      const dscr = annualDebtService > 0 ? (ttm?.dscr ?? 0) : 0;
+      const dscr = annualDebtService > 0 ? (ttm?.dscr ?? null) : null;
 
       const equity = valuation.businessValue - debt + cash;
 

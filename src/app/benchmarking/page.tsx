@@ -6,9 +6,13 @@ import { useStores } from "@/lib/store-context";
 import { benchmarks as industryBenchmarks } from "@/lib/data";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import {
+  applyLoanDebtServiceToTtm,
   calcRatios,
   calcTtmMetrics,
   enrichMonthlyRecords,
+  fetchAnnualDebtServiceByStore,
+  fetchMonthlyFinancialsForStores,
+  fetchStoreMonthlyFinancials,
   sortRecordsDesc,
   type CalculatedMonthly,
   type MonthlyFinancialRecord,
@@ -97,11 +101,13 @@ export default function BenchmarkingPage() {
   const [store, setStore] = useState<StoreFinancialProfile | null>(null);
   const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
   const [records, setRecords] = useState<CalculatedMonthly[]>([]);
+  const [annualDebtService, setAnnualDebtService] = useState(0);
 
   const loadData = useCallback(async () => {
     if (!selectedStore?.id) {
       setStore(null);
       setRecords([]);
+      setAnnualDebtService(0);
       setLoading(false);
       return;
     }
@@ -118,46 +124,36 @@ export default function BenchmarkingPage() {
         return;
       }
 
-      console.log("[benchmarking] store id:", selectedStore.id);
-
       const [
         { data: storeData, error: storeError },
-        { data: financialsData, error: financialsError },
+        financialsData,
         { data: equipmentData, error: equipError },
+        debtByStore,
       ] = await Promise.all([
         supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
-        supabase
-          .from("monthly_financials")
-          .select("*")
-          .eq("store_id", selectedStore.id)
-          .order("year", { ascending: false })
-          .order("month", { ascending: false }),
+        fetchStoreMonthlyFinancials(supabase, selectedStore.id),
         supabase.from("equipment_inventory").select("*").eq("store_id", selectedStore.id),
+        fetchAnnualDebtServiceByStore(supabase, [selectedStore.id]),
       ]);
 
-      console.log("[benchmarking] monthly_financials query result:", {
-        data: financialsData,
-        error: financialsError,
-      });
-
-      const errors = [storeError, financialsError, equipError]
-        .filter(Boolean)
-        .map((e) => e!.message);
+      const errors = [storeError, equipError].filter(Boolean).map((e) => e!.message);
       if (errors.length > 0) {
         console.warn("[benchmarking] load warnings:", errors.join(" · "));
       }
 
       setStore(storeData as StoreFinancialProfile);
       setEquipment((equipmentData ?? []) as EquipmentRecord[]);
+      setAnnualDebtService(debtByStore[selectedStore.id] ?? 0);
 
       const sorted = enrichMonthlyRecords(
-        sortRecordsDesc((financialsData ?? []) as MonthlyFinancialRecord[])
+        sortRecordsDesc(financialsData as MonthlyFinancialRecord[])
       );
       setRecords(sorted);
     } catch {
       setLoadError(true);
       setStore(null);
       setRecords([]);
+      setAnnualDebtService(0);
     } finally {
       setLoading(false);
     }
@@ -168,7 +164,10 @@ export default function BenchmarkingPage() {
     loadData();
   }, [storesLoading, loadData]);
 
-  const ttm = useMemo(() => calcTtmMetrics(records), [records]);
+  const ttm = useMemo(
+    () => applyLoanDebtServiceToTtm(calcTtmMetrics(records), annualDebtService),
+    [records, annualDebtService]
+  );
 
   const metrics = useMemo(() => {
     if (!store || records.length === 0) return null;

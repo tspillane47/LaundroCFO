@@ -345,7 +345,7 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
             <Text style={[styles.tableCellRight, { width: "10%" }]}>{fmtCurrency(d.annualRevenue)}</Text>
             <Text style={[styles.tableCellRight, { width: "10%" }]}>{fmtCurrency(d.annualEbitda)}</Text>
             <Text style={[styles.tableCellRight, { width: "8%" }]}>
-              {d.annualDebtService > 0 ? fmtMultiple(d.dscr) : "—"}
+              {d.annualDebtService > 0 && d.dscr != null ? fmtMultiple(d.dscr) : "N/A"}
             </Text>
             <Text style={[styles.tableCellRight, { width: "10%" }]}>{fmtCurrency(d.valuation.businessValue)}</Text>
             <Text style={[styles.tableCellRight, { width: "10%" }]}>{fmtCurrency(d.debt)}</Text>

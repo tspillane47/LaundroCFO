@@ -359,9 +359,25 @@ export type PortfolioTtmSummary = {
   globalDscr: number;
 };
 
+/** Prefer store_loans annual debt service for DSCR; fall back to monthly_financials debt_service. */
+export function applyLoanDebtServiceToTtm(
+  ttm: TtmMetrics,
+  annualDebtServiceFromLoans: number
+): TtmMetrics {
+  const ttmDebtService =
+    annualDebtServiceFromLoans > 0 ? annualDebtServiceFromLoans : ttm.ttmDebtService;
+  return {
+    ...ttm,
+    ttmDebtService,
+    dscr: ttmDebtService > 0 ? ttm.ttmEbitda / ttmDebtService : 0,
+    ttmNoi: ttm.ttmEbitda - ttmDebtService,
+  };
+}
+
 export function buildPortfolioTtmSummary(
   rows: MonthlyFinancialRecord[],
-  storeIds: string[]
+  storeIds: string[],
+  annualDebtServiceByStore?: Record<string, number>
 ): PortfolioTtmSummary {
   const grouped = groupFinancialsByStoreId(rows);
   const byStoreId: Record<string, TtmMetrics> = {};
@@ -369,7 +385,8 @@ export function buildPortfolioTtmSummary(
   let ttmDebtService = 0;
 
   for (const id of storeIds) {
-    const ttm = calcStoreTtmFromFinancials(grouped.get(id) ?? []);
+    const baseTtm = calcStoreTtmFromFinancials(grouped.get(id) ?? []);
+    const ttm = applyLoanDebtServiceToTtm(baseTtm, annualDebtServiceByStore?.[id] ?? 0);
     byStoreId[id] = ttm;
     ttmEbitda += ttm.ttmEbitda;
     ttmDebtService += ttm.ttmDebtService;
@@ -417,7 +434,8 @@ function sumTtmRecords(
 /** Portfolio-wide TTM cash flow from monthly_financials — same fields as Financials P&L. */
 export function buildPortfolioTtmCashFlow(
   rows: MonthlyFinancialRecord[],
-  storeIds: string[]
+  storeIds: string[],
+  annualDebtServiceByStore?: Record<string, number>
 ): PortfolioTtmCashFlow {
   if (storeIds.length === 0) return EMPTY_PORTFOLIO_TTM_CASH_FLOW;
 
@@ -443,7 +461,9 @@ export function buildPortfolioTtmCashFlow(
       (r) => r.totalExpenses - r.utilities - r.rent - r.payroll - r.repairs_maintenance
     );
     ebitda += sumTtmRecords(records, (r) => r.ebitda);
-    debtService += sumTtmRecords(records, (r) => r.debt_service);
+    const loanDebt = annualDebtServiceByStore?.[id] ?? 0;
+    debtService +=
+      loanDebt > 0 ? loanDebt : sumTtmRecords(records, (r) => r.debt_service);
   }
 
   return {
@@ -492,21 +512,58 @@ export async function fetchStoreTtmMetrics(
   return calcTtmMetrics(records);
 }
 
-/** Same monthly_financials query as the Financials page (ordered newest first). */
+/** Identical monthly_financials query used by src/app/financials/page.tsx for one store. */
+export async function fetchStoreMonthlyFinancials(
+  supabase: FinancialsSupabaseClient,
+  storeId: string
+): Promise<MonthlyFinancialRecord[]> {
+  const { data, error } = await supabase
+    .from("monthly_financials")
+    .select("*")
+    .eq("store_id", storeId)
+    .order("year", { ascending: false })
+    .order("month", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as MonthlyFinancialRecord[];
+}
+
+/** Same monthly_financials query as the Financials page (per store, ordered newest first). */
 export async function fetchMonthlyFinancialsForStores(
   supabase: FinancialsSupabaseClient,
   storeIds: string[]
 ): Promise<MonthlyFinancialRecord[]> {
   if (storeIds.length === 0) return [];
 
-  const { data } = await supabase
-    .from("monthly_financials")
-    .select("*")
-    .in("store_id", storeIds)
-    .order("year", { ascending: false })
-    .order("month", { ascending: false });
+  const results = await Promise.all(
+    storeIds.map((storeId) => fetchStoreMonthlyFinancials(supabase, storeId))
+  );
+  return results.flat();
+}
 
-  return (data ?? []) as MonthlyFinancialRecord[];
+/** Annual debt service from active store_loans (monthly_payment × 12), keyed by store_id. */
+export async function fetchAnnualDebtServiceByStore(
+  supabase: FinancialsSupabaseClient,
+  storeIds: string[]
+): Promise<Record<string, number>> {
+  const byStore: Record<string, number> = {};
+  for (const id of storeIds) byStore[id] = 0;
+  if (storeIds.length === 0) return byStore;
+
+  const { data, error } = await supabase
+    .from("store_loans")
+    .select("store_id, monthly_payment")
+    .in("store_id", storeIds)
+    .eq("is_active", true);
+
+  if (error) throw error;
+
+  for (const loan of data ?? []) {
+    const storeId = loan.store_id as string;
+    byStore[storeId] = (byStore[storeId] ?? 0) + num(loan.monthly_payment) * 12;
+  }
+
+  return byStore;
 }
 
 export function resolveAnnualEbitda(

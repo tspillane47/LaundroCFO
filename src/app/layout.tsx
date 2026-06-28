@@ -8,6 +8,7 @@ import { StoreProvider, useStores } from "@/lib/store-context";
 import clsx from "clsx";
 import { NavIcon, SunIcon, MoonIcon, ChevronDownIcon, MenuIcon, CloseIcon } from "@/components/ui/NavIcons";
 import { FeedbackModal } from "@/components/ui/FeedbackModal";
+import { setTermsReturnPath } from "@/components/ui/TermsBackLink";
 
 const ADMIN_EMAIL = "tuckerspillane7@gmail.com";
 
@@ -506,6 +507,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         >
           <Link
             href="/terms"
+            onClick={() => setTermsReturnPath(pathname)}
             className="text-[11px] hover:underline underline-offset-2"
             style={{ color: "var(--text-muted)" }}
           >
@@ -538,10 +540,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     else document.documentElement.classList.remove("dark");
   }, []);
 
-  if (isAuthPage || isPublicPage || isMarketingPage) {
+  if (isAuthPage || isMarketingPage) {
     return (
       <html lang="en" className={isDark ? "dark" : ""}>
         <body>{children}</body>
+      </html>
+    );
+  }
+
+  if (isPublicPage) {
+    return (
+      <html lang="en" className={isDark ? "dark" : ""}>
+        <body>
+          <StoreProvider>{children}</StoreProvider>
+        </body>
       </html>
     );
   }

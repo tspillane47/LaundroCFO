@@ -33,6 +33,7 @@ import {
   buildPortfolioTtmSummary,
   EMPTY_PORTFOLIO_TTM_CASH_FLOW,
   EMPTY_TTM_METRICS,
+  fetchAnnualDebtServiceByStore,
   fetchMonthlyFinancialsForStores,
   type PortfolioTtmCashFlow,
   type PortfolioTtmSummary,
@@ -54,7 +55,8 @@ function calcYearsRemaining(endDate: string | null): number {
   return Math.max(0, (end.getTime() - Date.now()) / (365.25 * 24 * 60 * 60 * 1000));
 }
 
-function financeabilityRating(dscr: number, globalDscr: number): string {
+function financeabilityRating(dscr: number | null, globalDscr: number | null): string {
+  if (dscr == null || globalDscr == null) return "—";
   if (dscr >= 1.5 && globalDscr >= 1.5) return "Strong";
   if (dscr >= 1.25 && globalDscr >= 1.25) return "Acceptable";
   if (dscr >= 1.0) return "Marginal";
@@ -156,6 +158,8 @@ export default function ReportsPage() {
 
   useEffect(() => {
     async function load() {
+      if (storesLoading) return;
+
       if (!selectedStore?.id) {
         setStoreTtm(null);
         setPortfolioTtm(null);
@@ -189,26 +193,27 @@ export default function ReportsPage() {
       const storeValuation = await getStoreValuation(storeData.id);
       setValuation(storeValuation);
 
-      const [{ data: equipmentData }, { data: policiesData }] = await Promise.all([
-        supabase.from("equipment_inventory").select("*").eq("store_id", storeData.id),
-        supabase
-          .from("insurance_policies")
-          .select("*")
-          .eq("store_id", storeData.id)
-          .eq("is_active", true),
-      ]);
+      const storeIds = stores.length > 0 ? stores.map((s) => s.id) : [storeData.id];
+
+      const [{ data: equipmentData }, { data: policiesData }, financialsData, annualDebtByStore] =
+        await Promise.all([
+          supabase.from("equipment_inventory").select("*").eq("store_id", storeData.id),
+          supabase
+            .from("insurance_policies")
+            .select("*")
+            .eq("store_id", storeData.id)
+            .eq("is_active", true),
+          fetchMonthlyFinancialsForStores(supabase, storeIds),
+          fetchAnnualDebtServiceByStore(supabase, storeIds),
+        ]);
 
       setEquipment((equipmentData ?? []) as EquipmentRecord[]);
       setInsurance(policiesData ?? []);
 
-      const storeIds = stores.length > 0 ? stores.map((s) => s.id) : [storeData.id];
-      // Same monthly_financials query + TTM rollups as src/app/financials/page.tsx
-      const financialsData = await fetchMonthlyFinancialsForStores(supabase, storeIds);
-
-      const portfolioSummary = buildPortfolioTtmSummary(financialsData, storeIds);
+      const portfolioSummary = buildPortfolioTtmSummary(financialsData, storeIds, annualDebtByStore);
       setStoreTtm(portfolioSummary.byStoreId[storeData.id] ?? EMPTY_TTM_METRICS);
       setPortfolioTtm(portfolioSummary);
-      setPortfolioCashFlow(buildPortfolioTtmCashFlow(financialsData, storeIds));
+      setPortfolioCashFlow(buildPortfolioTtmCashFlow(financialsData, storeIds, annualDebtByStore));
 
       const ownerOccupied = storeData.occupancy_type === "owner_occupied";
 
@@ -256,7 +261,7 @@ export default function ReportsPage() {
     }
 
     load();
-  }, [selectedStore?.id, stores, supabase]);
+  }, [selectedStore?.id, stores, storesLoading, supabase]);
 
   useEffect(() => {
     async function loadPortfolio() {
@@ -272,11 +277,13 @@ export default function ReportsPage() {
           .eq("archived", false);
 
         const storeIds = (userStores ?? []).map((s) => s.id);
-        // Same monthly_financials query + TTM expense rollups as src/app/financials/page.tsx
-        const financialsData = await fetchMonthlyFinancialsForStores(supabase, storeIds);
-        const cashFlow = buildPortfolioTtmCashFlow(financialsData, storeIds);
+        const [financialsData, annualDebtByStore] = await Promise.all([
+          fetchMonthlyFinancialsForStores(supabase, storeIds),
+          fetchAnnualDebtServiceByStore(supabase, storeIds),
+        ]);
+        const cashFlow = buildPortfolioTtmCashFlow(financialsData, storeIds, annualDebtByStore);
         setPortfolioCashFlow(cashFlow);
-        const data = await getPortfolioReport(userId, { financialsData });
+        const data = await getPortfolioReport(userId, { financialsData, annualDebtByStore });
         setPortfolioData({ ...data, cashFlow });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load portfolio report");
@@ -334,13 +341,13 @@ export default function ReportsPage() {
     const sqft = store.square_footage ?? 3500;
     const isOwnerOccupied = store.occupancy_type === "owner_occupied";
 
-    const dscr = ttmDebtService > 0 ? (storeTtm?.dscr ?? 0) : 0;
+    const dscr = ttmDebtService > 0 ? (storeTtm?.dscr ?? null) : null;
     const portfolioTtmEbitda = portfolioTtm?.ttmEbitda ?? 0;
     const portfolioTtmDebtService = portfolioTtm?.ttmDebtService ?? 0;
     const globalDscr =
       portfolioTtmDebtService > 0
         ? calcGlobalDSCR(portfolioTtmEbitda, portfolioTtmDebtService)
-        : dscr;
+        : null;
 
     const hasTtm = storeTtm != null && storeTtm.monthsUsed > 0;
     const ebitdaMargin =
@@ -719,7 +726,7 @@ export default function ReportsPage() {
                       <td className="py-2.5 pr-3 text-right tabular-nums text-slate-200">{fmtDollar(d.annualRevenue)}</td>
                       <td className="py-2.5 pr-3 text-right tabular-nums text-green-400">{fmtDollar(d.annualEbitda)}</td>
                       <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">
-                        {d.annualDebtService > 0 ? fmtMultiple(d.dscr) : "—"}
+                        {d.annualDebtService > 0 && d.dscr != null ? fmtMultiple(d.dscr) : "N/A"}
                       </td>
                       <td className="py-2.5 pr-3 text-right tabular-nums text-slate-200">{fmtDollar(d.valuation.businessValue)}</td>
                       <td className="py-2.5 pr-3 text-right tabular-nums text-slate-300">{fmtDollar(d.debt)}</td>
@@ -937,13 +944,13 @@ export default function ReportsPage() {
           <div className="divide-y divide-white/[0.04] text-[13px]">
             <PreviewRow
               label="DSCR"
-              value={metrics.ttmDebtService > 0 ? fmtMultiple(metrics.dscr) : "N/A"}
-              className={ratioColorClass(metrics.dscr, 1.25, 1.0)}
+              value={metrics.dscr != null ? fmtMultiple(metrics.dscr) : "N/A"}
+              className={metrics.dscr != null ? ratioColorClass(metrics.dscr, 1.25, 1.0) : "text-slate-400"}
             />
             <PreviewRow
               label="Global DSCR"
-              value={metrics.portfolioTtmDebtService > 0 ? fmtMultiple(metrics.globalDscr) : "N/A"}
-              className={ratioColorClass(metrics.globalDscr, 1.25, 1.0)}
+              value={metrics.globalDscr != null ? fmtMultiple(metrics.globalDscr) : "N/A"}
+              className={metrics.globalDscr != null ? ratioColorClass(metrics.globalDscr, 1.25, 1.0) : "text-slate-400"}
             />
             <PreviewRow label="Rating" value={metrics.financeRating} className="text-green-400" />
           </div>
@@ -1068,8 +1075,8 @@ export default function ReportsPage() {
         <SectionHeading>Financial Ratios</SectionHeading>
         <div className="grid grid-cols-4 gap-3">
           {[
-            ["DSCR", metrics.ttmDebtService > 0 ? fmtMultiple(metrics.dscr) : "N/A", ratioColorClass(metrics.dscr, 1.25, 1.0)],
-            ["Global DSCR", metrics.portfolioTtmDebtService > 0 ? fmtMultiple(metrics.globalDscr) : "N/A", ratioColorClass(metrics.globalDscr, 1.25, 1.0)],
+            ["DSCR", metrics.dscr != null ? fmtMultiple(metrics.dscr) : "N/A", metrics.dscr != null ? ratioColorClass(metrics.dscr, 1.25, 1.0) : "text-slate-400"],
+            ["Global DSCR", metrics.globalDscr != null ? fmtMultiple(metrics.globalDscr) : "N/A", metrics.globalDscr != null ? ratioColorClass(metrics.globalDscr, 1.25, 1.0) : "text-slate-400"],
             ["EBITDA Margin", fmtPct(metrics.ebitdaMargin), ratioColorClass(metrics.ebitdaMargin, 25, 20)],
             ["Rent / Revenue", fmtPct(metrics.rentToRevenue), ratioColorClass(metrics.rentToRevenue, 0, 15, true)],
             ["Utility / Revenue", fmtPct(metrics.utilityRatio), ratioColorClass(metrics.utilityRatio, 0, 17, true)],
