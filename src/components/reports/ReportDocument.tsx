@@ -297,9 +297,12 @@ function computeReportMetrics(props: ReportProps) {
   const globalDscr =
     portfolioDebtService > 0 ? calcGlobalDSCR(portfolioEbitda, portfolioDebtService) : dscr;
 
-  const ebitdaMargin = hasTtm
-    ? storeTtm!.ttmEbitdaMargin
-    : calcEbitdaMargin(annualEbitda, annualRevenue);
+  const ebitdaMargin =
+    annualRevenue > 0
+      ? hasTtm
+        ? storeTtm!.ttmEbitdaMargin
+        : calcEbitdaMargin(annualEbitda, annualRevenue)
+      : 0;
   const revenuePerSF = calcRevenuePerSF(annualRevenue, sqft);
   const ebitdaPerSF = calcEbitdaPerSF(annualEbitda, sqft);
   const utilityRatio = calcUtilityRatio(monthlyUtilities * 12, annualRevenue);
@@ -448,8 +451,8 @@ export function ReportDocument(props: ReportProps) {
           <MetricTile label="Annual EBITDA" value={fmtDollar(m.annualEbitda)} />
           <MetricTile
             label="EBITDA Margin"
-            value={fmtPct(m.ebitdaMargin)}
-            valueColor={ratioColor(m.ebitdaMargin, 25, 20)}
+            value={m.annualRevenue > 0 ? fmtPct(m.ebitdaMargin) : "—"}
+            valueColor={m.annualRevenue > 0 ? ratioColor(m.ebitdaMargin, 25, 20) : undefined}
           />
         </View>
         <SectionHeader>Financeability Snapshot</SectionHeader>

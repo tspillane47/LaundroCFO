@@ -332,7 +332,13 @@ export default function ReportsPage() {
         ? calcGlobalDSCR(portfolioTtmEbitda, portfolioTtmDebtService)
         : dscr;
 
-    const ebitdaMargin = calcEbitdaMargin(annualEbitda, annualRevenue);
+    const hasTtm = storeTtm != null && storeTtm.monthsUsed > 0;
+    const ebitdaMargin =
+      annualRevenue > 0
+        ? hasTtm
+          ? storeTtm.ttmEbitdaMargin
+          : calcEbitdaMargin(annualEbitda, annualRevenue)
+        : 0;
     const utilityRatio = calcUtilityRatio(monthlyUtilities * 12, annualRevenue);
     const rentToRevenue = calcRentToRevenue((lease?.monthly_rent ?? 0) * 12, annualRevenue);
     const revenuePerSF = calcRevenuePerSF(annualRevenue, sqft);

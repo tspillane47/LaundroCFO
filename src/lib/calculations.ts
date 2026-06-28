@@ -9,6 +9,7 @@ export function calcGlobalDSCR(globalCashFlow: number, globalDebtService: number
 }
 
 export function calcEbitdaMargin(ebitda: number, revenue: number) {
+  if (!revenue || revenue <= 0) return 0;
   return (ebitda / revenue) * 100;
 }
 

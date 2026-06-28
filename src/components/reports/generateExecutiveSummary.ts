@@ -53,7 +53,12 @@ export function generateExecutiveSummary({
   const hasTtm = (storeTtm?.monthsUsed ?? 0) > 0;
   const annualRevenue = hasTtm ? storeTtm!.ttmRevenue : monthlyRevenue * 12;
   const annualEbitda = hasTtm ? storeTtm!.ttmEbitda : (monthlyRevenue - monthlyExpenses) * 12;
-  const ebitdaMargin = hasTtm ? storeTtm!.ttmEbitdaMargin : calcEbitdaMargin(annualEbitda, annualRevenue);
+  const ebitdaMargin =
+    annualRevenue > 0
+      ? hasTtm
+        ? storeTtm!.ttmEbitdaMargin
+        : calcEbitdaMargin(annualEbitda, annualRevenue)
+      : 0;
   const ttmDebtService = storeTtm?.ttmDebtService ?? 0;
   const dscr = ttmDebtService > 0 ? (storeTtm?.dscr ?? 0) : 0;
   const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
@@ -108,7 +113,7 @@ export function generateExecutiveSummary({
 
   const parts = [
     `${storeName} is a ${perf} laundromat located at ${address}${sqft > 0 ? ` with ${sqft.toLocaleString()} SF` : ""}${totalMachines > 0 ? ` and ${totalMachines} machines` : ""}.`,
-    `The store generates ${fmtDollar(annualRevenue)} in annual revenue with a ${ebitdaMargin.toFixed(1)}% EBITDA margin, ${marginVs} the industry median of ~22%.`,
+    `The store generates ${fmtDollar(annualRevenue)} in annual revenue with a ${annualRevenue > 0 ? `${ebitdaMargin.toFixed(1)}%` : "—"} EBITDA margin, ${marginVs} the industry median of ~22%.`,
     `Estimated business value of ${fmtDollar(valuation.businessValue)} at ${fmtMultiple(valuation.finalMultiple)} reflects ${topDriver.toLowerCase().replace(/\.$/, "")}.`,
     leaseSentence,
     equipSentence,
