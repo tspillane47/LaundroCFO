@@ -29,9 +29,12 @@ import {
 import { generateExecutiveSummary } from "@/components/reports/generateExecutiveSummary";
 import { getPortfolioReport, type PortfolioReportData } from "@/lib/getPortfolioReport";
 import {
+  buildPortfolioTtmCashFlow,
   buildPortfolioTtmSummary,
+  EMPTY_PORTFOLIO_TTM_CASH_FLOW,
   EMPTY_TTM_METRICS,
   fetchMonthlyFinancialsForStores,
+  type PortfolioTtmCashFlow,
   type PortfolioTtmSummary,
   type TtmMetrics,
 } from "@/lib/financials";
@@ -137,6 +140,7 @@ export default function ReportsPage() {
   const [valuation, setValuation] = useState<ValuationResult | null>(null);
   const [storeTtm, setStoreTtm] = useState<TtmMetrics | null>(null);
   const [portfolioTtm, setPortfolioTtm] = useState<PortfolioTtmSummary | null>(null);
+  const [portfolioCashFlow, setPortfolioCashFlow] = useState<PortfolioTtmCashFlow | null>(null);
 
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -155,6 +159,7 @@ export default function ReportsPage() {
       if (!selectedStore?.id) {
         setStoreTtm(null);
         setPortfolioTtm(null);
+        setPortfolioCashFlow(null);
         setLoading(false);
         return;
       }
@@ -197,11 +202,13 @@ export default function ReportsPage() {
       setInsurance(policiesData ?? []);
 
       const storeIds = stores.length > 0 ? stores.map((s) => s.id) : [storeData.id];
+      // Same monthly_financials query + TTM rollups as src/app/financials/page.tsx
       const financialsData = await fetchMonthlyFinancialsForStores(supabase, storeIds);
 
       const portfolioSummary = buildPortfolioTtmSummary(financialsData, storeIds);
       setStoreTtm(portfolioSummary.byStoreId[storeData.id] ?? EMPTY_TTM_METRICS);
       setPortfolioTtm(portfolioSummary);
+      setPortfolioCashFlow(buildPortfolioTtmCashFlow(financialsData, storeIds));
 
       const ownerOccupied = storeData.occupancy_type === "owner_occupied";
 
@@ -265,9 +272,12 @@ export default function ReportsPage() {
           .eq("archived", false);
 
         const storeIds = (userStores ?? []).map((s) => s.id);
+        // Same monthly_financials query + TTM expense rollups as src/app/financials/page.tsx
         const financialsData = await fetchMonthlyFinancialsForStores(supabase, storeIds);
+        const cashFlow = buildPortfolioTtmCashFlow(financialsData, storeIds);
+        setPortfolioCashFlow(cashFlow);
         const data = await getPortfolioReport(userId, { financialsData });
-        setPortfolioData(data);
+        setPortfolioData({ ...data, cashFlow });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load portfolio report");
         setPortfolioData(null);
@@ -407,6 +417,7 @@ export default function ReportsPage() {
       portfolioStores: stores,
       storeTtm,
       portfolioTtm,
+      portfolioCashFlow: portfolioCashFlow ?? EMPTY_PORTFOLIO_TTM_CASH_FLOW,
       generatedDate,
       executiveSummary,
     };
@@ -421,6 +432,7 @@ export default function ReportsPage() {
     stores,
     storeTtm,
     portfolioTtm,
+    portfolioCashFlow,
     generatedDate,
     executiveSummary,
   ]);
@@ -547,7 +559,7 @@ export default function ReportsPage() {
   const isStoreReady = Boolean(store && valuation && metrics && portfolioTtm);
   const portfolioReady = Boolean(portfolioData && portfolioData.totals.storeCount > 0);
   const totals = portfolioData?.totals;
-  const cashFlow = portfolioData?.cashFlow;
+  const cashFlow = portfolioCashFlow ?? portfolioData?.cashFlow;
   const storeDetails = portfolioData?.storeDetails ?? [];
 
   const pdfDisabled =

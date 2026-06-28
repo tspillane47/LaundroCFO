@@ -15,7 +15,7 @@ import {
   fmtMultiple,
   fmtPct,
 } from "@/lib/calculations";
-import type { PortfolioTtmSummary, TtmMetrics } from "@/lib/financials";
+import type { PortfolioTtmCashFlow, PortfolioTtmSummary, TtmMetrics } from "@/lib/financials";
 import type { ValuationResult } from "@/lib/valuation";
 import { DisclaimerPdf } from "@/components/reports/DisclaimerPdf";
 
@@ -30,6 +30,7 @@ export interface ReportProps {
   portfolioStores: any[];
   storeTtm: TtmMetrics | null;
   portfolioTtm: PortfolioTtmSummary;
+  portfolioCashFlow: PortfolioTtmCashFlow;
   generatedDate: string;
   executiveSummary: string;
 }
@@ -386,8 +387,17 @@ function computeReportMetrics(props: ReportProps) {
 
 export function ReportDocument(props: ReportProps) {
   const m = computeReportMetrics(props);
-  const { executiveSummary, generatedDate, lease, realEstate, insurance, portfolioStores, store, portfolioTtm } =
-    props;
+  const {
+    executiveSummary,
+    generatedDate,
+    lease,
+    realEstate,
+    insurance,
+    portfolioStores,
+    store,
+    portfolioTtm,
+    portfolioCashFlow,
+  } = props;
 
   return (
     <Document
@@ -828,6 +838,17 @@ export function ReportDocument(props: ReportProps) {
         <DataRow label="Portfolio Debt Service" value={m.portfolioDebtService > 0 ? fmtDollar(m.portfolioDebtService) : "—"} />
         <DataRow label="Global DSCR" value={m.portfolioDebtService > 0 ? fmtMultiple(m.globalDscr) : "N/A"} valueColor={ratioColor(m.globalDscr, 1.5, 1.25)} />
         <DataRow label="Combined Est. Value" value={fmtDollar(portfolioStores.reduce((s, ps) => s + (portfolioTtm.byStoreId[ps.id]?.ttmEbitda ?? 0) * m.valuation.finalMultiple, 0))} positive />
+        <SectionHeader>Global Cash Flow</SectionHeader>
+        <Text style={styles.bodyText}>Trailing twelve-month portfolio cash flow from monthly_financials.</Text>
+        <DataRow label="Revenue" value={fmtDollar(portfolioCashFlow.revenue)} />
+        <DataRow label="Utilities" value={fmtDollar(portfolioCashFlow.utilities)} />
+        <DataRow label="Rent" value={fmtDollar(portfolioCashFlow.rent)} />
+        <DataRow label="Payroll" value={fmtDollar(portfolioCashFlow.payroll)} />
+        <DataRow label="Repairs" value={fmtDollar(portfolioCashFlow.repairs)} />
+        <DataRow label="Other Expenses" value={fmtDollar(portfolioCashFlow.otherExpenses)} />
+        <DataRow label="EBITDA" value={fmtDollar(portfolioCashFlow.ebitda)} positive />
+        <DataRow label="Debt Service" value={fmtDollar(portfolioCashFlow.debtService)} />
+        <DataRow label="Cash Flow After Debt" value={fmtDollar(portfolioCashFlow.cashFlowAfterDebt)} positive />
         <PageChrome storeName={m.storeName} />
       </Page>
 
