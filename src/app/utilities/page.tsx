@@ -17,7 +17,17 @@ import {
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtPct } from "@/lib/calculations";
-import { MONTH_NAMES, MONTH_SHORT, monthKey, sortRecordsDesc, enrichMonthlyRecords, buildUtilitiesLookup, type MonthlyFinancialRecord, type MonthlyUtilityRecord } from "@/lib/financials";
+import {
+  MONTH_NAMES,
+  MONTH_SHORT,
+  monthKey,
+  sortRecordsDesc,
+  enrichMonthlyRecords,
+  buildUtilitiesLookup,
+  type MonthlyFinancialRecord,
+  type MonthlyUtilityRecord,
+  type UtilityImportField,
+} from "@/lib/financials";
 import {
   computeTurnsPerDay,
   DEFAULT_DRYER_REVENUE_PCT,
@@ -84,6 +94,42 @@ function benchmarkColor(value: number, low: number, high: number): string {
   return "text-red-400";
 }
 
+function fmtCostPerLoad(value: number | null): string {
+  return value != null ? `$${value.toFixed(2)}/load` : "N/A";
+}
+
+function fmtLoadsPerMonth(value: number | null): string {
+  return value != null ? Math.round(value).toLocaleString() : "N/A";
+}
+
+function costPerLoadBenchmark(value: number): { label: string; color: string } {
+  if (value < 0.4) return { label: "Good", color: "text-green-400" };
+  if (value <= 0.55) return { label: "Watch", color: "text-amber-400" };
+  return { label: "High", color: "text-red-400" };
+}
+
+function sumTtmUtilityField(
+  ttmRecords: { year: number; month: number }[],
+  utilitiesLookup: Map<string, MonthlyUtilityRecord>,
+  field: UtilityImportField
+): number {
+  return ttmRecords.reduce((sum, record) => {
+    const utilityRecord = utilitiesLookup.get(monthKey(record.year, record.month));
+    return sum + (utilityRecord?.[field] ?? 0);
+  }, 0);
+}
+
+function ttmUtilityFieldHasData(
+  ttmRecords: { year: number; month: number }[],
+  utilitiesLookup: Map<string, MonthlyUtilityRecord>,
+  field: UtilityImportField
+): boolean {
+  return ttmRecords.some((record) => {
+    const utilityRecord = utilitiesLookup.get(monthKey(record.year, record.month));
+    return utilityRecord != null && (utilityRecord[field] ?? 0) > 0;
+  });
+}
+
 function ChartTooltip({
   active,
   payload,
@@ -116,6 +162,7 @@ export default function UtilitiesPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [store, setStore] = useState<StoreProfile | null>(null);
   const [records, setRecords] = useState<MonthlyUtilityRow[]>([]);
+  const [financialRecords, setFinancialRecords] = useState<MonthlyFinancialRecord[]>([]);
   const [revenueByMonth, setRevenueByMonth] = useState<Map<string, number>>(new Map());
   const [equipment, setEquipment] = useState<EquipmentRow[]>([]);
   const [turnsContext, setTurnsContext] = useState<{
@@ -137,6 +184,7 @@ export default function UtilitiesPage() {
     if (!selectedStore?.id) {
       setStore(null);
       setRecords([]);
+      setFinancialRecords([]);
       setLoading(false);
       return;
     }
@@ -178,10 +226,11 @@ export default function UtilitiesPage() {
 
       setStore(storeData as StoreProfile);
       setRecords((utilityData ?? []) as MonthlyUtilityRow[]);
+      setFinancialRecords((financialsData ?? []) as MonthlyFinancialRecord[]);
       setEquipment((equipmentData ?? []) as EquipmentRow[]);
 
       if (financialsData && financialsData.length > 0) {
-        const utilitiesLookup = buildUtilitiesLookup([] as MonthlyUtilityRecord[]);
+        const utilitiesLookup = buildUtilitiesLookup((utilityData ?? []) as MonthlyUtilityRecord[]);
         const records = enrichMonthlyRecords(
           sortRecordsDesc(financialsData as MonthlyFinancialRecord[]),
           utilitiesLookup
@@ -196,6 +245,7 @@ export default function UtilitiesPage() {
         });
       } else {
         setTurnsContext(null);
+        setFinancialRecords([]);
       }
 
       const revMap = new Map<string, number>();
@@ -309,6 +359,68 @@ export default function UtilitiesPage() {
       avgEquipmentAge: store?.avg_machine_age ?? 0,
     };
   }, [equipment, store?.avg_machine_age]);
+
+  const costPerLoadMetrics = useMemo(() => {
+    const empty = {
+      totalLoadsPerMonth: null as number | null,
+      totalUtilityCostPerLoad: null as number | null,
+      waterCostPerLoad: null as number | null,
+      electricCostPerLoad: null as number | null,
+      gasCostPerLoad: null as number | null,
+    };
+
+    if (financialRecords.length === 0) return empty;
+
+    const utilitiesLookup = buildUtilitiesLookup(records);
+    const ttmRecords = enrichMonthlyRecords(
+      sortRecordsDesc(financialRecords),
+      utilitiesLookup
+    ).slice(0, 12);
+    const monthsUsed = ttmRecords.length;
+    if (monthsUsed === 0) return empty;
+
+    const washerCount = equipment
+      .filter((e) => e.machine_type === "Washer")
+      .reduce((sum, e) => sum + e.quantity, 0);
+    const washerCountOrNull = washerCount > 0 ? washerCount : null;
+    const turnsPerDay = realTurnsPerDay;
+    const totalLoadsPerMonth =
+      turnsPerDay != null && turnsPerDay > 0 && washerCountOrNull != null
+        ? turnsPerDay * washerCountOrNull * 30
+        : null;
+
+    const toMonthlyAverage = (ttmTotal: number) => ttmTotal / monthsUsed;
+
+    const hasWater = ttmUtilityFieldHasData(ttmRecords, utilitiesLookup, "water");
+    const hasElectric = ttmUtilityFieldHasData(ttmRecords, utilitiesLookup, "electric");
+    const hasGas = ttmUtilityFieldHasData(ttmRecords, utilitiesLookup, "gas");
+
+    const avgWater = hasWater
+      ? toMonthlyAverage(sumTtmUtilityField(ttmRecords, utilitiesLookup, "water"))
+      : null;
+    const avgElectric = hasElectric
+      ? toMonthlyAverage(sumTtmUtilityField(ttmRecords, utilitiesLookup, "electric"))
+      : null;
+    const avgGas = hasGas ? toMonthlyAverage(sumTtmUtilityField(ttmRecords, utilitiesLookup, "gas")) : null;
+
+    const costPerLoad = (monthlyCost: number | null) =>
+      monthlyCost != null && totalLoadsPerMonth != null && totalLoadsPerMonth > 0
+        ? monthlyCost / totalLoadsPerMonth
+        : null;
+
+    const totalAvgUtilities =
+      avgWater != null && avgElectric != null && avgGas != null
+        ? avgWater + avgElectric + avgGas
+        : null;
+
+    return {
+      totalLoadsPerMonth,
+      totalUtilityCostPerLoad: costPerLoad(totalAvgUtilities),
+      waterCostPerLoad: costPerLoad(avgWater),
+      electricCostPerLoad: costPerLoad(avgElectric),
+      gasCostPerLoad: costPerLoad(avgGas),
+    };
+  }, [financialRecords, records, equipment, realTurnsPerDay]);
 
   const equipmentInsight = useMemo(() => {
     if (!latest) return "No significant correlation detected yet - add more historical data.";
@@ -730,7 +842,58 @@ export default function UtilitiesPage() {
         </div>
       )}
 
-      {/* Section 5 — Water Analysis */}
+      {/* Section 5 — Utility Cost Per Load */}
+      <div className="card">
+        <div className="section-title">Utility Cost Per Load</div>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+          {[
+            {
+              label: "Total Utility Cost Per Load",
+              value: fmtCostPerLoad(costPerLoadMetrics.totalUtilityCostPerLoad),
+              valueClass:
+                costPerLoadMetrics.totalUtilityCostPerLoad != null
+                  ? costPerLoadBenchmark(costPerLoadMetrics.totalUtilityCostPerLoad).color
+                  : undefined,
+            },
+            { label: "Water Cost Per Load", value: fmtCostPerLoad(costPerLoadMetrics.waterCostPerLoad) },
+            { label: "Electric Cost Per Load", value: fmtCostPerLoad(costPerLoadMetrics.electricCostPerLoad) },
+            { label: "Gas Cost Per Load", value: fmtCostPerLoad(costPerLoadMetrics.gasCostPerLoad) },
+            {
+              label: "Total Loads Per Month",
+              value: fmtLoadsPerMonth(costPerLoadMetrics.totalLoadsPerMonth),
+            },
+          ].map((item) => (
+            <div key={item.label} className="card2">
+              <div className="metric-label">{item.label}</div>
+              <div
+                className={clsx("text-[18px] font-bold tabular-nums", item.valueClass)}
+                style={item.valueClass ? undefined : { color: "var(--text-primary)" }}
+              >
+                {item.value}
+              </div>
+            </div>
+          ))}
+        </div>
+        {costPerLoadMetrics.totalUtilityCostPerLoad != null ? (
+          <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
+            Industry benchmark:{" "}
+            <span className={costPerLoadBenchmark(costPerLoadMetrics.totalUtilityCostPerLoad).color}>
+              {costPerLoadBenchmark(costPerLoadMetrics.totalUtilityCostPerLoad).label}
+            </span>
+            {" — "}
+            Good under $0.40/load · Watch $0.40–$0.55 · High over $0.55. Based on TTM utility averages
+            (water, electric, gas) and loads from equipment turns per day × washers × 30 days.
+          </p>
+        ) : (
+          <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
+            Add monthly financials, utility costs (water, electric, gas), and equipment with vend prices to
+            calculate cost per load. Industry benchmark: Good under $0.40/load · Watch $0.40–$0.55 · High
+            over $0.55.
+          </p>
+        )}
+      </div>
+
+      {/* Section 6 — Water Analysis */}
       {latest && (
         <div className="card">
           <div className="section-title">Water Analysis</div>
@@ -756,7 +919,7 @@ export default function UtilitiesPage() {
         </div>
       )}
 
-      {/* Section 6 — Equipment Connection */}
+      {/* Section 7 — Equipment Connection */}
       {latest && (
         <div className="card">
           <div className="section-title">Equipment Connection</div>
@@ -784,7 +947,7 @@ export default function UtilitiesPage() {
         </div>
       )}
 
-      {/* Section 7 — History table */}
+      {/* Section 8 — History table */}
       <div className="card">
         <div className="section-title">Monthly History</div>
         <div className="table-scroll">
