@@ -14,6 +14,7 @@ import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
+import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
@@ -519,7 +520,9 @@ export default function PortfolioPage() {
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>EBITDA</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+              <DisclaimerLabel className="!text-[#94a3b8]">EBITDA</DisclaimerLabel>
+            </div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'white' }}>
               {aggregates.hasAnyFinancialData ? (
                 <>$<AnimatedNumber value={aggregates.totalAnnualEbitda} duration={1000} /></>
@@ -530,7 +533,9 @@ export default function PortfolioPage() {
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Global DSCR</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+              <DisclaimerLabel className="!text-[#94a3b8]">Global DSCR</DisclaimerLabel>
+            </div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'white' }}>
               {aggregates.hasDebtData ? (
                 <AnimatedNumber value={aggregates.globalDSCR} decimals={2} suffix="x" duration={1000} />
@@ -712,7 +717,9 @@ export default function PortfolioPage() {
                   },
                 ].map((metric) => (
                   <div key={metric.label}>
-                    <div className="metric-label mb-1">{metric.label}</div>
+                    <div className="metric-label mb-1">
+                      <DisclaimerLabel>{metric.label}</DisclaimerLabel>
+                    </div>
                     <div
                       className={clsx("text-[14px] font-semibold tabular-nums", metric.color)}
                       style={metric.color ? undefined : { color: "var(--text-primary)" }}
@@ -825,7 +832,9 @@ export default function PortfolioPage() {
         </h3>
         <div className="space-y-3 mb-4">
           <div className="flex justify-between text-[13px]">
-            <span style={{ color: "var(--text-secondary)" }}>Global DSCR</span>
+            <span style={{ color: "var(--text-secondary)" }}>
+              <DisclaimerLabel>Global DSCR</DisclaimerLabel>
+            </span>
             <span
               className={clsx("font-semibold", aggregates.hasDebtData && dscrColorClass(aggregates.globalDSCR))}
               style={aggregates.hasDebtData ? undefined : { color: "var(--text-muted)" }}

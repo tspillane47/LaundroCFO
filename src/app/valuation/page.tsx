@@ -32,7 +32,7 @@ import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
-import { MetricTooltip } from "@/components/ui/MetricTooltip";
+import { Disclaimer, DisclaimerLabel } from "@/components/ui/Disclaimer";
 
 type MarketDensity = "urban" | "suburban" | "average" | "rural";
 type RevenueTrend = "growing" | "stable" | "declining";
@@ -679,11 +679,13 @@ export default function ValuationPage() {
           <AnimatedNumber value={valuation.businessValue} prefix="$" className="hero-value-text" duration={1200} />
           <ValueChangeIndicator value={valuation.businessValue} />
         </div>
+        <Disclaimer variant="valuation" className="!text-[#94a3b8] max-w-xl" />
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
           <span style={{ background: 'rgba(59,130,246,0.15)', color: '#93c5fd', padding: '4px 12px', borderRadius: '20px', fontSize: '14px', fontWeight: 600 }}>
             <AnimatedNumber value={valuation.finalMultiple} decimals={2} suffix="x" duration={1000} /> EBITDA Multiple
           </span>
         </div>
+        <Disclaimer variant="valuation" className="!text-[#94a3b8] mt-1" />
 
         <div style={{ display: 'flex', gap: '24px', marginTop: '28px', flexWrap: 'wrap' }}>
           <div>
@@ -699,7 +701,9 @@ export default function ValuationPage() {
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>DSCR</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+              <DisclaimerLabel className="!text-[#94a3b8]">DSCR</DisclaimerLabel>
+            </div>
             <div style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>
               <AnimatedNumber value={dscr} decimals={2} suffix="x" duration={1000} />
             </div>
@@ -738,6 +742,7 @@ export default function ValuationPage() {
           <div style={{ fontSize: '28px', fontWeight: 700, color: 'white' }}>
             <AnimatedNumber value={valuation.combinedValue} prefix="$" duration={1200} />
           </div>
+          <Disclaimer variant="valuation" className="!text-[#94a3b8] mt-2" />
         </div>
       )}
 
@@ -870,6 +875,7 @@ export default function ValuationPage() {
               <div className="text-[17px] font-bold text-blue-400 tabular-nums">
                 Final Multiple: {fmtMultiple(valuation.finalMultiple)}
               </div>
+              <Disclaimer variant="valuation" className="text-right" />
               <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px", textAlign: "right" }}>
                 Laundromat multiples typically range from 2.5x to 6.0x depending on lease,
                 equipment, location, and revenue quality.
@@ -880,6 +886,7 @@ export default function ValuationPage() {
               <div className="text-[17px] font-bold text-green-400 tabular-nums">
                 = Business Value: {fmtDollar(valuation.businessValue)}
               </div>
+              <Disclaimer variant="valuation" className="text-right" />
               <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px", textAlign: "right" }}>
                 Estimated market value based on EBITDA multiple approach used by laundromat
                 brokers, SBA lenders, and industry buyers.
@@ -899,30 +906,28 @@ export default function ValuationPage() {
                   {fmtDollar(valuation.businessValue)}
                 </span>
               </div>
+              <Disclaimer variant="valuation" />
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[10px] text-slate-500">
-                  <MetricTooltip
-                    label="Final Multiple"
-                    explanation="Applied to annual EBITDA to estimate store value. Higher multiples reflect better lease, equipment, and market factors."
-                  />
+                  <DisclaimerLabel>Final Multiple</DisclaimerLabel>
                 </span>
                 <span className="text-[13px] font-bold text-blue-400 tabular-nums">
                   {fmtMultiple(valuation.finalMultiple)}
                 </span>
               </div>
+              <Disclaimer variant="valuation" />
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[10px] text-slate-500">
-                  <MetricTooltip
-                    label="Annual EBITDA"
-                    explanation="Earnings Before Interest, Taxes, Depreciation & Amortization. The primary profit metric for laundromat valuation."
-                  />
+                  <DisclaimerLabel>Annual EBITDA</DisclaimerLabel>
                 </span>
                 <span className="text-[12px] font-semibold text-slate-200 tabular-nums">
                   {fmtDollar(annualEbitda)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[10px] text-slate-500">EBITDA Margin</span>
+                <span className="text-[10px] text-slate-500">
+                  <DisclaimerLabel>EBITDA Margin</DisclaimerLabel>
+                </span>
                 <span className="text-[12px] font-semibold text-slate-200 tabular-nums">
                   {ebitdaMargin.toFixed(1)}%
                 </span>

@@ -7,6 +7,7 @@ import { INPUT_CLASS } from "@/components/occupancy/shared";
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
@@ -16,18 +17,27 @@ export default function SignupPage() {
   const supabase = createClient();
 
   async function handleSignup() {
+    if (!termsAccepted) return;
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signUp({
+    const termsAcceptedAt = new Date().toISOString();
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: { terms_accepted_at: termsAcceptedAt },
       },
     });
     if (error) {
       setError(error.message);
     } else {
+      if (data.user?.id) {
+        await supabase.from("profiles").upsert({
+          id: data.user.id,
+          terms_accepted_at: termsAcceptedAt,
+        });
+      }
       setPendingEmail(email);
       setPending(true);
     }
@@ -126,10 +136,29 @@ export default function SignupPage() {
               placeholder="Min 8 characters"
             />
           </div>
+          <label className="flex items-start gap-2.5 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500/30"
+            />
+            <span className="text-[12px] text-slate-400 leading-relaxed group-hover:text-slate-300">
+              I have read and agree to the{" "}
+              <Link href="/terms" className="text-blue-400 hover:text-blue-300">
+                Terms of Service
+              </Link>
+              {" "}and{" "}
+              <Link href="/terms#privacy-policy" className="text-blue-400 hover:text-blue-300">
+                Privacy Policy
+              </Link>
+              .
+            </span>
+          </label>
           <button
             onClick={handleSignup}
-            disabled={loading}
-            className="btn-primary w-full py-2.5 text-[13px]"
+            disabled={loading || !termsAccepted}
+            className="btn-primary w-full py-2.5 text-[13px] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Creating account..." : "Create Account"}
           </button>

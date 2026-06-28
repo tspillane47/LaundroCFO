@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import type { PortfolioReportData } from "@/lib/getPortfolioReport";
+import { DisclaimerPdf } from "@/components/reports/DisclaimerPdf";
 
 export interface PortfolioReportProps {
   data: PortfolioReportData;
@@ -174,6 +175,9 @@ function getLargestMachine(equipment: EquipmentRecord[]): string {
 function PageChrome() {
   return (
     <>
+      <View style={{ position: "absolute", bottom: 28, left: 40, right: 40 }} fixed>
+        <DisclaimerPdf variant="report-footer" />
+      </View>
       <Text style={styles.footer} fixed>
         LaundroCFO — Portfolio Report — Confidential
       </Text>

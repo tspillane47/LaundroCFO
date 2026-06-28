@@ -24,6 +24,7 @@ import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple, fmtPct } from "@/lib/calculations";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
+import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import { PageError } from "@/components/ui/PageError";
 import {
@@ -750,10 +751,7 @@ export default function FinancialsPage() {
             />
             <div className="card">
               <div className="metric-label">
-                <MetricTooltip
-                  label="TTM EBITDA"
-                  explanation="Earnings Before Interest, Taxes, Depreciation & Amortization. The primary profit metric for laundromat valuation."
-                />
+                <DisclaimerLabel>TTM EBITDA</DisclaimerLabel>
               </div>
               <div className="metric-value">{fmtDollar(ttm.ttmEbitda || 0)}</div>
               <div className="text-[12px] mt-1 text-slate-500">
@@ -763,10 +761,7 @@ export default function FinancialsPage() {
             <MetricCard label="EBITDA Margin" value={fmtPct(ttm.ttmEbitdaMargin || 0)} sub="TTM" subColor="muted" />
             <div className="card">
               <div className="metric-label">
-                <MetricTooltip
-                  label="DSCR"
-                  explanation="Debt Service Coverage Ratio. Measures ability to cover loan payments. Lenders require minimum 1.25x."
-                />
+                <DisclaimerLabel>DSCR</DisclaimerLabel>
               </div>
               <div className="metric-value">
                 {displayDscr != null ? fmtMultiple(displayDscr) : "—"}
@@ -887,11 +882,15 @@ export default function FinancialsPage() {
                   <div className="text-lg font-bold text-red-400">{fmtDollar(liveCalc.totalExpenses)}</div>
                 </div>
                 <div className="card2">
-                  <div className="metric-label">EBITDA</div>
+                  <div className="metric-label">
+                    <DisclaimerLabel>EBITDA</DisclaimerLabel>
+                  </div>
                   <div className="text-lg font-bold text-green-400">{fmtDollar(liveCalc.ebitda)}</div>
                 </div>
                 <div className="card2">
-                  <div className="metric-label">EBITDA Margin</div>
+                  <div className="metric-label">
+                    <DisclaimerLabel>EBITDA Margin</DisclaimerLabel>
+                  </div>
                   <div className="text-lg font-bold text-slate-100">{fmtPct(liveCalc.ebitdaMargin)}</div>
                 </div>
                 <div className="card2">

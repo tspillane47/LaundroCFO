@@ -7,6 +7,7 @@ import {
   scoreArcColor,
   type LaundroCfoScoreResult,
 } from "@/lib/laundroCfoScore";
+import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 
 const CATEGORY_LABELS: Record<keyof LaundroCfoScoreResult["categories"], string> = {
   financialPerformance: "Financial Performance",
@@ -129,7 +130,9 @@ export function LaundroCfoScoreCard({ result, className = "", compact = false }:
 
   return (
     <div className={`card ${className}`}>
-      <div className="metric-label mb-3">LaundroCFO Score</div>
+      <div className="metric-label mb-3">
+        <DisclaimerLabel>LaundroCFO Score</DisclaimerLabel>
+      </div>
 
       <div className="flex flex-col items-center">
         <LaundroCfoScoreGauge score={result.total} grade={result.grade} size={gaugeSize} />

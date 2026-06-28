@@ -1,8 +1,11 @@
 import { createClient } from "@/lib/supabase";
 import { getStoreValuation, getStoreDebt } from "@/lib/getStoreValuation";
 import {
+  buildPortfolioTtmCashFlow,
   buildPortfolioTtmSummary,
+  fetchMonthlyFinancialsForStores,
   type MonthlyFinancialRecord,
+  type PortfolioTtmCashFlow,
 } from "@/lib/financials";
 
 export interface PortfolioReportData {
@@ -41,20 +44,13 @@ export interface PortfolioReportData {
     debtToEbitda: number;
     storeCount: number;
   };
-  cashFlow: {
-    revenue: number;
-    utilities: number;
-    rent: number;
-    payroll: number;
-    repairs: number;
-    otherExpenses: number;
-    ebitda: number;
-    debtService: number;
-    cashFlowAfterDebt: number;
-  };
+  cashFlow: PortfolioTtmCashFlow;
 }
 
-export async function getPortfolioReport(userId: string): Promise<PortfolioReportData> {
+export async function getPortfolioReport(
+  userId: string,
+  options?: { financialsData?: MonthlyFinancialRecord[] }
+): Promise<PortfolioReportData> {
   const supabase = createClient();
 
   const { data: stores } = await supabase
@@ -97,17 +93,12 @@ export async function getPortfolioReport(userId: string): Promise<PortfolioRepor
   }
 
   const storeIds = stores.map((s) => s.id);
-  const { data: financialsData } = await supabase
-    .from("monthly_financials")
-    .select("*")
-    .in("store_id", storeIds)
-    .order("year", { ascending: false })
-    .order("month", { ascending: false });
+  const financialsData =
+    options?.financialsData ??
+    (await fetchMonthlyFinancialsForStores(supabase, storeIds));
 
-  const portfolioTtm = buildPortfolioTtmSummary(
-    (financialsData ?? []) as MonthlyFinancialRecord[],
-    storeIds
-  );
+  const portfolioTtm = buildPortfolioTtmSummary(financialsData, storeIds);
+  const cashFlow = buildPortfolioTtmCashFlow(financialsData, storeIds);
 
   const storeDetails = await Promise.all(
     stores.map(async (store) => {
@@ -218,18 +209,6 @@ export async function getPortfolioReport(userId: string): Promise<PortfolioRepor
   const globalLTV = portfolioValue > 0 ? (portfolioDebt / portfolioValue) * 100 : 0;
   const debtYield = portfolioDebt > 0 ? (annualEbitda / portfolioDebt) * 100 : 0;
   const debtToEbitda = annualEbitda > 0 ? portfolioDebt / annualEbitda : 0;
-
-  const cashFlow = {
-    revenue: annualRevenue,
-    utilities: storeDetails.reduce((s, d) => s + ((d.store.monthly_expenses ?? 0) * 0.25) * 12, 0),
-    rent: storeDetails.reduce((s, d) => s + (d.store.monthly_rent ?? 0) * 12, 0),
-    payroll: storeDetails.reduce((s, d) => s + ((d.store.monthly_expenses ?? 0) * 0.35) * 12, 0),
-    repairs: storeDetails.reduce((s, d) => s + ((d.store.monthly_expenses ?? 0) * 0.05) * 12, 0),
-    otherExpenses: storeDetails.reduce((s, d) => s + ((d.store.monthly_expenses ?? 0) * 0.35) * 12, 0),
-    ebitda: annualEbitda,
-    debtService: annualDebtService,
-    cashFlowAfterDebt: annualEbitda - annualDebtService,
-  };
 
   return {
     stores,

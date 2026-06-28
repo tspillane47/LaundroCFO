@@ -66,7 +66,7 @@ const pageTitles: Record<string, string> = {
   "/admin/feedback": "Feedback Admin",
 };
 
-const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password", "/auth/callback"];
+const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password", "/auth/callback", "/terms"];
 const marketingPages = ["/", "/pricing", "/about"];
 
 function AppShell({ children }: { children: React.ReactNode }) {
@@ -498,6 +498,19 @@ function AppShell({ children }: { children: React.ReactNode }) {
         >
           {children}
         </main>
+
+        <footer
+          className="flex-shrink-0 px-6 py-2 border-t text-center"
+          style={{ borderColor: "var(--border)", background: "var(--bg-card)" }}
+        >
+          <Link
+            href="/terms"
+            className="text-[11px] hover:underline underline-offset-2"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Disclaimer
+          </Link>
+        </footer>
       </div>
 
       <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />

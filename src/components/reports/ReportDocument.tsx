@@ -17,6 +17,7 @@ import {
 } from "@/lib/calculations";
 import type { PortfolioTtmSummary, TtmMetrics } from "@/lib/financials";
 import type { ValuationResult } from "@/lib/valuation";
+import { DisclaimerPdf } from "@/components/reports/DisclaimerPdf";
 
 export interface ReportProps {
   store: any;
@@ -198,6 +199,9 @@ function labelize(value: string | null | undefined): string {
 function PageChrome({ storeName }: { storeName: string }) {
   return (
     <>
+      <View style={{ position: "absolute", bottom: 28, left: 40, right: 40 }} fixed>
+        <DisclaimerPdf variant="report-footer" />
+      </View>
       <Text style={styles.footer} fixed>
         LaundroCFO — {storeName} — Confidential
       </Text>

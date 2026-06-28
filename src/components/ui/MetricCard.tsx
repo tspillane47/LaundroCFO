@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 
 interface MetricCardProps {
   label: string;
@@ -39,7 +40,9 @@ export function MetricCard({
 }: MetricCardProps) {
   return (
     <div className={clsx("card", highlight && "border-blue-500/30")}>
-      <div className="metric-label">{label}</div>
+      <div className="metric-label">
+        <DisclaimerLabel>{label}</DisclaimerLabel>
+      </div>
       <div className="flex items-center gap-2">
         <div className="metric-value">{value}</div>
         {badge && <span className={clsx("badge", badgeClasses[badgeColor])}>{badge}</span>}
@@ -62,7 +65,9 @@ export function SmallMetric({ label, value, color = "text-slate-100" }: {
 }) {
   return (
     <div className="card2">
-      <div className="metric-label">{label}</div>
+      <div className="metric-label">
+        <DisclaimerLabel>{label}</DisclaimerLabel>
+      </div>
       <div className={clsx("text-lg font-bold", color)}>{value}</div>
     </div>
   );

@@ -383,6 +383,82 @@ export function buildPortfolioTtmSummary(
   };
 }
 
+export type PortfolioTtmCashFlow = {
+  revenue: number;
+  utilities: number;
+  rent: number;
+  payroll: number;
+  repairs: number;
+  otherExpenses: number;
+  ebitda: number;
+  debtService: number;
+  cashFlowAfterDebt: number;
+};
+
+export const EMPTY_PORTFOLIO_TTM_CASH_FLOW: PortfolioTtmCashFlow = {
+  revenue: 0,
+  utilities: 0,
+  rent: 0,
+  payroll: 0,
+  repairs: 0,
+  otherExpenses: 0,
+  ebitda: 0,
+  debtService: 0,
+  cashFlowAfterDebt: 0,
+};
+
+function sumTtmRecords(
+  records: CalculatedMonthly[],
+  pick: (record: CalculatedMonthly) => number
+): number {
+  return records.slice(0, 12).reduce((sum, record) => sum + pick(record), 0);
+}
+
+/** Portfolio-wide TTM cash flow from monthly_financials — same fields as Financials P&L. */
+export function buildPortfolioTtmCashFlow(
+  rows: MonthlyFinancialRecord[],
+  storeIds: string[]
+): PortfolioTtmCashFlow {
+  if (storeIds.length === 0) return EMPTY_PORTFOLIO_TTM_CASH_FLOW;
+
+  const grouped = groupFinancialsByStoreId(rows);
+  let revenue = 0;
+  let utilities = 0;
+  let rent = 0;
+  let payroll = 0;
+  let repairs = 0;
+  let otherExpenses = 0;
+  let ebitda = 0;
+  let debtService = 0;
+
+  for (const id of storeIds) {
+    const records = enrichMonthlyRecords(sortRecordsDesc(grouped.get(id) ?? []));
+    revenue += sumTtmRecords(records, (r) => r.revenue);
+    utilities += sumTtmRecords(records, (r) => r.utilities);
+    rent += sumTtmRecords(records, (r) => r.rent);
+    payroll += sumTtmRecords(records, (r) => r.payroll);
+    repairs += sumTtmRecords(records, (r) => r.repairs_maintenance);
+    otherExpenses += sumTtmRecords(
+      records,
+      (r) => r.totalExpenses - r.utilities - r.rent - r.payroll - r.repairs_maintenance
+    );
+    ebitda += sumTtmRecords(records, (r) => r.ebitda);
+    debtService += sumTtmRecords(records, (r) => r.debt_service);
+  }
+
+  return {
+    revenue,
+    utilities,
+    rent,
+    payroll,
+    repairs,
+    otherExpenses,
+    ebitda,
+    debtService,
+    cashFlowAfterDebt: ebitda - debtService,
+  };
+}
+
 import type { createClient } from "@/lib/supabase";
 import { toNum, toNullableText } from "@/lib/formHelpers";
 
@@ -414,6 +490,23 @@ export async function fetchStoreTtmMetrics(
   );
 
   return calcTtmMetrics(records);
+}
+
+/** Same monthly_financials query as the Financials page (ordered newest first). */
+export async function fetchMonthlyFinancialsForStores(
+  supabase: FinancialsSupabaseClient,
+  storeIds: string[]
+): Promise<MonthlyFinancialRecord[]> {
+  if (storeIds.length === 0) return [];
+
+  const { data } = await supabase
+    .from("monthly_financials")
+    .select("*")
+    .in("store_id", storeIds)
+    .order("year", { ascending: false })
+    .order("month", { ascending: false });
+
+  return (data ?? []) as MonthlyFinancialRecord[];
 }
 
 export function resolveAnnualEbitda(

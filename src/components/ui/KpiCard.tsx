@@ -1,4 +1,12 @@
 import { ReactNode } from "react";
+import { DisclaimerLabel } from "@/components/ui/Disclaimer";
+
+function renderKpiLabel(label: ReactNode) {
+  if (typeof label === "string") {
+    return <DisclaimerLabel>{label}</DisclaimerLabel>;
+  }
+  return label;
+}
 
 type KpiCardProps = {
   label: ReactNode;
@@ -20,7 +28,7 @@ export function KpiCard({ label, value, sub, valueColor, className, style, label
         className="metric-label"
         style={{ fontSize: "11px", whiteSpace: "normal", marginBottom: "8px", ...labelStyle }}
       >
-        {label}
+        {renderKpiLabel(label)}
       </div>
       <div
         style={{

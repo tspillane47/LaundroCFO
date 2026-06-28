@@ -27,7 +27,7 @@ import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { KpiCard } from "@/components/ui/KpiCard";
-import { MetricTooltip } from "@/components/ui/MetricTooltip";
+import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { CashCard } from "@/components/ui/CashCard";
 import { PageError } from "@/components/ui/PageError";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
@@ -610,12 +610,7 @@ export default function DashboardPage() {
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0s" }}
-          label={
-            <MetricTooltip
-              label="DSCR"
-              explanation="Debt Service Coverage Ratio. Measures ability to cover loan payments. Lenders require minimum 1.25x."
-            />
-          }
+          label={<DisclaimerLabel>DSCR</DisclaimerLabel>}
           value={
             hasFinancialData && debtService > 0 ? (
               <AnimatedNumber value={dscrNum} decimals={2} suffix="x" duration={1000} />
@@ -648,12 +643,7 @@ export default function DashboardPage() {
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.05s" }}
-          label={
-            <MetricTooltip
-              label="EBITDA Margin"
-              explanation="Earnings Before Interest, Taxes, Depreciation & Amortization. The primary profit metric for laundromat valuation."
-            />
-          }
+          label={<DisclaimerLabel>EBITDA Margin</DisclaimerLabel>}
           value={
             hasFinancialData ? (
               <AnimatedNumber value={ebitdaMargin} decimals={1} suffix="%" duration={1000} />
@@ -1086,11 +1076,7 @@ export default function DashboardPage() {
           ].map((item) => (
             <div key={item.label}>
               <div className="metric-label">
-                {"tooltip" in item && item.tooltip ? (
-                  <MetricTooltip label={item.label} explanation={item.tooltip} />
-                ) : (
-                  item.label
-                )}
+                <DisclaimerLabel>{item.label}</DisclaimerLabel>
               </div>
               <div className="text-[16px] font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>
                 {item.value}

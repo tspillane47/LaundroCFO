@@ -31,7 +31,7 @@ import { getPortfolioReport, type PortfolioReportData } from "@/lib/getPortfolio
 import {
   buildPortfolioTtmSummary,
   EMPTY_TTM_METRICS,
-  type MonthlyFinancialRecord,
+  fetchMonthlyFinancialsForStores,
   type PortfolioTtmSummary,
   type TtmMetrics,
 } from "@/lib/financials";
@@ -197,17 +197,9 @@ export default function ReportsPage() {
       setInsurance(policiesData ?? []);
 
       const storeIds = stores.length > 0 ? stores.map((s) => s.id) : [storeData.id];
-      const { data: portfolioFinancialsData } = await supabase
-        .from("monthly_financials")
-        .select("*")
-        .in("store_id", storeIds)
-        .order("year", { ascending: false })
-        .order("month", { ascending: false });
+      const financialsData = await fetchMonthlyFinancialsForStores(supabase, storeIds);
 
-      const portfolioSummary = buildPortfolioTtmSummary(
-        (portfolioFinancialsData ?? []) as MonthlyFinancialRecord[],
-        storeIds
-      );
+      const portfolioSummary = buildPortfolioTtmSummary(financialsData, storeIds);
       setStoreTtm(portfolioSummary.byStoreId[storeData.id] ?? EMPTY_TTM_METRICS);
       setPortfolioTtm(portfolioSummary);
 
@@ -266,7 +258,15 @@ export default function ReportsPage() {
       setPortfolioLoading(true);
       setError("");
       try {
-        const data = await getPortfolioReport(userId);
+        const { data: userStores } = await supabase
+          .from("stores")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("archived", false);
+
+        const storeIds = (userStores ?? []).map((s) => s.id);
+        const financialsData = await fetchMonthlyFinancialsForStores(supabase, storeIds);
+        const data = await getPortfolioReport(userId, { financialsData });
         setPortfolioData(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load portfolio report");
@@ -277,7 +277,7 @@ export default function ReportsPage() {
     }
 
     loadPortfolio();
-  }, [reportMode, userId]);
+  }, [reportMode, userId, supabase]);
 
   useEffect(() => {
     if (reportMode !== "store") return;
