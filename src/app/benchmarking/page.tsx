@@ -13,7 +13,6 @@ import {
   type CalculatedMonthly,
   type MonthlyFinancialRecord,
   type StoreFinancialProfile,
-  type TtmMetrics,
 } from "@/lib/financials";
 import { fmtMultiple, fmtPct } from "@/lib/calculations";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -98,13 +97,11 @@ export default function BenchmarkingPage() {
   const [store, setStore] = useState<StoreFinancialProfile | null>(null);
   const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
   const [records, setRecords] = useState<CalculatedMonthly[]>([]);
-  const [ttm, setTtm] = useState<TtmMetrics | null>(null);
 
   const loadData = useCallback(async () => {
     if (!selectedStore?.id) {
       setStore(null);
       setRecords([]);
-      setTtm(null);
       setLoading(false);
       return;
     }
@@ -121,24 +118,34 @@ export default function BenchmarkingPage() {
         return;
       }
 
+      console.log("[benchmarking] store id:", selectedStore.id);
+
       const [
         { data: storeData, error: storeError },
-        { data: equipmentData, error: equipError },
         { data: financialsData, error: financialsError },
+        { data: equipmentData, error: equipError },
       ] = await Promise.all([
         supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
-        supabase.from("equipment_inventory").select("*").eq("store_id", selectedStore.id),
         supabase
           .from("monthly_financials")
           .select("*")
           .eq("store_id", selectedStore.id)
           .order("year", { ascending: false })
           .order("month", { ascending: false }),
+        supabase.from("equipment_inventory").select("*").eq("store_id", selectedStore.id),
       ]);
 
-      if (storeError) throw storeError;
-      if (equipError) throw equipError;
-      if (financialsError) throw financialsError;
+      console.log("[benchmarking] monthly_financials query result:", {
+        data: financialsData,
+        error: financialsError,
+      });
+
+      const errors = [storeError, financialsError, equipError]
+        .filter(Boolean)
+        .map((e) => e!.message);
+      if (errors.length > 0) {
+        console.warn("[benchmarking] load warnings:", errors.join(" · "));
+      }
 
       setStore(storeData as StoreFinancialProfile);
       setEquipment((equipmentData ?? []) as EquipmentRecord[]);
@@ -147,12 +154,10 @@ export default function BenchmarkingPage() {
         sortRecordsDesc((financialsData ?? []) as MonthlyFinancialRecord[])
       );
       setRecords(sorted);
-      setTtm(sorted.length > 0 ? calcTtmMetrics(sorted) : null);
     } catch {
       setLoadError(true);
       setStore(null);
       setRecords([]);
-      setTtm(null);
     } finally {
       setLoading(false);
     }
@@ -163,8 +168,10 @@ export default function BenchmarkingPage() {
     loadData();
   }, [storesLoading, loadData]);
 
+  const ttm = useMemo(() => calcTtmMetrics(records), [records]);
+
   const metrics = useMemo(() => {
-    if (!store || !ttm || ttm.ttmRevenue <= 0) return null;
+    if (!store || records.length === 0) return null;
 
     const ratios = calcRatios(store, records, ttm);
     const equipMetrics = computeEquipmentMetrics(equipment);
@@ -291,7 +298,7 @@ export default function BenchmarkingPage() {
     );
   }
 
-  if (!metrics?.hasFinancials) {
+  if (records.length === 0 || !metrics) {
     return (
       <div className="card text-center py-10">
         <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
