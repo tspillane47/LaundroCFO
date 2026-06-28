@@ -6,6 +6,7 @@ import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { SmallMetric } from "@/components/ui/MetricCard";
 import clsx from "clsx";
+import { getNextRentEscalation } from "@/lib/rent-escalation";
 import {
   INPUT_CLASS,
   LabelValue,
@@ -326,6 +327,14 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
     const risk = riskFromScore(score);
     const daysUntilNotice = calcDaysUntilNoticeDeadline(lease?.lease_end_date ?? null, options);
 
+    const rentEscalation = lease
+      ? getNextRentEscalation(
+          lease.lease_start_date,
+          lease.annual_escalation_pct,
+          lease.monthly_rent
+        )
+      : null;
+
     return {
       yearsRemaining,
       monthsRemaining,
@@ -334,6 +343,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       risk,
       daysUntilNotice,
       availableOptions,
+      rentEscalation,
     };
   }, [lease, options, store]);
 
@@ -608,6 +618,41 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               }
             />
           </div>
+
+          {metrics.rentEscalation && (
+            <div
+              className={clsx(
+                "card p-4 border",
+                metrics.rentEscalation.monthsUntil <= 3
+                  ? "bg-red-500/8 border-red-500/20"
+                  : metrics.rentEscalation.monthsUntil <= 6
+                    ? "bg-amber-500/8 border-amber-500/20"
+                    : "bg-blue-500/8 border-blue-500/20"
+              )}
+            >
+              <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">
+                Next Rent Escalation
+              </div>
+              <div className="text-[13px] font-semibold text-slate-100">
+                {metrics.rentEscalation.nextDate.toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+                <span className="text-slate-400 font-normal">
+                  {" "}
+                  · in{" "}
+                  {metrics.rentEscalation.monthsUntil === 1
+                    ? "1 month"
+                    : `${metrics.rentEscalation.monthsUntil} months`}
+                </span>
+              </div>
+              <div className="text-[12px] text-slate-400 mt-1">
+                Monthly rent increases from {formatCurrency(metrics.rentEscalation.currentRent)} to{" "}
+                {formatCurrency(metrics.rentEscalation.newRent)} (+{formatCurrency(metrics.rentEscalation.increase)})
+              </div>
+            </div>
+          )}
 
           <div className="card">
             <div className="section-title">Base Lease Information</div>

@@ -1,3 +1,9 @@
+import {
+  escalationSeverity,
+  formatRentEscalationAlert,
+  getNextRentEscalation,
+} from "@/lib/rent-escalation";
+
 export interface FeedItem {
   id: string;
   date: string;
@@ -173,6 +179,30 @@ export function generateStoreFeed(store: any, lease?: any, equipment?: any[], in
           ? 'Moderate rent burden. Monitor as revenue fluctuates.'
           : '⚠ High rent burden. Above 20% threshold — lenders will scrutinize.',
         severity: Number(rentRatio) < 15 ? 'success' : Number(rentRatio) < 20 ? 'info' : 'warning',
+        storeName: store.name,
+      });
+    }
+  }
+
+  if (lease) {
+    const escalation = getNextRentEscalation(
+      lease.lease_start_date,
+      lease.annual_escalation_pct,
+      lease.monthly_rent,
+      now
+    );
+    const escalationAlertSeverity = escalation
+      ? escalationSeverity(escalation.monthsUntil)
+      : null;
+    if (escalation && escalationAlertSeverity) {
+      items.push({
+        id: 'lease-escalation-' + store.id,
+        date: formatDate(now),
+        category: 'lease',
+        icon: '📈',
+        headline: formatRentEscalationAlert(escalation),
+        description: `Next escalation on ${escalation.nextDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} (${lease.annual_escalation_pct}% annual increase). Review cash flow and budget accordingly.`,
+        severity: escalationAlertSeverity,
         storeName: store.name,
       });
     }

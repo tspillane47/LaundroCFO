@@ -267,6 +267,7 @@ export default function AlertsPage() {
             ["Utility Alert", "> 20%"],
             ["Occupancy Cost Alert", "> 20%"],
             ["Lease Warning", "< 5 years"],
+            ["Rent Escalation", "≤ 6 months"],
             ["Equip. Age Warning", "> 12 years"],
           ].map(([label, val]) => (
             <div key={label} className="card2">
