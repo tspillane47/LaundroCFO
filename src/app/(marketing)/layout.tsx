@@ -61,7 +61,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
                 href={link.href}
                 className={clsx(
                   "text-[14px] font-medium transition-colors",
-                  navSolid ? "text-slate-600 hover:text-slate-900" : "text-slate-300 hover:text-white"
+                  navSolid ? "text-slate-600 hover:text-slate-900" : "text-gray-700 dark:text-slate-300 hover:text-white"
                 )}
               >
                 {link.label}
@@ -147,7 +147,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10">
             <div>
               <div className="text-[20px] font-bold text-[#60a5fa] tracking-tight">LaundroCFO</div>
-              <p className="text-[14px] text-slate-400 mt-2 max-w-xs leading-relaxed">
+              <p className="text-[14px] text-gray-700 dark:text-slate-400 mt-2 max-w-xs leading-relaxed">
                 The financial operating system for laundromat owners, buyers, brokers, and lenders.
               </p>
             </div>
@@ -156,7 +156,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="text-[14px] text-slate-400 hover:text-white transition-colors"
+                  className="text-[14px] text-gray-700 dark:text-slate-400 hover:text-white transition-colors"
                 >
                   {link.label}
                 </Link>

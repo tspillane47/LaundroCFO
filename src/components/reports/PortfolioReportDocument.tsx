@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   coverInfoCol: { width: "31%" },
   coverInfoLabel: {
     fontSize: 10,
-    color: "#94a3b8",
+    color: '#374151',
     textTransform: "uppercase",
     letterSpacing: 1,
     marginBottom: 4,
@@ -109,15 +109,15 @@ const styles = StyleSheet.create({
   metricValue: { fontSize: 18, fontWeight: "bold", color: "#1e293b" },
   metricLabel: {
     fontSize: 8,
-    color: "#94a3b8",
+    color: '#374151',
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   positiveText: { color: "#15803d" },
   negativeText: { color: "#b91c1c" },
-  pageNumber: { position: "absolute", bottom: 30, right: 40, fontSize: 9, color: "#94a3b8" },
-  footer: { position: "absolute", bottom: 30, left: 40, fontSize: 9, color: "#94a3b8" },
+  pageNumber: { position: "absolute", bottom: 30, right: 40, fontSize: 9, color: '#374151' },
+  footer: { position: "absolute", bottom: 30, left: 40, fontSize: 9, color: '#374151' },
   divider: { borderBottom: "1 solid #e2e8f0", marginVertical: 12 },
   tableHeader: {
     flexDirection: "row",
@@ -482,7 +482,7 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
             <DataRow label="Business Value" value={fmtCurrency(d.valuation.businessValue)} positive />
           </View>
         ))}
-        <Text style={[styles.bodyText, { fontSize: 8, color: "#94a3b8", marginTop: 12 }]}>
+        <Text style={[styles.bodyText, { fontSize: 8, color: '#374151', marginTop: 12 }]}>
           Report generated {generatedDate}. All figures based on owner-reported data and should be independently verified.
         </Text>
         <PageChrome />

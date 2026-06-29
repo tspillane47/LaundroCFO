@@ -11,7 +11,7 @@ function SectionHeading({ title, subtitle }: { title: string; subtitle?: string 
       <h2 className="text-[28px] lg:text-[40px] font-bold text-white tracking-tight leading-tight mb-4">
         {title}
       </h2>
-      {subtitle && <p className="text-[16px] lg:text-[18px] text-slate-400 leading-relaxed">{subtitle}</p>}
+      {subtitle && <p className="text-[16px] lg:text-[18px] text-gray-700 dark:text-slate-400 leading-relaxed">{subtitle}</p>}
     </div>
   );
 }
@@ -38,7 +38,7 @@ const integrations = [
   { name: "QuickBooks", abbr: "QB", color: "#2CA01C", active: true },
   { name: "FasCard", abbr: "FC", color: "#2563eb", active: true },
   { name: "Bank Accounts", abbr: "🏦", color: "#60a5fa", active: true, isEmoji: true },
-  { name: "CSV Import", abbr: "CSV", color: "#94a3b8", active: true },
+  { name: "CSV Import", abbr: "CSV", color: '#374151', active: true },
 ];
 
 const comingSoon = ["Laundry POS", "Coin Laundry Pro", "CSC Pay"];
@@ -150,7 +150,7 @@ function TrackBusinessMockup() {
           { label: "Vending", value: "$400" },
         ].map((row) => (
           <div key={row.label} className="flex justify-between text-[12px]">
-            <span className="text-slate-400">{row.label}</span>
+            <span className="text-gray-700 dark:text-slate-400">{row.label}</span>
             <span className="text-white font-semibold tabular-nums">{row.value}</span>
           </div>
         ))}
@@ -228,7 +228,7 @@ function ManageDebtMockup() {
           { label: "Remaining", value: "63 months" },
         ].map((row) => (
           <div key={row.label} className="flex justify-between text-[12px]">
-            <span className="text-slate-400">{row.label}</span>
+            <span className="text-gray-700 dark:text-slate-400">{row.label}</span>
             <span className="text-white font-semibold tabular-nums">{row.value}</span>
           </div>
         ))}
@@ -342,7 +342,7 @@ function FeaturePillars() {
               <h3 className="text-[22px] lg:text-[26px] font-bold text-white mb-4">{pillar.title}</h3>
               <ul className="space-y-2 mb-2">
                 {pillar.bullets.map((b) => (
-                  <li key={b} className="flex items-center gap-2 text-[14px] text-slate-400">
+                  <li key={b} className="flex items-center gap-2 text-[14px] text-gray-700 dark:text-slate-400">
                     <IconCheck className="text-blue-400 shrink-0" />
                     {b}
                   </li>
@@ -388,7 +388,7 @@ function ComparisonTable() {
                             borderLeft: "2px solid #3b82f6",
                             borderRight: "2px solid #3b82f6",
                           }
-                        : { color: "#94a3b8" }
+                        : { color: '#374151' }
                     }
                   >
                     {col}
@@ -399,13 +399,13 @@ function ComparisonTable() {
             <tbody>
               {comparisonRows.map((row, ri) => (
                 <tr key={ri} style={{ borderTop: "1px solid rgba(59,130,246,0.08)" }}>
-                  <td className="px-5 py-4 text-[14px] text-slate-400">
+                  <td className="px-5 py-4 text-[14px] text-gray-700 dark:text-slate-400">
                     <span className="inline-flex items-center gap-2">
                       <IconX className="text-slate-500 shrink-0" />
                       {row.qb}
                     </span>
                   </td>
-                  <td className="px-5 py-4 text-[14px] text-slate-400">
+                  <td className="px-5 py-4 text-[14px] text-gray-700 dark:text-slate-400">
                     <span className="inline-flex items-center gap-2">
                       <IconX className="text-slate-500 shrink-0" />
                       {row.fc}
@@ -559,7 +559,7 @@ function BankReportsPreview() {
                   <div key={row} className="flex items-center justify-between text-[12px]">
                     <span className="text-slate-500">{row.split(":")[0]}</span>
                     {row.includes(":") && (
-                      <span className="text-slate-300 font-medium tabular-nums">{row.split(":")[1]?.trim()}</span>
+                      <span className="text-gray-700 dark:text-slate-300 font-medium tabular-nums">{row.split(":")[1]?.trim()}</span>
                     )}
                   </div>
                 ))}
@@ -622,7 +622,7 @@ function BenchmarkingSection() {
               style={{ background: "rgba(15,30,60,0.5)", borderColor: "rgba(59,130,246,0.12)" }}
             >
               <div className="flex items-start justify-between gap-2 mb-1">
-                <span className="text-[12px] font-medium text-slate-400 leading-tight">{b.name}</span>
+                <span className="text-[12px] font-medium text-gray-700 dark:text-slate-400 leading-tight">{b.name}</span>
                 <span className={`badge ${b.badge} shrink-0`}>{b.status}</span>
               </div>
               <div className="text-[20px] font-bold text-white tabular-nums">{b.value}</div>
@@ -793,12 +793,12 @@ function SamplePL() {
                 className="flex justify-between py-2.5 text-[14px]"
                 style={{ background: i % 2 === 0 ? "rgba(30,41,59,0.25)" : "transparent", margin: "0 -12px", padding: "10px 12px" }}
               >
-                <span className="text-slate-400">{row.label}</span>
+                <span className="text-gray-700 dark:text-slate-400">{row.label}</span>
                 <span className="text-white font-medium tabular-nums">{row.value}</span>
               </div>
             ))}
             <div className="flex justify-between py-3 text-[14px] font-semibold border-t border-slate-700/40 mt-1">
-              <span className="text-slate-300">Total Revenue</span>
+              <span className="text-gray-700 dark:text-slate-300">Total Revenue</span>
               <span className="text-white tabular-nums">$26,100</span>
             </div>
 
@@ -809,12 +809,12 @@ function SamplePL() {
                 className="flex justify-between py-2.5 text-[14px]"
                 style={{ background: i % 2 === 0 ? "rgba(30,41,59,0.25)" : "transparent", margin: "0 -12px", padding: "10px 12px" }}
               >
-                <span className="text-slate-400">{row.label}</span>
+                <span className="text-gray-700 dark:text-slate-400">{row.label}</span>
                 <span className="text-white font-medium tabular-nums">{row.value}</span>
               </div>
             ))}
             <div className="flex justify-between py-3 text-[14px] font-semibold border-t border-slate-700/40 mt-1">
-              <span className="text-slate-300">Total Expenses</span>
+              <span className="text-gray-700 dark:text-slate-300">Total Expenses</span>
               <span className="text-white tabular-nums">$11,450</span>
             </div>
 
@@ -895,7 +895,7 @@ function TrustBadgesSection() {
               </div>
               <div className="flex items-center gap-2">
                 <IconCheck className="text-emerald-400 shrink-0" />
-                <span className="text-[14px] text-slate-300 font-medium">{item.label}</span>
+                <span className="text-[14px] text-gray-700 dark:text-slate-300 font-medium">{item.label}</span>
               </div>
             </div>
           ))}
@@ -956,7 +956,7 @@ function FAQSection() {
                   </svg>
                 </button>
                 {isOpen && (
-                  <div className="px-5 pb-4 text-[14px] text-slate-400 leading-relaxed border-t border-slate-700/30 pt-3">
+                  <div className="px-5 pb-4 text-[14px] text-gray-700 dark:text-slate-400 leading-relaxed border-t border-slate-700/30 pt-3">
                     {faq.a}
                   </div>
                 )}
@@ -978,7 +978,7 @@ function FinalCTA() {
         <h2 className="text-[32px] lg:text-[44px] font-bold text-white tracking-tight leading-tight mb-4">
           Know Your Value. Manage Your Debt. Grow Your Portfolio.
         </h2>
-        <p className="text-[18px] text-slate-400 mb-10">
+        <p className="text-[18px] text-gray-700 dark:text-slate-400 mb-10">
           The operating system built specifically for laundromat owners.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">

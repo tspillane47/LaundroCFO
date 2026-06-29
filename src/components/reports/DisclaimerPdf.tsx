@@ -9,7 +9,7 @@ type DisclaimerPdfProps = {
 export function DisclaimerPdf({ variant }: DisclaimerPdfProps) {
   if (variant === "valuation") {
     return (
-      <Text style={{ fontSize: 7, color: "#94a3b8", marginTop: 2, lineHeight: 1.35 }}>
+      <Text style={{ fontSize: 7, color: '#374151', marginTop: 2, lineHeight: 1.35 }}>
         {getDisclaimerText(variant)}
       </Text>
     );
@@ -17,7 +17,7 @@ export function DisclaimerPdf({ variant }: DisclaimerPdfProps) {
 
   if (variant === "report-footer") {
     return (
-      <Text style={{ fontSize: 7, color: "#94a3b8", lineHeight: 1.35, marginTop: 4 }}>
+      <Text style={{ fontSize: 7, color: '#374151', lineHeight: 1.35, marginTop: 4 }}>
         {getDisclaimerText(variant)}
       </Text>
     );

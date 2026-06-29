@@ -679,30 +679,30 @@ export default function ValuationPage() {
           <AnimatedNumber value={valuation.businessValue} prefix="$" className="hero-value-text" duration={1200} />
           <ValueChangeIndicator value={valuation.businessValue} />
         </div>
-        <Disclaimer variant="valuation" className="!text-[#94a3b8] max-w-xl" />
+        <Disclaimer variant="valuation" className="!text-slate-300 max-w-xl" />
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
           <span style={{ background: 'rgba(59,130,246,0.15)', color: '#93c5fd', padding: '4px 12px', borderRadius: '20px', fontSize: '14px', fontWeight: 600 }}>
             <AnimatedNumber value={valuation.finalMultiple} decimals={2} suffix="x" duration={1000} /> EBITDA Multiple
           </span>
         </div>
-        <Disclaimer variant="valuation" className="!text-[#94a3b8] mt-1" />
+        <Disclaimer variant="valuation" className="!text-slate-300 mt-1" />
 
         <div style={{ display: 'flex', gap: '24px', marginTop: '28px', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Equipment Grade</div>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Equipment Grade</div>
             <div style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>{equipmentGrade}</div>
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Lease Score</div>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Lease Score</div>
             <div style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>
               <AnimatedNumber value={leaseScore} duration={1000} />
             </div>
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
-              <DisclaimerLabel className="!text-[#94a3b8]">DSCR</DisclaimerLabel>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+              <DisclaimerLabel className="!text-slate-300">DSCR</DisclaimerLabel>
             </div>
             <div style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>
               <AnimatedNumber value={dscr} decimals={2} suffix="x" duration={1000} />
@@ -710,21 +710,21 @@ export default function ValuationPage() {
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Cash</div>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Cash</div>
             <div style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>
               $<AnimatedNumber value={totalCash} duration={1000} />
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '20px', marginTop: '20px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.08)', flexWrap: 'wrap', fontSize: '12px', color: '#94a3b8' }}>
+        <div style={{ display: 'flex', gap: '20px', marginTop: '20px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.08)', flexWrap: 'wrap', fontSize: '12px', color: 'rgba(255,255,255,0.75)' }}>
           <span>Market: {marketDensityLabel}</span>
           <span>Store Size: {store?.square_footage?.toLocaleString()} SF</span>
           <span>Vintage: {store?.year_opened ?? '—'}</span>
         </div>
 
         <div style={{ position: 'absolute', top: '32px', right: '40px', textAlign: 'right' }}>
-          <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Data Completeness</div>
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Data Completeness</div>
           <div style={{ fontSize: '24px', fontWeight: 700, color: dataCompleteness >= 80 ? '#4ade80' : dataCompleteness >= 50 ? '#fbbf24' : '#f87171' }}>
             <AnimatedNumber value={dataCompleteness} suffix="%" duration={1000} />
           </div>
@@ -742,7 +742,7 @@ export default function ValuationPage() {
           <div style={{ fontSize: '28px', fontWeight: 700, color: 'white' }}>
             <AnimatedNumber value={valuation.combinedValue} prefix="$" duration={1200} />
           </div>
-          <Disclaimer variant="valuation" className="!text-[#94a3b8] mt-2" />
+          <Disclaimer variant="valuation" className="!text-slate-300 mt-2" />
         </div>
       )}
 

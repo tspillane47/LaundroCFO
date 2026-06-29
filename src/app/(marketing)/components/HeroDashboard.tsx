@@ -470,7 +470,7 @@ export default function HeroDashboard() {
               Equipment Age Score
             </div>
             <EquipmentDonut />
-            <div className="text-[7px] lg:text-[8px] text-slate-400 mt-1 text-center leading-tight">
+            <div className="text-[7px] lg:text-[8px] text-gray-700 dark:text-slate-400 mt-1 text-center leading-tight">
               Excellent: 8.2/10
             </div>
           </div>

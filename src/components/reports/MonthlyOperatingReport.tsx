@@ -22,7 +22,7 @@ const styles = StyleSheet.create({
   coverPage: { backgroundColor: "#0f1e3d", padding: 50, height: "100%" },
   coverTitle: { color: "white", fontSize: 28, fontFamily: "Helvetica-Bold", fontWeight: "bold", marginBottom: 8 },
   coverSubtitle: { color: "#93c5fd", fontSize: 16, marginBottom: 40 },
-  coverMeta: { color: "#94a3b8", fontSize: 12, marginTop: 8 },
+  coverMeta: { color: '#374151', fontSize: 12, marginTop: 8 },
   sectionHeader: {
     backgroundColor: "#0f1e3d",
     color: "white",
@@ -51,8 +51,8 @@ const styles = StyleSheet.create({
   },
   tableCell: { fontSize: 9, color: "#475569" },
   tableCellBold: { fontSize: 9, color: "#1e293b", fontWeight: "bold" },
-  pageNumber: { position: "absolute", bottom: 30, right: 40, fontSize: 9, color: "#94a3b8" },
-  footer: { position: "absolute", bottom: 30, left: 40, fontSize: 9, color: "#94a3b8" },
+  pageNumber: { position: "absolute", bottom: 30, right: 40, fontSize: 9, color: '#374151' },
+  footer: { position: "absolute", bottom: 30, left: 40, fontSize: 9, color: '#374151' },
   positiveText: { color: "#15803d" },
   negativeText: { color: "#b91c1c" },
 });

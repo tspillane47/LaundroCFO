@@ -502,14 +502,14 @@ export default function PortfolioPage() {
 
         <div style={{ display: 'flex', gap: '24px', marginTop: '28px', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Stores</div>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Stores</div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'white' }}>
               <AnimatedNumber value={stores.length} duration={800} />
             </div>
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Cash</div>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Cash</div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: '#4ade80' }}>
               {aggregates.hasAnyFinancialData ? (
                 <>$<AnimatedNumber value={aggregates.totalCash} duration={1000} /></>
@@ -520,8 +520,8 @@ export default function PortfolioPage() {
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
-              <DisclaimerLabel className="!text-[#94a3b8]">EBITDA</DisclaimerLabel>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+              <DisclaimerLabel className="!text-slate-300">EBITDA</DisclaimerLabel>
             </div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'white' }}>
               {aggregates.hasAnyFinancialData ? (
@@ -533,8 +533,8 @@ export default function PortfolioPage() {
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
-              <DisclaimerLabel className="!text-[#94a3b8]">Global DSCR</DisclaimerLabel>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+              <DisclaimerLabel className="!text-slate-300">Global DSCR</DisclaimerLabel>
             </div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'white' }}>
               {aggregates.hasDebtData ? (

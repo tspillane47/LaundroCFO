@@ -49,7 +49,7 @@ export default function AboutPage() {
           <h1 className="text-[36px] lg:text-[48px] font-bold text-white tracking-tight leading-tight mb-6">
             Built by people who understand laundromats and finance.
           </h1>
-          <p className="text-[18px] lg:text-[20px] text-slate-400 leading-relaxed">
+          <p className="text-[18px] lg:text-[20px] text-gray-700 dark:text-slate-400 leading-relaxed">
             LaundroCFO was created because laundromat owners deserve the same financial tools that large businesses
             take for granted.
           </p>
