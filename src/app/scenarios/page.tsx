@@ -202,9 +202,9 @@ export default function ScenariosPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-[15px] font-semibold text-slate-100">
+        <h1 className="text-[15px] font-semibold text-gray-900 dark:text-slate-100">
           Scenario Planner{" "}
-          <span className="text-[12px] text-gray-700 dark:text-slate-500 font-normal ml-2">
+          <span className="text-[12px] text-gray-700 dark:text-gray-600 dark:text-slate-500 font-normal ml-2">
             {String(ctx.store.name ?? "Store")} — based on live financials
           </span>
         </h1>
@@ -223,14 +223,14 @@ export default function ScenariosPage() {
         </div>
 
         <div className="card xl:sticky xl:top-0">
-          <div className="text-[13px] font-bold text-slate-100 mb-4">
+          <div className="text-[13px] font-bold text-gray-900 dark:text-slate-100 mb-4">
             {selected.title}
           </div>
 
           <div className="grid grid-cols-2 gap-2.5 mb-4">
             <div className="card2">
               <div className="metric-label">Current Value</div>
-              <div className="text-[16px] font-bold text-slate-100">
+              <div className="text-[16px] font-bold text-gray-900 dark:text-slate-100">
                 {fmtDollar(selected.currentValue)}
               </div>
             </div>
@@ -256,14 +256,14 @@ export default function ScenariosPage() {
             </div>
           </div>
 
-          <div className="text-[11px] text-gray-700 dark:text-slate-600 uppercase tracking-wider mb-2">Key Outputs</div>
+          <div className="text-[11px] text-gray-700 dark:text-gray-600 dark:text-slate-600 uppercase tracking-wider mb-2">Key Outputs</div>
           <div className="divide-y divide-white/[0.04] mb-4">
             <div className="flex items-center justify-between py-2 text-[12px]">
-              <span className="text-gray-700 dark:text-slate-500">New EBITDA</span>
-              <span className="font-semibold text-slate-100">{fmtDollar(selected.newEbitda)}</span>
+              <span className="text-gray-700 dark:text-gray-600 dark:text-slate-500">New EBITDA</span>
+              <span className="font-semibold text-gray-900 dark:text-slate-100">{fmtDollar(selected.newEbitda)}</span>
             </div>
             <div className="flex items-center justify-between py-2 text-[12px]">
-              <span className="text-gray-700 dark:text-slate-500">Multiple Applied</span>
+              <span className="text-gray-700 dark:text-gray-600 dark:text-slate-500">Multiple Applied</span>
               <span className="font-semibold text-blue-300">{fmtMultiple(selected.newMultiple)}</span>
             </div>
             {Object.entries(selected.detail).map(([k, v]) => {
@@ -272,8 +272,8 @@ export default function ScenariosPage() {
                 .replace(/^./, (s) => s.toUpperCase());
               return (
                 <div key={k} className="flex items-center justify-between py-2 text-[12px]">
-                  <span className="text-gray-700 dark:text-slate-500">{label}</span>
-                  <span className="font-semibold text-slate-100">
+                  <span className="text-gray-700 dark:text-gray-600 dark:text-slate-500">{label}</span>
+                  <span className="font-semibold text-gray-900 dark:text-slate-100">
                     {typeof v === "number" && k.toLowerCase().includes("revenue") && k !== "revenueGain"
                       ? fmtDollar(v)
                       : String(v)}
@@ -318,20 +318,20 @@ function ScenarioCard({
         active && "border-blue-500 bg-blue-500/5"
       )}
     >
-      <div className="text-[13px] font-semibold text-slate-100">
+      <div className="text-[13px] font-semibold text-gray-900 dark:text-slate-100">
         {scenario.title}
       </div>
-      <div className="text-[11px] text-gray-700 dark:text-slate-500 mt-1">{scenario.description}</div>
+      <div className="text-[11px] text-gray-700 dark:text-gray-600 dark:text-slate-500 mt-1">{scenario.description}</div>
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/[0.05]">
         <div>
-          <div className="text-[10px] text-gray-700 dark:text-slate-600 uppercase tracking-wider">Value Impact</div>
+          <div className="text-[10px] text-gray-700 dark:text-gray-600 dark:text-slate-600 uppercase tracking-wider">Value Impact</div>
           <div className={clsx("text-[16px] font-bold mt-0.5", neg ? "text-red-400" : "text-green-400")}>
             {neg ? "−" : "+"}
             {fmtDollar(Math.abs(scenario.valueImpact))}
           </div>
         </div>
         <div className="text-right">
-          <div className="text-[10px] text-gray-700 dark:text-slate-600 uppercase tracking-wider">
+          <div className="text-[10px] text-gray-700 dark:text-gray-600 dark:text-slate-600 uppercase tracking-wider">
             {scenario.id === "revenue" ? "New EBITDA" : scenario.id === "retool" ? "Multiple" : "% Change"}
           </div>
           <div className="text-[16px] font-bold text-blue-300 mt-0.5">
