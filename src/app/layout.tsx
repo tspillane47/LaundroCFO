@@ -44,7 +44,6 @@ const navSections = [
     label: "ACCOUNT",
     items: [
       { href: "/alerts", label: "Alerts", icon: "alerts" },
-      { href: "/pricing", label: "Pricing", icon: "pricing" },
       { href: "/settings", label: "Settings", icon: "settings" },
     ],
   },
@@ -65,7 +64,6 @@ const pageTitles: Record<string, string> = {
   "/alerts": "Alerts",
   "/integrations": "Integrations",
   "/settings": "Settings",
-  "/pricing": "Pricing",
   "/settings/manage-stores": "Manage Stores",
   "/settings/edit-store": "Edit Store",
   "/admin/feedback": "Feedback Admin",
@@ -73,7 +71,7 @@ const pageTitles: Record<string, string> = {
 
 const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password", "/auth/callback"];
 const publicPages = ["/terms"];
-const marketingPages = ["/", "/about"];
+const marketingPages = ["/", "/about", "/pricing"];
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
