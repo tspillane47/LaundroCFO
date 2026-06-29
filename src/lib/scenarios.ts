@@ -44,7 +44,104 @@ export type ScenarioInputParams = {
 export type InteractiveScenarioResult = ScenarioResult & {
   baselineDscr: number | null;
   newDscr: number | null;
+  currentEbitda: number;
+  ebitdaChange: number;
+  monthlyCashFlowImpact: number;
+  investmentRequired: number | null;
+  paybackMonths: number | null;
+  breakEvenMonths: number | null;
 };
+
+export type RankedScenario = InteractiveScenarioResult & {
+  rank: number;
+  opportunityReason: string;
+};
+
+export const SCENARIO_IDS = [
+  "retool",
+  "revenue",
+  "utility",
+  "lease",
+  "wdf",
+  "rent",
+  "commercial",
+  "delivery",
+] as const;
+
+export type ScenarioId = (typeof SCENARIO_IDS)[number];
+
+const INVESTMENT_SCENARIO_IDS = new Set<ScenarioId>(["retool", "wdf", "delivery"]);
+
+const WDF_STARTUP_COST = 15_000;
+const DELIVERY_STARTUP_COST = 35_000;
+
+export function isInvestmentScenario(id: string): boolean {
+  return INVESTMENT_SCENARIO_IDS.has(id as ScenarioId);
+}
+
+export function getScenarioInvestment(
+  scenarioId: string,
+  params: ScenarioInputParams
+): number | null {
+  switch (scenarioId) {
+    case "retool":
+      return params.retool.investment;
+    case "wdf":
+      return WDF_STARTUP_COST;
+    case "delivery":
+      return DELIVERY_STARTUP_COST;
+    default:
+      return null;
+  }
+}
+
+export function calcPaybackMonths(
+  investment: number,
+  annualEbitdaIncrease: number,
+  valueImpact: number
+): number | null {
+  if (investment <= 0) return null;
+  const annualBenefit =
+    annualEbitdaIncrease > 0 ? annualEbitdaIncrease : valueImpact > 0 ? valueImpact : 0;
+  if (annualBenefit <= 0) return null;
+  return (investment / annualBenefit) * 12;
+}
+
+function enrichInteractiveResult(
+  ctx: StoreScenarioContext,
+  scenarioId: string,
+  params: ScenarioInputParams,
+  base: Omit<
+    InteractiveScenarioResult,
+    | "currentEbitda"
+    | "ebitdaChange"
+    | "monthlyCashFlowImpact"
+    | "investmentRequired"
+    | "paybackMonths"
+    | "breakEvenMonths"
+  > & { newEbitda: number }
+): InteractiveScenarioResult {
+  const resolved = ctx.resolvedFinancials ?? resolveStoreFinancials(ctx.store);
+  const currentEbitda = resolved.annualEbitda;
+  const ebitdaChange = base.newEbitda - currentEbitda;
+  const monthlyCashFlowImpact = ebitdaChange / 12;
+  const investmentRequired = getScenarioInvestment(scenarioId, params);
+  const paybackMonths =
+    investmentRequired != null
+      ? calcPaybackMonths(investmentRequired, ebitdaChange, base.valueImpact)
+      : null;
+  const breakEvenMonths = paybackMonths;
+
+  return {
+    ...base,
+    currentEbitda: Math.round(currentEbitda),
+    ebitdaChange: Math.round(ebitdaChange),
+    monthlyCashFlowImpact: Math.round(monthlyCashFlowImpact),
+    investmentRequired,
+    paybackMonths,
+    breakEvenMonths,
+  };
+}
 
 export const DEFAULT_SCENARIO_INPUTS: ScenarioInputParams = {
   retool: { investment: 395000, equipmentAge: 1 },
@@ -661,9 +758,123 @@ export function computeInteractiveScenario(
     note: baseMeta.note,
   });
 
-  return {
+  return enrichInteractiveResult(ctx, scenarioId, params, {
     ...result,
     baselineDscr,
     newDscr,
-  };
+  });
+}
+
+export function computeAllInteractiveScenarios(
+  ctx: StoreScenarioContext,
+  params: ScenarioInputParams
+): InteractiveScenarioResult[] {
+  return SCENARIO_IDS.map((id) => computeInteractiveScenario(ctx, id, params)).filter(
+    (s): s is InteractiveScenarioResult => s != null
+  );
+}
+
+function buildOpportunityReason(
+  scenario: InteractiveScenarioResult,
+  ctx: StoreScenarioContext
+): string {
+  const store = ctx.store;
+  const baselineMultiple = runValuation(ctx).finalMultiple;
+
+  switch (scenario.id) {
+    case "retool":
+      return `New equipment would lift your multiple from ${baselineMultiple.toFixed(2)}x to ${scenario.newMultiple.toFixed(2)}x, adding ${fmtCompact(scenario.valueImpact)} in business value.`;
+    case "revenue":
+      return `A ${scenario.detail.revenueIncrease ?? "10%"} revenue lift flows almost entirely to EBITDA at your current ${fmtCompact(scenario.currentEbitda)} annual base.`;
+    case "utility":
+      return `Utility savings drop straight to the bottom line with no revenue risk — worth ${fmtCompact(scenario.valueImpact)} at your current valuation multiple.`;
+    case "lease":
+      return `With ${ctx.leaseYearsRemaining.toFixed(1)} years remaining, extending lease control strengthens lender confidence and adds ${fmtCompact(scenario.valueImpact)} in value.`;
+    case "wdf":
+      return `WDF is high-margin revenue; at ${scenario.detail.newWdfPct ?? "25%"} of sales it adds ${fmtCompact(scenario.ebitdaChange)} in annual EBITDA.`;
+    case "rent":
+      return `A rent hike would compress EBITDA by ${fmtCompact(Math.abs(scenario.ebitdaChange))}/yr — know the downside before renewal talks.`;
+    case "commercial":
+      return `Commercial accounts typically represent ${store.commercial_pct ?? 12}% of your revenue; losing that volume cuts value by ${fmtCompact(Math.abs(scenario.valueImpact))}.`;
+    case "delivery":
+      return `Route revenue adds recurring cash flow with ${fmtCompact(scenario.ebitdaChange)} net annual EBITDA after route costs.`;
+    default:
+      return scenario.note;
+  }
+}
+
+function fmtCompact(n: number): string {
+  const abs = Math.abs(Math.round(n));
+  if (abs >= 1_000_000) return `$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `$${Math.round(abs / 1_000)}K`;
+  return `$${abs.toLocaleString()}`;
+}
+
+export function rankScenariosByImpact(
+  ctx: StoreScenarioContext,
+  params: ScenarioInputParams
+): RankedScenario[] {
+  const all = computeAllInteractiveScenarios(ctx, params);
+  const sorted = [...all].sort((a, b) => b.valueImpact - a.valueImpact);
+  return sorted.map((scenario, index) => ({
+    ...scenario,
+    rank: index + 1,
+    opportunityReason: buildOpportunityReason(scenario, ctx),
+  }));
+}
+
+export function buildScenarioNarrative(
+  scenario: InteractiveScenarioResult,
+  ctx: StoreScenarioContext,
+  params: ScenarioInputParams
+): string {
+  const baseline = runValuation(ctx);
+  const parts: string[] = [];
+
+  parts.push(
+    `At your current EBITDA of $${scenario.currentEbitda.toLocaleString()}, this scenario ${scenario.valueImpact >= 0 ? "increases" : "reduces"} store value by ${scenario.valueImpact >= 0 ? "+" : "−"}$${Math.abs(scenario.valueImpact).toLocaleString()} (${Math.abs(scenario.pctChange).toFixed(1)}%).`
+  );
+
+  if (scenario.id === "retool" || scenario.id === "lease") {
+    parts.push(
+      `Your valuation multiple would move from ${baseline.finalMultiple.toFixed(2)}x to ${scenario.newMultiple.toFixed(2)}x.`
+    );
+  } else {
+    parts.push(
+      `EBITDA would ${scenario.ebitdaChange >= 0 ? "rise" : "fall"} by ${scenario.ebitdaChange >= 0 ? "+" : "−"}$${Math.abs(scenario.ebitdaChange).toLocaleString()}/yr to $${scenario.newEbitda.toLocaleString()}.`
+    );
+  }
+
+  const investment = getScenarioInvestment(scenario.id, params);
+  if (investment != null && investment > 0 && scenario.paybackMonths != null) {
+    const paybackYears = scenario.paybackMonths / 12;
+    parts.push(
+      `The $${investment.toLocaleString()} investment has a payback period of ${paybackYears.toFixed(1)} years based on the $${Math.max(scenario.ebitdaChange, scenario.valueImpact).toLocaleString()} annual benefit.`
+    );
+  }
+
+  if (scenario.baselineDscr != null && scenario.newDscr != null && ctx.annualDebtService) {
+    const dscrNote =
+      scenario.newDscr >= 1.25
+        ? `Your DSCR would remain above the 1.25x minimum (${scenario.newDscr.toFixed(2)}x).`
+        : scenario.newDscr < scenario.baselineDscr
+          ? `DSCR would drop from ${scenario.baselineDscr.toFixed(2)}x to ${scenario.newDscr.toFixed(2)}x — monitor lender covenant risk.`
+          : `DSCR improves from ${scenario.baselineDscr.toFixed(2)}x to ${scenario.newDscr.toFixed(2)}x.`;
+    parts.push(dscrNote);
+  }
+
+  return parts.slice(0, 3).join(" ");
+}
+
+export function formatPayback(months: number | null): string {
+  if (months == null || !Number.isFinite(months)) return "—";
+  if (months < 12) return `${Math.round(months)} mo`;
+  return `${(months / 12).toFixed(1)} yr`;
+}
+
+export function formatRank(rank: number): string {
+  if (rank === 1) return "1st";
+  if (rank === 2) return "2nd";
+  if (rank === 3) return "3rd";
+  return `${rank}th`;
 }

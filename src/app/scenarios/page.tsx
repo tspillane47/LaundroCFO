@@ -15,11 +15,16 @@ import { fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { type EquipmentRecord } from "@/lib/equipment";
 import {
   buildDefaultScenarioInputs,
+  buildScenarioNarrative,
   calcYearsRemaining,
-  computeInteractiveScenario,
-  computeScenarios,
+  computeAllInteractiveScenarios,
+  formatPayback,
+  formatRank,
+  isInvestmentScenario,
+  rankScenariosByImpact,
+  SCENARIO_IDS,
+  type InteractiveScenarioResult,
   type ScenarioInputParams,
-  type ScenarioResult,
   type StoreScenarioContext,
 } from "@/lib/scenarios";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -36,14 +41,43 @@ type SliderConfig = {
   format: (value: number) => string;
 };
 
+type SavedScenarioRow = {
+  id: string;
+  scenario_name: string;
+  inputs: Record<string, unknown>;
+  outputs: Record<string, unknown>;
+  created_at: string;
+};
+
 export default function ScenariosPage() {
   const supabase = createClient();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [ctx, setCtx] = useState<StoreScenarioContext | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState("retool");
   const [inputParams, setInputParams] = useState<ScenarioInputParams | null>(null);
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareA, setCompareA] = useState("retool");
+  const [compareB, setCompareB] = useState("revenue");
+  const [savedScenarios, setSavedScenarios] = useState<SavedScenarioRow[]>([]);
+  const [savedExpanded, setSavedExpanded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  const loadSavedScenarios = useCallback(
+    async (storeId: string, uid: string) => {
+      const { data, error } = await supabase
+        .from("saved_scenarios")
+        .select("id, scenario_name, inputs, outputs, created_at")
+        .eq("store_id", storeId)
+        .eq("user_id", uid)
+        .order("created_at", { ascending: false });
+      if (!error && data) setSavedScenarios(data as SavedScenarioRow[]);
+    },
+    [supabase]
+  );
 
   const loadData = useCallback(async () => {
     if (!selectedStore?.id) {
@@ -64,6 +98,7 @@ export default function ScenariosPage() {
         setLoading(false);
         return;
       }
+      setUserId(user.id);
 
       const [
         { data: storeData, error: storeError },
@@ -141,6 +176,7 @@ export default function ScenariosPage() {
 
       setCtx(nextCtx);
       setInputParams(buildDefaultScenarioInputs(nextCtx));
+      await loadSavedScenarios(selectedStore.id, user.id);
     } catch {
       setLoadError(true);
       setCtx(null);
@@ -148,19 +184,39 @@ export default function ScenariosPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedStore?.id, supabase]);
+  }, [selectedStore?.id, supabase, loadSavedScenarios]);
 
   useEffect(() => {
     if (storesLoading) return;
     loadData();
   }, [storesLoading, loadData]);
 
-  const scenarios = useMemo(() => (ctx ? computeScenarios(ctx) : []), [ctx]);
+  const rankedScenarios = useMemo(
+    () => (ctx && inputParams ? rankScenariosByImpact(ctx, inputParams) : []),
+    [ctx, inputParams]
+  );
 
-  const liveScenario = useMemo(() => {
-    if (!ctx || !inputParams) return null;
-    return computeInteractiveScenario(ctx, selectedId, inputParams);
-  }, [ctx, selectedId, inputParams]);
+  const liveScenarios = useMemo(
+    () => (ctx && inputParams ? computeAllInteractiveScenarios(ctx, inputParams) : []),
+    [ctx, inputParams]
+  );
+
+  const liveScenarioMap = useMemo(
+    () => new Map(liveScenarios.map((s) => [s.id, s])),
+    [liveScenarios]
+  );
+
+  const rankMap = useMemo(
+    () => new Map(rankedScenarios.map((s) => [s.id, s.rank])),
+    [rankedScenarios]
+  );
+
+  const liveScenario = liveScenarioMap.get(selectedId) ?? null;
+
+  const compareScenarioA = liveScenarioMap.get(compareA) ?? null;
+  const compareScenarioB = liveScenarioMap.get(compareB) ?? null;
+
+  const topOpportunities = rankedScenarios.filter((s) => s.valueImpact > 0).slice(0, 3);
 
   const updateParams = useCallback(
     <K extends keyof ScenarioInputParams>(
@@ -172,6 +228,64 @@ export default function ScenariosPage() {
       );
     },
     []
+  );
+
+  const handleSaveScenario = useCallback(async () => {
+    if (!ctx || !inputParams || !liveScenario || !selectedStore?.id || !userId) return;
+    setSaving(true);
+    setSaveMessage(null);
+    try {
+      const outputs = {
+        currentValue: liveScenario.currentValue,
+        scenarioValue: liveScenario.scenarioValue,
+        valueImpact: liveScenario.valueImpact,
+        pctChange: liveScenario.pctChange,
+        currentEbitda: liveScenario.currentEbitda,
+        newEbitda: liveScenario.newEbitda,
+        ebitdaChange: liveScenario.ebitdaChange,
+        baselineDscr: liveScenario.baselineDscr,
+        newDscr: liveScenario.newDscr,
+        monthlyCashFlowImpact: liveScenario.monthlyCashFlowImpact,
+        paybackMonths: liveScenario.paybackMonths,
+        breakEvenMonths: liveScenario.breakEvenMonths,
+        investmentRequired: liveScenario.investmentRequired,
+        newMultiple: liveScenario.newMultiple,
+      };
+      const { error } = await supabase.from("saved_scenarios").insert({
+        store_id: selectedStore.id,
+        user_id: userId,
+        scenario_name: liveScenario.title,
+        inputs: { scenarioId: selectedId, params: inputParams },
+        outputs,
+      });
+      if (error) throw error;
+      setSaveMessage("Scenario saved");
+      await loadSavedScenarios(selectedStore.id, userId);
+      setSavedExpanded(true);
+    } catch {
+      setSaveMessage("Failed to save — try again");
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSaveMessage(null), 3000);
+    }
+  }, [
+    ctx,
+    inputParams,
+    liveScenario,
+    selectedStore?.id,
+    userId,
+    selectedId,
+    supabase,
+    loadSavedScenarios,
+  ]);
+
+  const handleDeleteSaved = useCallback(
+    async (id: string) => {
+      if (!selectedStore?.id || !userId) return;
+      await supabase.from("saved_scenarios").delete().eq("id", id);
+      await loadSavedScenarios(selectedStore.id, userId);
+    },
+    [selectedStore?.id, userId, supabase, loadSavedScenarios]
   );
 
   if (storesLoading || loading) {
@@ -224,130 +338,447 @@ export default function ScenariosPage() {
 
   const isNeg = liveScenario.valueImpact < 0;
   const sliders = buildSliders(selectedId, inputParams, updateParams);
+  const narrative = buildScenarioNarrative(liveScenario, ctx, inputParams);
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-[15px] font-semibold text-gray-900 dark:text-slate-100">
           Scenario Planner{" "}
-          <span className="text-[12px] text-gray-700 dark:text-gray-600 dark:text-slate-500 font-normal ml-2">
+          <span className="text-[12px] text-gray-700 dark:text-slate-500 font-normal ml-2">
             {String(ctx.store.name ?? "Store")} — based on live financials
           </span>
         </h1>
+        <button
+          type="button"
+          onClick={() => setCompareMode((v) => !v)}
+          className={clsx(
+            "text-[12px] font-medium px-3 py-1.5 rounded-lg border transition-colors",
+            compareMode
+              ? "bg-blue-500/10 border-blue-500/40 text-blue-400"
+              : "border-[var(--border)] text-gray-700 dark:text-slate-400 hover:border-blue-500/30"
+          )}
+        >
+          {compareMode ? "Close Compare" : "Compare Scenarios"}
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-5">
+      {/* Section 1 — Top Opportunities */}
+      {topOpportunities.length > 0 && (
+        <section className="card card-success">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-green-600 dark:text-green-400 mb-3">
+            Your Top {topOpportunities.length} Opportunities
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {topOpportunities.map((opp, i) => (
+              <div
+                key={opp.id}
+                className={clsx(
+                  "rounded-lg p-3 border",
+                  i === 0
+                    ? "bg-amber-500/8 border-amber-500/30"
+                    : "bg-green-500/5 border-green-500/20"
+                )}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-lg">{opp.emoji}</span>
+                  <span className="text-[12px] font-bold text-gray-900 dark:text-slate-100">
+                    #{opp.rank} {opp.title}
+                  </span>
+                </div>
+                <div className="text-[18px] font-bold text-green-500 dark:text-green-400">
+                  +{fmtDollar(opp.valueImpact)}
+                </div>
+                <p className="text-[11px] text-gray-600 dark:text-slate-400 mt-1.5 leading-relaxed">
+                  {opp.opportunityReason}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Section 4 — Compare Mode */}
+      {compareMode && compareScenarioA && compareScenarioB && (
+        <ComparePanel
+          scenarioA={compareScenarioA}
+          scenarioB={compareScenarioB}
+          compareA={compareA}
+          compareB={compareB}
+          onCompareAChange={setCompareA}
+          onCompareBChange={setCompareB}
+          scenarios={liveScenarios}
+        />
+      )}
+
+      {/* Sections 2 & 3 — Cards + Right Panel */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {scenarios.map((sc) => (
-            <ScenarioCard
-              key={sc.id}
-              scenario={sc}
-              active={selectedId === sc.id}
-              onSelect={() => setSelectedId(sc.id)}
-            />
-          ))}
+          {SCENARIO_IDS.map((id) => {
+            const scenario = liveScenarioMap.get(id);
+            if (!scenario) return null;
+            return (
+              <ScenarioCard
+                key={id}
+                scenario={scenario}
+                rank={rankMap.get(id) ?? 0}
+                active={selectedId === id}
+                onSelect={() => setSelectedId(id)}
+              />
+            );
+          })}
         </div>
 
         <div className="card xl:sticky xl:top-0 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
-          <div className="text-[13px] font-bold text-gray-900 dark:text-slate-100 mb-4">
-            {liveScenario.title}
+          <div className="flex items-start justify-between gap-2 mb-4">
+            <div className="text-[13px] font-bold text-gray-900 dark:text-slate-100">
+              {liveScenario.emoji} {liveScenario.title}
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveScenario}
+              disabled={saving}
+              className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-[var(--border)] text-gray-700 dark:text-slate-400 hover:border-blue-500/40 hover:text-blue-400 transition-colors shrink-0 disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save Scenario"}
+            </button>
           </div>
+          {saveMessage && (
+            <div className="text-[11px] text-blue-400 mb-3">{saveMessage}</div>
+          )}
 
+          {/* Sliders */}
           <div className="space-y-4 mb-5 pb-5 border-b border-[var(--border)]">
             <div className="text-[11px] text-gray-700 dark:text-slate-600 uppercase tracking-wider">
               Adjust Assumptions
             </div>
-            {sliders.map((slider) => (
-              <ScenarioSlider key={slider.label} {...slider} />
-            ))}
+            {sliders.length > 0 ? (
+              sliders.map((slider) => <ScenarioSlider key={slider.label} {...slider} />)
+            ) : (
+              <p className="text-[11px] text-gray-600 dark:text-slate-500">
+                No adjustable inputs for this scenario.
+              </p>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5 mb-4">
-            <div className="card2">
-              <div className="metric-label">Current Value</div>
-              <div className="text-[16px] font-bold text-gray-900 dark:text-slate-100">
-                {fmtDollar(liveScenario.currentValue)}
-              </div>
-            </div>
-            <div className={clsx("card2", isNeg ? "border-red-500/20" : "border-green-500/20")}>
-              <div className="metric-label">Scenario Value</div>
-              <div className={clsx("text-[16px] font-bold", isNeg ? "text-red-400" : "text-green-400")}>
-                {fmtDollar(liveScenario.scenarioValue)}
-              </div>
-            </div>
-            <div className="card2">
-              <div className="metric-label">Value Change</div>
-              <div className={clsx("text-[16px] font-bold", isNeg ? "text-red-400" : "text-green-400")}>
-                {isNeg ? "−" : "+"}
-                {fmtDollar(Math.abs(liveScenario.valueImpact))}
-              </div>
-            </div>
-            <div className="card2">
-              <div className="metric-label">% Change</div>
-              <div className={clsx("text-[16px] font-bold", isNeg ? "text-red-400" : "text-green-400")}>
-                {isNeg ? "−" : "+"}
-                {Math.abs(liveScenario.pctChange).toFixed(1)}%
-              </div>
-            </div>
-          </div>
-
+          {/* Key Metrics Grid */}
           <div className="text-[11px] text-gray-700 dark:text-slate-600 uppercase tracking-wider mb-2">
-            Key Outputs
+            Key Metrics
           </div>
-          <div className="divide-y divide-white/[0.04] mb-4">
-            {(selectedId === "retool" ||
-              selectedId === "revenue" ||
-              selectedId === "utility" ||
-              selectedId === "wdf" ||
-              selectedId === "rent" ||
-              selectedId === "commercial" ||
-              selectedId === "delivery") && (
-              <OutputRow label="New EBITDA" value={fmtDollar(liveScenario.newEbitda)} />
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <MetricTile label="Current Value" value={fmtDollar(liveScenario.currentValue)} />
+            <MetricTile
+              label="Scenario Value"
+              value={fmtDollar(liveScenario.scenarioValue)}
+              accent={isNeg ? "red" : "green"}
+            />
+            <MetricTile
+              label="Value Change"
+              value={`${isNeg ? "−" : "+"}${fmtDollar(Math.abs(liveScenario.valueImpact))}`}
+              accent={isNeg ? "red" : "green"}
+            />
+            <MetricTile
+              label="% Change"
+              value={`${isNeg ? "−" : "+"}${Math.abs(liveScenario.pctChange).toFixed(1)}%`}
+              accent={isNeg ? "red" : "green"}
+            />
+            <MetricTile label="Current EBITDA" value={fmtDollar(liveScenario.currentEbitda)} />
+            <MetricTile label="New EBITDA" value={fmtDollar(liveScenario.newEbitda)} />
+            <MetricTile
+              label="EBITDA Change"
+              value={`${liveScenario.ebitdaChange >= 0 ? "+" : "−"}${fmtDollar(Math.abs(liveScenario.ebitdaChange))}`}
+              accent={liveScenario.ebitdaChange >= 0 ? "green" : "red"}
+            />
+            <MetricTile
+              label="Current DSCR"
+              value={
+                liveScenario.baselineDscr != null
+                  ? fmtMultiple(liveScenario.baselineDscr)
+                  : "—"
+              }
+            />
+            <MetricTile
+              label="New DSCR"
+              value={
+                liveScenario.newDscr != null ? fmtMultiple(liveScenario.newDscr) : "—"
+              }
+              accent={
+                liveScenario.newDscr != null && liveScenario.newDscr < 1.25
+                  ? "red"
+                  : undefined
+              }
+            />
+            <MetricTile
+              label="Monthly Cash Flow"
+              value={`${liveScenario.monthlyCashFlowImpact >= 0 ? "+" : "−"}${fmtDollar(Math.abs(liveScenario.monthlyCashFlowImpact))}`}
+              accent={liveScenario.monthlyCashFlowImpact >= 0 ? "green" : "red"}
+            />
+            {isInvestmentScenario(selectedId) && (
+              <>
+                <MetricTile
+                  label="Payback Period"
+                  value={formatPayback(liveScenario.paybackMonths)}
+                />
+                <MetricTile
+                  label="Break-even Timeline"
+                  value={
+                    liveScenario.breakEvenMonths != null
+                      ? `${Math.round(liveScenario.breakEvenMonths)} mo`
+                      : "—"
+                  }
+                />
+              </>
             )}
-            {(selectedId === "retool" || selectedId === "lease") && (
-              <OutputRow label="Multiple Applied" value={fmtMultiple(liveScenario.newMultiple)} accent />
-            )}
-            {selectedId === "rent" && (
-              <OutputRow
-                label="DSCR"
-                value={liveScenario.newDscr != null ? fmtMultiple(liveScenario.newDscr) : "—"}
-                accent
-              />
-            )}
-            <OutputRow label="Scenario Value" value={fmtDollar(liveScenario.scenarioValue)} />
           </div>
 
+          {/* Narrative */}
           <div
             className={clsx(
-              "p-3 rounded-lg text-[12px]",
+              "p-3 rounded-lg text-[12px] leading-relaxed",
               isNeg
-                ? "bg-red-500/8 border border-red-500/20 text-red-400"
-                : "bg-green-500/8 border border-green-500/20 text-green-400"
+                ? "bg-red-500/8 border border-red-500/20 text-red-300"
+                : "bg-green-500/8 border border-green-500/20 text-green-300"
             )}
           >
-            {liveScenario.note}
+            {narrative}
           </div>
         </div>
       </div>
+
+      {/* Section 5 — Saved Scenarios */}
+      {savedScenarios.length > 0 && (
+        <section className="card">
+          <button
+            type="button"
+            onClick={() => setSavedExpanded((v) => !v)}
+            className="w-full flex items-center justify-between text-left"
+          >
+            <span className="text-[13px] font-semibold text-gray-900 dark:text-slate-100">
+              Saved Scenarios ({savedScenarios.length})
+            </span>
+            <span className="text-[11px] text-gray-600 dark:text-slate-500">
+              {savedExpanded ? "Collapse ▲" : "Expand ▼"}
+            </span>
+          </button>
+          {savedExpanded && (
+            <div className="mt-4 space-y-2">
+              {savedScenarios.map((saved) => (
+                <SavedScenarioItem
+                  key={saved.id}
+                  saved={saved}
+                  onDelete={() => handleDeleteSaved(saved.id)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }
 
-function OutputRow({
+function MetricTile({
   label,
   value,
   accent,
 }: {
   label: string;
   value: string;
-  accent?: boolean;
+  accent?: "green" | "red";
 }) {
   return (
-    <div className="flex items-center justify-between py-2 text-[12px]">
-      <span className="text-gray-700 dark:text-slate-500">{label}</span>
-      <span className={clsx("font-semibold", accent ? "text-blue-300" : "text-gray-900 dark:text-slate-100")}>
+    <div
+      className={clsx(
+        "card2",
+        accent === "green" && "border-green-500/20",
+        accent === "red" && "border-red-500/20"
+      )}
+    >
+      <div className="metric-label">{label}</div>
+      <div
+        className={clsx(
+          "text-[14px] font-bold tabular-nums",
+          accent === "green" && "text-green-400",
+          accent === "red" && "text-red-400",
+          !accent && "text-gray-900 dark:text-slate-100"
+        )}
+      >
         {value}
-      </span>
+      </div>
+    </div>
+  );
+}
+
+function ComparePanel({
+  scenarioA,
+  scenarioB,
+  compareA,
+  compareB,
+  onCompareAChange,
+  onCompareBChange,
+  scenarios,
+}: {
+  scenarioA: InteractiveScenarioResult;
+  scenarioB: InteractiveScenarioResult;
+  compareA: string;
+  compareB: string;
+  onCompareAChange: (id: string) => void;
+  onCompareBChange: (id: string) => void;
+  scenarios: InteractiveScenarioResult[];
+}) {
+  const rows: { label: string; a: string; b: string }[] = [
+    {
+      label: "Investment Required",
+      a:
+        scenarioA.investmentRequired != null
+          ? fmtDollar(scenarioA.investmentRequired)
+          : "—",
+      b:
+        scenarioB.investmentRequired != null
+          ? fmtDollar(scenarioB.investmentRequired)
+          : "—",
+    },
+    {
+      label: "Value Impact",
+      a: `${scenarioA.valueImpact >= 0 ? "+" : "−"}${fmtDollar(Math.abs(scenarioA.valueImpact))}`,
+      b: `${scenarioB.valueImpact >= 0 ? "+" : "−"}${fmtDollar(Math.abs(scenarioB.valueImpact))}`,
+    },
+    {
+      label: "New Store Value",
+      a: fmtDollar(scenarioA.scenarioValue),
+      b: fmtDollar(scenarioB.scenarioValue),
+    },
+    {
+      label: "EBITDA Impact",
+      a: `${scenarioA.ebitdaChange >= 0 ? "+" : "−"}${fmtDollar(Math.abs(scenarioA.ebitdaChange))}`,
+      b: `${scenarioB.ebitdaChange >= 0 ? "+" : "−"}${fmtDollar(Math.abs(scenarioB.ebitdaChange))}`,
+    },
+    {
+      label: "New DSCR",
+      a: scenarioA.newDscr != null ? fmtMultiple(scenarioA.newDscr) : "—",
+      b: scenarioB.newDscr != null ? fmtMultiple(scenarioB.newDscr) : "—",
+    },
+    {
+      label: "Payback Period",
+      a: formatPayback(scenarioA.paybackMonths),
+      b: formatPayback(scenarioB.paybackMonths),
+    },
+    {
+      label: "Monthly Cash Flow Impact",
+      a: `${scenarioA.monthlyCashFlowImpact >= 0 ? "+" : "−"}${fmtDollar(Math.abs(scenarioA.monthlyCashFlowImpact))}`,
+      b: `${scenarioB.monthlyCashFlowImpact >= 0 ? "+" : "−"}${fmtDollar(Math.abs(scenarioB.monthlyCashFlowImpact))}`,
+    },
+  ];
+
+  return (
+    <section className="card">
+      <div className="text-[13px] font-semibold text-gray-900 dark:text-slate-100 mb-4">
+        Side-by-Side Comparison
+      </div>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <select
+          value={compareA}
+          onChange={(e) => onCompareAChange(e.target.value)}
+          className="text-[12px] bg-[var(--bg-card2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-gray-900 dark:text-slate-100"
+        >
+          {scenarios.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.title}
+            </option>
+          ))}
+        </select>
+        <select
+          value={compareB}
+          onChange={(e) => onCompareBChange(e.target.value)}
+          className="text-[12px] bg-[var(--bg-card2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-gray-900 dark:text-slate-100"
+        >
+          {scenarios.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.title}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12px]">
+          <thead>
+            <tr className="border-b border-[var(--border)]">
+              <th className="text-left py-2 text-gray-600 dark:text-slate-500 font-medium">
+                Metric
+              </th>
+              <th className="text-right py-2 text-gray-900 dark:text-slate-100 font-semibold">
+                {scenarioA.emoji} {scenarioA.title}
+              </th>
+              <th className="text-right py-2 text-gray-900 dark:text-slate-100 font-semibold">
+                {scenarioB.emoji} {scenarioB.title}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.label} className="border-b border-[var(--border)] last:border-0">
+                <td className="py-2.5 text-gray-600 dark:text-slate-500">{row.label}</td>
+                <td className="py-2.5 text-right font-semibold text-gray-900 dark:text-slate-100 tabular-nums">
+                  {row.a}
+                </td>
+                <td className="py-2.5 text-right font-semibold text-gray-900 dark:text-slate-100 tabular-nums">
+                  {row.b}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function SavedScenarioItem({
+  saved,
+  onDelete,
+}: {
+  saved: SavedScenarioRow;
+  onDelete: () => void;
+}) {
+  const outputs = saved.outputs as {
+    valueImpact?: number;
+    scenarioValue?: number;
+    newEbitda?: number;
+  };
+  const impact = outputs.valueImpact ?? 0;
+  const neg = impact < 0;
+
+  return (
+    <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-[var(--bg-card2)] border border-[var(--border)]">
+      <div>
+        <div className="text-[12px] font-semibold text-gray-900 dark:text-slate-100">
+          {saved.scenario_name}
+        </div>
+        <div className="text-[11px] text-gray-600 dark:text-slate-500 mt-0.5">
+          {new Date(saved.created_at).toLocaleDateString()} · Value{" "}
+          {outputs.scenarioValue != null ? fmtDollar(outputs.scenarioValue) : "—"} · EBITDA{" "}
+          {outputs.newEbitda != null ? fmtDollar(outputs.newEbitda) : "—"}
+        </div>
+      </div>
+      <div className="flex items-center gap-3 shrink-0">
+        <span
+          className={clsx(
+            "text-[13px] font-bold tabular-nums",
+            neg ? "text-red-400" : "text-green-400"
+          )}
+        >
+          {neg ? "−" : "+"}
+          {fmtDollar(Math.abs(impact))}
+        </span>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="text-[10px] text-gray-600 dark:text-slate-500 hover:text-red-400"
+        >
+          Delete
+        </button>
+      </div>
     </div>
   );
 }
@@ -379,8 +810,12 @@ function ScenarioSlider({
         className="scenario-slider"
       />
       <div className="flex justify-between mt-1">
-        <span className="text-[10px] text-gray-600 dark:text-slate-600 tabular-nums">{format(min)}</span>
-        <span className="text-[10px] text-gray-600 dark:text-slate-600 tabular-nums">{format(max)}</span>
+        <span className="text-[10px] text-gray-600 dark:text-slate-600 tabular-nums">
+          {format(min)}
+        </span>
+        <span className="text-[10px] text-gray-600 dark:text-slate-600 tabular-nums">
+          {format(max)}
+        </span>
       </div>
     </div>
   );
@@ -516,51 +951,81 @@ function buildSliders(
 
 function ScenarioCard({
   scenario,
+  rank,
   active,
   onSelect,
 }: {
-  scenario: ScenarioResult;
+  scenario: InteractiveScenarioResult;
+  rank: number;
   active: boolean;
   onSelect: () => void;
 }) {
   const neg = scenario.valueImpact < 0;
+  const neutral = scenario.valueImpact === 0;
+  const isRisk = scenario.id === "commercial" || scenario.id === "rent";
+
+  const borderClass = neutral
+    ? "border-gray-400/30"
+    : neg
+      ? "border-red-500/50"
+      : "border-green-500/50";
+
   return (
     <button
       type="button"
       onClick={onSelect}
       className={clsx(
-        "card text-left transition-all hover:border-blue-500/50",
-        active && "border-blue-500 bg-blue-500/5"
+        "card text-left transition-all border-2 relative",
+        borderClass,
+        active && "ring-2 ring-blue-500/50 bg-blue-500/5",
+        !active && "hover:border-blue-500/40"
       )}
     >
-      <div className="text-[13px] font-semibold text-gray-900 dark:text-slate-100">
-        {scenario.title}
+      {rank > 0 && (
+        <span
+          className={clsx(
+            "absolute top-2 right-2 text-[10px] font-bold px-1.5 py-0.5 rounded",
+            rank <= 3 && !neg
+              ? "bg-amber-500/15 text-amber-500 dark:text-amber-400"
+              : "bg-[var(--bg-card2)] text-gray-600 dark:text-slate-500"
+          )}
+        >
+          {formatRank(rank)}
+        </span>
+      )}
+
+      <div className="text-[13px] font-semibold text-gray-900 dark:text-slate-100 pr-10">
+        {scenario.emoji} {scenario.title}
       </div>
-      <div className="text-[11px] text-gray-700 dark:text-gray-600 dark:text-slate-500 mt-1">
+      <div className="text-[11px] text-gray-700 dark:text-slate-500 mt-1">
         {scenario.description}
       </div>
-      <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/[0.05]">
-        <div>
-          <div className="text-[10px] text-gray-700 dark:text-gray-600 dark:text-slate-600 uppercase tracking-wider">
-            Value Impact
-          </div>
-          <div className={clsx("text-[16px] font-bold mt-0.5", neg ? "text-red-400" : "text-green-400")}>
-            {neg ? "−" : "+"}
-            {fmtDollar(Math.abs(scenario.valueImpact))}
-          </div>
+
+      <div className="mt-4 pt-3 border-t border-[var(--border)]">
+        <div className="text-[10px] text-gray-700 dark:text-slate-600 uppercase tracking-wider">
+          Value Impact
         </div>
-        <div className="text-right">
-          <div className="text-[10px] text-gray-700 dark:text-gray-600 dark:text-slate-600 uppercase tracking-wider">
-            {scenario.id === "revenue" ? "New EBITDA" : scenario.id === "retool" ? "Multiple" : "% Change"}
-          </div>
-          <div className="text-[16px] font-bold text-blue-300 mt-0.5">
-            {scenario.id === "revenue"
-              ? fmtDollar(scenario.newEbitda)
-              : scenario.id === "retool"
-                ? fmtMultiple(scenario.newMultiple)
-                : `${neg ? "−" : "+"}${Math.abs(scenario.pctChange).toFixed(1)}%`}
-          </div>
+        <div
+          className={clsx(
+            "text-[18px] font-bold mt-0.5 tabular-nums",
+            neg || isRisk ? "text-red-400" : "text-green-400"
+          )}
+        >
+          {neg ? "−" : neutral ? "" : "+"}
+          {fmtDollar(Math.abs(scenario.valueImpact))}
         </div>
+
+        {isInvestmentScenario(scenario.id) && scenario.paybackMonths != null && (
+          <div className="text-[11px] text-gray-600 dark:text-slate-500 mt-1.5">
+            Payback: {formatPayback(scenario.paybackMonths)}
+          </div>
+        )}
+
+        {(scenario.id === "rent" || scenario.id === "commercial") && neg && (
+          <div className="text-[10px] text-red-400/80 mt-1">
+            Downside risk scenario
+          </div>
+        )}
       </div>
     </button>
   );
