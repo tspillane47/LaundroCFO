@@ -70,7 +70,7 @@ function SelectField({
 }) {
   return (
     <div>
-      <label className="block text-[11px] text-slate-500 mb-1.5">{label}</label>
+      <label className="block text-[11px] text-gray-700 dark:text-slate-500 mb-1.5">{label}</label>
       <select value={value} onChange={(e) => onChange(e.target.value)} className={INPUT_CLASS}>
         {options.map((opt) => (
           <option key={opt} value={opt}>
@@ -310,7 +310,7 @@ export default function EquipmentPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-[15px] font-semibold text-slate-100">Equipment Inventory</h1>
-          <p className="text-slate-500 text-[13px] mt-0.5">
+          <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-0.5">
             Fleet tracking, age analysis, and valuation impact for {store?.name ?? "your store"}
           </p>
         </div>
@@ -330,7 +330,7 @@ export default function EquipmentPage() {
           <div className={clsx("metric-value", avgAgeColor(metrics.weightedAvgAge))}>
             {metrics.weightedAvgAge.toFixed(1)} yrs
           </div>
-          <div className="text-[12px] mt-1 text-slate-500">
+          <div className="text-[12px] mt-1 text-gray-700 dark:text-slate-500">
             {metrics.weightedAvgAge < 8
               ? "Modern fleet"
               : metrics.weightedAvgAge < 12
@@ -344,7 +344,7 @@ export default function EquipmentPage() {
             <div className={clsx("metric-value", gradeColor(metrics.grade))}>
               Grade {metrics.grade}
             </div>
-            <span className="text-[12px] text-slate-500">({metrics.qualityScore}/100)</span>
+            <span className="text-[12px] text-gray-700 dark:text-slate-500">({metrics.qualityScore}/100)</span>
           </div>
           <div className="progress-bar mt-2">
             <div
@@ -372,7 +372,7 @@ export default function EquipmentPage() {
           <div className={clsx("metric-value", adjustmentColor(metrics.totalEquipmentAdjustment))}>
             {formatAdjustment(metrics.totalEquipmentAdjustment)}
           </div>
-          <div className="text-[12px] mt-1 text-slate-500">EBITDA multiple adjustment</div>
+          <div className="text-[12px] mt-1 text-gray-700 dark:text-slate-500">EBITDA multiple adjustment</div>
         </div>
       </div>
 
@@ -384,12 +384,12 @@ export default function EquipmentPage() {
           <div className="card">
             <div className="section-title">Age Distribution</div>
             {metrics.totalMachines === 0 ? (
-              <div className="text-[13px] text-slate-500 py-4">Add equipment to see age distribution.</div>
+              <div className="text-[13px] text-gray-700 dark:text-slate-500 py-4">Add equipment to see age distribution.</div>
             ) : (
               <div className="divide-y divide-white/[0.04]">
                 {metrics.ageBuckets.map((bucket) => (
                   <div key={bucket.label} className="flex items-center gap-3 py-3">
-                    <div className="text-[12px] text-slate-400 w-28 flex-shrink-0">{bucket.label}</div>
+                    <div className="text-[12px] text-gray-700 dark:text-slate-400 w-28 flex-shrink-0">{bucket.label}</div>
                     <div className="flex-1 h-2 bg-[var(--border)] dark:bg-[#243347] rounded-full overflow-hidden">
                       <div
                         className={clsx("h-full rounded-full transition-all", bucket.color)}
@@ -416,8 +416,8 @@ export default function EquipmentPage() {
 
             {equipment.length === 0 && !showForm ? (
               <div className="text-center py-12">
-                <div className="text-[15px] font-semibold text-slate-200 mb-2">No equipment added yet</div>
-                <div className="text-[13px] text-slate-500 mb-6 max-w-sm mx-auto">
+                <div className="text-[15px] font-semibold text-slate-900 dark:text-slate-200 mb-2">No equipment added yet</div>
+                <div className="text-[13px] text-gray-700 dark:text-slate-500 mb-6 max-w-sm mx-auto">
                   Add your washer and dryer fleet to track age, quality score, and valuation impact.
                 </div>
                 <button type="button" onClick={openAddForm} className="btn-primary px-8 py-3 text-[14px]">
@@ -428,7 +428,7 @@ export default function EquipmentPage() {
               <div className="table-scroll overflow-x-auto">
                 <table className="w-full text-[12px]">
                   <thead>
-                    <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.06]">
+                    <tr className="text-[10px] text-gray-700 dark:text-slate-600 uppercase tracking-wider border-b border-white/[0.06]">
                       <th className="text-left pb-2 font-medium">Type</th>
                       <th className="text-left pb-2 font-medium">Manufacturer</th>
                       <th className="text-left pb-2 font-medium">Size</th>
@@ -445,20 +445,20 @@ export default function EquipmentPage() {
                       const age = currentYear - item.installation_year;
                       return (
                         <tr key={item.id}>
-                          <td className="py-2.5 text-slate-300">{item.machine_type}</td>
-                          <td className="py-2.5 text-slate-400">{item.manufacturer}</td>
-                          <td className="py-2.5 text-slate-400">{item.machine_size}</td>
-                          <td className="py-2.5 text-slate-400">{item.quantity}</td>
-                          <td className="py-2.5 text-slate-400">{item.installation_year}</td>
+                          <td className="py-2.5 text-slate-900 dark:text-slate-300">{item.machine_type}</td>
+                          <td className="py-2.5 text-gray-700 dark:text-slate-400">{item.manufacturer}</td>
+                          <td className="py-2.5 text-gray-700 dark:text-slate-400">{item.machine_size}</td>
+                          <td className="py-2.5 text-gray-700 dark:text-slate-400">{item.quantity}</td>
+                          <td className="py-2.5 text-gray-700 dark:text-slate-400">{item.installation_year}</td>
                           <td className={clsx("py-2.5 font-semibold", ageColor(age))}>{age} yr</td>
-                          <td className="py-2.5 text-center text-slate-400">
+                          <td className="py-2.5 text-center text-gray-700 dark:text-slate-400">
                             {item.machine_type === "Washer" && item.high_speed_extract ? (
                               <span className="text-green-400">Yes</span>
                             ) : (
                               "—"
                             )}
                           </td>
-                          <td className="py-2.5 text-slate-400">{item.condition}</td>
+                          <td className="py-2.5 text-gray-700 dark:text-slate-400">{item.condition}</td>
                           <td className="py-2.5 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button
@@ -484,7 +484,7 @@ export default function EquipmentPage() {
                   {equipment.length > 0 && (
                     <tfoot>
                       <tr className="border-t border-white/[0.08]">
-                        <td className="pt-3 text-slate-400 font-semibold" colSpan={8}>
+                        <td className="pt-3 text-gray-700 dark:text-slate-400 font-semibold" colSpan={8}>
                           Total Replacement Cost
                         </td>
                         <td className="pt-3 text-right text-slate-100 font-bold">
@@ -501,7 +501,7 @@ export default function EquipmentPage() {
             {showForm && (
               <div className="mt-5 pt-5 border-t border-white/[0.08]">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="text-[13px] font-semibold text-slate-200">
+                  <div className="text-[13px] font-semibold text-slate-900 dark:text-slate-200">
                     {editingId ? "Edit Machine Group" : "Add Machine Group"}
                   </div>
                   <button type="button" onClick={closeForm} className="btn-outline text-[11px]">
@@ -529,7 +529,7 @@ export default function EquipmentPage() {
                     options={sizeOptions}
                   />
                   <div>
-                    <label className="block text-[11px] text-slate-500 mb-1.5">Quantity</label>
+                    <label className="block text-[11px] text-gray-700 dark:text-slate-500 mb-1.5">Quantity</label>
                     <input
                       type="number"
                       min={1}
@@ -540,7 +540,7 @@ export default function EquipmentPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-slate-500 mb-1.5">Installation Year</label>
+                    <label className="block text-[11px] text-gray-700 dark:text-slate-500 mb-1.5">Installation Year</label>
                     <input
                       type="number"
                       min={1980}
@@ -566,13 +566,13 @@ export default function EquipmentPage() {
                         onChange={(e) => updateForm("high_speed_extract", e.target.checked)}
                         className="rounded border-[var(--border2)] dark:border-white/20 bg-[var(--bg-input)] dark:bg-[#1e2a3a]"
                       />
-                      <label htmlFor="high_speed_extract" className="text-[13px] text-slate-300">
+                      <label htmlFor="high_speed_extract" className="text-[13px] text-slate-900 dark:text-slate-300">
                         High Speed Extract (200G+)
                       </label>
                     </div>
                   )}
                   <div className="md:col-span-2">
-                    <label className="block text-[11px] text-slate-500 mb-1.5">Notes</label>
+                    <label className="block text-[11px] text-gray-700 dark:text-slate-500 mb-1.5">Notes</label>
                     <textarea
                       value={form.notes}
                       onChange={(e) => updateForm("notes", e.target.value)}
@@ -614,19 +614,19 @@ export default function EquipmentPage() {
             <div className="section-title">Valuation Impact</div>
             <div className="space-y-3">
               <div className="flex items-center justify-between text-[13px]">
-                <span className="text-slate-400">Base equipment adjustment</span>
+                <span className="text-gray-700 dark:text-slate-400">Base equipment adjustment</span>
                 <span className={clsx("font-semibold", adjustmentColor(metrics.baseEquipmentAdjustment))}>
                   {formatAdjustment(metrics.baseEquipmentAdjustment)}
                 </span>
               </div>
               {metrics.bonus200GAdjustment > 0 && (
                 <div className="flex items-center justify-between text-[13px]">
-                  <span className="text-slate-400">200G bonus</span>
+                  <span className="text-gray-700 dark:text-slate-400">200G bonus</span>
                   <span className="font-semibold text-green-400">+0.10x</span>
                 </div>
               )}
               <div className="border-t border-white/[0.08] pt-3 flex items-center justify-between text-[13px]">
-                <span className="text-slate-200 font-medium">Total equipment adjustment</span>
+                <span className="text-slate-900 dark:text-slate-200 font-medium">Total equipment adjustment</span>
                 <span className={clsx("font-bold text-[15px]", adjustmentColor(metrics.totalEquipmentAdjustment))}>
                   {formatAdjustment(metrics.totalEquipmentAdjustment)}
                 </span>
@@ -642,14 +642,14 @@ export default function EquipmentPage() {
                   {valuationImpactDollars >= 0 ? "+" : "−"}
                   {fmtDollar(Math.abs(valuationImpactDollars))}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">
+                <div className="text-[11px] text-gray-700 dark:text-slate-500 mt-1">
                   {formatAdjustment(metrics.totalEquipmentAdjustment)} × {fmtDollar(annualEbitda)} EBITDA
                 </div>
               </div>
 
               {/* Visual indicator */}
               <div className="mt-2">
-                <div className="flex justify-between text-[10px] text-slate-600 mb-1">
+                <div className="flex justify-between text-[10px] text-gray-700 dark:text-slate-600 mb-1">
                   <span>−0.50x</span>
                   <span>0.00x</span>
                   <span>+0.60x</span>
@@ -684,15 +684,15 @@ export default function EquipmentPage() {
               </div>
             </div>
             {metrics.totalMachines > 0 && (
-              <div className="text-[12px] text-slate-500 text-center mb-4">
+              <div className="text-[12px] text-gray-700 dark:text-slate-500 text-center mb-4">
                 Ratio {metrics.totalWashers}:{metrics.totalDryers} washer/dryer
               </div>
             )}
             <div className="space-y-3">
               <div>
                 <div className="flex items-center justify-between text-[12px] mb-1">
-                  <span className="text-slate-400">200G Washers</span>
-                  <span className="font-semibold text-slate-200">{metrics.pct200GWashers.toFixed(0)}%</span>
+                  <span className="text-gray-700 dark:text-slate-400">200G Washers</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-200">{metrics.pct200GWashers.toFixed(0)}%</span>
                 </div>
                 <div className="h-1.5 bg-[var(--border)] dark:bg-[#243347] rounded-full overflow-hidden">
                   <div
@@ -703,8 +703,8 @@ export default function EquipmentPage() {
               </div>
               <div>
                 <div className="flex items-center justify-between text-[12px] mb-1">
-                  <span className="text-slate-400">Under 10 Years</span>
-                  <span className="font-semibold text-slate-200">{metrics.pctUnder10Years.toFixed(0)}%</span>
+                  <span className="text-gray-700 dark:text-slate-400">Under 10 Years</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-200">{metrics.pctUnder10Years.toFixed(0)}%</span>
                 </div>
                 <div className="h-1.5 bg-[var(--border)] dark:bg-[#243347] rounded-full overflow-hidden">
                   <div

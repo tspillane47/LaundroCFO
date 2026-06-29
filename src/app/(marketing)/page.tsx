@@ -315,7 +315,7 @@ export default function MarketingHomePage() {
                   <GeoIcon variant={item.icon} />
                 </div>
                 <h3 className="text-[16px] font-semibold text-slate-900 mb-2">{item.title}</h3>
-                <p className="text-[14px] text-slate-500 leading-relaxed">{item.description}</p>
+                <p className="text-[14px] text-gray-700 leading-relaxed">{item.description}</p>
               </div>
             ))}
           </div>
@@ -329,7 +329,7 @@ export default function MarketingHomePage() {
             <h2 className="text-[28px] lg:text-[36px] font-bold text-slate-900 mb-3">
               Everything you need to run your laundromat like a CFO
             </h2>
-            <p className="text-[16px] text-slate-500">
+            <p className="text-[16px] text-gray-700">
               Built specifically for laundromats. Not generic accounting software.
             </p>
           </div>
@@ -342,7 +342,7 @@ export default function MarketingHomePage() {
                   <GeoIcon variant={item.icon} />
                 </div>
                 <h3 className="text-[15px] font-semibold text-slate-900 mb-2">{item.title}</h3>
-                <p className="text-[13px] text-slate-500 leading-relaxed">{item.description}</p>
+                <p className="text-[13px] text-gray-700 leading-relaxed">{item.description}</p>
               </div>
             ))}
           </div>
@@ -361,7 +361,7 @@ export default function MarketingHomePage() {
             {audiences.map((item) => (
               <div key={item.title} className="p-5 rounded-lg bg-white border border-slate-200">
                 <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{item.title}</h3>
-                <p className="text-[13px] text-slate-500 leading-relaxed">{item.description}</p>
+                <p className="text-[13px] text-gray-700 leading-relaxed">{item.description}</p>
               </div>
             ))}
           </div>

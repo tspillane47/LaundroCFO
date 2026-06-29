@@ -10,13 +10,13 @@
   --bg-card2: #ffffff;
   --bg-sidebar: #1a2b3c;
   --bg-sidebar-hover: #243548;
-  --bg-nav-active: #243548;
+  --bg-nav-active: #166534;
   --bg-input: #ffffff;
   --nav-active-border: transparent;
   --nav-active-text: #ffffff;
   --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
   --border: #e2e8f0;
   --border2: #cbd5e1;
   --accent: #1a2b3c;
@@ -105,7 +105,7 @@ html, body {
   }
   .metric-label {
     font-size: 11px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.07em;
     font-weight: 500;
@@ -188,8 +188,8 @@ html, body {
     color: var(--text-primary);
   }
   .nav-item-active {
-    background: var(--bg-card2);
-    color: var(--text-primary);
+    background: var(--bg-nav-active);
+    color: var(--nav-active-text);
     font-weight: 500;
     border-left: none;
   }
@@ -539,13 +539,13 @@ html, body {
   color: rgba(255, 255, 255, 0.7);
 }
 
-:root:not(.dark) .app-sidebar .nav-item:hover,
-:root:not(.dark) .app-sidebar .nav-item-active {
+:root:not(.dark) .app-sidebar .nav-item:hover {
   color: #ffffff;
 }
 
-:root:not(.dark) .nav-item-active {
+:root:not(.dark) .app-sidebar .nav-item-active {
   background: var(--bg-nav-active);
+  color: var(--nav-active-text);
 }
 
 :root:not(.dark) .nav-item:hover {

@@ -425,7 +425,7 @@ export function RealEstateModule({ store }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-slate-500 text-[13px]">Loading real estate data...</div>
+        <div className="text-gray-700 dark:text-slate-500 text-[13px]">Loading real estate data...</div>
       </div>
     );
   }
@@ -438,7 +438,7 @@ export function RealEstateModule({ store }: Props) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-[15px] font-semibold text-slate-100">Real Estate Ownership</h2>
-          <p className="text-slate-500 text-[13px] mt-0.5">Owner-occupied or related-party real estate</p>
+          <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-0.5">Owner-occupied or related-party real estate</p>
         </div>
         {mode === "view" ? (
           <button type="button" onClick={enterEditMode} className="btn-primary">
@@ -469,8 +469,8 @@ export function RealEstateModule({ store }: Props) {
 
       {mode === "view" && !record ? (
         <div className="card text-center py-12">
-          <div className="text-slate-300 text-[14px]">No real estate profile on file</div>
-          <p className="text-slate-500 text-[13px] mt-2 mb-4">
+          <div className="text-slate-900 dark:text-slate-300 text-[14px]">No real estate profile on file</div>
+          <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-2 mb-4">
             Add building ownership and mortgage details to track equity and debt position.
           </p>
           <button type="button" onClick={enterEditMode} className="btn-primary">

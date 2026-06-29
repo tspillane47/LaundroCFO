@@ -61,7 +61,7 @@ export default function IntegrationsPage() {
     <div className="space-y-5 max-w-3xl">
       <div>
         <h1 className="text-[15px] font-semibold text-slate-100">Integrations</h1>
-        <p className="text-[12px] text-slate-500 mt-1">
+        <p className="text-[12px] text-gray-700 dark:text-slate-500 mt-1">
           Connect your data sources to automatically populate financial metrics and reduce manual entry.
         </p>
       </div>
@@ -85,7 +85,7 @@ export default function IntegrationsPage() {
                   <span className="badge badge-green text-[10px]">Connected</span>
                 )}
               </div>
-              <div className="text-[12px] text-slate-400 mb-2">{i.description}</div>
+              <div className="text-[12px] text-gray-700 dark:text-slate-400 mb-2">{i.description}</div>
               <div className="flex gap-1.5 flex-wrap">
                 {i.syncs.map((s) => (
                   <span key={s} className="text-[10px] bg-[var(--bg-page)] dark:bg-[#243347] text-[var(--text-secondary)] dark:text-slate-400 px-2 py-0.5 rounded-md border border-[var(--border)] dark:border-transparent">

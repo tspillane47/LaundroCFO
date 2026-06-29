@@ -659,7 +659,7 @@ export default function ValuationPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-[15px] font-semibold text-slate-100">Valuation Engine</h1>
-        <p className="text-slate-500 text-[13px] mt-0.5">
+        <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-0.5">
           EBITDA multiple model with equipment, lease, market, and revenue mix adjustments
         </p>
       </div>
@@ -765,7 +765,7 @@ export default function ValuationPage() {
                   "px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors",
                   historyPeriod === key
                     ? "bg-blue-500/20 text-blue-300 border border-blue-500/40"
-                    : "text-slate-400 border border-white/[0.08] hover:border-white/20"
+                    : "text-gray-700 dark:text-slate-400 border border-white/[0.08] hover:border-white/20"
                 )}
               >
                 {label}
@@ -832,12 +832,12 @@ export default function ValuationPage() {
         >
           {/* Left — adjustment waterfall */}
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-700 dark:text-slate-400 mb-1.5">
               How We Arrived At This Value
             </div>
 
             <div className="flex items-center h-9 text-[11px] border-b border-white/[0.06]">
-              <span className="text-slate-400 flex-shrink-0">Base Multiple</span>
+              <span className="text-gray-700 dark:text-slate-400 flex-shrink-0">Base Multiple</span>
               <span className="ml-auto font-semibold text-slate-100 tabular-nums">
                 {fmtMultiple(valuation.baseMultiple)}
               </span>
@@ -849,11 +849,11 @@ export default function ValuationPage() {
                 className="flex flex-col justify-center min-h-9 py-1 text-[11px] border-b border-white/[0.06] min-w-0"
               >
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-slate-300 font-medium flex-shrink-0">{adj.label}</span>
+                  <span className="text-slate-900 dark:text-slate-300 font-medium flex-shrink-0">{adj.label}</span>
                   <span
                     className={clsx(
                       "text-[9px] px-1 py-px rounded border uppercase tracking-wide flex-shrink-0",
-                      CATEGORY_COLORS[adj.category] ?? "bg-slate-500/15 text-slate-400 border-slate-500/30"
+                      CATEGORY_COLORS[adj.category] ?? "bg-slate-500/15 text-gray-700 dark:text-slate-400 border-slate-500/30"
                     )}
                   >
                     {adj.category.replace("_", " ")}
@@ -867,7 +867,7 @@ export default function ValuationPage() {
                     {formatAdj(adj.value)}
                   </span>
                 </div>
-                <div className="text-[10px] text-slate-500 truncate pl-0.5">{adj.reason}</div>
+                <div className="text-[10px] text-gray-700 dark:text-slate-500 truncate pl-0.5">{adj.reason}</div>
               </div>
             ))}
 
@@ -880,7 +880,7 @@ export default function ValuationPage() {
                 Laundromat multiples typically range from 2.5x to 6.0x depending on lease,
                 equipment, location, and revenue quality.
               </div>
-              <div className="text-[11px] text-slate-500 tabular-nums">
+              <div className="text-[11px] text-gray-700 dark:text-slate-500 tabular-nums">
                 × Annual EBITDA: {fmtDollar(annualEbitda)}
               </div>
               <div className="text-[17px] font-bold text-green-400 tabular-nums">
@@ -897,18 +897,18 @@ export default function ValuationPage() {
           {/* Right — key metrics & drivers */}
           <div className="flex flex-col gap-2 min-w-0">
             <div className="card2 !p-2.5 space-y-1.5">
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+              <div className="text-[10px] uppercase tracking-wider text-gray-700 dark:text-slate-500 font-semibold">
                 Key Metrics
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[10px] text-slate-500">Store Value</span>
+                <span className="text-[10px] text-gray-700 dark:text-slate-500">Store Value</span>
                 <span className="text-[15px] font-bold text-green-400 tabular-nums">
                   {fmtDollar(valuation.businessValue)}
                 </span>
               </div>
               <Disclaimer variant="valuation" />
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[10px] text-slate-500">
+                <span className="text-[10px] text-gray-700 dark:text-slate-500">
                   <DisclaimerLabel>Final Multiple</DisclaimerLabel>
                 </span>
                 <span className="text-[13px] font-bold text-blue-400 tabular-nums">
@@ -917,18 +917,18 @@ export default function ValuationPage() {
               </div>
               <Disclaimer variant="valuation" />
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[10px] text-slate-500">
+                <span className="text-[10px] text-gray-700 dark:text-slate-500">
                   <DisclaimerLabel>Annual EBITDA</DisclaimerLabel>
                 </span>
-                <span className="text-[12px] font-semibold text-slate-200 tabular-nums">
+                <span className="text-[12px] font-semibold text-slate-900 dark:text-slate-200 tabular-nums">
                   {fmtDollar(annualEbitda)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[10px] text-slate-500">
+                <span className="text-[10px] text-gray-700 dark:text-slate-500">
                   <DisclaimerLabel>EBITDA Margin</DisclaimerLabel>
                 </span>
-                <span className="text-[12px] font-semibold text-slate-200 tabular-nums">
+                <span className="text-[12px] font-semibold text-slate-900 dark:text-slate-200 tabular-nums">
                   {ebitdaMargin.toFixed(1)}%
                 </span>
               </div>
@@ -939,13 +939,13 @@ export default function ValuationPage() {
                 Helping Value
               </div>
               {valuation.valueDrivers.length === 0 ? (
-                <p className="text-[10px] text-slate-500">No major drivers identified.</p>
+                <p className="text-[10px] text-gray-700 dark:text-slate-500">No major drivers identified.</p>
               ) : (
                 <ul className="space-y-1">
                   {valuation.valueDrivers.slice(0, 3).map((driver) => (
                     <li
                       key={driver}
-                      className="text-[10px] text-slate-300 min-w-0 truncate"
+                      className="text-[10px] text-slate-900 dark:text-slate-300 min-w-0 truncate"
                     >
                       {driver}
                     </li>
@@ -959,13 +959,13 @@ export default function ValuationPage() {
                 Hurting Value
               </div>
               {valuation.valueRisks.length === 0 ? (
-                <p className="text-[10px] text-slate-500">No significant risks flagged.</p>
+                <p className="text-[10px] text-gray-700 dark:text-slate-500">No significant risks flagged.</p>
               ) : (
                 <ul className="space-y-1">
                   {valuation.valueRisks.slice(0, 3).map((risk) => (
                     <li
                       key={risk}
-                      className="text-[10px] text-slate-300 min-w-0 truncate"
+                      className="text-[10px] text-slate-900 dark:text-slate-300 min-w-0 truncate"
                     >
                       {risk}
                     </li>
@@ -983,11 +983,11 @@ export default function ValuationPage() {
         className="card2 w-full text-left !p-3.5 hover:opacity-90 transition-opacity"
       >
         <div className="flex items-center justify-between">
-          <span className="text-[13px] font-semibold text-slate-200">How is this calculated?</span>
-          <span className="text-slate-400 text-[12px]">{calcExpanded ? "▲" : "▼"}</span>
+          <span className="text-[13px] font-semibold text-slate-900 dark:text-slate-200">How is this calculated?</span>
+          <span className="text-gray-700 dark:text-slate-400 text-[12px]">{calcExpanded ? "▲" : "▼"}</span>
         </div>
         {calcExpanded && (
-          <p className="text-[12px] text-slate-400 mt-3 leading-relaxed">
+          <p className="text-[12px] text-gray-700 dark:text-slate-400 mt-3 leading-relaxed">
             LaundroCFO uses an EBITDA multiple approach, which is the standard valuation
             method used by laundromat brokers, SBA lenders, and industry buyers. We start
             with a base multiple of 4.0x and apply positive and negative adjustments based
@@ -1040,7 +1040,7 @@ export default function ValuationPage() {
             { label: "Pickup & Delivery %", value: pickupDeliveryPct, set: setPickupDeliveryPct },
           ].map((field) => (
             <div key={field.label}>
-              <label className="block text-[11px] text-slate-500 mb-1.5">{field.label}</label>
+              <label className="block text-[11px] text-gray-700 dark:text-slate-500 mb-1.5">{field.label}</label>
               <input
                 type="number"
                 min={0}
@@ -1054,7 +1054,7 @@ export default function ValuationPage() {
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div>
-            <label className="block text-[11px] text-slate-500 mb-1.5">Last Retool Year</label>
+            <label className="block text-[11px] text-gray-700 dark:text-slate-500 mb-1.5">Last Retool Year</label>
             <input
               type="number"
               min={1990}
@@ -1066,7 +1066,7 @@ export default function ValuationPage() {
             />
           </div>
           <div>
-            <label className="block text-[11px] text-slate-500 mb-1.5">Investment Amount</label>
+            <label className="block text-[11px] text-gray-700 dark:text-slate-500 mb-1.5">Investment Amount</label>
             <input
               type="number"
               min={0}
@@ -1077,7 +1077,7 @@ export default function ValuationPage() {
             />
           </div>
           <div>
-            <label className="block text-[11px] text-slate-500 mb-1.5">Retool Type</label>
+            <label className="block text-[11px] text-gray-700 dark:text-slate-500 mb-1.5">Retool Type</label>
             <select
               value={retoolType}
               onChange={(e) => setRetoolType(e.target.value)}
@@ -1111,7 +1111,7 @@ export default function ValuationPage() {
       <div className="card">
           <div className="section-title mb-3">Improvement Opportunities</div>
           {valuation.improvements.length === 0 ? (
-            <p className="text-[12px] text-slate-500">Store is well-optimized across key factors.</p>
+            <p className="text-[12px] text-gray-700 dark:text-slate-500">Store is well-optimized across key factors.</p>
           ) : (
             <ul className="space-y-3">
               {valuation.improvements.map((item) => (
@@ -1120,7 +1120,7 @@ export default function ValuationPage() {
                   className="flex items-start justify-between gap-3 text-[12px] border-b border-white/[0.04] pb-3 last:border-0 last:pb-0"
                 >
                   <div>
-                    <div className="text-slate-200 font-medium">{item.action}</div>
+                    <div className="text-slate-900 dark:text-slate-200 font-medium">{item.action}</div>
                     <div className="text-green-400 font-semibold mt-0.5">
                       +{fmtDollar(item.estimatedGain)} potential
                     </div>
@@ -1168,7 +1168,7 @@ export default function ValuationPage() {
             </div>
           </div>
           <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center justify-between">
-            <span className="text-[13px] text-slate-400">Equipment Valuation Adjustment</span>
+            <span className="text-[13px] text-gray-700 dark:text-slate-400">Equipment Valuation Adjustment</span>
             <span
               className={clsx(
                 "text-[16px] font-bold",
@@ -1183,7 +1183,7 @@ export default function ValuationPage() {
         <div className="card">
           <div className="section-title mb-4">Lease Summary</div>
           {isOwnerOccupied ? (
-            <div className="text-[13px] text-slate-400">
+            <div className="text-[13px] text-gray-700 dark:text-slate-400">
               Owner-occupied — fee-simple real estate ownership applies instead of lease term control.
             </div>
           ) : (
@@ -1203,7 +1203,7 @@ export default function ValuationPage() {
             </div>
           )}
           <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center justify-between">
-            <span className="text-[13px] text-slate-400">Lease Valuation Adjustment</span>
+            <span className="text-[13px] text-gray-700 dark:text-slate-400">Lease Valuation Adjustment</span>
             <span
               className={clsx(
                 "text-[16px] font-bold",

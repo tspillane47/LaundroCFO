@@ -309,7 +309,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
                     key={item.href}
                     href={item.href}
                     onClick={() => setSidebarOpen(false)}
-                    className="nav-item"
+                    className={active ? "nav-item nav-item-active" : "nav-item"}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -318,14 +318,14 @@ function AppShell({ children }: { children: React.ReactNode }) {
                       fontSize: "13px",
                       textDecoration: "none",
                       fontWeight: active ? 500 : 400,
-                      color: active ? "var(--text-primary)" : "var(--text-muted)",
-                      background: active ? "var(--bg-card2)" : "transparent",
+                      color: active ? "var(--nav-active-text)" : "var(--text-muted)",
+                      background: active ? "var(--bg-nav-active)" : "transparent",
                     }}
                     onMouseEnter={(e) => {
-                      if (!active) e.currentTarget.style.background = "color-mix(in srgb, var(--bg-card2) 50%, transparent)";
+                      if (!active) e.currentTarget.style.background = "color-mix(in srgb, var(--bg-sidebar-hover) 50%, transparent)";
                     }}
                     onMouseLeave={(e) => {
-                      if (!active) e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.background = active ? "var(--bg-nav-active)" : "transparent";
                     }}
                   >
                     <NavIcon name={item.icon} />

@@ -59,7 +59,7 @@ export default function AboutPage() {
       <section className="py-24 bg-white">
         <div className="max-w-3xl mx-auto px-6">
           <h2 className="text-[32px] font-bold text-slate-900 mb-6">Our Mission</h2>
-          <p className="text-[16px] text-slate-500 leading-relaxed">
+          <p className="text-[16px] text-gray-700 leading-relaxed">
             Laundromats are one of America&apos;s most resilient small businesses — recession-resistant, cash-flowing,
             and community-essential. But most owners manage them with spreadsheets, gut instinct, and outdated
             financial tools. LaundroCFO changes that. We built a platform that gives every laundromat owner, buyer,
@@ -79,7 +79,7 @@ export default function AboutPage() {
                 className="p-8 rounded-2xl bg-white border border-slate-200 hover:shadow-lg transition-shadow"
               >
                 <h3 className="text-[18px] font-bold text-slate-900 mb-3">{item.title}</h3>
-                <p className="text-[15px] text-slate-500 leading-relaxed">{item.description}</p>
+                <p className="text-[15px] text-gray-700 leading-relaxed">{item.description}</p>
               </div>
             ))}
           </div>
@@ -96,7 +96,7 @@ export default function AboutPage() {
                 className="p-7 rounded-2xl bg-white border border-slate-200 hover:shadow-lg transition-shadow"
               >
                 <h3 className="text-[16px] font-bold text-slate-900 mb-2">{item.title}</h3>
-                <p className="text-[13px] text-slate-500 leading-relaxed">{item.description}</p>
+                <p className="text-[13px] text-gray-700 leading-relaxed">{item.description}</p>
               </div>
             ))}
           </div>

@@ -45,8 +45,8 @@ function BenchmarkRow({
   if (store == null) {
     return (
       <div className="flex items-center gap-4 py-3 border-b border-white/[0.05]">
-        <div className="text-[13px] text-slate-400 w-44 flex-shrink-0">{metric}</div>
-        <div className="flex-1 text-[12px] text-slate-600 italic">Add data to see this metric</div>
+        <div className="text-[13px] text-gray-700 dark:text-slate-400 w-44 flex-shrink-0">{metric}</div>
+        <div className="flex-1 text-[12px] text-gray-700 dark:text-slate-600 italic">Add data to see this metric</div>
       </div>
     );
   }
@@ -64,7 +64,7 @@ function BenchmarkRow({
 
   return (
     <div className="flex items-center gap-4 py-3 border-b border-white/[0.05]">
-      <div className="text-[13px] text-slate-400 w-44 flex-shrink-0">{metric}</div>
+      <div className="text-[13px] text-gray-700 dark:text-slate-400 w-44 flex-shrink-0">{metric}</div>
       <div className="flex-1 relative">
         <div
           className="h-2 rounded-full overflow-hidden"
@@ -78,7 +78,7 @@ function BenchmarkRow({
           className="absolute top-[-3px] w-[3px] h-[14px] bg-white rounded-sm"
           style={{ left: `calc(${pct}% - 1.5px)` }}
         />
-        <div className="flex justify-between text-[10px] text-slate-600 mt-1">
+        <div className="flex justify-between text-[10px] text-gray-700 dark:text-slate-600 mt-1">
           <span>
             {lowerIsBetter ? "Best" : "Worst"} 25% — {fmtVal(lowerIsBetter ? top25 : bottom25)}
           </span>
@@ -312,7 +312,7 @@ export default function BenchmarkingPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-[15px] font-semibold text-slate-100">
           Industry Benchmarking{" "}
-          <span className="text-[12px] text-slate-500 font-normal ml-2">
+          <span className="text-[12px] text-gray-700 dark:text-slate-500 font-normal ml-2">
             {metrics.storeName} — vs. U.S. 2024 Data
           </span>
         </h1>
@@ -322,35 +322,35 @@ export default function BenchmarkingPage() {
         <div className="card">
           <div className="metric-label">Performance Rating</div>
           <div className="metric-value text-green-400">{summary.performanceRating}</div>
-          <div className="text-[12px] text-slate-500 mt-1">vs. laundromats nationally</div>
+          <div className="text-[12px] text-gray-700 dark:text-slate-500 mt-1">vs. laundromats nationally</div>
         </div>
         <div className="card">
           <div className="metric-label">Metrics Above Median</div>
           <div className="metric-value">
             {summary.aboveMedian} / {summary.total}
           </div>
-          <div className="text-[12px] text-slate-500 mt-1">
+          <div className="text-[12px] text-gray-700 dark:text-slate-500 mt-1">
             {summary.total > 0 ? `${Math.round((summary.aboveMedian / summary.total) * 100)}% of tracked metrics` : "—"}
           </div>
         </div>
         <div className="card">
           <div className="metric-label">Financeability Rating</div>
           <div className="metric-value text-green-400">{summary.financeRating}</div>
-          <div className="text-[12px] text-slate-500 mt-1">Based on live DSCR</div>
+          <div className="text-[12px] text-gray-700 dark:text-slate-500 mt-1">Based on live DSCR</div>
         </div>
       </div>
 
       <div className="card">
         <div className="section-title">
           Store vs. Industry Benchmarks
-          <span className="text-[11px] text-slate-600 font-normal ml-auto">
+          <span className="text-[11px] text-gray-700 dark:text-slate-600 font-normal ml-auto">
             White bar = {metrics.storeName} position
           </span>
         </div>
         {rows.map((b) => (
           <BenchmarkRow key={b.metric} {...b} storeLabel={metrics.storeName} />
         ))}
-        <div className="text-[11px] text-slate-600 mt-4 pt-3 border-t border-white/[0.05]">
+        <div className="text-[11px] text-gray-700 dark:text-slate-600 mt-4 pt-3 border-t border-white/[0.05]">
           Industry benchmark data sourced from Coin Laundry Association, LaundroCFO peer database (2024).
           Utility ratio uses trailing 12-month P&amp;L when available.
         </div>
@@ -359,7 +359,7 @@ export default function BenchmarkingPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="card border-green-500/20">
           <div className="text-[12px] text-green-400 font-semibold mb-2">Strengths</div>
-          <div className="space-y-1.5 text-[12px] text-slate-400">
+          <div className="space-y-1.5 text-[12px] text-gray-700 dark:text-slate-400">
             {callouts.strengths.length > 0 ? (
               callouts.strengths.map((s) => <div key={s}>{s}</div>)
             ) : (
@@ -369,7 +369,7 @@ export default function BenchmarkingPage() {
         </div>
         <div className="card border-amber-500/20">
           <div className="text-[12px] text-amber-400 font-semibold mb-2">Watch</div>
-          <div className="space-y-1.5 text-[12px] text-slate-400">
+          <div className="space-y-1.5 text-[12px] text-gray-700 dark:text-slate-400">
             {callouts.watch.length > 0 ? (
               callouts.watch.map((s) => <div key={s}>{s}</div>)
             ) : (
@@ -379,7 +379,7 @@ export default function BenchmarkingPage() {
         </div>
         <div className="card border-blue-500/20">
           <div className="text-[12px] text-blue-400 font-semibold mb-2">Opportunities</div>
-          <div className="space-y-1.5 text-[12px] text-slate-400">
+          <div className="space-y-1.5 text-[12px] text-gray-700 dark:text-slate-400">
             {callouts.opportunities.map((s) => (
               <div key={s}>{s}</div>
             ))}

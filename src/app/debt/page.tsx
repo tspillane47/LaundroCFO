@@ -254,7 +254,7 @@ function ToggleField({
 }) {
   return (
     <div className="flex items-center justify-between py-2">
-      <span className="text-[13px] text-slate-300">{label}</span>
+      <span className="text-[13px] text-slate-900 dark:text-slate-300">{label}</span>
       <button
         type="button"
         onClick={() => onChange(!value)}
@@ -900,7 +900,7 @@ export default function DebtPage() {
                           debtServiceAnalysis.monthlyVariance,
                           debtServiceAnalysis.scheduledMonthly
                         )
-                      : "text-slate-400"
+                      : "text-gray-700 dark:text-slate-400"
                   )}
                 >
                   {debtServiceAnalysis.monthlyVariance != null
@@ -928,7 +928,7 @@ export default function DebtPage() {
                           debtServiceAnalysis.annualVariance,
                           debtServiceAnalysis.scheduledAnnual
                         )
-                      : "text-slate-400"
+                      : "text-gray-700 dark:text-slate-400"
                   )}
                 >
                   {debtServiceAnalysis.annualVariance != null
@@ -968,7 +968,7 @@ export default function DebtPage() {
                 "text-[28px] font-bold tabular-nums mt-1",
                 debtServiceAnalysis.scheduledDscr != null
                   ? dscrColorClass(debtServiceAnalysis.scheduledDscr)
-                  : "text-slate-400"
+                  : "text-gray-700 dark:text-slate-400"
               )}
             >
               {debtServiceAnalysis.scheduledDscr != null
@@ -988,7 +988,7 @@ export default function DebtPage() {
                 "text-[28px] font-bold tabular-nums mt-1",
                 debtServiceAnalysis.actualDscr != null
                   ? dscrColorClass(debtServiceAnalysis.actualDscr)
-                  : "text-slate-400"
+                  : "text-gray-700 dark:text-slate-400"
               )}
             >
               {debtServiceAnalysis.actualDscr != null

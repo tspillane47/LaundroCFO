@@ -316,7 +316,7 @@ export default function OnboardingPage() {
   if (!hydrated) {
     return (
       <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0f1e3d] flex items-center justify-center">
-        <div className="text-slate-400 text-[13px]">Loading...</div>
+        <div className="text-gray-700 dark:text-slate-400 text-[13px]">Loading...</div>
       </div>
     );
   }
@@ -339,7 +339,7 @@ export default function OnboardingPage() {
           <div className="text-center mb-6 sm:mb-8">
             <div className="text-[22px] font-bold text-blue-300 tracking-tight">LaundroCFO</div>
             {data.step > 1 && (
-              <div className="text-[12px] text-slate-500 mt-2">
+              <div className="text-[12px] text-gray-700 dark:text-slate-500 mt-2">
                 Step {data.step} of {TOTAL_STEPS}
               </div>
             )}
@@ -359,10 +359,10 @@ export default function OnboardingPage() {
               <h1 className="text-[32px] sm:text-[40px] font-bold text-white tracking-tight mb-3">
                 Welcome to LaundroCFO
               </h1>
-              <p className="text-[16px] text-slate-400 mb-2">
+              <p className="text-[16px] text-gray-700 dark:text-slate-400 mb-2">
                 Let&apos;s set up your first store. It takes about 2 minutes.
               </p>
-              <p className="text-[12px] text-slate-500 mb-10">Step 1 of 4</p>
+              <p className="text-[12px] text-gray-700 dark:text-slate-500 mb-10">Step 1 of 4</p>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-10">
                 {FEATURES.map((f) => (
@@ -387,7 +387,7 @@ export default function OnboardingPage() {
                 Get Started →
               </button>
               <div>
-                <Link href="/portfolio" className="text-[13px] text-slate-500 hover:text-slate-300">
+                <Link href="/portfolio" className="text-[13px] text-gray-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-300">
                   I&apos;ll do this later
                 </Link>
               </div>
@@ -398,7 +398,7 @@ export default function OnboardingPage() {
           {data.step === 2 && (
             <div>
               <h2 className="text-[24px] font-bold text-white mb-1">Tell us about your store</h2>
-              <p className="text-[13px] text-slate-500 mb-6">Step 2 of 4</p>
+              <p className="text-[13px] text-gray-700 dark:text-slate-500 mb-6">Step 2 of 4</p>
 
               <div className="card space-y-4">
                 <Field label="Store Name *">
@@ -468,7 +468,7 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex items-center justify-between mt-6">
-                <button onClick={() => goToStep(1)} className="text-[13px] text-slate-500 hover:text-slate-300">
+                <button onClick={() => goToStep(1)} className="text-[13px] text-gray-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-300">
                   ← Back
                 </button>
                 <button
@@ -486,7 +486,7 @@ export default function OnboardingPage() {
           {data.step === 3 && (
             <div>
               <h2 className="text-[24px] font-bold text-white mb-1">Enter your store&apos;s financials</h2>
-              <p className="text-[13px] text-slate-400 mb-6">
+              <p className="text-[13px] text-gray-700 dark:text-slate-400 mb-6">
                 Estimates are fine — you can update these anytime.
               </p>
 
@@ -522,28 +522,28 @@ export default function OnboardingPage() {
                     <div className="text-[13px] font-semibold text-[var(--text-info)] dark:text-blue-300 mb-4">Based on your numbers:</div>
                     <div className="space-y-3">
                       <div>
-                        <div className="text-[11px] text-slate-500 uppercase tracking-wider">Estimated EBITDA</div>
+                        <div className="text-[11px] text-gray-700 dark:text-slate-500 uppercase tracking-wider">Estimated EBITDA</div>
                         <div className="text-[22px] font-bold text-[var(--text-primary)] dark:text-white">
                           {fmtDollar(financialPreview.monthlyEbitda)}/mo
                         </div>
                       </div>
                       <div>
-                        <div className="text-[11px] text-slate-500 uppercase tracking-wider">Estimated Annual EBITDA</div>
+                        <div className="text-[11px] text-gray-700 dark:text-slate-500 uppercase tracking-wider">Estimated Annual EBITDA</div>
                         <div className="text-[18px] font-bold text-[var(--text-primary)] dark:text-slate-200">
                           {fmtDollar(financialPreview.annualEbitda)}
                         </div>
                       </div>
                       <div>
-                        <div className="text-[11px] text-slate-500 uppercase tracking-wider">Estimated Store Value</div>
+                        <div className="text-[11px] text-gray-700 dark:text-slate-500 uppercase tracking-wider">Estimated Store Value</div>
                         <div className="text-[18px] font-bold positive">
                           {fmtDollar(financialPreview.storeValue)}
                         </div>
                       </div>
                       <div>
-                        <div className="text-[11px] text-slate-500 uppercase tracking-wider">DSCR</div>
+                        <div className="text-[11px] text-gray-700 dark:text-slate-500 uppercase tracking-wider">DSCR</div>
                         <div className={clsx(
                           "text-[18px] font-bold",
-                          financialPreview.dscr >= 1.25 ? "text-green-400" : financialPreview.dscr > 0 ? "text-amber-400" : "text-slate-500"
+                          financialPreview.dscr >= 1.25 ? "text-green-400" : financialPreview.dscr > 0 ? "text-amber-400" : "text-gray-700 dark:text-slate-500"
                         )}>
                           {financialPreview.dscr > 0 ? fmtMultiple(financialPreview.dscr) : "—"}
                         </div>
@@ -554,7 +554,7 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex items-center justify-between mt-6">
-                <button onClick={() => goToStep(2)} className="text-[13px] text-slate-500 hover:text-slate-300">
+                <button onClick={() => goToStep(2)} className="text-[13px] text-gray-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-300">
                   ← Back
                 </button>
                 <button onClick={() => goToStep(4)} className="btn-primary px-8 py-2.5 text-[13px]">
@@ -568,7 +568,7 @@ export default function OnboardingPage() {
           {data.step === 4 && (
             <div>
               <h2 className="text-[24px] font-bold text-white mb-1">Tell us about your lease</h2>
-              <p className="text-[13px] text-slate-400 mb-6">
+              <p className="text-[13px] text-gray-700 dark:text-slate-400 mb-6">
                 This affects your store&apos;s valuation and lending risk.
               </p>
 
@@ -618,7 +618,7 @@ export default function OnboardingPage() {
                     </Field>
                   </div>
                   <div className="flex items-center justify-between py-2">
-                    <span className="text-[13px] text-slate-300">Personal Guaranty</span>
+                    <span className="text-[13px] text-slate-900 dark:text-slate-300">Personal Guaranty</span>
                     <button
                       type="button"
                       onClick={() => set("personal_guaranty", !data.personal_guaranty)}
@@ -642,13 +642,13 @@ export default function OnboardingPage() {
                     <div className="text-[13px] font-semibold text-[var(--text-primary)] dark:text-slate-200 mb-4">Your Lease Position:</div>
                     <div className="space-y-3">
                       <div>
-                        <div className="text-[11px] text-slate-500 uppercase tracking-wider">Years Remaining</div>
+                        <div className="text-[11px] text-gray-700 dark:text-slate-500 uppercase tracking-wider">Years Remaining</div>
                         <div className="text-[22px] font-bold text-[var(--text-primary)] dark:text-white">
                           {data.lease_expiration ? `${leasePreview.years.toFixed(1)} years` : "—"}
                         </div>
                       </div>
                       <div>
-                        <div className="text-[11px] text-slate-500 uppercase tracking-wider">Risk Level</div>
+                        <div className="text-[11px] text-gray-700 dark:text-slate-500 uppercase tracking-wider">Risk Level</div>
                         <div className={clsx("text-[18px] font-bold", leasePreview.risk.color)}>
                           {data.lease_expiration ? leasePreview.risk.label : "—"}
                         </div>
@@ -659,14 +659,14 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6">
-                <button onClick={() => goToStep(3)} className="text-[13px] text-slate-500 hover:text-slate-300">
+                <button onClick={() => goToStep(3)} className="text-[13px] text-gray-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-300">
                   ← Back
                 </button>
                 <div className="flex flex-col w-full sm:w-auto items-stretch sm:items-center gap-3">
                   <button
                     onClick={() => handleSubmit(false)}
                     disabled={submitting || submitStatus === "success"}
-                    className="text-[13px] text-slate-500 hover:text-slate-300 disabled:opacity-40"
+                    className="text-[13px] text-gray-700 dark:text-slate-500 hover:text-slate-900 dark:text-slate-300 disabled:opacity-40"
                   >
                     Skip for now
                   </button>

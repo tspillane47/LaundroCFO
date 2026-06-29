@@ -670,7 +670,7 @@ export default function UtilitiesPage() {
                         isSelected
                           ? "bg-blue-600/20 border-blue-500/40 text-adaptive-info"
                           : hasData
-                            ? "bg-[#243347] border-white/10 text-slate-300 hover:border-blue-500/30"
+                            ? "bg-[var(--bg-page)] dark:bg-[#243347] border-[var(--border2)] dark:border-white/10 text-[var(--text-primary)] dark:text-slate-300 hover:border-blue-500/30"
                             : "bg-transparent border-white/[0.06] text-adaptive-muted hover:text-adaptive-muted"
                       )}
                     >

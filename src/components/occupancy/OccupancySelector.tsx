@@ -38,7 +38,7 @@ export function OccupancySelector({ saving, onSelect }: Props) {
       <h2 className="text-[16px] font-semibold text-slate-100 text-center mb-1">
         How does this laundromat occupy its space?
       </h2>
-      <p className="text-slate-500 text-[13px] text-center mb-6">
+      <p className="text-gray-700 dark:text-slate-500 text-[13px] text-center mb-6">
         This determines which occupancy module we show — lease analysis or real estate ownership.
       </p>
 
@@ -60,13 +60,13 @@ export function OccupancySelector({ saving, onSelect }: Props) {
           >
             <div className="text-2xl mb-3">{opt.emoji}</div>
             <div className="text-[14px] font-semibold text-[var(--text-primary)] dark:text-slate-100 mb-1.5">{opt.title}</div>
-            <p className="text-[12px] text-slate-500 leading-relaxed">{opt.description}</p>
+            <p className="text-[12px] text-gray-700 dark:text-slate-500 leading-relaxed">{opt.description}</p>
           </button>
         ))}
       </div>
 
       {saving && (
-        <p className="text-center text-slate-500 text-[12px] mt-4">Saving selection...</p>
+        <p className="text-center text-gray-700 dark:text-slate-500 text-[12px] mt-4">Saving selection...</p>
       )}
     </div>
   );

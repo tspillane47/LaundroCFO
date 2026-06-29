@@ -26,7 +26,7 @@ export function TermsBackLink() {
     <button
       type="button"
       onClick={handleBack}
-      className="text-[13px] text-slate-500 hover:text-slate-300 mb-6 inline-block"
+      className="text-[13px] text-gray-700 dark:text-slate-500 hover:text-slate-900 dark:text-slate-300 mb-6 inline-block"
     >
       ← Back
     </button>

@@ -86,7 +86,7 @@ export default function PricingPage() {
                     <span className="text-[32px] font-extrabold tracking-tight text-slate-900">
                       ${plan.price}
                     </span>
-                    <span className="text-[14px] text-slate-400">/month</span>
+                    <span className="text-[14px] text-gray-700">/month</span>
                   </div>
                 </div>
                 <ul className="space-y-2 mb-6 flex-1">

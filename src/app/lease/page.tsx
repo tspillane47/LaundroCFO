@@ -129,8 +129,8 @@ export default function OccupancyPage() {
   if (!store) {
     return (
       <div className="card text-center py-12">
-        <div className="text-slate-300 text-[14px]">No store found.</div>
-        <p className="text-slate-500 text-[13px] mt-2">
+        <div className="text-slate-900 dark:text-slate-300 text-[14px]">No store found.</div>
+        <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-2">
           Complete onboarding to manage occupancy and real estate.
         </p>
       </div>
@@ -144,10 +144,10 @@ export default function OccupancyPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[15px] font-semibold text-slate-100">Occupancy & Real Estate</h1>
-          <p className="text-slate-500 text-[13px] mt-0.5">
+          <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-0.5">
             {store.address ?? "Store address not set"}
             {store.occupancy_type && !showSelector && (
-              <span className="text-slate-600"> · {OCCUPANCY_LABELS[store.occupancy_type]}</span>
+              <span className="text-gray-700 dark:text-slate-600"> · {OCCUPANCY_LABELS[store.occupancy_type]}</span>
             )}
           </p>
         </div>
@@ -173,8 +173,8 @@ export default function OccupancyPage() {
         <>
           {!hasLease && (
             <div className="card text-center py-16">
-              <div className="text-slate-200 text-[16px] font-semibold mb-2">No lease on file yet</div>
-              <p className="text-slate-500 text-[13px] mb-6 max-w-sm mx-auto">
+              <div className="text-slate-900 dark:text-slate-200 text-[16px] font-semibold mb-2">No lease on file yet</div>
+              <p className="text-gray-700 dark:text-slate-500 text-[13px] mb-6 max-w-sm mx-auto">
                 Add your lease terms to calculate risk score and track renewal options.
               </p>
               <button type="button" onClick={triggerLeaseEdit} className="btn-primary px-8 py-3 text-[14px]">
