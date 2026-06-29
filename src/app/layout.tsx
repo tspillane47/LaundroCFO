@@ -8,7 +8,9 @@ import { StoreProvider, useStores } from "@/lib/store-context";
 import clsx from "clsx";
 import { NavIcon, SunIcon, MoonIcon, ChevronDownIcon, MenuIcon, CloseIcon } from "@/components/ui/NavIcons";
 import { FeedbackModal } from "@/components/ui/FeedbackModal";
+import { BetaBanner } from "@/components/ui/BetaBanner";
 import { setTermsReturnPath } from "@/components/ui/TermsBackLink";
+import { BETA_MODE } from "@/lib/config";
 
 const ADMIN_EMAIL = "tuckerspillane7@gmail.com";
 
@@ -42,6 +44,7 @@ const navSections = [
     label: "ACCOUNT",
     items: [
       { href: "/alerts", label: "Alerts", icon: "alerts" },
+      { href: "/pricing", label: "Pricing", icon: "pricing" },
       { href: "/settings", label: "Settings", icon: "settings" },
     ],
   },
@@ -62,6 +65,7 @@ const pageTitles: Record<string, string> = {
   "/alerts": "Alerts",
   "/integrations": "Integrations",
   "/settings": "Settings",
+  "/pricing": "Pricing",
   "/settings/manage-stores": "Manage Stores",
   "/settings/edit-store": "Edit Store",
   "/admin/feedback": "Feedback Admin",
@@ -69,7 +73,7 @@ const pageTitles: Record<string, string> = {
 
 const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password", "/auth/callback"];
 const publicPages = ["/terms"];
-const marketingPages = ["/", "/pricing", "/about"];
+const marketingPages = ["/", "/about"];
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -267,15 +271,22 @@ function AppShell({ children }: { children: React.ReactNode }) {
           className="px-5 py-4 border-b"
           style={{ borderColor: "var(--border)" }}
         >
-          <div
-            style={{
-              fontSize: "15px",
-              fontWeight: 700,
-              color: "var(--text-primary)",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            LaundroCFO
+          <div className="flex items-center gap-2">
+            <div
+              style={{
+                fontSize: "15px",
+                fontWeight: 700,
+                color: "var(--text-primary)",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              LaundroCFO
+            </div>
+            {BETA_MODE && (
+              <span className="badge badge-blue text-[9px] px-1.5 py-0.5 font-semibold uppercase tracking-wide">
+                Beta
+              </span>
+            )}
           </div>
         </div>
 
@@ -492,6 +503,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         </header>
+
+        <BetaBanner onFeedbackClick={() => setFeedbackOpen(true)} />
 
         {/* Page content */}
         <main
