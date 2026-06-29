@@ -221,6 +221,42 @@ html, body {
   }
   .metric-row:last-child { border-bottom: none; }
 
+  /* Scenario planner range sliders */
+  .scenario-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-card2);
+    border: 1px solid var(--border);
+    outline: none;
+    cursor: pointer;
+  }
+  .scenario-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg-card);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+  }
+  .scenario-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg-card);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+  }
+  .scenario-slider:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+
   /* Tinted info cards */
   .card-info { background: var(--bg-info-tint); border-color: rgba(37,99,235,0.15); }
   .card-success { background: var(--bg-success-tint); border-color: rgba(21,128,61,0.15); }

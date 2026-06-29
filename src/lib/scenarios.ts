@@ -1,3 +1,4 @@
+import { calcDSCR } from "@/lib/calculations";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import { resolveStoreFinancials, type ResolvedStoreFinancials } from "@/lib/getStoreValuation";
 import { calcValuation, type ValuationInputs, type ValuationResult } from "@/lib/valuation";
@@ -25,6 +26,101 @@ export type StoreScenarioContext = {
   isOwnerOccupied: boolean;
   realEstateValue: number;
   resolvedFinancials?: ResolvedStoreFinancials;
+  /** Annual debt service for DSCR (TTM or loan schedule). */
+  annualDebtService?: number;
+};
+
+export type ScenarioInputParams = {
+  retool: { investment: number; equipmentAge: number };
+  revenue: { increasePct: number };
+  utility: { reductionPct: number };
+  lease: { yearsToExtend: number };
+  wdf: { wdfPct: number; pricePerLb: number };
+  rent: { increasePct: number };
+  commercial: { revenueLossPct: number };
+  delivery: { routeRevenueMonthly: number };
+};
+
+export type InteractiveScenarioResult = ScenarioResult & {
+  baselineDscr: number | null;
+  newDscr: number | null;
+};
+
+export const DEFAULT_SCENARIO_INPUTS: ScenarioInputParams = {
+  retool: { investment: 395000, equipmentAge: 1 },
+  revenue: { increasePct: 10 },
+  utility: { reductionPct: 3 },
+  lease: { yearsToExtend: 5 },
+  wdf: { wdfPct: 25, pricePerLb: 1.75 },
+  rent: { increasePct: 10 },
+  commercial: { revenueLossPct: 12 },
+  delivery: { routeRevenueMonthly: 10000 },
+};
+
+function retoolEquipmentScore(age: number): number {
+  return Math.round(99 - ((age - 1) / 4) * 14);
+}
+
+const SCENARIO_META: Record<
+  string,
+  Pick<ScenarioResult, "id" | "emoji" | "title" | "description" | "note">
+> = {
+  retool: {
+    id: "retool",
+    emoji: "🔧",
+    title: "Retool with New Equipment",
+    description: "Replace full washer/dryer fleet",
+    note: "New equipment lowers avg age and boosts valuation multiple through equipment quality adjustments.",
+  },
+  revenue: {
+    id: "revenue",
+    emoji: "📈",
+    title: "Increase Revenue 10%",
+    description: "Add WDF, extend hours, marketing",
+    note: "Revenue growth lifts annual EBITDA and store value proportionally.",
+  },
+  utility: {
+    id: "utility",
+    emoji: "⚡",
+    title: "Reduce Utility Ratio 3%",
+    description: "Solar, LED, efficient equipment",
+    note: "Cutting utility costs flows directly to EBITDA and valuation.",
+  },
+  lease: {
+    id: "lease",
+    emoji: "📋",
+    title: "Extend Lease 5 Years",
+    description: "Negotiate early extension with landlord",
+    note: "Extending lease control improves lender confidence and adds to the valuation multiple.",
+  },
+  wdf: {
+    id: "wdf",
+    emoji: "👕",
+    title: "Add WDF Service",
+    description: "Wash-dry-fold service line",
+    note: "WDF adds high-margin recurring revenue with minimal equipment cost.",
+  },
+  rent: {
+    id: "rent",
+    emoji: "⬆️",
+    title: "Rent Increase",
+    description: "Landlord raises rent at renewal",
+    note: "A rent increase compresses EBITDA and reduces store value.",
+  },
+  commercial: {
+    id: "commercial",
+    emoji: "🏢",
+    title: "Lose Commercial Account",
+    description: "Lose hotel/restaurant contract",
+    note: "Losing commercial revenue materially reduces EBITDA and value.",
+  },
+  delivery: {
+    id: "delivery",
+    emoji: "🚐",
+    title: "Add Pickup & Delivery",
+    description: "Driver + van + route optimization",
+    note: "P&D adds route revenue with incremental operating costs.",
+  },
 };
 
 function parseDate(value: string | null | undefined): Date | null {
@@ -70,6 +166,7 @@ export function buildValuationInputs(
     pickupDeliveryPct?: number;
     selfServicePct?: number;
     lastRetoolYear?: number;
+    retoolInvestment?: number;
     revenueTrend?: string;
   } = {}
 ): ValuationInputs {
@@ -104,7 +201,7 @@ export function buildValuationInputs(
     ),
     storeCondition: normalizeStoreCondition(store.store_condition as string),
     lastRetoolYear: overrides.lastRetoolYear ?? (Number(store.last_retool_year) || undefined),
-    retoolInvestment: Number(store.retool_investment) || undefined,
+    retoolInvestment: overrides.retoolInvestment ?? (Number(store.retool_investment) || undefined),
     retoolType: (store.retool_type as string) || undefined,
     revenueTrend: overrides.revenueTrend ?? ((store.revenue_trend as string) || "stable"),
     competitionLevel: (store.competition_level as string) || "normal",
@@ -350,4 +447,223 @@ export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
       note: "P&D adds $120k/yr revenue with ~$78k/yr in added operating costs.",
     }),
   ];
+}
+
+export function buildDefaultScenarioInputs(ctx: StoreScenarioContext): ScenarioInputParams {
+  const store = ctx.store;
+  const resolved = ctx.resolvedFinancials ?? resolveStoreFinancials(store);
+  const monthlyRevenue = resolved.monthlyRevenue;
+  const commercialPct = store.commercial_pct != null ? Number(store.commercial_pct) : 12;
+  const wdfPct = store.wdf_pct != null ? Number(store.wdf_pct) : 18;
+  const wdfMonthlyRevenue = monthlyRevenue + 6000;
+  const wdfAnnual = wdfMonthlyRevenue * 12;
+  const defaultWdfPct =
+    wdfAnnual > 0 ? Math.min(40, wdfPct + (72000 / wdfAnnual) * 100) : Math.min(40, wdfPct + 10);
+
+  const monthlyRent = Number(store.monthly_rent) || 0;
+  const rentIncreasePct =
+    monthlyRent > 0 ? Math.min(30, Math.round((2000 / monthlyRent) * 100)) : 10;
+
+  return {
+    ...DEFAULT_SCENARIO_INPUTS,
+    wdf: { wdfPct: Math.round(defaultWdfPct), pricePerLb: 1.75 },
+    rent: { increasePct: rentIncreasePct },
+    commercial: { revenueLossPct: Math.min(30, Math.max(1, Math.round(commercialPct))) },
+  };
+}
+
+export function computeInteractiveScenario(
+  ctx: StoreScenarioContext,
+  scenarioId: string,
+  params: ScenarioInputParams
+): InteractiveScenarioResult | null {
+  const store = ctx.store;
+  const resolved = ctx.resolvedFinancials ?? resolveStoreFinancials(store);
+  const monthlyRevenue = resolved.monthlyRevenue;
+  const monthlyExpenses = resolved.monthlyExpenses;
+  const annualEbitda = (monthlyRevenue - monthlyExpenses) * 12;
+  const commercialPct = store.commercial_pct != null ? Number(store.commercial_pct) : 12;
+  const wdfPct = store.wdf_pct != null ? Number(store.wdf_pct) : 18;
+  const pickupPct = Number(store.pickup_delivery_pct) || 0;
+  const annualDebtService = ctx.annualDebtService ?? 0;
+  const currentYear = new Date().getFullYear();
+  const baseline = runValuation(ctx);
+  const baselineValue = baseline.businessValue;
+  const baselineDscr =
+    annualDebtService > 0 ? calcDSCR(annualEbitda, annualDebtService) : null;
+
+  const baseMeta = SCENARIO_META[scenarioId];
+  if (!baseMeta) return null;
+
+  let scenarioValuation: ValuationResult;
+  let newEbitda: number;
+  let detail: Record<string, string | number> = {};
+  let newDscr: number | null = baselineDscr;
+
+  switch (scenarioId) {
+    case "retool": {
+      const { investment, equipmentAge } = params.retool;
+      scenarioValuation = runValuation(ctx, {
+        avgEquipmentAge: equipmentAge,
+        equipmentScore: retoolEquipmentScore(equipmentAge),
+        pct200G: Math.max(computeEquipmentMetrics(ctx.equipment).pct200GWashers, 55),
+        lastRetoolYear: currentYear,
+        retoolInvestment: investment,
+      });
+      newEbitda = annualEbitda;
+      detail = {
+        investment,
+        newAvgAge: equipmentAge,
+        newEquipmentScore: retoolEquipmentScore(equipmentAge),
+        multipleImpact: `${scenarioValuation.finalMultiple - baseline.finalMultiple >= 0 ? "+" : ""}${(scenarioValuation.finalMultiple - baseline.finalMultiple).toFixed(2)}x`,
+      };
+      break;
+    }
+    case "revenue": {
+      const { increasePct } = params.revenue;
+      const newMonthly = monthlyRevenue * (1 + increasePct / 100);
+      scenarioValuation = runValuation(ctx, { monthlyRevenue: newMonthly });
+      newEbitda = (newMonthly - monthlyExpenses) * 12;
+      detail = {
+        revenueIncrease: `${increasePct}%`,
+        revenueGain: Math.round(monthlyRevenue * (increasePct / 100) * 12),
+        newRevenue: Math.round(newMonthly * 12),
+      };
+      break;
+    }
+    case "utility": {
+      const { reductionPct } = params.utility;
+      const savingsMonthly = monthlyRevenue * (reductionPct / 100);
+      const newExpenses = Math.max(0, monthlyExpenses - savingsMonthly);
+      scenarioValuation = runValuation(ctx, { monthlyExpenses: newExpenses });
+      newEbitda = (monthlyRevenue - newExpenses) * 12;
+      detail = {
+        annualSavings: Math.round(savingsMonthly * 12),
+        utilityReduction: `${reductionPct}%`,
+      };
+      break;
+    }
+    case "lease": {
+      const { yearsToExtend } = params.lease;
+      scenarioValuation = runValuation(ctx, {
+        leaseYearsRemaining: ctx.leaseYearsRemaining + yearsToExtend,
+        totalLeaseControl: ctx.totalLeaseControl + yearsToExtend,
+      });
+      newEbitda = annualEbitda;
+      detail = {
+        yearsExtended: yearsToExtend,
+        newYearsRemaining: `${(ctx.leaseYearsRemaining + yearsToExtend).toFixed(1)} yrs`,
+        multipleImpact: `${scenarioValuation.finalMultiple - baseline.finalMultiple >= 0 ? "+" : ""}${(scenarioValuation.finalMultiple - baseline.finalMultiple).toFixed(2)}x`,
+      };
+      break;
+    }
+    case "wdf": {
+      const { wdfPct: targetWdfPct, pricePerLb } = params.wdf;
+      const nonWdfMonthly = monthlyRevenue * (1 - wdfPct / 100);
+      const targetTotalMonthly =
+        targetWdfPct >= 100 ? monthlyRevenue : nonWdfMonthly / (1 - targetWdfPct / 100);
+      const baseAddedMonthly = Math.max(0, targetTotalMonthly - monthlyRevenue);
+      const referencePrice = 1.75;
+      const impliedLbsPerMonth =
+        referencePrice > 0 ? baseAddedMonthly / referencePrice : 0;
+      const addedMonthly = impliedLbsPerMonth * pricePerLb;
+      const newMonthlyRevenue = monthlyRevenue + addedMonthly;
+      const effectiveWdfPct =
+        newMonthlyRevenue > 0
+          ? Math.min(100, ((monthlyRevenue * wdfPct) / 100 + addedMonthly) / newMonthlyRevenue * 100)
+          : targetWdfPct;
+      scenarioValuation = runValuation(ctx, {
+        monthlyRevenue: newMonthlyRevenue,
+        wdfPct: effectiveWdfPct,
+        selfServicePct: Math.max(0, 100 - effectiveWdfPct - commercialPct - pickupPct),
+      });
+      newEbitda = (newMonthlyRevenue - monthlyExpenses) * 12;
+      detail = {
+        newWdfPct: `${effectiveWdfPct.toFixed(1)}%`,
+        pricePerLb: `$${pricePerLb.toFixed(2)}`,
+        impliedLbsPerMonth: Math.round(impliedLbsPerMonth),
+        revenueGain: Math.round(addedMonthly * 12),
+      };
+      break;
+    }
+    case "rent": {
+      const { increasePct } = params.rent;
+      const monthlyRent = Number(store.monthly_rent) || monthlyExpenses * 0.15;
+      const rentIncrease = monthlyRent * (increasePct / 100);
+      const newExpenses = monthlyExpenses + rentIncrease;
+      scenarioValuation = runValuation(ctx, { monthlyExpenses: newExpenses });
+      newEbitda = (monthlyRevenue - newExpenses) * 12;
+      newDscr = annualDebtService > 0 ? calcDSCR(newEbitda, annualDebtService) : null;
+      detail = {
+        rentIncrease: `${increasePct}%`,
+        monthlyRentIncrease: Math.round(rentIncrease),
+        newMonthlyRent: Math.round(monthlyRent + rentIncrease),
+        ebitdaImpact: Math.round(newEbitda - annualEbitda),
+      };
+      break;
+    }
+    case "commercial": {
+      const { revenueLossPct } = params.commercial;
+      const lossMonthly = monthlyRevenue * (revenueLossPct / 100);
+      const newMonthly = Math.max(0, monthlyRevenue - lossMonthly);
+      const newCommercialPct = Math.max(0, commercialPct - revenueLossPct);
+      scenarioValuation = runValuation(ctx, {
+        monthlyRevenue: newMonthly,
+        commercialPct: newCommercialPct,
+        selfServicePct: Math.max(0, 100 - wdfPct - newCommercialPct - pickupPct),
+      });
+      newEbitda = (newMonthly - monthlyExpenses) * 12;
+      detail = {
+        revenueLoss: Math.round(lossMonthly * 12),
+        revenueLossPct: `${revenueLossPct}%`,
+        newRevenue: Math.round(newMonthly * 12),
+      };
+      break;
+    }
+    case "delivery": {
+      const { routeRevenueMonthly } = params.delivery;
+      const addedCosts = routeRevenueMonthly * 0.65;
+      const newMonthlyRevenue = monthlyRevenue + routeRevenueMonthly;
+      const newMonthlyExpenses = monthlyExpenses + addedCosts;
+      const pdAnnual = newMonthlyRevenue * 12;
+      const addedPdPct =
+        pdAnnual > 0 ? (routeRevenueMonthly * 12 / pdAnnual) * 100 : 0;
+      const newPdPct = Math.min(100, pickupPct + addedPdPct);
+      scenarioValuation = runValuation(ctx, {
+        monthlyRevenue: newMonthlyRevenue,
+        monthlyExpenses: newMonthlyExpenses,
+        pickupDeliveryPct: newPdPct,
+        selfServicePct: Math.max(0, 100 - wdfPct - commercialPct - newPdPct),
+      });
+      newEbitda = (newMonthlyRevenue - newMonthlyExpenses) * 12;
+      detail = {
+        routeRevenueMonthly,
+        addedCosts: Math.round(addedCosts * 12),
+        revenueGain: Math.round(routeRevenueMonthly * 12),
+        netEbitdaGain: Math.round(newEbitda - annualEbitda),
+      };
+      break;
+    }
+    default:
+      return null;
+  }
+
+  const result = makeScenario({
+    id: baseMeta.id,
+    emoji: baseMeta.emoji,
+    title: baseMeta.title,
+    description: baseMeta.description,
+    baselineValue,
+    scenarioValue: scenarioValuation.businessValue,
+    newEbitda,
+    newMultiple: scenarioValuation.finalMultiple,
+    detail,
+    note: baseMeta.note,
+  });
+
+  return {
+    ...result,
+    baselineDscr,
+    newDscr,
+  };
 }
