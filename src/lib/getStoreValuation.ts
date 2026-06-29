@@ -81,9 +81,9 @@ export function resolveStoreFinancials(
     const monthlyRevenue = ttm.ttmRevenue / ttm.monthsUsed;
     const monthlyExpenses = (ttm.ttmRevenue - ttm.ttmEbitda) / ttm.monthsUsed;
     return {
-      monthlyRevenue,
-      monthlyExpenses,
-      annualEbitda: ttm.ttmEbitda,
+      monthlyRevenue: Number.isFinite(monthlyRevenue) ? monthlyRevenue : 0,
+      monthlyExpenses: Number.isFinite(monthlyExpenses) ? monthlyExpenses : 0,
+      annualEbitda: Number.isFinite(ttm.ttmEbitda) ? ttm.ttmEbitda : 0,
       source: "ttm",
     };
   }

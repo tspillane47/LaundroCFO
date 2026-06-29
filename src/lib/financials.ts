@@ -166,7 +166,8 @@ export const MONTH_SHORT = [
 ];
 
 function num(value: number | null | undefined): number {
-  return value ?? 0;
+  const n = value ?? 0;
+  return Number.isFinite(n) ? n : 0;
 }
 
 export function calcMonthly(record: MonthlyFinancialRecord): CalculatedMonthly {

@@ -479,6 +479,16 @@ export default function DebtPage() {
 
   async function handleSave() {
     if (!selectedStore || !userId || saving || saveStatus === "success") return;
+
+    if (!form.lender_name.trim()) {
+      setMessage({ type: "error", text: "Enter a lender name before saving." });
+      return;
+    }
+    if (parseNum(form.current_balance) == null && parseNum(form.monthly_payment) == null) {
+      setMessage({ type: "error", text: "Enter a current balance or monthly payment." });
+      return;
+    }
+
     setSaving(true);
     setSaveStatus("idle");
     setMessage(null);

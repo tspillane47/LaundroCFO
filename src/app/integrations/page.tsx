@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
 const integrations = [
   {
     id: "qbo",
@@ -11,6 +14,7 @@ const integrations = [
     label: "QB",
     cta: "Connect QuickBooks",
     ctaStyle: "btn-primary",
+    href: "/financials",
   },
   {
     id: "plaid",
@@ -22,6 +26,7 @@ const integrations = [
     label: "PL",
     cta: "Join Waitlist",
     ctaStyle: "btn-outline",
+    disabled: true,
   },
   {
     id: "utility",
@@ -33,6 +38,7 @@ const integrations = [
     label: "UT",
     cta: "Upload Bill",
     ctaStyle: "btn-outline",
+    href: "/utilities",
   },
   {
     id: "lease",
@@ -44,10 +50,13 @@ const integrations = [
     label: "LS",
     cta: "Upload Lease",
     ctaStyle: "btn-outline",
+    href: "/lease",
   },
 ];
 
 export default function IntegrationsPage() {
+  const router = useRouter();
+
   return (
     <div className="space-y-5 max-w-3xl">
       <div>
@@ -85,9 +94,22 @@ export default function IntegrationsPage() {
                 ))}
               </div>
             </div>
-            <button className={`${i.ctaStyle} flex-shrink-0 whitespace-nowrap`}>
-              {i.cta}
-            </button>
+            {i.href ? (
+              <Link href={i.href} className={`${i.ctaStyle} flex-shrink-0 whitespace-nowrap`}>
+                {i.cta}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className={`${i.ctaStyle} flex-shrink-0 whitespace-nowrap disabled:opacity-50`}
+                disabled={i.disabled}
+                onClick={() => {
+                  if (!i.disabled) router.push("/transactions");
+                }}
+              >
+                {i.cta}
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -95,9 +117,8 @@ export default function IntegrationsPage() {
       {/* Manual entry note */}
       <div className="card">
         <div className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
-          <span className="text-[var(--text-primary)] dark:text-slate-200 font-semibold">Currently running on mock data.</span>{" "}
-          All metrics are calculated from the seed data in <code className="text-blue-300 text-[12px] bg-blue-500/10 px-1.5 py-0.5 rounded">src/lib/data.ts</code>.
-          Connect QuickBooks or upload files above to sync live store data.
+          <span className="text-[var(--text-primary)] dark:text-slate-200 font-semibold">Manual entry available today.</span>{" "}
+          Enter monthly financials, utilities, and lease data directly in the app, or connect QuickBooks from the Financials page when ready.
         </div>
       </div>
     </div>

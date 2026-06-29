@@ -22,12 +22,12 @@ export function formatDate(value: string | null): string {
 }
 
 export function formatCurrency(value: number | null): string {
-  if (value == null) return "—";
+  if (value == null || !Number.isFinite(value)) return "—";
   return "$" + value.toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
 
 export function formatPct(value: number | null): string {
-  if (value == null) return "—";
+  if (value == null || !Number.isFinite(value)) return "—";
   return value.toFixed(1) + "%";
 }
 

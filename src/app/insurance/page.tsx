@@ -726,6 +726,7 @@ export default function InsurancePage() {
       console.error("Unexpected insurance policy save error:", err);
       setSaveStatus("error");
       setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+    } finally {
       setSaving(false);
     }
   }

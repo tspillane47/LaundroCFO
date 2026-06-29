@@ -441,15 +441,15 @@ export function RealEstateModule({ store }: Props) {
           <p className="text-slate-500 text-[13px] mt-0.5">Owner-occupied or related-party real estate</p>
         </div>
         {mode === "view" ? (
-          <button onClick={enterEditMode} className="btn-primary">
+          <button type="button" onClick={enterEditMode} className="btn-primary">
             {record ? "Edit Profile" : "Add Profile"}
           </button>
         ) : (
           <div className="flex gap-2">
-            <button onClick={cancelEdit} className="btn-outline" disabled={saving}>
+            <button type="button" onClick={cancelEdit} className="btn-outline" disabled={saving}>
               Cancel
             </button>
-            <button onClick={handleSave} className="btn-primary" disabled={saving}>
+            <button type="button" onClick={handleSave} className="btn-primary" disabled={saving}>
               {saving ? "Saving..." : "Save Changes"}
             </button>
           </div>
@@ -473,7 +473,7 @@ export function RealEstateModule({ store }: Props) {
           <p className="text-slate-500 text-[13px] mt-2 mb-4">
             Add building ownership and mortgage details to track equity and debt position.
           </p>
-          <button onClick={enterEditMode} className="btn-primary">
+          <button type="button" onClick={enterEditMode} className="btn-primary">
             Add Profile
           </button>
         </div>

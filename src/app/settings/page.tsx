@@ -39,6 +39,21 @@ const TREND_OPTIONS = ["growing", "stable", "declining"];
 const COMPETITION_OPTIONS = ["protected", "normal", "heavy"];
 const STORE_TYPES = ["Coin", "Card", "Hybrid"];
 const PREFERENCES_KEY = "laundrocfo_preferences";
+const VALUATION_SETTINGS_KEY = "laundrocfo_valuation_settings";
+
+type ValuationSettings = {
+  baseMultiple: string;
+  minDscr: string;
+  utilityThreshold: string;
+  occupancyThreshold: string;
+};
+
+const DEFAULT_VALUATION_SETTINGS: ValuationSettings = {
+  baseMultiple: "4.5",
+  minDscr: "1.25",
+  utilityThreshold: "20",
+  occupancyThreshold: "20",
+};
 
 type NotificationPrefs = {
   emailAlerts: boolean;
@@ -83,12 +98,8 @@ export default function SettingsPage() {
     smsAlerts: false,
   });
 
-  const [valuationSettings, setValuationSettings] = useState({
-    baseMultiple: "4.5",
-    minDscr: "1.25",
-    utilityThreshold: "20",
-    occupancyThreshold: "20",
-  });
+  const [valuationSettings, setValuationSettings] = useState<ValuationSettings>(DEFAULT_VALUATION_SETTINGS);
+  const [savedValuationSettings, setSavedValuationSettings] = useState<ValuationSettings>(DEFAULT_VALUATION_SETTINGS);
 
   const [form, setForm] = useState<StoreForm>({
     name: "",
@@ -135,6 +146,18 @@ export default function SettingsPage() {
         }
       } catch {
         /* ignore invalid preferences */
+      }
+
+      try {
+        const savedValuation = localStorage.getItem(VALUATION_SETTINGS_KEY);
+        if (savedValuation) {
+          const parsed = JSON.parse(savedValuation) as Partial<ValuationSettings>;
+          const merged = { ...DEFAULT_VALUATION_SETTINGS, ...parsed };
+          setValuationSettings(merged);
+          setSavedValuationSettings(merged);
+        }
+      } catch {
+        /* ignore invalid valuation settings */
       }
 
       if (selectedStore) {
@@ -244,6 +267,19 @@ export default function SettingsPage() {
     setEditingNotifications(false);
     setSuccess("Notification preferences saved.");
     setTimeout(() => setSuccess(""), 3000);
+  }
+
+  function handleSaveValuation() {
+    localStorage.setItem(VALUATION_SETTINGS_KEY, JSON.stringify(valuationSettings));
+    setSavedValuationSettings(valuationSettings);
+    setEditingValuation(false);
+    setSuccess("Valuation settings saved.");
+    setTimeout(() => setSuccess(""), 3000);
+  }
+
+  function handleCancelValuation() {
+    setValuationSettings(savedValuationSettings);
+    setEditingValuation(false);
   }
 
   async function handleSignOut() {
@@ -356,10 +392,10 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <button onClick={handleSaveStore} disabled={saving} className="btn-primary flex-1">
+                  <button type="button" onClick={handleSaveStore} disabled={saving} className="btn-primary flex-1">
                     {saving ? "Saving..." : "Save Changes"}
                   </button>
-                  <button onClick={() => setEditingStore(false)} className="btn-outline flex-1">Cancel</button>
+                  <button type="button" onClick={() => setEditingStore(false)} className="btn-outline flex-1">Cancel</button>
                 </div>
               </div>
             ) : (
@@ -388,7 +424,7 @@ export default function SettingsPage() {
                     </div>
                   ))}
                 </div>
-                <button onClick={() => setEditingStore(true)} className="btn-outline w-full mt-4">
+                <button type="button" onClick={() => setEditingStore(true)} className="btn-outline w-full mt-4">
                   Edit Store Profile
                 </button>
                 <Link
@@ -444,10 +480,10 @@ export default function SettingsPage() {
                   Connect QuickBooks or Plaid to sync automatically (coming soon)
                 </p>
                 <div className="flex gap-2 pt-2">
-                  <button onClick={handleSaveCash} disabled={savingCash} className="btn-primary flex-1">
+                  <button type="button" onClick={handleSaveCash} disabled={savingCash} className="btn-primary flex-1">
                     {savingCash ? "Saving..." : "Save Cash Balances"}
                   </button>
-                  <button onClick={() => setEditingCash(false)} className="btn-outline flex-1">
+                  <button type="button" onClick={() => setEditingCash(false)} className="btn-outline flex-1">
                     Cancel
                   </button>
                 </div>
@@ -492,7 +528,7 @@ export default function SettingsPage() {
                 <p className="text-[11px] mt-3" style={{ color: "var(--text-muted)" }}>
                   Connect QuickBooks or Plaid to sync automatically (coming soon)
                 </p>
-                <button onClick={() => setEditingCash(true)} className="btn-outline w-full mt-4">
+                <button type="button" onClick={() => setEditingCash(true)} className="btn-outline w-full mt-4">
                   Update Cash Balances
                 </button>
               </>
@@ -521,7 +557,7 @@ export default function SettingsPage() {
                   </label>
                 ))}
                 <div className="flex gap-2 pt-2">
-                  <button onClick={handleSaveNotifications} className="btn-primary flex-1">Save</button>
+                  <button type="button" onClick={handleSaveNotifications} className="btn-primary flex-1">Save</button>
                   <button
                     onClick={() => {
                       try {
@@ -555,7 +591,7 @@ export default function SettingsPage() {
                     </div>
                   ))}
                 </div>
-                <button onClick={() => setEditingNotifications(true)} className="btn-outline w-full mt-4">
+                <button type="button" onClick={() => setEditingNotifications(true)} className="btn-outline w-full mt-4">
                   Manage Notifications
                 </button>
               </>
@@ -585,8 +621,8 @@ export default function SettingsPage() {
                   </div>
                 ))}
                 <div className="flex gap-2 pt-2">
-                  <button onClick={() => setEditingValuation(false)} className="btn-primary flex-1">Save</button>
-                  <button onClick={() => setEditingValuation(false)} className="btn-outline flex-1">Cancel</button>
+                  <button type="button" onClick={handleSaveValuation} className="btn-primary flex-1">Save</button>
+                  <button type="button" onClick={handleCancelValuation} className="btn-outline flex-1">Cancel</button>
                 </div>
               </div>
             ) : (
@@ -607,7 +643,7 @@ export default function SettingsPage() {
                     </div>
                   ))}
                 </div>
-                <button onClick={() => setEditingValuation(true)} className="btn-outline w-full mt-4">
+                <button type="button" onClick={() => setEditingValuation(true)} className="btn-outline w-full mt-4">
                   Edit Valuation Settings
                 </button>
               </>
@@ -632,12 +668,13 @@ export default function SettingsPage() {
             </div>
             <div className="flex gap-2 mt-4">
               <button
+                type="button"
                 onClick={() => setEditingStore(true)}
                 className="btn-outline flex-1"
               >
-                Edit Profile
+                Edit Store Profile
               </button>
-              <button onClick={handleSignOut} className="btn-outline flex-1 text-red-400 border-red-500/20">
+              <button type="button" onClick={handleSignOut} className="btn-outline flex-1 text-red-400 border-red-500/20">
                 Sign Out
               </button>
             </div>

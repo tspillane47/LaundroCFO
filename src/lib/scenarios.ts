@@ -129,7 +129,10 @@ function makeScenario(
   }
 ): ScenarioResult {
   const valueImpact = base.scenarioValue - base.baselineValue;
-  const pctChange = base.baselineValue > 0 ? (valueImpact / base.baselineValue) * 100 : 0;
+  const pctChange =
+    base.baselineValue > 0 && Number.isFinite(valueImpact)
+      ? (valueImpact / base.baselineValue) * 100
+      : 0;
   return {
     id: base.id,
     emoji: base.emoji,

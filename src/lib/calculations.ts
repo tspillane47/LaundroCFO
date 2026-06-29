@@ -1,51 +1,63 @@
 // src/lib/calculations.ts
 
+function safeDivide(numerator: number, denominator: number, fallback = 0): number {
+  if (!denominator || !Number.isFinite(denominator) || !Number.isFinite(numerator)) return fallback;
+  const result = numerator / denominator;
+  return Number.isFinite(result) ? result : fallback;
+}
+
 export function calcDSCR(cashFlow: number, annualDebtService: number) {
-  return cashFlow / annualDebtService;
+  return safeDivide(cashFlow, annualDebtService, 0);
 }
 
 export function calcGlobalDSCR(globalCashFlow: number, globalDebtService: number) {
-  return globalCashFlow / globalDebtService;
+  return safeDivide(globalCashFlow, globalDebtService, 0);
 }
 
 export function calcEbitdaMargin(ebitda: number, revenue: number) {
   if (!revenue || revenue <= 0) return 0;
-  return (ebitda / revenue) * 100;
+  return safeDivide(ebitda, revenue, 0) * 100;
 }
 
 export function calcRentToRevenue(annualRent: number, revenue: number) {
-  return (annualRent / revenue) * 100;
+  if (!revenue || revenue <= 0) return 0;
+  return safeDivide(annualRent, revenue, 0) * 100;
 }
 
 export function calcOccupancyCostRatio(occupancyCost: number, revenue: number) {
-  return (occupancyCost / revenue) * 100;
+  if (!revenue || revenue <= 0) return 0;
+  return safeDivide(occupancyCost, revenue, 0) * 100;
 }
 
 export function calcUtilityRatio(utilities: number, revenue: number) {
-  return (utilities / revenue) * 100;
+  if (!revenue || revenue <= 0) return 0;
+  return safeDivide(utilities, revenue, 0) * 100;
 }
 
 export function calcRevenuePerSF(revenue: number, sqft: number) {
-  return revenue / sqft;
+  return safeDivide(revenue, sqft, 0);
 }
 
 export function calcEbitdaPerSF(ebitda: number, sqft: number) {
-  return ebitda / sqft;
+  return safeDivide(ebitda, sqft, 0);
 }
 
 export function calcRevenuePerMachine(revenue: number, machines: number) {
-  return revenue / machines;
+  return safeDivide(revenue, machines, 0);
 }
 
 export function calcDebtYield(noi: number, totalDebt: number) {
-  return (noi / totalDebt) * 100;
+  if (!totalDebt || totalDebt <= 0) return 0;
+  return safeDivide(noi, totalDebt, 0) * 100;
 }
 
 export function calcCapRate(noi: number, estimatedValue: number) {
-  return (noi / estimatedValue) * 100;
+  if (!estimatedValue || estimatedValue <= 0) return 0;
+  return safeDivide(noi, estimatedValue, 0) * 100;
 }
 
 export function calcValuation(ebitda: number, multiple: number) {
+  if (!Number.isFinite(ebitda) || !Number.isFinite(multiple)) return 0;
   return ebitda * multiple;
 }
 
@@ -152,7 +164,10 @@ export function calcValuationMultiple(params: {
   return Math.max(1.5, multiple);
 }
 
+const NA_DISPLAY = "—";
+
 export function fmt(n: number, decimals = 0) {
+  if (!Number.isFinite(n)) return NA_DISPLAY;
   return n.toLocaleString("en-US", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
@@ -160,14 +175,17 @@ export function fmt(n: number, decimals = 0) {
 }
 
 export function fmtDollar(n: number) {
+  if (!Number.isFinite(n)) return NA_DISPLAY;
   return "$" + fmt(Math.round(n));
 }
 
 export function fmtPct(n: number, decimals = 1) {
+  if (!Number.isFinite(n)) return NA_DISPLAY;
   return n.toFixed(decimals) + "%";
 }
 
 export function fmtMultiple(n: number) {
+  if (!Number.isFinite(n)) return NA_DISPLAY;
   return n.toFixed(2) + "x";
 }
 

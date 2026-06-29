@@ -153,12 +153,12 @@ export default function OccupancyPage() {
         </div>
         <div className="flex gap-2">
           {isLeased && (
-            <button onClick={triggerLeaseEdit} className="btn-primary">
+            <button type="button" onClick={triggerLeaseEdit} className="btn-primary">
               {hasLease ? "Edit Lease" : "Set Up Your Lease →"}
             </button>
           )}
           {store.occupancy_type && !showSelector && (
-            <button onClick={handleChangeOccupancyType} className="btn-outline">
+            <button type="button" onClick={handleChangeOccupancyType} className="btn-outline">
               Change Occupancy Type
             </button>
           )}
@@ -177,7 +177,7 @@ export default function OccupancyPage() {
               <p className="text-slate-500 text-[13px] mb-6 max-w-sm mx-auto">
                 Add your lease terms to calculate risk score and track renewal options.
               </p>
-              <button onClick={triggerLeaseEdit} className="btn-primary px-8 py-3 text-[14px]">
+              <button type="button" onClick={triggerLeaseEdit} className="btn-primary px-8 py-3 text-[14px]">
                 Set Up Your Lease →
               </button>
             </div>

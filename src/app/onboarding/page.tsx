@@ -285,6 +285,8 @@ export default function OnboardingPage() {
           if (optionCount > 0 && leaseRow?.id) {
             const options = Array.from({ length: optionCount }, (_, i) => ({
               lease_id: leaseRow.id,
+              store_id: newStore.id,
+              user_id: user.id,
               option_number: i + 1,
               option_years: 5,
               status: "Available",

@@ -334,8 +334,9 @@ export function calcValuation(inputs: ValuationInputs): ValuationResult {
 
   const totalAdj = adjustments.reduce((s, a) => s + a.value, 0);
   const finalMultiple = Math.min(MAX_MULTIPLE, Math.max(MIN_MULTIPLE, base + totalAdj));
-  const businessValue = inputs.ebitda * finalMultiple;
-  const realEstateValue = inputs.realEstateValue ?? 0;
+  const safeEbitda = Number.isFinite(inputs.ebitda) ? inputs.ebitda : 0;
+  const businessValue = safeEbitda * finalMultiple;
+  const realEstateValue = Number.isFinite(inputs.realEstateValue ?? 0) ? (inputs.realEstateValue ?? 0) : 0;
 
   const valueDrivers: string[] = [];
   const valueRisks: string[] = [];

@@ -14,13 +14,16 @@ interface AnimatedNumberProps {
 export function AnimatedNumber({
   value, duration = 1200, prefix = '', suffix = '', decimals = 0, className, style
 }: AnimatedNumberProps) {
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const showPlaceholder = !Number.isFinite(value);
   const [displayValue, setDisplayValue] = useState(0);
   const prevValue = useRef(0);
   const rafRef = useRef<number>();
 
   useEffect(() => {
+    if (showPlaceholder) return;
     const startValue = prevValue.current;
-    const endValue = value;
+    const endValue = safeValue;
     const startTime = performance.now();
 
     function animate(now: number) {
@@ -40,7 +43,15 @@ export function AnimatedNumber({
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [value, duration]);
+  }, [safeValue, duration, showPlaceholder]);
+
+  if (showPlaceholder) {
+    return (
+      <span className={className} style={style}>
+        —
+      </span>
+    );
+  }
 
   const formatted = decimals > 0
     ? displayValue.toFixed(decimals)

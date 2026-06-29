@@ -196,16 +196,20 @@ export function computeTurnsPerDay(
     return sum + item.quantity * item.avg_vend_price;
   }, 0);
 
-  const annualVendCapacityAtOneTurn = totalWeightedVendCapacity * 365;
-  const overallTurnsPerDay =
-    !missingVendPrices &&
-    washerGroups.length > 0 &&
-    annualVendCapacityAtOneTurn > 0 &&
-    washerRevenue > 0
-      ? washerRevenue / annualVendCapacityAtOneTurn
-      : missingVendPrices || washerGroups.length === 0
-        ? null
-        : 0;
+  const daysInPeriod = 365;
+  const annualVendCapacityAtOneTurn = totalWeightedVendCapacity * daysInPeriod;
+
+  let overallTurnsPerDay: number | null = null;
+  if (missingVendPrices || washerGroups.length === 0) {
+    overallTurnsPerDay = null;
+  } else if (annualVendCapacityAtOneTurn > 0 && washerRevenue > 0) {
+    // turns/machine/day = annual washer revenue / (365 × Σ qty × vend price)
+    // equivalent to (monthly revenue / vend price) / (30 × machines) when prices are uniform
+    const rawTurns = washerRevenue / annualVendCapacityAtOneTurn;
+    overallTurnsPerDay = Number.isFinite(rawTurns) ? rawTurns : null;
+  } else {
+    overallTurnsPerDay = 0;
+  }
 
   const sizeMap = new Map<string, { quantity: number; weightedPriceSum: number }>();
   for (const item of washerGroups) {
@@ -226,8 +230,9 @@ export function computeTurnsPerDay(
       const avgVendPrice = group.weightedPriceSum / group.quantity;
       const groupShare = (group.quantity * avgVendPrice) / totalWeightedVendCapacity;
       const groupAnnualCapacity = group.quantity * avgVendPrice * 365;
-      const turnsPerDay =
+      const turnsPerDayRaw =
         groupAnnualCapacity > 0 ? (washerRevenue * groupShare) / groupAnnualCapacity : 0;
+      const turnsPerDay = Number.isFinite(turnsPerDayRaw) ? turnsPerDayRaw : 0;
       bySize.push({
         size,
         quantity: group.quantity,

@@ -518,15 +518,15 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             <p className="text-slate-500 text-[13px] mt-0.5">Third-party leased location</p>
           </div>
           {mode === "view" ? (
-            <button onClick={enterEditMode} className="btn-primary">
+            <button type="button" onClick={enterEditMode} className="btn-primary">
               {lease ? "Edit Lease" : "Add Lease"}
             </button>
           ) : (
             <div className="flex gap-2">
-              <button onClick={cancelEdit} className="btn-outline" disabled={saving}>
+              <button type="button" onClick={cancelEdit} className="btn-outline" disabled={saving}>
                 Cancel
               </button>
-              <button onClick={handleSave} className="btn-primary" disabled={saving || saveStatus === "success"}>
+              <button type="button" onClick={handleSave} className="btn-primary" disabled={saving || saveStatus === "success"}>
                 {saveStatus === "success" ? "Saved ✓" : saving ? "Saving..." : "Save Changes"}
               </button>
             </div>
@@ -535,10 +535,10 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       )}
       {hideHeader && mode === "edit" && (
         <div className="flex justify-end gap-2">
-          <button onClick={cancelEdit} className="btn-outline" disabled={saving}>
+          <button type="button" onClick={cancelEdit} className="btn-outline" disabled={saving}>
             Cancel
           </button>
-          <button onClick={handleSave} className="btn-primary" disabled={saving || saveStatus === "success"}>
+          <button type="button" onClick={handleSave} className="btn-primary" disabled={saving || saveStatus === "success"}>
             {saveStatus === "success" ? "Saved ✓" : saving ? "Saving..." : "Save Changes"}
           </button>
         </div>
@@ -567,7 +567,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
           <p className="text-slate-500 text-[13px] mt-2 mb-4">
             Add your lease terms to calculate risk score and track renewal options.
           </p>
-          <button onClick={enterEditMode} className="btn-primary">
+          <button type="button" onClick={enterEditMode} className="btn-primary">
             Add Lease
           </button>
         </div>
