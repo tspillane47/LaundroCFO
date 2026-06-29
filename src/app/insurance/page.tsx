@@ -1262,23 +1262,23 @@ export default function InsurancePage() {
 
                   <div className="space-y-1 text-[12px] border-t border-white/[0.04] pt-3">
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-slate-500">Effective</span>
-                      <span className="text-slate-900 dark:text-slate-200">{formatDate(policy.effective_date)}</span>
+                      <span className="text-gray-700 dark:text-gray-300">Effective</span>
+                      <span className="text-gray-900 dark:text-white">{formatDate(policy.effective_date)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-slate-500">Expiration</span>
-                      <span className="text-slate-900 dark:text-slate-200">{formatDate(policy.expiration_date)}</span>
+                      <span className="text-gray-700 dark:text-gray-300">Expiration</span>
+                      <span className="text-gray-900 dark:text-white">{formatDate(policy.expiration_date)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-slate-500">Annual Premium</span>
-                      <span className="text-slate-100 font-semibold">
+                      <span className="text-gray-700 dark:text-gray-300">Annual Premium</span>
+                      <span className="text-gray-900 dark:text-white font-semibold">
                         {formatCurrency(policy.annual_premium)}
                       </span>
                     </div>
                     {(policy.building_coverage || policy.contents_coverage || policy.equipment_coverage) && (
                       <div className="flex justify-between">
-                        <span className="text-gray-700 dark:text-slate-500">Property Coverage</span>
-                        <span className="text-slate-900 dark:text-slate-200">
+                        <span className="text-gray-700 dark:text-gray-300">Property Coverage</span>
+                        <span className="text-gray-900 dark:text-white">
                           {formatCurrency(
                             (policy.building_coverage ?? 0) +
                               (policy.contents_coverage ?? 0) +
@@ -1289,8 +1289,8 @@ export default function InsurancePage() {
                     )}
                     {policy.liability_per_occurrence != null && (
                       <div className="flex justify-between">
-                        <span className="text-gray-700 dark:text-slate-500">Liability / Occurrence</span>
-                        <span className="text-slate-900 dark:text-slate-200">
+                        <span className="text-gray-700 dark:text-gray-300">Liability / Occurrence</span>
+                        <span className="text-gray-900 dark:text-white">
                           {formatCurrency(policy.liability_per_occurrence)}
                         </span>
                       </div>
@@ -1456,7 +1456,7 @@ export default function InsurancePage() {
                         className="card2 flex items-center justify-between gap-4"
                       >
                         <div className="min-w-0">
-                          <div className="text-[13px] text-slate-900 dark:text-slate-200">
+                          <div className="text-[13px] text-gray-900 dark:text-white">
                             {formatDate(claim.claim_date)} · {claim.claim_type}
                           </div>
                           <div className="text-[12px] text-gray-700 dark:text-slate-500 truncate">
@@ -1464,7 +1464,7 @@ export default function InsurancePage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
-                          <span className="text-[13px] font-semibold text-slate-100">
+                          <span className="text-[13px] font-semibold text-gray-900 dark:text-white">
                             {formatCurrency(claim.amount)}
                           </span>
                           <span className={clsx("badge", claimStatusBadge(claim.status))}>

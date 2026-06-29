@@ -869,10 +869,9 @@ export default function DebtPage() {
                   <th
                     key={col}
                     className={clsx(
-                      "py-2.5 pr-4 font-medium",
+                      "py-2.5 pr-4 font-medium text-gray-700 dark:text-gray-300",
                       col === "" ? "text-left" : "text-right"
                     )}
-                    style={{ color: "var(--text-muted)" }}
                   >
                     {col}
                   </th>
@@ -881,13 +880,13 @@ export default function DebtPage() {
             </thead>
             <tbody>
               <tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                <td className="py-3 pr-4 font-medium" style={{ color: "var(--text-primary)" }}>
+                <td className="py-3 pr-4 font-medium text-gray-700 dark:text-gray-300">
                   Monthly Debt Service
                 </td>
-                <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "var(--text-primary)" }}>
+                <td className="py-3 pr-4 text-right tabular-nums text-gray-900 dark:text-white">
                   {fmtDollar(debtServiceAnalysis.scheduledMonthly)}
                 </td>
-                <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>
+                <td className="py-3 pr-4 text-right tabular-nums text-gray-900 dark:text-white">
                   {debtServiceAnalysis.hasActualData
                     ? fmtDollar(debtServiceAnalysis.actualMonthlyAvg ?? 0)
                     : "N/A"}
@@ -900,7 +899,7 @@ export default function DebtPage() {
                           debtServiceAnalysis.monthlyVariance,
                           debtServiceAnalysis.scheduledMonthly
                         )
-                      : "text-gray-700 dark:text-slate-400"
+                      : "text-gray-900 dark:text-white"
                   )}
                 >
                   {debtServiceAnalysis.monthlyVariance != null
@@ -909,13 +908,13 @@ export default function DebtPage() {
                 </td>
               </tr>
               <tr>
-                <td className="py-3 pr-4 font-medium" style={{ color: "var(--text-primary)" }}>
+                <td className="py-3 pr-4 font-medium text-gray-700 dark:text-gray-300">
                   Annual Debt Service
                 </td>
-                <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "var(--text-primary)" }}>
+                <td className="py-3 pr-4 text-right tabular-nums text-gray-900 dark:text-white">
                   {fmtDollar(debtServiceAnalysis.scheduledAnnual)}
                 </td>
-                <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>
+                <td className="py-3 pr-4 text-right tabular-nums text-gray-900 dark:text-white">
                   {debtServiceAnalysis.hasActualData
                     ? fmtDollar(debtServiceAnalysis.actualAnnualTotal ?? 0)
                     : "N/A"}
@@ -928,7 +927,7 @@ export default function DebtPage() {
                           debtServiceAnalysis.annualVariance,
                           debtServiceAnalysis.scheduledAnnual
                         )
-                      : "text-gray-700 dark:text-slate-400"
+                      : "text-gray-900 dark:text-white"
                   )}
                 >
                   {debtServiceAnalysis.annualVariance != null
@@ -1249,8 +1248,7 @@ export default function DebtPage() {
                 {["Lender", "Type", "Balance", "Rate", "Payment", "% Paid Off"].map((col) => (
                   <th
                     key={col}
-                    className="text-left py-2.5 pr-4 font-medium"
-                    style={{ color: "var(--text-muted)" }}
+                    className="text-left py-2.5 pr-4 font-medium text-gray-700 dark:text-gray-300"
                   >
                     {col}
                   </th>
@@ -1260,38 +1258,38 @@ export default function DebtPage() {
             <tbody>
               {enrichedLoans.map((loan) => (
                 <tr key={loan.id} className="border-b last:border-b-0" style={{ borderColor: "var(--border)" }}>
-                  <td className="py-2.5 pr-4 font-medium" style={{ color: "var(--text-primary)" }}>
+                  <td className="py-2.5 pr-4 font-medium text-gray-900 dark:text-white">
                     {loan.lender_name ?? "—"}
                   </td>
-                  <td className="py-2.5 pr-4" style={{ color: "var(--text-secondary)" }}>
+                  <td className="py-2.5 pr-4 text-gray-700 dark:text-gray-300">
                     {loan.loan_type ?? "—"}
                   </td>
-                  <td className="py-2.5 pr-4 tabular-nums" style={{ color: "var(--text-primary)" }}>
+                  <td className="py-2.5 pr-4 tabular-nums text-gray-900 dark:text-white">
                     {fmtDollar(loan.estimatedCurrentBalance)}
                   </td>
-                  <td className="py-2.5 pr-4 tabular-nums" style={{ color: "var(--text-secondary)" }}>
+                  <td className="py-2.5 pr-4 tabular-nums text-gray-900 dark:text-white">
                     {(loan.interest_rate ?? 0).toFixed(2)}%
                   </td>
-                  <td className="py-2.5 pr-4 tabular-nums" style={{ color: "var(--text-secondary)" }}>
+                  <td className="py-2.5 pr-4 tabular-nums text-gray-900 dark:text-white">
                     {fmtDollar(loan.monthly_payment ?? 0)}
                   </td>
-                  <td className="py-2.5 pr-4 tabular-nums" style={{ color: "var(--text-success)" }}>
+                  <td className="py-2.5 pr-4 tabular-nums text-green-600 dark:text-green-400">
                     {loan.pctPaidOff.toFixed(0)}%
                   </td>
                 </tr>
               ))}
               <tr className="font-semibold border-t-2" style={{ borderColor: "var(--border)" }}>
-                <td className="py-3 pr-4" style={{ color: "var(--text-primary)" }}>
+                <td className="py-3 pr-4 text-gray-900 dark:text-white">
                   Totals
                 </td>
                 <td className="py-3 pr-4" />
-                <td className="py-3 pr-4 tabular-nums" style={{ color: "var(--text-primary)" }}>
+                <td className="py-3 pr-4 tabular-nums text-gray-900 dark:text-white">
                   {fmtDollar(totals.totalDebt)}
                 </td>
-                <td className="py-3 pr-4 tabular-nums" style={{ color: "var(--text-secondary)" }}>
+                <td className="py-3 pr-4 tabular-nums text-gray-900 dark:text-white">
                   {totals.weightedAvgRate.toFixed(2)}%
                 </td>
-                <td className="py-3 pr-4 tabular-nums" style={{ color: "var(--text-secondary)" }}>
+                <td className="py-3 pr-4 tabular-nums text-gray-900 dark:text-white">
                   {fmtDollar(totals.totalMonthlyPayment)}
                 </td>
                 <td className="py-3 pr-4" />

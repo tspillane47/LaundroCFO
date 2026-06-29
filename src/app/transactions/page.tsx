@@ -1568,10 +1568,10 @@ export default function TransactionsPage() {
     const sample = rawDescription || "(no description)";
     return (
       <div className="min-w-0">
-        <div className="review-vendor-name truncate" title={vendorPattern}>
+        <div className="review-vendor-name truncate text-gray-900 dark:text-white" title={vendorPattern}>
           {vendorPattern}
         </div>
-        <div className="review-vendor-desc text-[10px] truncate mt-0.5" title={sample}>
+        <div className="review-vendor-desc text-[10px] text-gray-700 dark:text-gray-300 truncate mt-0.5" title={sample}>
           {prefixSample && sample !== "(no description)" ? `e.g. ${sample}` : sample}
         </div>
       </div>
@@ -1594,10 +1594,10 @@ export default function TransactionsPage() {
         </td>
         <td className="py-2 pr-3 pl-6">
           <div className="min-w-0">
-            <div className="text-adaptive-muted whitespace-nowrap text-[11px]">
+            <div className="text-gray-700 dark:text-gray-300 whitespace-nowrap text-[11px]">
               {new Date(item.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
             </div>
-            <div className="text-[11px] text-adaptive-secondary truncate mt-0.5" title={item.description ?? undefined}>
+            <div className="text-[11px] text-gray-900 dark:text-white truncate mt-0.5" title={item.description ?? undefined}>
               {item.description ?? "—"}
             </div>
           </div>
@@ -1606,7 +1606,7 @@ export default function TransactionsPage() {
           <TypeBadge type={item.type} />
         </td>
         <td className="py-2 pr-3" />
-        <td className="py-2 pr-3 text-right font-semibold tabular-nums text-[11px]">{fmtDollar(item.amount)}</td>
+        <td className="py-2 pr-3 text-right font-semibold tabular-nums text-[11px] text-gray-900 dark:text-white">{fmtDollar(item.amount)}</td>
         <td className="py-2 pr-3">
           <select
             value={item.category}
@@ -2037,7 +2037,7 @@ export default function TransactionsPage() {
           <div className="table-scroll">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="text-left review-table-header">
+                <tr className="text-left text-gray-700 dark:text-gray-300 review-table-header">
                   <th className="pb-3 pr-2 font-medium w-8">
                     <input
                       type="checkbox"
@@ -2078,7 +2078,7 @@ export default function TransactionsPage() {
                             <button
                               type="button"
                               onClick={() => toggleGroupExpanded(group.groupKey)}
-                              className="text-adaptive-muted hover:text-adaptive-secondary w-5 shrink-0 mt-0.5 text-[13px] leading-none"
+                              className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white w-5 shrink-0 mt-0.5 text-[13px] leading-none"
                               aria-label={isExpanded ? "Collapse group" : "Expand group"}
                             >
                               {isExpanded ? "▾" : "▸"}
@@ -2096,8 +2096,8 @@ export default function TransactionsPage() {
                       <td className="py-3 pr-3">
                         <TypeBadge type={group.type} />
                       </td>
-                      <td className="py-3 pr-3 text-adaptive-muted">{group.count}</td>
-                      <td className="py-3 pr-3 text-right font-semibold tabular-nums">{fmtDollar(group.totalAmount)}</td>
+                      <td className="py-3 pr-3 text-gray-700 dark:text-gray-300">{group.count}</td>
+                      <td className="py-3 pr-3 text-right font-semibold tabular-nums text-gray-900 dark:text-white">{fmtDollar(group.totalAmount)}</td>
                       <td className="py-3 pr-3">
                         <select
                           value={group.category}
@@ -2113,7 +2113,7 @@ export default function TransactionsPage() {
                           ))}
                         </select>
                       </td>
-                      <td className="py-3 pr-3 text-adaptive-muted text-[11px]">—</td>
+                      <td className="py-3 pr-3 text-gray-700 dark:text-gray-300 text-[11px]">—</td>
                       <td className="py-3 text-right whitespace-nowrap">
                         <button
                           type="button"
@@ -2187,7 +2187,7 @@ export default function TransactionsPage() {
           <div className="table-scroll">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="text-left review-table-header">
+                <tr className="text-left text-gray-700 dark:text-gray-300 review-table-header">
                   <th className="pb-3 pr-2 font-medium w-8">
                     <input
                       type="checkbox"
@@ -2228,10 +2228,10 @@ export default function TransactionsPage() {
                             aria-label={`Select ${row.description ?? "transaction"}`}
                           />
                         </td>
-                        <td className="py-3 pr-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                        <td className="py-3 pr-3 whitespace-nowrap text-gray-900 dark:text-white">
                           {new Date(row.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
                         </td>
-                        <td className="py-3 pr-3 text-adaptive-secondary max-w-[180px]">
+                        <td className="py-3 pr-3 text-gray-900 dark:text-white max-w-[180px]">
                           {renderVendorDescription(
                             normalizeVendorPattern(row.description) || "—",
                             row.description ?? "—"
@@ -2246,13 +2246,13 @@ export default function TransactionsPage() {
                         <td className="py-3 pr-3">
                           <TypeBadge type={row.type} />
                         </td>
-                        <td className="py-3 pr-3 text-right font-semibold tabular-nums">{fmtDollar(row.amount)}</td>
+                        <td className="py-3 pr-3 text-right font-semibold tabular-nums text-gray-900 dark:text-white">{fmtDollar(row.amount)}</td>
                         <td className="py-3 pr-3">
                           <StatusBadge status={row.status} excluded={row.excluded} />
                         </td>
                         <td className="py-3 pr-3">
                           {excluded ? (
-                            <span className="text-adaptive-muted">
+                            <span className="text-gray-700 dark:text-gray-300">
                               {row.original_category
                                 ? BANK_IMPORT_CATEGORY_LABELS[row.original_category as BankImportCategory] ??
                                   row.original_category

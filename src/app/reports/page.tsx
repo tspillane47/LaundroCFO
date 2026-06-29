@@ -92,8 +92,8 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 function PreviewRow({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
     <div className="flex justify-between py-2">
-      <span className="text-gray-700 dark:text-slate-400">{label}</span>
-      <span className={clsx("font-semibold", className ?? "text-slate-100")}>{value}</span>
+      <span className="text-gray-700 dark:text-gray-300">{label}</span>
+      <span className={clsx("font-semibold", className ?? "text-gray-900 dark:text-white")}>{value}</span>
     </div>
   );
 }
@@ -704,7 +704,7 @@ export default function ReportsPage() {
             <div className="table-scroll">
               <table className="w-full text-[12px] min-w-[900px]">
                 <thead>
-                  <tr className="text-left text-gray-700 dark:text-slate-500 border-b border-white/[0.06]">
+                  <tr className="text-left text-gray-700 dark:text-gray-300 border-b border-white/[0.06]">
                     <th className="pb-3 pr-3 font-medium">Store Name</th>
                     <th className="pb-3 pr-3 font-medium">Address</th>
                     <th className="pb-3 pr-3 font-medium text-right">Revenue</th>
@@ -721,19 +721,19 @@ export default function ReportsPage() {
                 <tbody>
                   {storeDetails.map((d) => (
                     <tr key={d.store.id} className="border-b border-white/[0.04]">
-                      <td className="py-2.5 pr-3 text-slate-900 dark:text-slate-200">{d.store.name ?? "Store"}</td>
-                      <td className="py-2.5 pr-3 text-gray-700 dark:text-slate-400">{d.store.address ?? "—"}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-200">{fmtDollar(d.annualRevenue)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-400">{fmtDollar(d.annualEbitda)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-300">
+                      <td className="py-2.5 pr-3 text-gray-900 dark:text-white">{d.store.name ?? "Store"}</td>
+                      <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-300">{d.store.address ?? "—"}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(d.annualRevenue)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-600 dark:text-green-400">{fmtDollar(d.annualEbitda)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
                         {d.annualDebtService > 0 && d.dscr != null ? fmtMultiple(d.dscr) : "N/A"}
                       </td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-200">{fmtDollar(d.valuation.businessValue)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-300">{fmtDollar(d.debt)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-300">{fmtDollar(d.cash)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-400">{fmtDollar(d.equity)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-300">{d.leaseScore}</td>
-                      <td className="py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-200">{d.equipmentGrade}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(d.valuation.businessValue)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(d.debt)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(d.cash)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-600 dark:text-green-400">{fmtDollar(d.equity)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{d.leaseScore}</td>
+                      <td className="py-2.5 text-right tabular-nums text-gray-900 dark:text-white">{d.equipmentGrade}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -757,13 +757,13 @@ export default function ReportsPage() {
                   ["Cash Flow After Debt", cashFlow.cashFlowAfterDebt],
                 ].map(([label, amount]) => (
                   <tr key={label as string}>
-                    <td className="py-2.5 text-gray-700 dark:text-slate-400">{label}</td>
+                    <td className="py-2.5 text-gray-700 dark:text-gray-300">{label}</td>
                     <td
                       className={clsx(
                         "py-2.5 text-right font-semibold tabular-nums",
                         label === "EBITDA" || label === "Cash Flow After Debt"
-                          ? "text-green-400"
-                          : "text-slate-100"
+                          ? "text-green-600 dark:text-green-400"
+                          : "text-gray-900 dark:text-white"
                       )}
                     >
                       {fmtDollar(amount as number)}
@@ -830,7 +830,7 @@ export default function ReportsPage() {
             <div className="table-scroll">
               <table className="w-full text-[12px] min-w-[640px]">
                 <thead>
-                  <tr className="text-left text-gray-700 dark:text-slate-500 border-b border-white/[0.06]">
+                  <tr className="text-left text-gray-700 dark:text-gray-300 border-b border-white/[0.06]">
                     <th className="pb-3 pr-3 font-medium">Store</th>
                     <th className="pb-3 pr-3 font-medium">Lease Expiration</th>
                     <th className="pb-3 pr-3 font-medium text-right">Years Remaining</th>
@@ -841,17 +841,17 @@ export default function ReportsPage() {
                 <tbody>
                   {storeDetails.map((d) => (
                     <tr key={`lease-${d.store.id}`} className="border-b border-white/[0.04]">
-                      <td className="py-2.5 pr-3 text-slate-900 dark:text-slate-200">{d.store.name ?? "Store"}</td>
-                      <td className="py-2.5 pr-3 text-gray-700 dark:text-slate-400">
+                      <td className="py-2.5 pr-3 text-gray-900 dark:text-white">{d.store.name ?? "Store"}</td>
+                      <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-300">
                         {formatLeaseExpiration(d.lease, d.store.occupancy_type === "owner_occupied")}
                       </td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-300">
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
                         {d.lease ? d.yearsRemaining.toFixed(1) : "—"}
                       </td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-300">
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
                         {d.availableLeaseOptions > 0 ? d.availableLeaseOptions : "—"}
                       </td>
-                      <td className="py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-200">{d.leaseScore}</td>
+                      <td className="py-2.5 text-right tabular-nums text-gray-900 dark:text-white">{d.leaseScore}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -864,7 +864,7 @@ export default function ReportsPage() {
             <div className="table-scroll">
               <table className="w-full text-[12px] min-w-[720px]">
                 <thead>
-                  <tr className="text-left text-gray-700 dark:text-slate-500 border-b border-white/[0.06]">
+                  <tr className="text-left text-gray-700 dark:text-gray-300 border-b border-white/[0.06]">
                     <th className="pb-3 pr-3 font-medium">Store</th>
                     <th className="pb-3 pr-3 font-medium text-right">Equipment Grade</th>
                     <th className="pb-3 pr-3 font-medium text-right">Avg Age</th>
@@ -879,13 +879,13 @@ export default function ReportsPage() {
                     const equipMetrics = computeEquipmentMetrics(d.equipment as EquipmentRecord[]);
                     return (
                       <tr key={`equip-${d.store.id}`} className="border-b border-white/[0.04]">
-                        <td className="py-2.5 pr-3 text-slate-900 dark:text-slate-200">{d.store.name ?? "Store"}</td>
-                        <td className="py-2.5 pr-3 text-right text-slate-900 dark:text-slate-200">{d.equipmentGrade}</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-300">{d.avgEquipmentAge.toFixed(1)} yrs</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-300">{equipMetrics.totalWashers}</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-300">{equipMetrics.totalDryers}</td>
-                        <td className="py-2.5 pr-3 text-slate-900 dark:text-slate-300">{getLargestMachine(d.equipment as EquipmentRecord[])}</td>
-                        <td className="py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-200">{equipMetrics.qualityScore}</td>
+                        <td className="py-2.5 pr-3 text-gray-900 dark:text-white">{d.store.name ?? "Store"}</td>
+                        <td className="py-2.5 pr-3 text-right text-gray-900 dark:text-white">{d.equipmentGrade}</td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{d.avgEquipmentAge.toFixed(1)} yrs</td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{equipMetrics.totalWashers}</td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{equipMetrics.totalDryers}</td>
+                        <td className="py-2.5 pr-3 text-gray-900 dark:text-white">{getLargestMachine(d.equipment as EquipmentRecord[])}</td>
+                        <td className="py-2.5 text-right tabular-nums text-gray-900 dark:text-white">{equipMetrics.qualityScore}</td>
                       </tr>
                     );
                   })}
@@ -984,7 +984,7 @@ export default function ReportsPage() {
               <>
                 <div>
                   Value:{" "}
-                  <span className="text-slate-100">
+                  <span className="text-gray-900 dark:text-white">
                     {realEstate?.estimated_value ? fmtDollar(realEstate.estimated_value) : "—"}
                   </span>
                 </div>
@@ -1001,27 +1001,27 @@ export default function ReportsPage() {
               <>
                 <div>
                   Expires:{" "}
-                  <span className="text-slate-100">
+                  <span className="text-gray-900 dark:text-white">
                     {metrics.leaseExpiresStr} — {metrics.yearsRemaining.toFixed(1)} years remaining
                   </span>
                 </div>
                 <div>
                   Renewals:{" "}
-                  <span className="text-slate-100">
+                  <span className="text-gray-900 dark:text-white">
                     {metrics.availableOptions.length} option{metrics.availableOptions.length !== 1 ? "s" : ""} (total{" "}
                     {metrics.totalLeaseControl.toFixed(1)}yr)
                   </span>
                 </div>
                 <div>
                   Monthly Rent:{" "}
-                  <span className="text-slate-100">
+                  <span className="text-gray-900 dark:text-white">
                     {metrics.monthlyRent ? fmtDollar(metrics.monthlyRent) : "—"}
                     {metrics.camCharges > 0 ? " + CAM" : ""}
                   </span>
                 </div>
                 <div>
                   Occupancy Cost:{" "}
-                  <span className="text-slate-100">
+                  <span className="text-gray-900 dark:text-white">
                     {fmtPct(metrics.occupancyCostRatio)} of revenue
                   </span>
                 </div>
@@ -1042,23 +1042,23 @@ export default function ReportsPage() {
           <div className="text-[13px] text-gray-700 dark:text-slate-400 space-y-2">
             <div>
               Total Machines:{" "}
-              <span className="text-slate-100">
+              <span className="text-gray-900 dark:text-white">
                 {equipMetrics.totalMachines} ({equipMetrics.totalWashers} washers, {equipMetrics.totalDryers} dryers)
               </span>
             </div>
             <div>
               Average Age:{" "}
-              <span className="text-slate-100">
+              <span className="text-gray-900 dark:text-white">
                 {equipMetrics.weightedAvgAge.toFixed(1)} years — {scoreLabel(equipMetrics.qualityScore)}
               </span>
             </div>
             <div>
               Fleet Under 10yr:{" "}
-              <span className="text-slate-100">{equipMetrics.pctUnder10Years.toFixed(0)}% of machines</span>
+              <span className="text-gray-900 dark:text-white">{equipMetrics.pctUnder10Years.toFixed(0)}% of machines</span>
             </div>
             <div>
               Replacement Estimate:{" "}
-              <span className="text-slate-100">{fmtDollar(equipMetrics.estimatedReplacementValue)}</span>
+              <span className="text-gray-900 dark:text-white">{fmtDollar(equipMetrics.estimatedReplacementValue)}</span>
             </div>
             <div>
               Equipment Score:{" "}
@@ -1080,8 +1080,8 @@ export default function ReportsPage() {
             ["EBITDA Margin", fmtPct(metrics.ebitdaMargin), ratioColorClass(metrics.ebitdaMargin, 25, 20)],
             ["Rent / Revenue", fmtPct(metrics.rentToRevenue), ratioColorClass(metrics.rentToRevenue, 0, 15, true)],
             ["Utility / Revenue", fmtPct(metrics.utilityRatio), ratioColorClass(metrics.utilityRatio, 0, 17, true)],
-            ["Revenue / SF", `$${metrics.revenuePerSF.toFixed(2)}`, "text-slate-100"],
-            ["EBITDA / SF", `$${metrics.ebitdaPerSF.toFixed(2)}`, "text-slate-100"],
+            ["Revenue / SF", `$${metrics.revenuePerSF.toFixed(2)}`, "text-gray-900 dark:text-white"],
+            ["EBITDA / SF", `$${metrics.ebitdaPerSF.toFixed(2)}`, "text-gray-900 dark:text-white"],
             ["Debt Yield", store.loan_balance ? fmtPct(metrics.debtYield) : "N/A", ratioColorClass(metrics.debtYield, 12, 8)],
           ].map(([label, val, color]) => (
             <div key={label as string} className="card2">

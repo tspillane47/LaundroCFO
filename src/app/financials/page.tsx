@@ -914,7 +914,7 @@ export default function FinancialsPage() {
             <div className="table-scroll">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="text-left text-gray-700 dark:text-slate-500 border-b border-white/[0.06]">
+                <tr className="text-left text-gray-700 dark:text-gray-300 border-b border-white/[0.06]">
                   <th className="pb-3 pr-3 font-medium">Month</th>
                   <th className="pb-3 pr-3 font-medium text-right">Revenue</th>
                   <th className="pb-3 pr-3 font-medium text-right">Expenses</th>
@@ -934,44 +934,44 @@ export default function FinancialsPage() {
                     )}
                     onClick={() => setSelectedMonth(i + 1)}
                   >
-                    <td className="py-2.5 pr-3 text-slate-900 dark:text-slate-300">{MONTH_NAMES[i]}</td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-200">
+                    <td className="py-2.5 pr-3 text-gray-900 dark:text-white">{MONTH_NAMES[i]}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
                       {r ? fmtDollar(r.revenue) : "—"}
                     </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-red-400/80">
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
                       {r ? fmtDollar(r.totalExpenses) : "—"}
                     </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-green-400">
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-green-600 dark:text-green-400">
                       {r ? fmtDollar(r.ebitda) : "—"}
                     </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-300">
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
                       {r ? fmtPct(r.ebitdaMargin) : "—"}
                     </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-300">
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
                       {r ? fmtDollar(r.debt_service) : "—"}
                     </td>
-                    <td className="py-2.5 text-right tabular-nums text-blue-400">
+                    <td className="py-2.5 text-right tabular-nums text-blue-600 dark:text-blue-400">
                       {r ? fmtDollar(r.noi) : "—"}
                     </td>
                   </tr>
                 ))}
                 {yearTotals && (
                   <tr className="font-semibold bg-[var(--bg-page)] dark:bg-[#243347]/50">
-                    <td className="py-3 pr-3 text-slate-100">Total</td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{fmtDollar(yearTotals.revenue)}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums text-red-400">
+                    <td className="py-3 pr-3 text-gray-900 dark:text-white">Total</td>
+                    <td className="py-3 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(yearTotals.revenue)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
                       {fmtDollar(yearTotals.totalExpenses)}
                     </td>
-                    <td className="py-3 pr-3 text-right tabular-nums text-green-400">
+                    <td className="py-3 pr-3 text-right tabular-nums text-green-600 dark:text-green-400">
                       {fmtDollar(yearTotals.ebitda)}
                     </td>
-                    <td className="py-3 pr-3 text-right tabular-nums">
+                    <td className="py-3 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
                       {yearTotals.revenue > 0
                         ? fmtPct((yearTotals.ebitda / yearTotals.revenue) * 100)
                         : "—"}
                     </td>
-                    <td className="py-3 pr-3 text-right tabular-nums">{fmtDollar(yearTotals.debt_service)}</td>
-                    <td className="py-3 text-right tabular-nums text-blue-400">{fmtDollar(yearTotals.noi)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(yearTotals.debt_service)}</td>
+                    <td className="py-3 text-right tabular-nums text-blue-600 dark:text-blue-400">{fmtDollar(yearTotals.noi)}</td>
                   </tr>
                 )}
               </tbody>
@@ -1254,7 +1254,7 @@ export default function FinancialsPage() {
               <div className="table-scroll">
               <table className="w-full text-[12px]">
                 <thead>
-                  <tr className="text-left text-gray-700 dark:text-slate-500 border-b border-white/[0.06]">
+                  <tr className="text-left text-gray-700 dark:text-gray-300 border-b border-white/[0.06]">
                     <th className="pb-3 pr-3 font-medium">Date</th>
                     <th className="pb-3 pr-3 font-medium">Description</th>
                     <th className="pb-3 pr-3 font-medium text-right">Amount</th>
@@ -1266,11 +1266,11 @@ export default function FinancialsPage() {
                 <tbody>
                   {stagedTransactions.map((txn) => (
                     <tr key={txn.tempId} className="border-b border-white/[0.04]">
-                      <td className="py-3 pr-3 text-slate-900 dark:text-slate-300 whitespace-nowrap">
+                      <td className="py-3 pr-3 text-gray-900 dark:text-white whitespace-nowrap">
                         {new Date(txn.transaction_date + "T12:00:00").toLocaleDateString()}
                       </td>
-                      <td className="py-3 pr-3 text-slate-900 dark:text-slate-200 max-w-[200px] truncate">{txn.description ?? "—"}</td>
-                      <td className={clsx("py-3 pr-3 text-right font-semibold tabular-nums", txn.amount < 0 ? "text-red-400" : "text-green-400")}>
+                      <td className="py-3 pr-3 text-gray-900 dark:text-white max-w-[200px] truncate">{txn.description ?? "—"}</td>
+                      <td className={clsx("py-3 pr-3 text-right font-semibold tabular-nums", txn.amount < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>
                         {fmtDollar(txn.amount)}
                       </td>
                       <td className="py-3 pr-3">
@@ -1311,11 +1311,11 @@ export default function FinancialsPage() {
                     const suggested = suggestTransactionCategory(txn.description);
                     return (
                       <tr key={txn.id} className="border-b border-white/[0.04]">
-                        <td className="py-3 pr-3 text-slate-900 dark:text-slate-300 whitespace-nowrap">
+                        <td className="py-3 pr-3 text-gray-900 dark:text-white whitespace-nowrap">
                           {new Date(txn.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
                         </td>
-                        <td className="py-3 pr-3 text-slate-900 dark:text-slate-200 max-w-[200px] truncate">{txn.description ?? "—"}</td>
-                        <td className={clsx("py-3 pr-3 text-right font-semibold tabular-nums", txn.amount < 0 ? "text-red-400" : "text-green-400")}>
+                        <td className="py-3 pr-3 text-gray-900 dark:text-white max-w-[200px] truncate">{txn.description ?? "—"}</td>
+                        <td className={clsx("py-3 pr-3 text-right font-semibold tabular-nums", txn.amount < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>
                           {fmtDollar(txn.amount)}
                         </td>
                         <td className="py-3 pr-3">
@@ -1407,7 +1407,7 @@ export default function FinancialsPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-[12px]">
                 <thead>
-                  <tr className="text-left text-gray-700 dark:text-slate-500 border-b border-white/[0.06]">
+                  <tr className="text-left text-gray-700 dark:text-gray-300 border-b border-white/[0.06]">
                     <th className="pb-3 pr-4 font-medium">QuickBooks Account</th>
                     <th className="pb-3 font-medium">LaundroCFO Field</th>
                   </tr>
