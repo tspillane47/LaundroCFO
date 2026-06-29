@@ -76,7 +76,7 @@ export function YesNoToggle({
           className={
             value
               ? "flex-1 py-2 rounded-lg text-[13px] font-semibold bg-blue-600/20 border border-blue-500/40 text-blue-300"
-              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[var(--bg-input)] dark:bg-[#1e2a3a] border border-[var(--border2)] dark:border-white/10 text-[var(--text-secondary)] dark:text-slate-400 hover:border-[var(--border)] dark:hover:border-white/20"
+              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[var(--bg-input)] dark:bg-[#1e2a3a] border border-[var(--border2)] dark:border-white/10 text-[var(--text-secondary)] dark:text-gray-800 dark:text-slate-400 hover:border-[var(--border)] dark:hover:border-white/20"
           }
         >
           Yes
@@ -87,7 +87,7 @@ export function YesNoToggle({
           className={
             !value
               ? "flex-1 py-2 rounded-lg text-[13px] font-semibold bg-blue-600/20 border border-blue-500/40 text-blue-300"
-              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[var(--bg-input)] dark:bg-[#1e2a3a] border border-[var(--border2)] dark:border-white/10 text-[var(--text-secondary)] dark:text-slate-400 hover:border-[var(--border)] dark:hover:border-white/20"
+              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[var(--bg-input)] dark:bg-[#1e2a3a] border border-[var(--border2)] dark:border-white/10 text-[var(--text-secondary)] dark:text-gray-800 dark:text-slate-400 hover:border-[var(--border)] dark:hover:border-white/20"
           }
         >
           No

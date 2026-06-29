@@ -85,10 +85,10 @@ export default function IntegrationsPage() {
                   <span className="badge badge-green text-[10px]">Connected</span>
                 )}
               </div>
-              <div className="text-[12px] text-gray-700 dark:text-slate-400 mb-2">{i.description}</div>
+              <div className="text-[12px] text-gray-700 dark:text-gray-800 dark:text-slate-400 mb-2">{i.description}</div>
               <div className="flex gap-1.5 flex-wrap">
                 {i.syncs.map((s) => (
-                  <span key={s} className="text-[10px] bg-[var(--bg-page)] dark:bg-[#243347] text-[var(--text-secondary)] dark:text-slate-400 px-2 py-0.5 rounded-md border border-[var(--border)] dark:border-transparent">
+                  <span key={s} className="text-[10px] bg-[var(--bg-page)] dark:bg-[#243347] text-[var(--text-secondary)] dark:text-gray-800 dark:text-slate-400 px-2 py-0.5 rounded-md border border-[var(--border)] dark:border-transparent">
                     {s}
                   </span>
                 ))}

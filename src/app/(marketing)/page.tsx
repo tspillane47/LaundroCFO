@@ -51,7 +51,7 @@ function GeoIcon({ variant }: { variant: "chart" | "doc" | "grid" | "shield" | "
     fill: "none",
     stroke: "currentColor",
     strokeWidth: 1.5,
-    className: "text-gray-700 dark:text-slate-400",
+    className: "text-gray-700 dark:text-gray-800 dark:text-slate-400",
   };
 
   switch (variant) {
@@ -233,7 +233,7 @@ export default function MarketingHomePage() {
                 </span>
               </h1>
 
-              <p className="text-[18px] text-gray-700 dark:text-slate-400 leading-relaxed mb-10 max-w-xl">
+              <p className="text-[18px] text-gray-700 dark:text-gray-800 dark:text-slate-400 leading-relaxed mb-10 max-w-xl">
                 Track store value, underwrite acquisitions, manage leases, and grow your portfolio — all in one
                 platform built specifically for laundromat owners, buyers, brokers, and lenders.
               </p>
@@ -262,7 +262,7 @@ export default function MarketingHomePage() {
                 {heroTrustBadges.map((badge) => (
                   <span
                     key={badge.label}
-                    className="inline-flex items-center gap-1.5 text-[11px] text-gray-700 dark:text-slate-400 px-3 py-1.5 rounded-full"
+                    className="inline-flex items-center gap-1.5 text-[11px] text-gray-700 dark:text-gray-800 dark:text-slate-400 px-3 py-1.5 rounded-full"
                     style={{
                       background: "rgba(30,41,59,0.5)",
                       border: "1px solid rgba(59,130,246,0.15)",
@@ -292,7 +292,7 @@ export default function MarketingHomePage() {
             {trustBadges.map((badge) => (
               <span
                 key={badge}
-                className="px-3 py-1.5 rounded text-[12px] font-medium text-gray-700 dark:text-slate-400 border border-slate-700"
+                className="px-3 py-1.5 rounded text-[12px] font-medium text-gray-700 dark:text-gray-800 dark:text-slate-400 border border-slate-700"
               >
                 {badge}
               </span>
@@ -381,7 +381,7 @@ export default function MarketingHomePage() {
             <div className="space-y-2">
               {valuationLines.map((line) => (
                 <div key={line.label} className="flex items-center justify-between text-[13px]">
-                  <span className="text-gray-700 dark:text-slate-400">{line.label}</span>
+                  <span className="text-gray-700 dark:text-gray-800 dark:text-slate-400">{line.label}</span>
                   <span
                     className={
                       line.type === "positive"
@@ -398,7 +398,7 @@ export default function MarketingHomePage() {
             </div>
             <div className="border-t border-slate-700 mt-5 pt-5 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Final Multiple</span>
+                <span className="text-[13px] font-semibold text-gray-700 dark:text-gray-800 dark:text-slate-300">Final Multiple</span>
                 <span className="text-[20px] font-bold text-blue-400 tabular-nums">4.70x</span>
               </div>
               <div className="flex items-center justify-between text-[13px]">
@@ -406,7 +406,7 @@ export default function MarketingHomePage() {
                 <span className="font-semibold text-slate-200 tabular-nums">$237,843</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Store Value</span>
+                <span className="text-[13px] font-semibold text-gray-700 dark:text-gray-800 dark:text-slate-300">Store Value</span>
                 <span className="text-[24px] font-bold text-green-400 tabular-nums">$1,098,472</span>
               </div>
             </div>
@@ -420,7 +420,7 @@ export default function MarketingHomePage() {
           <h2 className="text-[28px] lg:text-[36px] font-bold text-white mb-3">
             Start tracking your laundromat&apos;s value today.
           </h2>
-          <p className="text-[16px] text-gray-700 dark:text-slate-400 mb-8">Free during beta. No credit card required.</p>
+          <p className="text-[16px] text-gray-700 dark:text-gray-800 dark:text-slate-400 mb-8">Free during beta. No credit card required.</p>
           <Link
             href="/signup"
             className="inline-flex items-center justify-center px-8 py-3 rounded-md text-[15px] font-semibold bg-[#1D4ED8] text-white hover:opacity-90 transition-opacity"

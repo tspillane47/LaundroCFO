@@ -424,7 +424,7 @@ export function gradeColor(grade: "A" | "B" | "C" | "D"): string {
 export function adjustmentColor(value: number): string {
   if (value > 0) return "text-green-400";
   if (value < 0) return "text-red-400";
-  return "text-gray-700 dark:text-slate-400";
+  return "text-gray-700 dark:text-gray-800 dark:text-slate-400";
 }
 
 export function formatAdjustment(value: number): string {

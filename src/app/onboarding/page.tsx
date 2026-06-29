@@ -316,7 +316,7 @@ export default function OnboardingPage() {
   if (!hydrated) {
     return (
       <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0f1e3d] flex items-center justify-center">
-        <div className="text-gray-700 dark:text-slate-400 text-[13px]">Loading...</div>
+        <div className="text-gray-700 dark:text-gray-800 dark:text-slate-400 text-[13px]">Loading...</div>
       </div>
     );
   }
@@ -359,7 +359,7 @@ export default function OnboardingPage() {
               <h1 className="text-[32px] sm:text-[40px] font-bold text-white tracking-tight mb-3">
                 Welcome to LaundroCFO
               </h1>
-              <p className="text-[16px] text-gray-700 dark:text-slate-400 mb-2">
+              <p className="text-[16px] text-gray-700 dark:text-gray-800 dark:text-slate-400 mb-2">
                 Let&apos;s set up your first store. It takes about 2 minutes.
               </p>
               <p className="text-[12px] text-gray-700 dark:text-slate-500 mb-10">Step 1 of 4</p>
@@ -373,7 +373,7 @@ export default function OnboardingPage() {
                     <div className="mb-2 text-blue-400">
                       <NavIcon name={f.icon} />
                     </div>
-                    <div className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] dark:text-slate-300 font-medium">
+                    <div className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] dark:text-gray-800 dark:text-slate-300 font-medium">
                       {f.label}
                     </div>
                   </div>
@@ -387,7 +387,7 @@ export default function OnboardingPage() {
                 Get Started →
               </button>
               <div>
-                <Link href="/portfolio" className="text-[13px] text-gray-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-300">
+                <Link href="/portfolio" className="text-[13px] text-gray-700 dark:text-gray-800 dark:text-slate-300 hover:text-slate-900 dark:hover:text-gray-800 dark:text-slate-300">
                   I&apos;ll do this later
                 </Link>
               </div>
@@ -468,7 +468,7 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex items-center justify-between mt-6">
-                <button onClick={() => goToStep(1)} className="text-[13px] text-gray-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-300">
+                <button onClick={() => goToStep(1)} className="text-[13px] text-gray-700 dark:text-gray-800 dark:text-slate-300 hover:text-slate-900 dark:hover:text-gray-800 dark:text-slate-300">
                   ← Back
                 </button>
                 <button
@@ -486,7 +486,7 @@ export default function OnboardingPage() {
           {data.step === 3 && (
             <div>
               <h2 className="text-[24px] font-bold text-white mb-1">Enter your store&apos;s financials</h2>
-              <p className="text-[13px] text-gray-700 dark:text-slate-400 mb-6">
+              <p className="text-[13px] text-gray-700 dark:text-gray-800 dark:text-slate-400 mb-6">
                 Estimates are fine — you can update these anytime.
               </p>
 
@@ -554,7 +554,7 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex items-center justify-between mt-6">
-                <button onClick={() => goToStep(2)} className="text-[13px] text-gray-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-300">
+                <button onClick={() => goToStep(2)} className="text-[13px] text-gray-700 dark:text-gray-800 dark:text-slate-300 hover:text-slate-900 dark:hover:text-gray-800 dark:text-slate-300">
                   ← Back
                 </button>
                 <button onClick={() => goToStep(4)} className="btn-primary px-8 py-2.5 text-[13px]">
@@ -568,7 +568,7 @@ export default function OnboardingPage() {
           {data.step === 4 && (
             <div>
               <h2 className="text-[24px] font-bold text-white mb-1">Tell us about your lease</h2>
-              <p className="text-[13px] text-gray-700 dark:text-slate-400 mb-6">
+              <p className="text-[13px] text-gray-700 dark:text-gray-800 dark:text-slate-400 mb-6">
                 This affects your store&apos;s valuation and lending risk.
               </p>
 
@@ -618,7 +618,7 @@ export default function OnboardingPage() {
                     </Field>
                   </div>
                   <div className="flex items-center justify-between py-2">
-                    <span className="text-[13px] text-slate-900 dark:text-slate-300">Personal Guaranty</span>
+                    <span className="text-[13px] text-slate-900 dark:text-gray-800 dark:text-slate-300">Personal Guaranty</span>
                     <button
                       type="button"
                       onClick={() => set("personal_guaranty", !data.personal_guaranty)}
@@ -659,14 +659,14 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6">
-                <button onClick={() => goToStep(3)} className="text-[13px] text-gray-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-300">
+                <button onClick={() => goToStep(3)} className="text-[13px] text-gray-700 dark:text-gray-800 dark:text-slate-300 hover:text-slate-900 dark:hover:text-gray-800 dark:text-slate-300">
                   ← Back
                 </button>
                 <div className="flex flex-col w-full sm:w-auto items-stretch sm:items-center gap-3">
                   <button
                     onClick={() => handleSubmit(false)}
                     disabled={submitting || submitStatus === "success"}
-                    className="text-[13px] text-gray-700 dark:text-slate-500 hover:text-slate-900 dark:text-slate-300 disabled:opacity-40"
+                    className="text-[13px] text-gray-700 dark:text-slate-500 hover:text-slate-900 dark:text-gray-800 dark:text-slate-300 disabled:opacity-40"
                   >
                     Skip for now
                   </button>

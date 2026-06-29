@@ -563,7 +563,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
 
       {mode === "view" && !lease && hideHeader ? null : mode === "view" && !lease && !hideHeader ? (
         <div className="card text-center py-12">
-          <div className="text-slate-900 dark:text-slate-300 text-[14px]">No lease on file</div>
+          <div className="text-slate-900 dark:text-gray-800 dark:text-slate-300 text-[14px]">No lease on file</div>
           <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-2 mb-4">
             Add your lease terms to calculate risk score and track renewal options.
           </p>
@@ -639,7 +639,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                   day: "numeric",
                   year: "numeric",
                 })}
-                <span className="text-gray-700 dark:text-slate-400 font-normal">
+                <span className="text-gray-700 dark:text-gray-800 dark:text-slate-400 font-normal">
                   {" "}
                   · in{" "}
                   {metrics.rentEscalation.monthsUntil === 1
@@ -647,7 +647,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                     : `${metrics.rentEscalation.monthsUntil} months`}
                 </span>
               </div>
-              <div className="text-[12px] text-gray-700 dark:text-slate-400 mt-1">
+              <div className="text-[12px] text-gray-700 dark:text-gray-800 dark:text-slate-400 mt-1">
                 Monthly rent increases from {formatCurrency(metrics.rentEscalation.currentRent)} to{" "}
                 {formatCurrency(metrics.rentEscalation.newRent)} (+{formatCurrency(metrics.rentEscalation.increase)})
               </div>
@@ -737,15 +737,15 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                             : "badge-amber";
                       return (
                         <tr key={opt.id}>
-                          <td className="py-2.5 text-slate-900 dark:text-slate-300">{opt.option_number ?? "—"}</td>
-                          <td className="py-2.5 text-slate-900 dark:text-slate-300">{opt.option_years ?? "—"}</td>
+                          <td className="py-2.5 text-slate-900 dark:text-gray-800 dark:text-slate-300">{opt.option_number ?? "—"}</td>
+                          <td className="py-2.5 text-slate-900 dark:text-gray-800 dark:text-slate-300">{opt.option_years ?? "—"}</td>
                           <td className="py-2.5">
                             <span className={clsx("badge", statusColor)}>{opt.status ?? "—"}</span>
                           </td>
-                          <td className="py-2.5 text-gray-700 dark:text-slate-400">
+                          <td className="py-2.5 text-gray-700 dark:text-gray-800 dark:text-slate-400">
                             {opt.notice_days != null ? `${opt.notice_days} days` : "—"}
                           </td>
-                          <td className="py-2.5 text-slate-900 dark:text-slate-300">{deadline}</td>
+                          <td className="py-2.5 text-slate-900 dark:text-gray-800 dark:text-slate-300">{deadline}</td>
                         </tr>
                       );
                     })}
@@ -907,7 +907,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             </div>
 
             <div className="flex flex-wrap gap-6">
-              <label className="flex items-center gap-2 text-[13px] text-slate-900 dark:text-slate-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-[13px] text-slate-900 dark:text-gray-800 dark:text-slate-300 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={leaseForm.sublease_rights}
@@ -916,7 +916,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                 />
                 Sublease Rights
               </label>
-              <label className="flex items-center gap-2 text-[13px] text-slate-900 dark:text-slate-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-[13px] text-slate-900 dark:text-gray-800 dark:text-slate-300 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={leaseForm.personal_guaranty}
@@ -925,7 +925,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                 />
                 Personal Guaranty
               </label>
-              <label className="flex items-center gap-2 text-[13px] text-slate-900 dark:text-slate-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-[13px] text-slate-900 dark:text-gray-800 dark:text-slate-300 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={leaseForm.exclusivity_clause}

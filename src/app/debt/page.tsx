@@ -254,7 +254,7 @@ function ToggleField({
 }) {
   return (
     <div className="flex items-center justify-between py-2">
-      <span className="text-[13px] text-slate-900 dark:text-slate-300">{label}</span>
+      <span className="text-[13px] text-slate-900 dark:text-gray-800 dark:text-slate-300">{label}</span>
       <button
         type="button"
         onClick={() => onChange(!value)}
@@ -869,7 +869,7 @@ export default function DebtPage() {
                   <th
                     key={col}
                     className={clsx(
-                      "py-2.5 pr-4 font-medium text-gray-700 dark:text-gray-300",
+                      "py-2.5 pr-4 font-medium text-gray-700 dark:text-gray-800 dark:text-gray-300",
                       col === "" ? "text-left" : "text-right"
                     )}
                   >
@@ -880,7 +880,7 @@ export default function DebtPage() {
             </thead>
             <tbody>
               <tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                <td className="py-3 pr-4 font-medium text-gray-700 dark:text-gray-300">
+                <td className="py-3 pr-4 font-medium text-gray-700 dark:text-gray-800 dark:text-gray-300">
                   Monthly Debt Service
                 </td>
                 <td className="py-3 pr-4 text-right tabular-nums text-gray-900 dark:text-white">
@@ -908,7 +908,7 @@ export default function DebtPage() {
                 </td>
               </tr>
               <tr>
-                <td className="py-3 pr-4 font-medium text-gray-700 dark:text-gray-300">
+                <td className="py-3 pr-4 font-medium text-gray-700 dark:text-gray-800 dark:text-gray-300">
                   Annual Debt Service
                 </td>
                 <td className="py-3 pr-4 text-right tabular-nums text-gray-900 dark:text-white">
@@ -967,7 +967,7 @@ export default function DebtPage() {
                 "text-[28px] font-bold tabular-nums mt-1",
                 debtServiceAnalysis.scheduledDscr != null
                   ? dscrColorClass(debtServiceAnalysis.scheduledDscr)
-                  : "text-gray-700 dark:text-slate-400"
+                  : "text-gray-700 dark:text-gray-800 dark:text-slate-400"
               )}
             >
               {debtServiceAnalysis.scheduledDscr != null
@@ -987,7 +987,7 @@ export default function DebtPage() {
                 "text-[28px] font-bold tabular-nums mt-1",
                 debtServiceAnalysis.actualDscr != null
                   ? dscrColorClass(debtServiceAnalysis.actualDscr)
-                  : "text-gray-700 dark:text-slate-400"
+                  : "text-gray-700 dark:text-gray-800 dark:text-slate-400"
               )}
             >
               {debtServiceAnalysis.actualDscr != null
@@ -1248,7 +1248,7 @@ export default function DebtPage() {
                 {["Lender", "Type", "Balance", "Rate", "Payment", "% Paid Off"].map((col) => (
                   <th
                     key={col}
-                    className="text-left py-2.5 pr-4 font-medium text-gray-700 dark:text-gray-300"
+                    className="text-left py-2.5 pr-4 font-medium text-gray-700 dark:text-gray-800 dark:text-gray-300"
                   >
                     {col}
                   </th>
@@ -1261,7 +1261,7 @@ export default function DebtPage() {
                   <td className="py-2.5 pr-4 font-medium text-gray-900 dark:text-white">
                     {loan.lender_name ?? "—"}
                   </td>
-                  <td className="py-2.5 pr-4 text-gray-700 dark:text-gray-300">
+                  <td className="py-2.5 pr-4 text-gray-700 dark:text-gray-800 dark:text-gray-300">
                     {loan.loan_type ?? "—"}
                   </td>
                   <td className="py-2.5 pr-4 tabular-nums text-gray-900 dark:text-white">

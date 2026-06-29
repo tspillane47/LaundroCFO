@@ -292,7 +292,7 @@ function calcDaysRemaining(expirationDate: string | null): number | null {
 }
 
 function daysColor(days: number | null): string {
-  if (days == null) return "text-gray-700 dark:text-slate-400";
+  if (days == null) return "text-gray-700 dark:text-gray-800 dark:text-slate-400";
   if (days < 0) return "text-red-400";
   if (days < 60) return "text-red-400";
   if (days < 90) return "text-amber-400";
@@ -401,7 +401,7 @@ function ToggleField({
 }) {
   return (
     <div className="flex items-center justify-between py-2">
-      <span className="text-[13px] text-slate-900 dark:text-slate-300">{label}</span>
+      <span className="text-[13px] text-slate-900 dark:text-gray-800 dark:text-slate-300">{label}</span>
       <button
         type="button"
         onClick={() => onChange(!value)}
@@ -1135,7 +1135,7 @@ export default function InsurancePage() {
                   {ADDITIONAL_COVERAGE_FIELDS.map(({ key, label }) => (
                     <label
                       key={key}
-                      className="flex items-center gap-2 text-[13px] text-slate-900 dark:text-slate-300 cursor-pointer"
+                      className="flex items-center gap-2 text-[13px] text-slate-900 dark:text-gray-800 dark:text-slate-300 cursor-pointer"
                     >
                       <input
                         type="checkbox"
@@ -1262,22 +1262,22 @@ export default function InsurancePage() {
 
                   <div className="space-y-1 text-[12px] border-t border-white/[0.04] pt-3">
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-gray-300">Effective</span>
+                      <span className="text-gray-700 dark:text-gray-800 dark:text-gray-300">Effective</span>
                       <span className="text-gray-900 dark:text-white">{formatDate(policy.effective_date)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-gray-300">Expiration</span>
+                      <span className="text-gray-700 dark:text-gray-800 dark:text-gray-300">Expiration</span>
                       <span className="text-gray-900 dark:text-white">{formatDate(policy.expiration_date)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-gray-300">Annual Premium</span>
+                      <span className="text-gray-700 dark:text-gray-800 dark:text-gray-300">Annual Premium</span>
                       <span className="text-gray-900 dark:text-white font-semibold">
                         {formatCurrency(policy.annual_premium)}
                       </span>
                     </div>
                     {(policy.building_coverage || policy.contents_coverage || policy.equipment_coverage) && (
                       <div className="flex justify-between">
-                        <span className="text-gray-700 dark:text-gray-300">Property Coverage</span>
+                        <span className="text-gray-700 dark:text-gray-800 dark:text-gray-300">Property Coverage</span>
                         <span className="text-gray-900 dark:text-white">
                           {formatCurrency(
                             (policy.building_coverage ?? 0) +
@@ -1289,7 +1289,7 @@ export default function InsurancePage() {
                     )}
                     {policy.liability_per_occurrence != null && (
                       <div className="flex justify-between">
-                        <span className="text-gray-700 dark:text-gray-300">Liability / Occurrence</span>
+                        <span className="text-gray-700 dark:text-gray-800 dark:text-gray-300">Liability / Occurrence</span>
                         <span className="text-gray-900 dark:text-white">
                           {formatCurrency(policy.liability_per_occurrence)}
                         </span>
@@ -1322,7 +1322,7 @@ export default function InsurancePage() {
                     <div className="mt-3 pt-3 border-t border-white/[0.04] space-y-2">
                       {policyClaims.map((c) => (
                         <div key={c.id} className="text-[11px] flex justify-between items-center">
-                          <span className="text-gray-700 dark:text-slate-400">
+                          <span className="text-gray-700 dark:text-gray-800 dark:text-slate-400">
                             {formatDate(c.claim_date)} · {c.claim_type}
                           </span>
                           <span className={clsx("badge", claimStatusBadge(c.status))}>
@@ -1446,7 +1446,7 @@ export default function InsurancePage() {
               if (!policyClaims || policyClaims.length === 0) return null;
               return (
                 <div key={policy.id}>
-                  <div className="text-[12px] font-semibold text-gray-700 dark:text-slate-400 mb-2 uppercase tracking-wider">
+                  <div className="text-[12px] font-semibold text-gray-700 dark:text-gray-800 dark:text-slate-400 mb-2 uppercase tracking-wider">
                     {policy.policy_type} — {policy.carrier}
                   </div>
                   <div className="space-y-2">
@@ -1495,7 +1495,7 @@ export default function InsurancePage() {
               key={doc.label}
               className="card2 text-center py-6 border-dashed border-white/[0.12] relative overflow-hidden"
             >
-              <div className="text-[12px] font-semibold text-gray-700 dark:text-slate-400">{doc.label}</div>
+              <div className="text-[12px] font-semibold text-gray-700 dark:text-gray-800 dark:text-slate-400">{doc.label}</div>
               <div className="mt-2">
                 <span className="badge badge-amber">Coming Soon</span>
               </div>

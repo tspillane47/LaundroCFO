@@ -209,7 +209,7 @@ export default function AlertsPage() {
                     </div>
                   )}
                   <div className="text-[13px] font-semibold text-slate-100">{alert.title}</div>
-                  <div className="text-[12px] text-gray-700 dark:text-slate-400 mt-1 leading-relaxed">{alert.body}</div>
+                  <div className="text-[12px] text-gray-700 dark:text-gray-800 dark:text-slate-400 mt-1 leading-relaxed">{alert.body}</div>
                   <div className="flex gap-2 mt-3 flex-wrap">
                     {alert.tags.map((tag) => (
                       <span key={tag} className={`badge ${tagStyles[alert.severity] ?? "badge-blue"}`}>
@@ -248,7 +248,7 @@ export default function AlertsPage() {
                       {alert.storeName}
                     </div>
                   )}
-                  <div className="text-[13px] font-semibold text-gray-700 dark:text-slate-400">{alert.title}</div>
+                  <div className="text-[13px] font-semibold text-gray-700 dark:text-gray-800 dark:text-slate-400">{alert.title}</div>
                   <div className="text-[12px] text-gray-700 dark:text-slate-600 mt-1">{alert.body}</div>
                 </div>
                 <span className="badge badge-green flex-shrink-0">Healthy</span>

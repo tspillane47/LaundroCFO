@@ -469,7 +469,7 @@ export function RealEstateModule({ store }: Props) {
 
       {mode === "view" && !record ? (
         <div className="card text-center py-12">
-          <div className="text-slate-900 dark:text-slate-300 text-[14px]">No real estate profile on file</div>
+          <div className="text-slate-900 dark:text-gray-800 dark:text-slate-300 text-[14px]">No real estate profile on file</div>
           <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-2 mb-4">
             Add building ownership and mortgage details to track equity and debt position.
           </p>

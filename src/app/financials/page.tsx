@@ -155,11 +155,11 @@ function ChartTooltip({
   const fmt = formatter ?? ((v: number) => fmtDollar(v));
   return (
     <div className="bg-[var(--bg-card)] dark:bg-[#1e2a3a] border border-[var(--border)] dark:border-white/10 rounded-lg p-3 text-xs shadow-sm">
-      <div className="text-[var(--text-secondary)] dark:text-slate-400 mb-1">{label}</div>
+      <div className="text-[var(--text-secondary)] dark:text-gray-800 dark:text-slate-400 mb-1">{label}</div>
       {payload.map((entry) => (
         <div key={entry.name} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full" style={{ background: entry.color }} />
-          <span className="text-[var(--text-secondary)] dark:text-slate-300">{entry.name}:</span>
+          <span className="text-[var(--text-secondary)] dark:text-gray-800 dark:text-slate-300">{entry.name}:</span>
           <span className="text-[var(--text-primary)] dark:text-slate-100 font-semibold">{fmt(entry.value)}</span>
         </div>
       ))}
@@ -716,7 +716,7 @@ export default function FinancialsPage() {
                 "px-4 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
                 activeTab === tab.id
                   ? "border-blue-500 text-blue-400"
-                  : "border-transparent text-gray-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-300"
+                  : "border-transparent text-gray-700 dark:text-gray-800 dark:text-slate-300 hover:text-slate-900 dark:hover:text-gray-800 dark:text-slate-300"
               )}
             >
               {tab.label}
@@ -733,7 +733,7 @@ export default function FinancialsPage() {
         <div className="space-y-5">
           {records.length === 0 && !showForm && (
             <div className="card text-center py-10">
-              <p className="text-[14px] text-gray-700 dark:text-slate-400 mb-4">
+              <p className="text-[14px] text-gray-700 dark:text-gray-800 dark:text-slate-400 mb-4">
                 Add your first month of financials to get started
               </p>
               <button type="button" className="btn-primary" onClick={() => openMonthForm(selectedMonth)}>
@@ -835,8 +835,8 @@ export default function FinancialsPage() {
                             isSelected
                               ? "bg-blue-600/20 border-blue-500/40 text-blue-300"
                               : hasData
-                                ? "bg-[var(--bg-page)] dark:bg-[#243347] border-[var(--border2)] dark:border-white/10 text-[var(--text-primary)] dark:text-slate-300 hover:border-blue-500/30"
-                                : "bg-transparent border-[var(--border)] dark:border-white/[0.06] text-[var(--text-secondary)] dark:text-slate-600 hover:text-[var(--text-primary)] dark:hover:text-slate-400"
+                                ? "bg-[var(--bg-page)] dark:bg-[#243347] border-[var(--border2)] dark:border-white/10 text-[var(--text-primary)] dark:text-gray-800 dark:text-slate-300 hover:border-blue-500/30"
+                                : "bg-transparent border-[var(--border)] dark:border-white/[0.06] text-[var(--text-secondary)] dark:text-slate-600 hover:text-[var(--text-primary)] dark:hover:text-gray-800 dark:text-slate-400"
                           )}
                         >
                           {label}
@@ -914,7 +914,7 @@ export default function FinancialsPage() {
             <div className="table-scroll">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="text-left text-gray-700 dark:text-gray-300 border-b border-white/[0.06]">
+                <tr className="text-left text-gray-700 dark:text-gray-800 dark:text-gray-300 border-b border-white/[0.06]">
                   <th className="pb-3 pr-3 font-medium">Month</th>
                   <th className="pb-3 pr-3 font-medium text-right">Revenue</th>
                   <th className="pb-3 pr-3 font-medium text-right">Expenses</th>
@@ -1196,7 +1196,7 @@ export default function FinancialsPage() {
               <span>15% alert</span>
               <span>20% critical</span>
             </div>
-            <div className="mt-4 text-[12px] text-gray-700 dark:text-slate-400 leading-relaxed">
+            <div className="mt-4 text-[12px] text-gray-700 dark:text-gray-800 dark:text-slate-400 leading-relaxed">
               {occupancyPct <= 15
                 ? "Occupancy costs are healthy — well below the 20% lender alert threshold."
                 : occupancyPct <= 20
@@ -1254,7 +1254,7 @@ export default function FinancialsPage() {
               <div className="table-scroll">
               <table className="w-full text-[12px]">
                 <thead>
-                  <tr className="text-left text-gray-700 dark:text-gray-300 border-b border-white/[0.06]">
+                  <tr className="text-left text-gray-700 dark:text-gray-800 dark:text-gray-300 border-b border-white/[0.06]">
                     <th className="pb-3 pr-3 font-medium">Date</th>
                     <th className="pb-3 pr-3 font-medium">Description</th>
                     <th className="pb-3 pr-3 font-medium text-right">Amount</th>
@@ -1389,7 +1389,7 @@ export default function FinancialsPage() {
                 <div className="text-[14px] font-semibold text-slate-100">QuickBooks Online</div>
                 <span className="badge badge-amber text-[10px]">Not Connected</span>
               </div>
-              <div className="text-[12px] text-gray-700 dark:text-slate-400">
+              <div className="text-[12px] text-gray-700 dark:text-gray-800 dark:text-slate-400">
                 Connect QuickBooks to automatically sync monthly revenue, expenses, and debt service.
               </div>
             </div>
@@ -1407,7 +1407,7 @@ export default function FinancialsPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-[12px]">
                 <thead>
-                  <tr className="text-left text-gray-700 dark:text-gray-300 border-b border-white/[0.06]">
+                  <tr className="text-left text-gray-700 dark:text-gray-800 dark:text-gray-300 border-b border-white/[0.06]">
                     <th className="pb-3 pr-4 font-medium">QuickBooks Account</th>
                     <th className="pb-3 font-medium">LaundroCFO Field</th>
                   </tr>
@@ -1476,7 +1476,7 @@ export default function FinancialsPage() {
                   key={item.feature}
                   className="flex items-center justify-between py-2.5 border-b border-white/[0.04] last:border-b-0"
                 >
-                  <span className="text-[13px] text-slate-900 dark:text-slate-300">{item.feature}</span>
+                  <span className="text-[13px] text-slate-900 dark:text-gray-800 dark:text-slate-300">{item.feature}</span>
                   {item.status === "live" ? (
                     <span className="badge badge-green text-[10px]">Live</span>
                   ) : (

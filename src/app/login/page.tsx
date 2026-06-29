@@ -78,7 +78,7 @@ function LoginForm() {
             {loading ? "Signing in..." : "Sign In"}
           </button>
           <div className="flex justify-between text-[12px] text-gray-700 dark:text-slate-500 pt-1">
-            <Link href="/forgot-password" className="text-gray-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-300">Forgot password?</Link>
+            <Link href="/forgot-password" className="text-gray-700 dark:text-gray-800 dark:text-slate-300 hover:text-slate-900 dark:hover:text-gray-800 dark:text-slate-300">Forgot password?</Link>
           </div>
           <div className="text-center pt-2 border-t border-[var(--border)]">
             <Link href="/signup" className="text-[13px] text-blue-400 hover:text-blue-300 font-medium">

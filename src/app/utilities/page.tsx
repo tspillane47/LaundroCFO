@@ -142,11 +142,11 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-[var(--bg-card)] dark:bg-[#1e2a3a] border border-[var(--border)] dark:border-white/10 rounded-lg p-3 text-xs shadow-sm">
-      <div className="text-[var(--text-secondary)] dark:text-slate-400 mb-1">{label}</div>
+      <div className="text-[var(--text-secondary)] dark:text-gray-800 dark:text-slate-400 mb-1">{label}</div>
       {payload.map((entry) => (
         <div key={entry.name} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full" style={{ background: entry.color }} />
-          <span className="text-[var(--text-secondary)] dark:text-slate-300">{entry.name}:</span>
+          <span className="text-[var(--text-secondary)] dark:text-gray-800 dark:text-slate-300">{entry.name}:</span>
           <span className="text-[var(--text-primary)] dark:text-slate-100 font-semibold">{fmtDollar(entry.value)}</span>
         </div>
       ))}
@@ -670,7 +670,7 @@ export default function UtilitiesPage() {
                         isSelected
                           ? "bg-blue-600/20 border-blue-500/40 text-adaptive-info"
                           : hasData
-                            ? "bg-[var(--bg-page)] dark:bg-[#243347] border-[var(--border2)] dark:border-white/10 text-[var(--text-primary)] dark:text-slate-300 hover:border-blue-500/30"
+                            ? "bg-[var(--bg-page)] dark:bg-[#243347] border-[var(--border2)] dark:border-white/10 text-[var(--text-primary)] dark:text-gray-800 dark:text-slate-300 hover:border-blue-500/30"
                             : "bg-transparent border-white/[0.06] text-adaptive-muted hover:text-adaptive-muted"
                       )}
                     >
@@ -809,7 +809,7 @@ export default function UtilitiesPage() {
                   <Line type="monotone" dataKey="water" name="Water" stroke="#3b82f6" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="gas" name="Gas" stroke="#f59e0b" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="electric" name="Electric" stroke="#eab308" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="total" name="Total" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+                  <Line type="monotone" dataKey="total" name="Total" stroke="#374151" strokeWidth={2} strokeDasharray="4 4" dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

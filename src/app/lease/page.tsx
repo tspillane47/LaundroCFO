@@ -129,7 +129,7 @@ export default function OccupancyPage() {
   if (!store) {
     return (
       <div className="card text-center py-12">
-        <div className="text-slate-900 dark:text-slate-300 text-[14px]">No store found.</div>
+        <div className="text-slate-900 dark:text-gray-800 dark:text-slate-300 text-[14px]">No store found.</div>
         <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-2">
           Complete onboarding to manage occupancy and real estate.
         </p>

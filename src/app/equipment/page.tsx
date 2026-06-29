@@ -389,7 +389,7 @@ export default function EquipmentPage() {
               <div className="divide-y divide-white/[0.04]">
                 {metrics.ageBuckets.map((bucket) => (
                   <div key={bucket.label} className="flex items-center gap-3 py-3">
-                    <div className="text-[12px] text-gray-700 dark:text-slate-400 w-28 flex-shrink-0">{bucket.label}</div>
+                    <div className="text-[12px] text-gray-700 dark:text-gray-800 dark:text-slate-400 w-28 flex-shrink-0">{bucket.label}</div>
                     <div className="flex-1 h-2 bg-[var(--border)] dark:bg-[#243347] rounded-full overflow-hidden">
                       <div
                         className={clsx("h-full rounded-full transition-all", bucket.color)}
@@ -445,20 +445,20 @@ export default function EquipmentPage() {
                       const age = currentYear - item.installation_year;
                       return (
                         <tr key={item.id}>
-                          <td className="py-2.5 text-slate-900 dark:text-slate-300">{item.machine_type}</td>
-                          <td className="py-2.5 text-gray-700 dark:text-slate-400">{item.manufacturer}</td>
-                          <td className="py-2.5 text-gray-700 dark:text-slate-400">{item.machine_size}</td>
-                          <td className="py-2.5 text-gray-700 dark:text-slate-400">{item.quantity}</td>
-                          <td className="py-2.5 text-gray-700 dark:text-slate-400">{item.installation_year}</td>
+                          <td className="py-2.5 text-slate-900 dark:text-gray-800 dark:text-slate-300">{item.machine_type}</td>
+                          <td className="py-2.5 text-gray-700 dark:text-gray-800 dark:text-slate-400">{item.manufacturer}</td>
+                          <td className="py-2.5 text-gray-700 dark:text-gray-800 dark:text-slate-400">{item.machine_size}</td>
+                          <td className="py-2.5 text-gray-700 dark:text-gray-800 dark:text-slate-400">{item.quantity}</td>
+                          <td className="py-2.5 text-gray-700 dark:text-gray-800 dark:text-slate-400">{item.installation_year}</td>
                           <td className={clsx("py-2.5 font-semibold", ageColor(age))}>{age} yr</td>
-                          <td className="py-2.5 text-center text-gray-700 dark:text-slate-400">
+                          <td className="py-2.5 text-center text-gray-700 dark:text-gray-800 dark:text-slate-400">
                             {item.machine_type === "Washer" && item.high_speed_extract ? (
                               <span className="text-green-400">Yes</span>
                             ) : (
                               "—"
                             )}
                           </td>
-                          <td className="py-2.5 text-gray-700 dark:text-slate-400">{item.condition}</td>
+                          <td className="py-2.5 text-gray-700 dark:text-gray-800 dark:text-slate-400">{item.condition}</td>
                           <td className="py-2.5 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button
@@ -484,7 +484,7 @@ export default function EquipmentPage() {
                   {equipment.length > 0 && (
                     <tfoot>
                       <tr className="border-t border-white/[0.08]">
-                        <td className="pt-3 text-gray-700 dark:text-slate-400 font-semibold" colSpan={8}>
+                        <td className="pt-3 text-gray-700 dark:text-gray-800 dark:text-slate-400 font-semibold" colSpan={8}>
                           Total Replacement Cost
                         </td>
                         <td className="pt-3 text-right text-slate-100 font-bold">
@@ -566,7 +566,7 @@ export default function EquipmentPage() {
                         onChange={(e) => updateForm("high_speed_extract", e.target.checked)}
                         className="rounded border-[var(--border2)] dark:border-white/20 bg-[var(--bg-input)] dark:bg-[#1e2a3a]"
                       />
-                      <label htmlFor="high_speed_extract" className="text-[13px] text-slate-900 dark:text-slate-300">
+                      <label htmlFor="high_speed_extract" className="text-[13px] text-slate-900 dark:text-gray-800 dark:text-slate-300">
                         High Speed Extract (200G+)
                       </label>
                     </div>
@@ -614,14 +614,14 @@ export default function EquipmentPage() {
             <div className="section-title">Valuation Impact</div>
             <div className="space-y-3">
               <div className="flex items-center justify-between text-[13px]">
-                <span className="text-gray-700 dark:text-slate-400">Base equipment adjustment</span>
+                <span className="text-gray-700 dark:text-gray-800 dark:text-slate-400">Base equipment adjustment</span>
                 <span className={clsx("font-semibold", adjustmentColor(metrics.baseEquipmentAdjustment))}>
                   {formatAdjustment(metrics.baseEquipmentAdjustment)}
                 </span>
               </div>
               {metrics.bonus200GAdjustment > 0 && (
                 <div className="flex items-center justify-between text-[13px]">
-                  <span className="text-gray-700 dark:text-slate-400">200G bonus</span>
+                  <span className="text-gray-700 dark:text-gray-800 dark:text-slate-400">200G bonus</span>
                   <span className="font-semibold text-green-400">+0.10x</span>
                 </div>
               )}
@@ -691,7 +691,7 @@ export default function EquipmentPage() {
             <div className="space-y-3">
               <div>
                 <div className="flex items-center justify-between text-[12px] mb-1">
-                  <span className="text-gray-700 dark:text-slate-400">200G Washers</span>
+                  <span className="text-gray-700 dark:text-gray-800 dark:text-slate-400">200G Washers</span>
                   <span className="font-semibold text-slate-900 dark:text-slate-200">{metrics.pct200GWashers.toFixed(0)}%</span>
                 </div>
                 <div className="h-1.5 bg-[var(--border)] dark:bg-[#243347] rounded-full overflow-hidden">
@@ -703,7 +703,7 @@ export default function EquipmentPage() {
               </div>
               <div>
                 <div className="flex items-center justify-between text-[12px] mb-1">
-                  <span className="text-gray-700 dark:text-slate-400">Under 10 Years</span>
+                  <span className="text-gray-700 dark:text-gray-800 dark:text-slate-400">Under 10 Years</span>
                   <span className="font-semibold text-slate-900 dark:text-slate-200">{metrics.pctUnder10Years.toFixed(0)}%</span>
                 </div>
                 <div className="h-1.5 bg-[var(--border)] dark:bg-[#243347] rounded-full overflow-hidden">
