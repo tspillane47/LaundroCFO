@@ -18,8 +18,12 @@ import {
 import type { PortfolioTtmCashFlow, PortfolioTtmSummary, TtmMetrics } from "@/lib/financials";
 import type { ValuationResult } from "@/lib/valuation";
 import { PdfPageChrome } from "@/components/reports/PdfPageChrome";
-import { PdfDashboardDial, PDF_DIAL_ZONES } from "@/components/reports/PdfDashboardDial";
-import { PdfMetricGrid, PdfMetricTile, PdfDialRow, PdfDialWrap } from "@/components/reports/PdfMetricGrid";
+import { PdfMetricGrid, PdfMetricTile, PdfScorecard, PdfScorecardRow } from "@/components/reports/PdfMetricGrid";
+import {
+  dscrVerdict,
+  ebitdaMarginVerdict,
+  equipmentScoreVerdict,
+} from "@/lib/scorecard";
 
 export interface ReportProps {
   store: any;
@@ -530,47 +534,36 @@ export function ReportDocument(props: ReportProps) {
         <DataRow label="TTM Debt Service" value={m.ttmDebtService > 0 ? fmtDollar(m.ttmDebtService) : "Not reported"} />
         <DataRow label="Loan Balance" value={m.loanBalance > 0 ? fmtDollar(m.loanBalance) : "Not reported"} />
         <SectionHeader>Underwriting Ratios</SectionHeader>
-        <PdfDialRow>
-          <PdfDialWrap>
-            <PdfDashboardDial
-              label="DSCR"
-              value={m.ttmDebtService > 0 && m.dscr != null ? m.dscr : null}
-              displayValue={m.ttmDebtService > 0 && m.dscr != null ? fmtMultiple(m.dscr) : "N/A"}
-              min={0}
-              max={3}
-              zones={PDF_DIAL_ZONES.dscr}
-            />
-          </PdfDialWrap>
-          <PdfDialWrap>
-            <PdfDashboardDial
-              label="EBITDA Margin"
-              value={m.annualRevenue > 0 ? m.ebitdaMargin : null}
-              displayValue={m.annualRevenue > 0 ? fmtPct(m.ebitdaMargin) : "—"}
-              min={0}
-              max={40}
-              zones={PDF_DIAL_ZONES.ebitdaMargin}
-            />
-          </PdfDialWrap>
-          <PdfDialWrap>
-            <PdfDashboardDial
-              label="Equipment Score"
-              value={m.equipMetrics.totalMachines > 0 ? m.equipMetrics.qualityScore : null}
-              displayValue={m.equipMetrics.totalMachines > 0 ? String(m.equipMetrics.qualityScore) : "—"}
-              min={0}
-              max={100}
-              zones={PDF_DIAL_ZONES.equipmentScore}
-            />
-          </PdfDialWrap>
-        </PdfDialRow>
+        <PdfScorecardRow>
+          <PdfScorecard
+            label="DSCR"
+            value={m.ttmDebtService > 0 && m.dscr != null ? fmtMultiple(m.dscr) : "N/A"}
+            verdict={dscrVerdict(m.ttmDebtService > 0 ? m.dscr : null)}
+          />
+          <PdfScorecard
+            label="EBITDA Margin"
+            value={m.annualRevenue > 0 ? fmtPct(m.ebitdaMargin) : "—"}
+            verdict={m.annualRevenue > 0 ? ebitdaMarginVerdict(m.ebitdaMargin) : "Poor"}
+          />
+          <PdfScorecard
+            label="Equipment Score"
+            value={m.equipMetrics.totalMachines > 0 ? String(m.equipMetrics.qualityScore) : "—"}
+            verdict={
+              m.equipMetrics.totalMachines > 0
+                ? equipmentScoreVerdict(m.equipMetrics.qualityScore)
+                : "Poor"
+            }
+          />
+        </PdfScorecardRow>
         <PdfMetricGrid>
-          <MetricTile label="DSCR" value={m.ttmDebtService > 0 && m.dscr != null ? fmtMultiple(m.dscr) : "N/A"} valueColor={m.ttmDebtService > 0 && m.dscr != null ? ratioColor(m.dscr, 1.5, 1.25) : undefined} />
-          <MetricTile label="Global DSCR" value={m.portfolioDebtService > 0 && m.globalDscr != null ? fmtMultiple(m.globalDscr) : "N/A"} valueColor={m.portfolioDebtService > 0 && m.globalDscr != null ? ratioColor(m.globalDscr, 1.5, 1.25) : undefined} />
-          <MetricTile label="EBITDA Margin" value={fmtPct(m.ebitdaMargin)} valueColor={ratioColor(m.ebitdaMargin, 25, 20)} />
-          <MetricTile label="Rent / Revenue" value={fmtPct(m.rentToRevenue)} valueColor={ratioColor(m.rentToRevenue, 0, 15, true)} />
-          <MetricTile label="Utility / Revenue" value={fmtPct(m.utilityRatio)} valueColor={ratioColor(m.utilityRatio, 0, 17, true)} />
+          <MetricTile label="DSCR" value={m.ttmDebtService > 0 && m.dscr != null ? fmtMultiple(m.dscr) : "N/A"} />
+          <MetricTile label="Global DSCR" value={m.portfolioDebtService > 0 && m.globalDscr != null ? fmtMultiple(m.globalDscr) : "N/A"} />
+          <MetricTile label="EBITDA Margin" value={fmtPct(m.ebitdaMargin)} />
+          <MetricTile label="Rent / Revenue" value={fmtPct(m.rentToRevenue)} />
+          <MetricTile label="Utility / Revenue" value={fmtPct(m.utilityRatio)} />
           <MetricTile label="Revenue / SF" value={`$${m.revenuePerSF.toFixed(2)}`} />
           <MetricTile label="EBITDA / SF" value={`$${m.ebitdaPerSF.toFixed(2)}`} />
-          <MetricTile label="Debt Yield" value={m.loanBalance > 0 ? fmtPct(m.debtYield) : "N/A"} valueColor={m.loanBalance > 0 ? ratioColor(m.debtYield, 12, 8) : undefined} />
+          <MetricTile label="Debt Yield" value={m.loanBalance > 0 ? fmtPct(m.debtYield) : "N/A"} />
         </PdfMetricGrid>
         {m.utilityRatio > 17 && (
           <View style={styles.warningBox}>
@@ -659,7 +652,7 @@ export function ReportDocument(props: ReportProps) {
         <PdfMetricGrid>
           <MetricTile label="Total Machines" value={String(m.equipMetrics.totalMachines)} />
           <MetricTile label="Avg Age" value={`${m.equipMetrics.weightedAvgAge.toFixed(1)} yrs`} />
-          <MetricTile label="Equipment Score" value={`${m.equipMetrics.qualityScore}/100`} valueColor={m.equipMetrics.qualityScore >= 75 ? "#15803d" : "#b45309"} />
+          <MetricTile label="Equipment Score" value={`${m.equipMetrics.qualityScore}/100`} />
           <MetricTile label="Quality Grade" value={m.equipMetrics.grade} />
           <MetricTile label="Under 10yr" value={fmtPct(m.equipMetrics.pctUnder10Years, 0)} />
           <MetricTile label="200G Washers" value={fmtPct(m.equipMetrics.pct200GWashers, 0)} />

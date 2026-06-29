@@ -39,7 +39,7 @@ export function PdfPageChrome({ storeName, generatedDate, variant = "store" }: P
           render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
         />
       </View>
-      <Text style={{ fontSize: 7, color: "#94a3b8", lineHeight: 1.35 }}>
+      <Text style={{ fontSize: 7, color: "#374151", lineHeight: 1.35 }} wrap={false}>
         {getDisclaimerText("report-footer")}
       </Text>
     </View>
