@@ -40,11 +40,13 @@ import {
   type TtmMetrics,
 } from "@/lib/financials";
 import { KpiCard } from "@/components/ui/KpiCard";
-import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { DesktopOnlyGate } from "@/components/ui/DesktopOnlyGate";
+import { DisclaimerLabel } from "@/components/ui/Disclaimer";
+import { DashboardDial, zoneLetterGrade, type ColorZone } from "@/components/ui/DashboardDial";
+import { benchmarks as industryBenchmarks } from "@/lib/data";
 
 function parseDate(value: string | null): Date | null {
   if (!value) return null;
@@ -82,6 +84,57 @@ function scoreLabel(score: number): string {
   if (score >= 75) return "Good";
   if (score >= 60) return "Fair";
   return "Poor";
+}
+
+function fmtBenchmarkVal(v: number, unit: string): string {
+  if (unit === "$") return `$${Math.round(v).toLocaleString()}`;
+  if (unit === "x") return `${v.toFixed(2)}x`;
+  if (unit === "%") return `${v.toFixed(1)}%`;
+  if (unit === "yr") return `${v.toFixed(1)}yr`;
+  return `${v.toFixed(1)}${unit}`;
+}
+
+function equipmentGradeColor(grade: string): string {
+  if (grade === "A" || grade === "B") return "text-green-400";
+  if (grade === "C") return "text-amber-400";
+  return "text-red-400";
+}
+
+const EBITD_DIAL_ZONES: ColorZone[] = [
+  { start: 0, end: 15, color: "#ef4444", darkGlow: "rgba(239,68,68,0.6)" },
+  { start: 15, end: 22, color: "#f59e0b", darkGlow: "rgba(245,158,11,0.6)" },
+  { start: 22, end: 40, color: "#22c55e", darkGlow: "rgba(34,197,94,0.6)" },
+];
+
+const DSCR_DIAL_ZONES: ColorZone[] = [
+  { start: 0, end: 1.25, color: "#ef4444", darkGlow: "rgba(239,68,68,0.6)" },
+  { start: 1.25, end: 1.5, color: "#f59e0b", darkGlow: "rgba(245,158,11,0.6)" },
+  { start: 1.5, end: 3, color: "#22c55e", darkGlow: "rgba(34,197,94,0.6)" },
+];
+
+const EQUIP_SCORE_DIAL_ZONES: ColorZone[] = [
+  { start: 0, end: 50, color: "#ef4444", darkGlow: "rgba(239,68,68,0.6)" },
+  { start: 50, end: 70, color: "#f59e0b", darkGlow: "rgba(245,158,11,0.6)" },
+  { start: 70, end: 100, color: "#22c55e", darkGlow: "rgba(34,197,94,0.6)" },
+];
+
+function ReportMetricTile({
+  label,
+  value,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="card2 report-metric-card">
+      <div className="metric-label">{label}</div>
+      <div className={clsx("report-metric-value text-[20px] font-bold tabular-nums", valueClassName ?? "text-slate-100")}>
+        {value}
+      </div>
+    </div>
+  );
 }
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
@@ -580,6 +633,12 @@ function ReportsPageContent() {
   const cashFlow = portfolioCashFlow ?? portfolioData?.cashFlow;
   const storeDetails = portfolioData?.storeDetails ?? [];
 
+  const dialBenchmarks = useMemo(() => {
+    const ebitda = industryBenchmarks.find((b) => b.metric === "EBITDA Margin")!;
+    const dscr = industryBenchmarks.find((b) => b.metric === "DSCR")!;
+    return { ebitda, dscr };
+  }, []);
+
   const pdfDisabled =
     generatingPdf ||
     sharing ||
@@ -789,51 +848,26 @@ function ReportsPageContent() {
 
           <div className="card">
             <SectionHeading>Global Credit Metrics</SectionHeading>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="report-metric-grid">
               {[
                 {
                   label: "Global DSCR",
                   value: totals.annualDebtService > 0 ? fmtMultiple(totals.globalDSCR) : "N/A",
-                  explanation: "Combined EBITDA divided by total annual debt service across all stores.",
                 },
-                {
-                  label: "Global LTV",
-                  value: fmtPct(totals.globalLTV),
-                  explanation: "Total debt as a percentage of total portfolio business value.",
-                },
+                { label: "Global LTV", value: fmtPct(totals.globalLTV) },
                 {
                   label: "Debt Yield",
                   value: totals.portfolioDebt > 0 ? fmtPct(totals.debtYield) : "N/A",
-                  explanation: "Annual EBITDA divided by total outstanding debt.",
                 },
                 {
                   label: "Debt / EBITDA",
                   value: totals.annualEbitda > 0 ? fmtMultiple(totals.debtToEbitda) : "N/A",
-                  explanation: "Total debt relative to annual EBITDA — lower is better.",
                 },
-                {
-                  label: "Portfolio Cash",
-                  value: fmtDollar(totals.portfolioCash),
-                  explanation: "Combined operating, reserve, and petty cash across all stores.",
-                },
-                {
-                  label: "Portfolio Debt",
-                  value: fmtDollar(totals.portfolioDebt),
-                  explanation: "Total outstanding loan balances across active store loans.",
-                },
-                {
-                  label: "Portfolio Equity",
-                  value: fmtDollar(totals.portfolioEquity),
-                  explanation: "Portfolio value minus debt plus cash on hand.",
-                },
+                { label: "Portfolio Cash", value: fmtDollar(totals.portfolioCash) },
+                { label: "Portfolio Debt", value: fmtDollar(totals.portfolioDebt) },
+                { label: "Portfolio Equity", value: fmtDollar(totals.portfolioEquity) },
               ].map((item) => (
-                <div key={item.label} className="card2 p-4">
-                  <div className="metric-label mb-1">
-                    <MetricTooltip label={item.label} explanation={item.explanation} />
-                  </div>
-                  <div className="text-[18px] font-bold text-slate-100">{item.value}</div>
-                  <p className="text-[11px] text-gray-700 dark:text-slate-500 mt-2 leading-relaxed">{item.explanation}</p>
-                </div>
+                <ReportMetricTile key={item.label} label={item.label} value={item.value} />
               ))}
             </div>
           </div>
@@ -929,8 +963,10 @@ function ReportsPageContent() {
             </div>
           </div>
 
-          <div className="text-[11px] text-gray-700 dark:text-slate-600 pb-4">
-            Report generated by LaundroCFO — Portfolio — {generatedDate}
+          <div className="pt-2 pb-6 border-t border-white/[0.06]">
+            <p className="text-[11px] text-gray-700 dark:text-slate-600 leading-relaxed">
+              Report generated by LaundroCFO — Portfolio — {generatedDate}
+            </p>
           </div>
         </>
       )}
@@ -988,120 +1024,161 @@ function ReportsPageContent() {
         </div>
       </div>
 
-      {/* Lease + Equipment */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="card">
-          <SectionHeading>{metrics.isOwnerOccupied ? "Real Estate" : "Lease Summary"}</SectionHeading>
-          <div className="text-[13px] text-gray-700 dark:text-gray-800 dark:text-slate-400 space-y-2">
-            {metrics.isOwnerOccupied ? (
-              <>
-                <div>
-                  Value:{" "}
-                  <span className="text-gray-900 dark:text-white">
-                    {realEstate?.estimated_value ? fmtDollar(realEstate.estimated_value) : "—"}
-                  </span>
-                </div>
-                <div>
-                  Equity:{" "}
-                  <span className="text-green-400 font-semibold">
-                    {realEstate?.estimated_value != null && realEstate?.current_loan_balance != null
-                      ? fmtDollar(realEstate.estimated_value - realEstate.current_loan_balance)
-                      : "—"}
-                  </span>
-                </div>
-              </>
-            ) : lease ? (
-              <>
-                <div>
-                  Expires:{" "}
-                  <span className="text-gray-900 dark:text-white">
-                    {metrics.leaseExpiresStr} — {metrics.yearsRemaining.toFixed(1)} years remaining
-                  </span>
-                </div>
-                <div>
-                  Renewals:{" "}
-                  <span className="text-gray-900 dark:text-white">
-                    {metrics.availableOptions.length} option{metrics.availableOptions.length !== 1 ? "s" : ""} (total{" "}
-                    {metrics.totalLeaseControl.toFixed(1)}yr)
-                  </span>
-                </div>
-                <div>
-                  Monthly Rent:{" "}
-                  <span className="text-gray-900 dark:text-white">
-                    {metrics.monthlyRent ? fmtDollar(metrics.monthlyRent) : "—"}
-                    {metrics.camCharges > 0 ? " + CAM" : ""}
-                  </span>
-                </div>
-                <div>
-                  Occupancy Cost:{" "}
-                  <span className="text-gray-900 dark:text-white">
-                    {fmtPct(metrics.occupancyCostRatio)} of revenue
-                  </span>
-                </div>
-                <div>
-                  Lease Score:{" "}
-                  <span className="text-green-400 font-semibold">
-                    {metrics.leaseScore}/100 — {scoreLabel(metrics.leaseScore)}
-                  </span>
-                </div>
-              </>
-            ) : (
-              <div className="text-amber-400">No lease data on file</div>
-            )}
-          </div>
-        </div>
-        <div className="card">
-          <SectionHeading>Equipment Summary</SectionHeading>
-          <div className="text-[13px] text-gray-700 dark:text-gray-800 dark:text-slate-400 space-y-2">
-            <div>
-              Total Machines:{" "}
-              <span className="text-gray-900 dark:text-white">
-                {equipMetrics.totalMachines} ({equipMetrics.totalWashers} washers, {equipMetrics.totalDryers} dryers)
-              </span>
-            </div>
-            <div>
-              Average Age:{" "}
-              <span className="text-gray-900 dark:text-white">
-                {equipMetrics.weightedAvgAge.toFixed(1)} years — {scoreLabel(equipMetrics.qualityScore)}
-              </span>
-            </div>
-            <div>
-              Fleet Under 10yr:{" "}
-              <span className="text-gray-900 dark:text-white">{equipMetrics.pctUnder10Years.toFixed(0)}% of machines</span>
-            </div>
-            <div>
-              Replacement Estimate:{" "}
-              <span className="text-gray-900 dark:text-white">{fmtDollar(equipMetrics.estimatedReplacementValue)}</span>
-            </div>
-            <div>
-              Equipment Score:{" "}
-              <span className="text-green-400 font-semibold">
-                {equipMetrics.qualityScore}/100 — {scoreLabel(equipMetrics.qualityScore)}
-              </span>
-            </div>
-          </div>
+      {/* Lease summary */}
+      <div className="card">
+        <SectionHeading>{metrics.isOwnerOccupied ? "Real Estate" : "Lease Summary"}</SectionHeading>
+        <div className="text-[13px] text-gray-700 dark:text-gray-800 dark:text-slate-400 space-y-2">
+          {metrics.isOwnerOccupied ? (
+            <>
+              <div>
+                Value:{" "}
+                <span className="text-gray-900 dark:text-white">
+                  {realEstate?.estimated_value ? fmtDollar(realEstate.estimated_value) : "—"}
+                </span>
+              </div>
+              <div>
+                Equity:{" "}
+                <span className="text-green-400 font-semibold">
+                  {realEstate?.estimated_value != null && realEstate?.current_loan_balance != null
+                    ? fmtDollar(realEstate.estimated_value - realEstate.current_loan_balance)
+                    : "—"}
+                </span>
+              </div>
+            </>
+          ) : lease ? (
+            <>
+              <div>
+                Expires:{" "}
+                <span className="text-gray-900 dark:text-white">
+                  {metrics.leaseExpiresStr} — {metrics.yearsRemaining.toFixed(1)} years remaining
+                </span>
+              </div>
+              <div>
+                Renewals:{" "}
+                <span className="text-gray-900 dark:text-white">
+                  {metrics.availableOptions.length} option{metrics.availableOptions.length !== 1 ? "s" : ""} (total{" "}
+                  {metrics.totalLeaseControl.toFixed(1)}yr)
+                </span>
+              </div>
+              <div>
+                Monthly Rent:{" "}
+                <span className="text-gray-900 dark:text-white">
+                  {metrics.monthlyRent ? fmtDollar(metrics.monthlyRent) : "—"}
+                  {metrics.camCharges > 0 ? " + CAM" : ""}
+                </span>
+              </div>
+              <div>
+                Occupancy Cost:{" "}
+                <span className="text-gray-900 dark:text-white">
+                  {fmtPct(metrics.occupancyCostRatio)} of revenue
+                </span>
+              </div>
+              <div>
+                Lease Score:{" "}
+                <span className="text-green-400 font-semibold">
+                  {metrics.leaseScore}/100 — {scoreLabel(metrics.leaseScore)}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="text-amber-400">No lease data on file</div>
+          )}
         </div>
       </div>
 
-      {/* Financial Ratios */}
+      {/* Underwriting Ratios */}
       <div className="card">
-        <SectionHeading>Financial Ratios</SectionHeading>
-        <div className="grid grid-cols-4 gap-3">
+        <SectionHeading>Underwriting Ratios</SectionHeading>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <DashboardDial
+            compact
+            label={<DisclaimerLabel>DSCR</DisclaimerLabel>}
+            value={metrics.ttmDebtService > 0 ? metrics.dscr : null}
+            displayValue={metrics.dscr != null ? fmtMultiple(metrics.dscr) : "—"}
+            min={0}
+            max={3}
+            zones={DSCR_DIAL_ZONES}
+            grade={metrics.dscr != null ? zoneLetterGrade(metrics.dscr, 1.25, 1.5, 3) : null}
+            redEnd={1.25}
+            yellowEnd={1.5}
+            worstLabel={`Worst — ${fmtBenchmarkVal(dialBenchmarks.dscr.bottom25, "x")}`}
+            medianLabel={`Median — ${fmtBenchmarkVal(dialBenchmarks.dscr.median, "x")}`}
+            bestLabel={`Best — ${fmtBenchmarkVal(dialBenchmarks.dscr.top25, "x")}`}
+          />
+          <DashboardDial
+            compact
+            label={<DisclaimerLabel>EBITDA Margin</DisclaimerLabel>}
+            value={metrics.annualRevenue > 0 ? metrics.ebitdaMargin : null}
+            displayValue={metrics.annualRevenue > 0 ? fmtPct(metrics.ebitdaMargin) : "—"}
+            min={0}
+            max={40}
+            zones={EBITD_DIAL_ZONES}
+            grade={
+              metrics.annualRevenue > 0
+                ? zoneLetterGrade(metrics.ebitdaMargin, 15, 22, 40)
+                : null
+            }
+            redEnd={15}
+            yellowEnd={22}
+            worstLabel={`Worst — ${fmtBenchmarkVal(dialBenchmarks.ebitda.bottom25, "%")}`}
+            medianLabel={`Median — ${fmtBenchmarkVal(dialBenchmarks.ebitda.median, "%")}`}
+            bestLabel={`Best — ${fmtBenchmarkVal(dialBenchmarks.ebitda.top25, "%")}`}
+          />
+          <DashboardDial
+            compact
+            label="Equipment Score"
+            value={equipMetrics.totalMachines > 0 ? equipMetrics.qualityScore : null}
+            displayValue={equipMetrics.totalMachines > 0 ? String(equipMetrics.qualityScore) : "—"}
+            min={0}
+            max={100}
+            zones={EQUIP_SCORE_DIAL_ZONES}
+            grade={
+              equipMetrics.totalMachines > 0
+                ? zoneLetterGrade(equipMetrics.qualityScore, 50, 70, 100)
+                : null
+            }
+            redEnd={50}
+            yellowEnd={70}
+            worstLabel="Worst — 0"
+            medianLabel="Median — 65"
+            bestLabel="Best — 90+"
+          />
+        </div>
+        <div className="report-metric-grid">
           {[
-            ["DSCR", metrics.dscr != null ? fmtMultiple(metrics.dscr) : "N/A", metrics.dscr != null ? ratioColorClass(metrics.dscr, 1.25, 1.0) : "text-gray-700 dark:text-gray-800 dark:text-slate-400"],
-            ["Global DSCR", metrics.globalDscr != null ? fmtMultiple(metrics.globalDscr) : "N/A", metrics.globalDscr != null ? ratioColorClass(metrics.globalDscr, 1.25, 1.0) : "text-gray-700 dark:text-gray-800 dark:text-slate-400"],
+            ["DSCR", metrics.dscr != null ? fmtMultiple(metrics.dscr) : "N/A", metrics.dscr != null ? ratioColorClass(metrics.dscr, 1.25, 1.0) : "text-gray-700 dark:text-slate-400"],
+            ["Global DSCR", metrics.globalDscr != null ? fmtMultiple(metrics.globalDscr) : "N/A", metrics.globalDscr != null ? ratioColorClass(metrics.globalDscr, 1.25, 1.0) : "text-gray-700 dark:text-slate-400"],
             ["EBITDA Margin", fmtPct(metrics.ebitdaMargin), ratioColorClass(metrics.ebitdaMargin, 25, 20)],
             ["Rent / Revenue", fmtPct(metrics.rentToRevenue), ratioColorClass(metrics.rentToRevenue, 0, 15, true)],
             ["Utility / Revenue", fmtPct(metrics.utilityRatio), ratioColorClass(metrics.utilityRatio, 0, 17, true)],
             ["Revenue / SF", `$${metrics.revenuePerSF.toFixed(2)}`, "text-gray-900 dark:text-white"],
             ["EBITDA / SF", `$${metrics.ebitdaPerSF.toFixed(2)}`, "text-gray-900 dark:text-white"],
-            ["Debt Yield", store.loan_balance ? fmtPct(metrics.debtYield) : "N/A", ratioColorClass(metrics.debtYield, 12, 8)],
+            ["Debt Yield", store.loan_balance ? fmtPct(metrics.debtYield) : "N/A", store.loan_balance ? ratioColorClass(metrics.debtYield, 12, 8) : "text-gray-700 dark:text-slate-400"],
           ].map(([label, val, color]) => (
-            <div key={label as string} className="card2">
-              <div className="metric-label">{label}</div>
-              <div className={clsx("text-[16px] font-bold", color)}>{val}</div>
-            </div>
+            <ReportMetricTile key={label as string} label={label as string} value={val as string} valueClassName={color as string} />
           ))}
+        </div>
+      </div>
+
+      {/* Equipment Analysis */}
+      <div className="card">
+        <SectionHeading>Equipment Analysis</SectionHeading>
+        <div className="report-metric-grid">
+          <ReportMetricTile label="Total Machines" value={String(equipMetrics.totalMachines)} />
+          <ReportMetricTile label="Avg Age" value={`${equipMetrics.weightedAvgAge.toFixed(1)} yrs`} />
+          <ReportMetricTile
+            label="Equipment Score"
+            value={`${equipMetrics.qualityScore}/100`}
+            valueClassName={ratioColorClass(equipMetrics.qualityScore, 75, 60)}
+          />
+          <ReportMetricTile
+            label="Quality Grade"
+            value={equipMetrics.grade}
+            valueClassName={equipmentGradeColor(equipMetrics.grade)}
+          />
+          <ReportMetricTile label="Under 10yr" value={`${equipMetrics.pctUnder10Years.toFixed(0)}%`} />
+          <ReportMetricTile label="200G Washers" value={`${equipMetrics.pct200GWashers.toFixed(0)}%`} />
+          <ReportMetricTile label="Replacement Est." value={fmtDollar(equipMetrics.estimatedReplacementValue)} />
         </div>
       </div>
 
@@ -1154,8 +1231,10 @@ function ReportsPageContent() {
         </div>
       )}
 
-      <div className="text-[11px] text-gray-700 dark:text-slate-600 pb-4">
-        Report generated by LaundroCFO — {storeName} — {generatedDate}
+      <div className="pt-2 pb-6 border-t border-white/[0.06]">
+        <p className="text-[11px] text-gray-700 dark:text-slate-600 leading-relaxed">
+          Report generated by LaundroCFO — {storeName} — {generatedDate}
+        </p>
       </div>
         </>
       )}

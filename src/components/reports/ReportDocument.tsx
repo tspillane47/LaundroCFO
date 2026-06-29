@@ -17,7 +17,9 @@ import {
 } from "@/lib/calculations";
 import type { PortfolioTtmCashFlow, PortfolioTtmSummary, TtmMetrics } from "@/lib/financials";
 import type { ValuationResult } from "@/lib/valuation";
-import { DisclaimerPdf } from "@/components/reports/DisclaimerPdf";
+import { PdfPageChrome } from "@/components/reports/PdfPageChrome";
+import { PdfDashboardDial, PDF_DIAL_ZONES } from "@/components/reports/PdfDashboardDial";
+import { PdfMetricGrid, PdfMetricTile, PdfDialRow, PdfDialWrap } from "@/components/reports/PdfMetricGrid";
 
 export interface ReportProps {
   store: any;
@@ -36,7 +38,7 @@ export interface ReportProps {
 }
 
 const styles = StyleSheet.create({
-  page: { backgroundColor: "#F8FAFC", padding: 40, fontFamily: "Helvetica" },
+  page: { backgroundColor: "#F8FAFC", paddingTop: 40, paddingHorizontal: 40, paddingBottom: 58, fontFamily: "Helvetica" },
   coverPage: { backgroundColor: "#1a2b3c", padding: 50, height: "100%" },
   coverTitle: {
     color: "white",
@@ -76,7 +78,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     padding: 12,
     margin: 4,
-    flex: 1,
   },
   metricValue: { fontSize: 18, fontWeight: "bold", color: "#1e293b", marginBottom: 2 },
   metricLabel: {
@@ -198,22 +199,8 @@ function labelize(value: string | null | undefined): string {
   return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function PageChrome({ storeName }: { storeName: string }) {
-  return (
-    <>
-      <View style={{ position: "absolute", bottom: 28, left: 40, right: 40 }} fixed>
-        <DisclaimerPdf variant="report-footer" />
-      </View>
-      <Text style={styles.footer} fixed>
-        LaundroCFO — {storeName} — Confidential
-      </Text>
-      <Text
-        style={styles.pageNumber}
-        render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
-        fixed
-      />
-    </>
-  );
+function PageChrome({ storeName, generatedDate }: { storeName: string; generatedDate: string }) {
+  return <PdfPageChrome storeName={storeName} generatedDate={generatedDate} variant="store" />;
 }
 
 function SectionHeader({ children }: { children: string }) {
@@ -252,19 +239,12 @@ function MetricTile({
   label,
   value,
   valueColor,
-  width = "48%",
 }: {
   label: string;
   value: string;
   valueColor?: string;
-  width?: string;
 }) {
-  return (
-    <View style={[styles.metricCard, { width }]}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={[styles.metricValue, valueColor ? { color: valueColor } : {}]}>{value}</Text>
-    </View>
-  );
+  return <PdfMetricTile label={label} value={value} valueColor={valueColor} />;
 }
 
 function computeReportMetrics(props: ReportProps) {
@@ -456,7 +436,7 @@ export function ReportDocument(props: ReportProps) {
       <Page size="LETTER" style={styles.page}>
         <Text style={styles.sectionTitle}>Executive Summary</Text>
         <Text style={styles.bodyText}>{executiveSummary}</Text>
-        <View style={styles.grid2}>
+        <PdfMetricGrid>
           <MetricTile label="Store Value" value={fmtDollar(m.valuation.businessValue)} valueColor="#15803d" />
           <MetricTile label="EBITDA Multiple" value={fmtMultiple(m.valuation.finalMultiple)} valueColor="#1d4ed8" />
           <MetricTile label="Annual EBITDA" value={fmtDollar(m.annualEbitda)} />
@@ -465,7 +445,7 @@ export function ReportDocument(props: ReportProps) {
             value={m.annualRevenue > 0 ? fmtPct(m.ebitdaMargin) : "—"}
             valueColor={m.annualRevenue > 0 ? ratioColor(m.ebitdaMargin, 25, 20) : undefined}
           />
-        </View>
+        </PdfMetricGrid>
         <SectionHeader>Financeability Snapshot</SectionHeader>
         <DataRow
           label="Store DSCR"
@@ -495,7 +475,7 @@ export function ReportDocument(props: ReportProps) {
             </Text>
           </View>
         ) : null}
-        <PageChrome storeName={m.storeName} />
+        <PageChrome storeName={m.storeName} generatedDate={generatedDate} />
       </Page>
 
       {/* 3 — Store Overview */}
@@ -533,7 +513,7 @@ export function ReportDocument(props: ReportProps) {
             {m.revenuePerSF >= 150 ? "indicate strong productivity relative to industry benchmarks." : "should be benchmarked against comparable stores in the market."}
           </Text>
         </View>
-        <PageChrome storeName={m.storeName} />
+        <PageChrome storeName={m.storeName} generatedDate={generatedDate} />
       </Page>
 
       {/* 4 — Financial Analysis */}
@@ -550,16 +530,48 @@ export function ReportDocument(props: ReportProps) {
         <DataRow label="TTM Debt Service" value={m.ttmDebtService > 0 ? fmtDollar(m.ttmDebtService) : "Not reported"} />
         <DataRow label="Loan Balance" value={m.loanBalance > 0 ? fmtDollar(m.loanBalance) : "Not reported"} />
         <SectionHeader>Underwriting Ratios</SectionHeader>
-        <View style={styles.grid2}>
-          <MetricTile label="DSCR" value={m.ttmDebtService > 0 && m.dscr != null ? fmtMultiple(m.dscr) : "N/A"} valueColor={m.ttmDebtService > 0 && m.dscr != null ? ratioColor(m.dscr, 1.5, 1.25) : undefined} width="23%" />
-          <MetricTile label="Global DSCR" value={m.portfolioDebtService > 0 && m.globalDscr != null ? fmtMultiple(m.globalDscr) : "N/A"} valueColor={m.portfolioDebtService > 0 && m.globalDscr != null ? ratioColor(m.globalDscr, 1.5, 1.25) : undefined} width="23%" />
-          <MetricTile label="EBITDA Margin" value={fmtPct(m.ebitdaMargin)} valueColor={ratioColor(m.ebitdaMargin, 25, 20)} width="23%" />
-          <MetricTile label="Rent / Revenue" value={fmtPct(m.rentToRevenue)} valueColor={ratioColor(m.rentToRevenue, 0, 15, true)} width="23%" />
-          <MetricTile label="Utility / Revenue" value={fmtPct(m.utilityRatio)} valueColor={ratioColor(m.utilityRatio, 0, 17, true)} width="23%" />
-          <MetricTile label="Revenue / SF" value={`$${m.revenuePerSF.toFixed(2)}`} width="23%" />
-          <MetricTile label="EBITDA / SF" value={`$${m.ebitdaPerSF.toFixed(2)}`} width="23%" />
-          <MetricTile label="Debt Yield" value={m.loanBalance > 0 ? fmtPct(m.debtYield) : "N/A"} valueColor={m.loanBalance > 0 ? ratioColor(m.debtYield, 12, 8) : undefined} width="23%" />
-        </View>
+        <PdfDialRow>
+          <PdfDialWrap>
+            <PdfDashboardDial
+              label="DSCR"
+              value={m.ttmDebtService > 0 && m.dscr != null ? m.dscr : null}
+              displayValue={m.ttmDebtService > 0 && m.dscr != null ? fmtMultiple(m.dscr) : "N/A"}
+              min={0}
+              max={3}
+              zones={PDF_DIAL_ZONES.dscr}
+            />
+          </PdfDialWrap>
+          <PdfDialWrap>
+            <PdfDashboardDial
+              label="EBITDA Margin"
+              value={m.annualRevenue > 0 ? m.ebitdaMargin : null}
+              displayValue={m.annualRevenue > 0 ? fmtPct(m.ebitdaMargin) : "—"}
+              min={0}
+              max={40}
+              zones={PDF_DIAL_ZONES.ebitdaMargin}
+            />
+          </PdfDialWrap>
+          <PdfDialWrap>
+            <PdfDashboardDial
+              label="Equipment Score"
+              value={m.equipMetrics.totalMachines > 0 ? m.equipMetrics.qualityScore : null}
+              displayValue={m.equipMetrics.totalMachines > 0 ? String(m.equipMetrics.qualityScore) : "—"}
+              min={0}
+              max={100}
+              zones={PDF_DIAL_ZONES.equipmentScore}
+            />
+          </PdfDialWrap>
+        </PdfDialRow>
+        <PdfMetricGrid>
+          <MetricTile label="DSCR" value={m.ttmDebtService > 0 && m.dscr != null ? fmtMultiple(m.dscr) : "N/A"} valueColor={m.ttmDebtService > 0 && m.dscr != null ? ratioColor(m.dscr, 1.5, 1.25) : undefined} />
+          <MetricTile label="Global DSCR" value={m.portfolioDebtService > 0 && m.globalDscr != null ? fmtMultiple(m.globalDscr) : "N/A"} valueColor={m.portfolioDebtService > 0 && m.globalDscr != null ? ratioColor(m.globalDscr, 1.5, 1.25) : undefined} />
+          <MetricTile label="EBITDA Margin" value={fmtPct(m.ebitdaMargin)} valueColor={ratioColor(m.ebitdaMargin, 25, 20)} />
+          <MetricTile label="Rent / Revenue" value={fmtPct(m.rentToRevenue)} valueColor={ratioColor(m.rentToRevenue, 0, 15, true)} />
+          <MetricTile label="Utility / Revenue" value={fmtPct(m.utilityRatio)} valueColor={ratioColor(m.utilityRatio, 0, 17, true)} />
+          <MetricTile label="Revenue / SF" value={`$${m.revenuePerSF.toFixed(2)}`} />
+          <MetricTile label="EBITDA / SF" value={`$${m.ebitdaPerSF.toFixed(2)}`} />
+          <MetricTile label="Debt Yield" value={m.loanBalance > 0 ? fmtPct(m.debtYield) : "N/A"} valueColor={m.loanBalance > 0 ? ratioColor(m.debtYield, 12, 8) : undefined} />
+        </PdfMetricGrid>
         {m.utilityRatio > 17 && (
           <View style={styles.warningBox}>
             <Text style={styles.boxText}>
@@ -567,7 +579,7 @@ export function ReportDocument(props: ReportProps) {
             </Text>
           </View>
         )}
-        <PageChrome storeName={m.storeName} />
+        <PageChrome storeName={m.storeName} generatedDate={generatedDate} />
       </Page>
 
       {/* 5 — Lease Analysis */}
@@ -637,22 +649,22 @@ export function ReportDocument(props: ReportProps) {
             <Text style={styles.boxText}>No lease data on file. Add occupancy details in LaundroCFO.</Text>
           </View>
         )}
-        <PageChrome storeName={m.storeName} />
+        <PageChrome storeName={m.storeName} generatedDate={generatedDate} />
       </Page>
 
       {/* 6 — Equipment Analysis */}
       <Page size="LETTER" style={styles.page}>
         <Text style={styles.sectionTitle}>Equipment Analysis</Text>
         <Text style={styles.bodyText}>Fleet composition and replacement risk for collateral review.</Text>
-        <View style={styles.grid2}>
-          <MetricTile label="Total Machines" value={String(m.equipMetrics.totalMachines)} width="23%" />
-          <MetricTile label="Avg Age" value={`${m.equipMetrics.weightedAvgAge.toFixed(1)} yrs`} width="23%" />
-          <MetricTile label="Equipment Score" value={`${m.equipMetrics.qualityScore}/100`} valueColor={m.equipMetrics.qualityScore >= 75 ? "#15803d" : "#b45309"} width="23%" />
-          <MetricTile label="Quality Grade" value={m.equipMetrics.grade} width="23%" />
-          <MetricTile label="Under 10yr" value={fmtPct(m.equipMetrics.pctUnder10Years, 0)} width="23%" />
-          <MetricTile label="200G Washers" value={fmtPct(m.equipMetrics.pct200GWashers, 0)} width="23%" />
-          <MetricTile label="Replacement Est." value={fmtDollar(m.equipMetrics.estimatedReplacementValue)} width="48%" />
-        </View>
+        <PdfMetricGrid>
+          <MetricTile label="Total Machines" value={String(m.equipMetrics.totalMachines)} />
+          <MetricTile label="Avg Age" value={`${m.equipMetrics.weightedAvgAge.toFixed(1)} yrs`} />
+          <MetricTile label="Equipment Score" value={`${m.equipMetrics.qualityScore}/100`} valueColor={m.equipMetrics.qualityScore >= 75 ? "#15803d" : "#b45309"} />
+          <MetricTile label="Quality Grade" value={m.equipMetrics.grade} />
+          <MetricTile label="Under 10yr" value={fmtPct(m.equipMetrics.pctUnder10Years, 0)} />
+          <MetricTile label="200G Washers" value={fmtPct(m.equipMetrics.pct200GWashers, 0)} />
+          <MetricTile label="Replacement Est." value={fmtDollar(m.equipMetrics.estimatedReplacementValue)} />
+        </PdfMetricGrid>
         <SectionHeader>Fleet Detail</SectionHeader>
         {m.equipRecords.length === 0 ? (
           <Text style={styles.bodyText}>No equipment inventory on file.</Text>
@@ -682,7 +694,7 @@ export function ReportDocument(props: ReportProps) {
             ))}
           </>
         )}
-        <PageChrome storeName={m.storeName} />
+        <PageChrome storeName={m.storeName} generatedDate={generatedDate} />
       </Page>
 
       {/* 7 — Valuation Analysis */}
@@ -721,7 +733,7 @@ export function ReportDocument(props: ReportProps) {
             </View>
           ))
         )}
-        <PageChrome storeName={m.storeName} />
+        <PageChrome storeName={m.storeName} generatedDate={generatedDate} />
       </Page>
 
       {/* 8 — Risk Assessment */}
@@ -761,7 +773,7 @@ export function ReportDocument(props: ReportProps) {
               ? "Store meets minimum underwriting thresholds. Recommend conventional financing with standard covenants and utility cost monitoring."
               : "Additional due diligence recommended. Address flagged risks before lender submission."}
         </Text>
-        <PageChrome storeName={m.storeName} />
+        <PageChrome storeName={m.storeName} generatedDate={generatedDate} />
       </Page>
 
       {/* 9 — Insurance Summary */}
@@ -796,7 +808,7 @@ export function ReportDocument(props: ReportProps) {
             ))}
           </>
         )}
-        <PageChrome storeName={m.storeName} />
+        <PageChrome storeName={m.storeName} generatedDate={generatedDate} />
       </Page>
 
       {/* 10 — Portfolio Summary */}
@@ -854,7 +866,7 @@ export function ReportDocument(props: ReportProps) {
         <DataRow label="EBITDA" value={fmtDollar(portfolioCashFlow.ebitda)} positive />
         <DataRow label="Debt Service" value={fmtDollar(portfolioCashFlow.debtService)} />
         <DataRow label="Cash Flow After Debt" value={fmtDollar(portfolioCashFlow.cashFlowAfterDebt)} positive />
-        <PageChrome storeName={m.storeName} />
+        <PageChrome storeName={m.storeName} generatedDate={generatedDate} />
       </Page>
 
       {/* 11 — Appendix */}
@@ -878,7 +890,7 @@ export function ReportDocument(props: ReportProps) {
         <Text style={[styles.bodyText, { fontSize: 8, color: '#374151' }]}>
           This report is generated by LaundroCFO based on owner-reported data. It supports lender due diligence but does not constitute an appraisal, legal opinion, or lending commitment. LaundroCFO makes no warranties as to accuracy or completeness. All figures must be independently verified prior to any credit decision. Report generated {generatedDate}.
         </Text>
-        <PageChrome storeName={m.storeName} />
+        <PageChrome storeName={m.storeName} generatedDate={generatedDate} />
       </Page>
     </Document>
   );

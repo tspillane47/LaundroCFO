@@ -1,7 +1,8 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import type { PortfolioReportData } from "@/lib/getPortfolioReport";
-import { DisclaimerPdf } from "@/components/reports/DisclaimerPdf";
+import { PdfPageChrome } from "@/components/reports/PdfPageChrome";
+import { PdfMetricGrid, PdfMetricTile } from "@/components/reports/PdfMetricGrid";
 
 export interface PortfolioReportProps {
   data: PortfolioReportData;
@@ -14,7 +15,7 @@ const fmtMultiple = (n: number) => n.toFixed(2) + "x";
 const fmtPercent = (n: number) => n.toFixed(1) + "%";
 
 const styles = StyleSheet.create({
-  page: { backgroundColor: "#F8FAFC", padding: 40, fontFamily: "Helvetica" },
+  page: { backgroundColor: "#F8FAFC", paddingTop: 40, paddingHorizontal: 40, paddingBottom: 58, fontFamily: "Helvetica" },
   coverPage: {
     backgroundColor: "#0a1628",
     padding: 50,
@@ -93,18 +94,14 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: 10, color: "#64748b", flex: 1 },
   rowValue: { fontSize: 10, color: "#1e293b", fontWeight: "bold", textAlign: "right" },
   metricCard: {
-    width: "23%",
+    width: 125,
     backgroundColor: "#ffffff",
     border: "1px solid #e2e8f0",
     borderRadius: 6,
-    padding: "10 12",
-    marginBottom: 10,
-    marginRight: "2%",
-  },
-  metricCardGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-start",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    marginBottom: 8,
+    marginRight: 8,
   },
   metricValue: { fontSize: 18, fontWeight: "bold", color: "#1e293b" },
   metricLabel: {
@@ -172,22 +169,8 @@ function getLargestMachine(equipment: EquipmentRecord[]): string {
   return label;
 }
 
-function PageChrome() {
-  return (
-    <>
-      <View style={{ position: "absolute", bottom: 28, left: 40, right: 40 }} fixed>
-        <DisclaimerPdf variant="report-footer" />
-      </View>
-      <Text style={styles.footer} fixed>
-        LaundroCFO — Portfolio Report — Confidential
-      </Text>
-      <Text
-        style={styles.pageNumber}
-        render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
-        fixed
-      />
-    </>
-  );
+function PageChrome({ generatedDate }: { generatedDate: string }) {
+  return <PdfPageChrome storeName="Portfolio" generatedDate={generatedDate} variant="portfolio" />;
 }
 
 function SectionHeader({ children }: { children: string }) {
@@ -231,12 +214,7 @@ function MetricTile({
   value: string;
   valueColor?: string;
 }) {
-  return (
-    <View style={styles.metricCard}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={[styles.metricValue, valueColor ? { color: valueColor } : {}]}>{value}</Text>
-    </View>
-  );
+  return <PdfMetricTile label={label} value={value} valueColor={valueColor} />;
 }
 
 function CoverInfoCol({ label, value }: { label: string; value: string }) {
@@ -298,7 +276,7 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
         <Text style={styles.bodyText}>
           Aggregated metrics across {totals.storeCount} store{totals.storeCount !== 1 ? "s" : ""}.
         </Text>
-        <View style={styles.metricCardGrid}>
+        <PdfMetricGrid>
           <MetricTile label="Portfolio Value" value={fmtCurrency(totals.portfolioValue)} valueColor="#15803d" />
           <MetricTile label="Portfolio Debt" value={fmtCurrency(totals.portfolioDebt)} />
           <MetricTile label="Portfolio Equity" value={fmtCurrency(totals.portfolioEquity)} />
@@ -310,7 +288,7 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
           <MetricTile label="Global LTV" value={fmtPercent(totals.globalLTV)} />
           <MetricTile label="Annual Revenue" value={fmtCurrency(totals.annualRevenue)} />
           <MetricTile label="Annual EBITDA" value={fmtCurrency(totals.annualEbitda)} />
-        </View>
+        </PdfMetricGrid>
         <SectionHeader>Portfolio Net Worth</SectionHeader>
         <DataRow label="Portfolio Value" value={fmtCurrency(totals.portfolioValue)} />
         <DataRow label="+ Cash" value={fmtCurrency(totals.portfolioCash)} positive />
@@ -321,7 +299,7 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
           value={fmtCurrency(totals.portfolioNetWorth)}
           valueColor="#15803d"
         />
-        <PageChrome />
+        <PageChrome generatedDate={generatedDate} />
       </Page>
 
       {/* Page 3 — Store Summary */}
@@ -354,7 +332,7 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
             <Text style={[styles.tableCellRight, { width: "10%" }]}>{`${d.leaseScore}/100`}</Text>
           </View>
         ))}
-        <PageChrome />
+        <PageChrome generatedDate={generatedDate} />
       </Page>
 
       {/* Page 4 — Cash Flow & Credit Metrics */}
@@ -393,7 +371,7 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
         <Text style={[styles.bodyText, { fontSize: 8, marginTop: -4 }]}>
           Total debt relative to annual EBITDA — lower is better.
         </Text>
-        <PageChrome />
+        <PageChrome generatedDate={generatedDate} />
       </Page>
 
       {/* Page 5 — Lease & Equipment Summary */}
@@ -456,7 +434,7 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
             </View>
           );
         })}
-        <PageChrome />
+        <PageChrome generatedDate={generatedDate} />
       </Page>
 
       {/* Page 6 — Appendix */}
@@ -485,7 +463,7 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
         <Text style={[styles.bodyText, { fontSize: 8, color: '#374151', marginTop: 12 }]}>
           Report generated {generatedDate}. All figures based on owner-reported data and should be independently verified.
         </Text>
-        <PageChrome />
+        <PageChrome generatedDate={generatedDate} />
       </Page>
     </Document>
   );

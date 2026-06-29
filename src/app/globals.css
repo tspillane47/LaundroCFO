@@ -196,6 +196,29 @@ html, body {
     .metric-grid { grid-template-columns: repeat(4, 1fr); }
   }
 
+  /* Reports metric grid: 1 col mobile, 2 tablet, 4 desktop — no label/value wrapping */
+  .report-metric-grid {
+    display: grid;
+    grid-template-columns: minmax(140px, 1fr);
+    gap: 0.75rem;
+  }
+  @media (min-width: 640px) {
+    .report-metric-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+  }
+  @media (min-width: 1024px) {
+    .report-metric-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); }
+  }
+  .report-metric-card {
+    min-width: 140px;
+  }
+  .report-metric-card .metric-label,
+  .report-metric-card .report-metric-value {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    hyphens: none;
+  }
+
   /* Horizontally scrollable tables */
   .table-scroll {
     overflow-x: auto;
