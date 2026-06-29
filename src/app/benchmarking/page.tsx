@@ -19,7 +19,8 @@ import {
   type StoreFinancialProfile,
 } from "@/lib/financials";
 import { fmtMultiple, fmtPct } from "@/lib/calculations";
-import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
 
 type BenchmarkRowData = {
@@ -270,17 +271,7 @@ export default function BenchmarkingPage() {
   }, [metrics]);
 
   if (storesLoading || loading) {
-    return (
-      <div className="space-y-5">
-        <CardSkeleton />
-        <div className="grid grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <CardSkeleton key={i} />
-          ))}
-        </div>
-        <CardSkeleton />
-      </div>
-    );
+    return <LoadingSkeleton variant="metric" />;
   }
 
   if (loadError) {
@@ -291,7 +282,7 @@ export default function BenchmarkingPage() {
     return (
       <div className="card text-center py-10">
         <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
-          Add store financials to see benchmarks
+          Select a store to see benchmarks
         </p>
       </div>
     );
@@ -299,11 +290,13 @@ export default function BenchmarkingPage() {
 
   if (records.length === 0 || !metrics) {
     return (
-      <div className="card text-center py-10">
-        <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
-          Add store financials to see benchmarks
-        </p>
-      </div>
+      <EmptyState
+        icon="BarChart3"
+        title="No data to benchmark yet"
+        description="Add financials to see how your store compares to industry averages"
+        ctaLabel="Go to Financials"
+        ctaHref="/financials"
+      />
     );
   }
 

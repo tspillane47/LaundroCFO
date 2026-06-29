@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { ScoreRing } from "@/components/ui/ScoreRing";
-import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { PageError } from "@/components/ui/PageError";
 import {
@@ -784,14 +785,30 @@ export default function InsurancePage() {
   }
 
   if (loading) {
+    return <LoadingSkeleton variant="card" />;
+  }
+
+  if (policies.length === 0 && !showPolicyForm) {
     return (
       <div className="space-y-5">
-        <div className="grid grid-cols-3 lg:grid-cols-6 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <CardSkeleton key={i} />
-          ))}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-[15px] font-semibold text-slate-100">Insurance Management</h1>
+            <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-0.5">
+              {store?.name ?? "Store"} · {store?.address ?? "Address not set"}
+            </p>
+          </div>
+          <button type="button" onClick={openAddPolicy} className="btn-primary">
+            + Add Policy
+          </button>
         </div>
-        <CardSkeleton />
+        <EmptyState
+          icon="Shield"
+          title="No insurance policies yet"
+          description="Add your policies to track coverage and renewals"
+          ctaLabel="Add Policy"
+          ctaHref="/insurance"
+        />
       </div>
     );
   }
@@ -1218,21 +1235,10 @@ export default function InsurancePage() {
       {/* Policies */}
       <div className="card">
         <div className="section-title">Policies</div>
-        {policies.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-[15px] font-semibold text-slate-900 dark:text-slate-200 mb-2">No insurance policies on file</div>
-            <div className="text-[13px] text-gray-700 dark:text-slate-500 mb-6 max-w-sm mx-auto">
-              Track policies, renewals, and coverage gaps to protect your store and satisfy lenders.
-            </div>
-            <button type="button" onClick={openAddPolicy} className="btn-primary px-8 py-3 text-[14px]">
-              + Add Your First Policy
-            </button>
-          </div>
-        ) : (
-          <div
-            style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}
-          >
-            {policies.map((policy) => {
+        <div
+          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}
+        >
+          {policies.map((policy) => {
               const days = calcDaysRemaining(policy.expiration_date);
               const typeColor =
                 POLICY_TYPE_COLORS[policy.policy_type ?? ""] ?? "badge-blue";
@@ -1336,7 +1342,6 @@ export default function InsurancePage() {
               );
             })}
           </div>
-        )}
       </div>
 
       {/* Claims History */}

@@ -27,6 +27,8 @@ import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import { PageError } from "@/components/ui/PageError";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import {
   type BankTransaction,
   type CalculatedMonthly,
@@ -651,25 +653,18 @@ export default function FinancialsPage() {
   }
 
   if (storesLoading || loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-[14px]" style={{ color: "var(--text-muted)" }}>
-          Loading financials…
-        </div>
-      </div>
-    );
+    return <LoadingSkeleton variant="table" />;
   }
 
   if (stores.length === 0) {
     return (
-      <div className="card text-center py-10">
-        <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
-          No stores yet. Add your first store to view financials.
-        </p>
-        <Link href="/onboarding" className="btn-primary inline-flex mt-4 text-[13px]">
-          Add Store →
-        </Link>
-      </div>
+      <EmptyState
+        icon="Store"
+        title="No stores yet"
+        description="Add your first store to view financials."
+        ctaLabel="Add Your First Store"
+        ctaHref="/portfolio"
+      />
     );
   }
 
@@ -680,6 +675,18 @@ export default function FinancialsPage() {
           Select a store from the dropdown above to view financial details.
         </p>
       </div>
+    );
+  }
+
+  if (records.length === 0) {
+    return (
+      <EmptyState
+        icon="FileSpreadsheet"
+        title="No financial data yet"
+        description="Upload your bank CSV to see your P&L"
+        ctaLabel="Import Transactions"
+        ctaHref="/transactions"
+      />
     );
   }
 
@@ -731,17 +738,6 @@ export default function FinancialsPage() {
       {/* ─── TAB 1: P&L ─── */}
       {activeTab === "pl" && (
         <div className="space-y-5">
-          {records.length === 0 && !showForm && (
-            <div className="card text-center py-10">
-              <p className="text-[14px] text-gray-700 dark:text-gray-800 dark:text-slate-400 mb-4">
-                Add your first month of financials to get started
-              </p>
-              <button type="button" className="btn-primary" onClick={() => openMonthForm(selectedMonth)}>
-                Add Month
-              </button>
-            </div>
-          )}
-
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 grid-4">
             <MetricCard
               label="TTM Revenue"

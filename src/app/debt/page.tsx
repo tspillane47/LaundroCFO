@@ -30,7 +30,8 @@ import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { FormBanner } from "@/components/ui/FormBanner";
-import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
 import {
   INPUT_CLASS,
@@ -580,26 +581,18 @@ export default function DebtPage() {
   }
 
   if (loading) {
-    return (
-      <div className="space-y-5">
-        <CardSkeleton />
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <CardSkeleton key={i} />
-          ))}
-        </div>
-        <CardSkeleton />
-      </div>
-    );
+    return <LoadingSkeleton variant="card" />;
   }
 
   if (stores.length === 0) {
     return (
-      <div className="card text-center py-10">
-        <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
-          No stores yet. Add your first store to get started.
-        </p>
-      </div>
+      <EmptyState
+        icon="Store"
+        title="No stores yet"
+        description="Add your first store to manage debt and track loans."
+        ctaLabel="Add Your First Store"
+        ctaHref="/portfolio"
+      />
     );
   }
 
@@ -609,6 +602,33 @@ export default function DebtPage() {
         <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
           Select a store from the dropdown above to manage debt.
         </p>
+      </div>
+    );
+  }
+
+  if (loans.length === 0 && !showForm) {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>
+              Debt Management
+            </h1>
+            <p className="text-[13px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+              Track loans, monitor payoff progress, and calculate store equity
+            </p>
+          </div>
+          <button type="button" onClick={openAddLoan} className="btn-primary text-[13px]">
+            + Add Loan
+          </button>
+        </div>
+        <EmptyState
+          icon="Landmark"
+          title="No loans added yet"
+          description="Add your loans to track debt service and DSCR"
+          ctaLabel="Add Loan"
+          ctaHref="/debt"
+        />
       </div>
     );
   }

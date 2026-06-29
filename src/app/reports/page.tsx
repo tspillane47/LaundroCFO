@@ -42,6 +42,8 @@ import {
 import { KpiCard } from "@/components/ui/KpiCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 function parseDate(value: string | null): Date | null {
   if (!value) return null;
@@ -631,33 +633,41 @@ export default function ReportsPage() {
       )}
 
       {reportMode === "portfolio" && (portfolioLoading || storesLoading) && (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-gray-700 dark:text-slate-500 text-[13px]">Loading portfolio report...</div>
-        </div>
+        <LoadingSkeleton variant="page" />
       )}
 
       {reportMode === "portfolio" && !portfolioLoading && !storesLoading && !portfolioReady && (
-        <div className="card text-center py-10">
-          <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
-            Add at least one store to generate a portfolio report.
-          </p>
-        </div>
+        <EmptyState
+          icon="FileText"
+          title="No data for reports yet"
+          description="Add financials to generate your underwriting and operating reports"
+          ctaLabel="Go to Financials"
+          ctaHref="/financials"
+        />
       )}
 
       {reportMode === "store" && (storesLoading || loading) && (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-gray-700 dark:text-slate-500 text-[13px]">Loading report data...</div>
-        </div>
+        <LoadingSkeleton variant="page" />
       )}
 
       {reportMode === "store" && !storesLoading && !loading && !isStoreReady && (
-        <div className="card text-center py-10">
-          <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
-            {stores.length === 0
-              ? "Add a store to generate an underwriting report."
-              : "Select a store from the dropdown above to generate an underwriting report."}
-          </p>
-        </div>
+        stores.length === 0 || !selectedStore ? (
+          <div className="card text-center py-10">
+            <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
+              {stores.length === 0
+                ? "Add a store to generate an underwriting report."
+                : "Select a store from the dropdown above to generate an underwriting report."}
+            </p>
+          </div>
+        ) : (
+          <EmptyState
+            icon="FileText"
+            title="No data for reports yet"
+            description="Add financials to generate your underwriting and operating reports"
+            ctaLabel="Go to Financials"
+            ctaHref="/financials"
+          />
+        )
       )}
 
       {reportMode === "portfolio" && portfolioReady && totals && cashFlow && (

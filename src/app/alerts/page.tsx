@@ -6,7 +6,8 @@ import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { generatePortfolioAlerts, type AlertItem } from "@/lib/alerts";
-import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
 
 const severityStyles: Record<string, { bg: string; border: string }> = {
@@ -137,10 +138,7 @@ export default function AlertsPage() {
   if (storesLoading || loading) {
     return (
       <div className="space-y-5 max-w-3xl">
-        <CardSkeleton />
-        {Array.from({ length: 3 }).map((_, i) => (
-          <CardSkeleton key={i} />
-        ))}
+        <LoadingSkeleton variant="card" />
       </div>
     );
   }
@@ -151,10 +149,14 @@ export default function AlertsPage() {
 
   if (stores.length === 0) {
     return (
-      <div className="card text-center py-10 max-w-3xl">
-        <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
-          Add a store to start receiving alerts
-        </p>
+      <div className="space-y-5 max-w-3xl">
+        <EmptyState
+          icon="Store"
+          title="No stores yet"
+          description="Add a store to start receiving alerts."
+          ctaLabel="Add Your First Store"
+          ctaHref="/portfolio"
+        />
       </div>
     );
   }
@@ -163,11 +165,11 @@ export default function AlertsPage() {
     return (
       <div className="space-y-5 max-w-3xl">
         <h1 className="text-[15px] font-semibold text-slate-100">Active Alerts</h1>
-        <div className="card text-center py-10">
-          <p className="text-[14px] text-green-400 font-medium">
-            No active alerts — your portfolio looks healthy.
-          </p>
-        </div>
+        <EmptyState
+          icon="Bell"
+          title="No alerts right now"
+          description="Your store looks healthy — we will notify you when something needs attention"
+        />
       </div>
     );
   }
@@ -180,11 +182,11 @@ export default function AlertsPage() {
       </div>
 
       {active.length === 0 ? (
-        <div className="card text-center py-8">
-          <p className="text-[14px] text-green-400 font-medium">
-            No active alerts — your portfolio looks healthy.
-          </p>
-        </div>
+        <EmptyState
+          icon="Bell"
+          title="No alerts right now"
+          description="Your store looks healthy — we will notify you when something needs attention"
+        />
       ) : (
         <div className="space-y-3">
           {active.map((alert) => {

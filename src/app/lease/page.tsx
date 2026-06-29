@@ -10,6 +10,7 @@ import { LeaseModule } from "@/components/occupancy/LeaseModule";
 import { RealEstateModule } from "@/components/occupancy/RealEstateModule";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
 
 type Store = {
@@ -115,11 +116,7 @@ export default function OccupancyPage() {
   }
 
   if (loading) {
-    return (
-      <div className="space-y-5">
-        <LoadingSkeleton rows={4} />
-      </div>
-    );
+    return <LoadingSkeleton variant="card" />;
   }
 
   if (loadError) {
@@ -133,6 +130,38 @@ export default function OccupancyPage() {
         <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-2">
           Complete onboarding to manage occupancy and real estate.
         </p>
+      </div>
+    );
+  }
+
+  if (!showSelector && store.occupancy_type === "leased" && !hasLease) {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-[15px] font-semibold text-slate-100">Occupancy & Real Estate</h1>
+            <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-0.5">
+              {store.address ?? "Store address not set"}
+            </p>
+          </div>
+          <button type="button" onClick={triggerLeaseEdit} className="btn-primary">
+            Set Up Your Lease →
+          </button>
+        </div>
+        <FormBanner message={message} />
+        <EmptyState
+          icon="FileText"
+          title="No lease information yet"
+          description="Add your lease details to track rent and expiration dates"
+          ctaLabel="Add Lease"
+          ctaHref="/occupancy"
+        />
+        <LeaseModule
+          store={store}
+          editTrigger={editTrigger}
+          hideHeader
+          onLeaseStatus={setHasLease}
+        />
       </div>
     );
   }
@@ -170,25 +199,12 @@ export default function OccupancyPage() {
       {showSelector ? (
         <OccupancySelector saving={savingType} onSelect={handleSelectOccupancy} />
       ) : store.occupancy_type === "leased" ? (
-        <>
-          {!hasLease && (
-            <div className="card text-center py-16">
-              <div className="text-slate-900 dark:text-slate-200 text-[16px] font-semibold mb-2">No lease on file yet</div>
-              <p className="text-gray-700 dark:text-slate-500 text-[13px] mb-6 max-w-sm mx-auto">
-                Add your lease terms to calculate risk score and track renewal options.
-              </p>
-              <button type="button" onClick={triggerLeaseEdit} className="btn-primary px-8 py-3 text-[14px]">
-                Set Up Your Lease →
-              </button>
-            </div>
-          )}
-          <LeaseModule
-            store={store}
-            editTrigger={editTrigger}
-            hideHeader
-            onLeaseStatus={setHasLease}
-          />
-        </>
+        <LeaseModule
+          store={store}
+          editTrigger={editTrigger}
+          hideHeader
+          onLeaseStatus={setHasLease}
+        />
       ) : store.occupancy_type === "owner_occupied" ? (
         <RealEstateModule store={store} />
       ) : null}

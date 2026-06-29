@@ -19,7 +19,8 @@ import {
   type ScenarioResult,
   type StoreScenarioContext,
 } from "@/lib/scenarios";
-import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
 
 export default function ScenariosPage() {
@@ -145,16 +146,7 @@ export default function ScenariosPage() {
   );
 
   if (storesLoading || loading) {
-    return (
-      <div className="space-y-5">
-        <CardSkeleton />
-        <div className="grid grid-cols-2 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <CardSkeleton key={i} />
-          ))}
-        </div>
-      </div>
-    );
+    return <LoadingSkeleton variant="card" />;
   }
 
   if (loadError) {
@@ -163,11 +155,13 @@ export default function ScenariosPage() {
 
   if (stores.length === 0) {
     return (
-      <div className="card text-center py-10">
-        <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
-          Add a store to model valuation scenarios.
-        </p>
-      </div>
+      <EmptyState
+        icon="Store"
+        title="No stores yet"
+        description="Add a store to model valuation scenarios."
+        ctaLabel="Add Your First Store"
+        ctaHref="/portfolio"
+      />
     );
   }
 
@@ -189,11 +183,13 @@ export default function ScenariosPage() {
 
   if (!ctx || !selected || !hasFinancials) {
     return (
-      <div className="card text-center py-10">
-        <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
-          Add store financials (monthly revenue & expenses) to model scenarios.
-        </p>
-      </div>
+      <EmptyState
+        icon="LineChart"
+        title="No financial data to model"
+        description="Add monthly financials first to run scenarios"
+        ctaLabel="Go to Financials"
+        ctaHref="/financials"
+      />
     );
   }
 

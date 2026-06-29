@@ -25,7 +25,8 @@ import {
 import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
-import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { CashCard } from "@/components/ui/CashCard";
@@ -449,17 +450,7 @@ export default function DashboardPage() {
   }
 
   if (storesLoading || detailLoading) {
-    return (
-      <div className="space-y-5">
-        <CardSkeleton />
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <CardSkeleton key={i} />
-          ))}
-        </div>
-        <CardSkeleton />
-      </div>
-    );
+    return <LoadingSkeleton variant="card" />;
   }
 
   if (isAllStores && stores.length > 1) {
@@ -493,24 +484,18 @@ export default function DashboardPage() {
 
   if (!selectedStore && stores.length === 0) {
     return (
-      <div className="card text-center py-10">
-        <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>No stores yet. Add your first store to get started.</p>
-        <Link href="/onboarding" className="btn-primary inline-flex mt-4 text-[13px]">Add Store →</Link>
-      </div>
+      <EmptyState
+        icon="Store"
+        title="No stores yet"
+        description="Add your first store to start tracking performance, financials, and alerts."
+        ctaLabel="Add Your First Store"
+        ctaHref="/portfolio"
+      />
     );
   }
 
   if (!store) {
-    return (
-      <div className="space-y-5">
-        <CardSkeleton />
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <CardSkeleton key={i} />
-          ))}
-        </div>
-      </div>
-    );
+    return <LoadingSkeleton variant="card" />;
   }
 
   const benchmarks = [

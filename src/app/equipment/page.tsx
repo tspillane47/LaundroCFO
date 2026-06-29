@@ -25,7 +25,8 @@ import {
 } from "@/lib/equipment";
 import { fmtDollar } from "@/lib/calculations";
 import { FormBanner } from "@/components/ui/FormBanner";
-import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
 
 type Store = {
@@ -293,14 +294,40 @@ export default function EquipmentPage() {
   }
 
   if (loading) {
+    return <LoadingSkeleton variant="card" />;
+  }
+
+  if (!selectedStore?.id) {
+    return (
+      <div className="card text-center py-10">
+        <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
+          Select a store from the dropdown above to manage equipment.
+        </p>
+      </div>
+    );
+  }
+
+  if (equipment.length === 0 && !showForm) {
     return (
       <div className="space-y-5">
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <CardSkeleton key={i} />
-          ))}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-[15px] font-semibold text-slate-100">Equipment Inventory</h1>
+            <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-0.5">
+              Fleet tracking, age analysis, and valuation impact for {store?.name ?? "your store"}
+            </p>
+          </div>
+          <button type="button" onClick={openAddForm} className="btn-primary text-[13px] py-2 px-4 flex-shrink-0">
+            + Add Machine Group
+          </button>
         </div>
-        <CardSkeleton />
+        <EmptyState
+          icon="WashingMachine"
+          title="No equipment added yet"
+          description="Add your machines to track turns and revenue"
+          ctaLabel="Add Equipment"
+          ctaHref="/equipment"
+        />
       </div>
     );
   }
@@ -414,17 +441,7 @@ export default function EquipmentPage() {
               </button>
             </div>
 
-            {equipment.length === 0 && !showForm ? (
-              <div className="text-center py-12">
-                <div className="text-[15px] font-semibold text-slate-900 dark:text-slate-200 mb-2">No equipment added yet</div>
-                <div className="text-[13px] text-gray-700 dark:text-slate-500 mb-6 max-w-sm mx-auto">
-                  Add your washer and dryer fleet to track age, quality score, and valuation impact.
-                </div>
-                <button type="button" onClick={openAddForm} className="btn-primary px-8 py-3 text-[14px]">
-                  + Add Machine Group
-                </button>
-              </div>
-            ) : (
+            {equipment.length === 0 && !showForm ? null : (
               <div className="table-scroll overflow-x-auto">
                 <table className="w-full text-[12px]">
                   <thead>

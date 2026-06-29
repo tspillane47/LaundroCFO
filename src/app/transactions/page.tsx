@@ -10,7 +10,8 @@ import { INPUT_CLASS } from "@/components/occupancy/shared";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { PageError } from "@/components/ui/PageError";
-import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { RuleApplyPrompt } from "@/components/financials/RuleApplyPrompt";
 import {
   BANK_IMPORT_CATEGORY_LABELS,
@@ -1721,17 +1722,10 @@ export default function TransactionsPage() {
   }
 
   if (loading || storesLoading) {
-    return (
-      <div className="p-6 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <CardSkeleton />
-          <CardSkeleton />
-          <CardSkeleton />
-        </div>
-        <CardSkeleton />
-      </div>
-    );
+    return <LoadingSkeleton variant="table" />;
   }
+
+  const isEmpty = statusCounts.total === 0;
 
   return (
     <div className="p-6 space-y-4 max-w-[1400px]">
@@ -1743,12 +1737,6 @@ export default function TransactionsPage() {
       </div>
 
       <FormBanner message={message} />
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KpiCard label="Needs Review" value={statusCounts.needsReview} />
-        <KpiCard label="Posted" value={statusCounts.posted} valueColor="var(--text-success)" />
-        <KpiCard label="Excluded" value={statusCounts.excluded} />
-      </div>
 
       <div className="card flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -1780,6 +1768,22 @@ export default function TransactionsPage() {
             </button>
           )}
         </div>
+      </div>
+
+      {isEmpty ? (
+        <EmptyState
+          icon="Receipt"
+          title="No transactions yet"
+          description="Import your bank CSV to get started"
+          ctaLabel="Import CSV"
+          ctaHref="/transactions"
+        />
+      ) : (
+        <>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <KpiCard label="Needs Review" value={statusCounts.needsReview} />
+        <KpiCard label="Posted" value={statusCounts.posted} valueColor="var(--text-success)" />
+        <KpiCard label="Excluded" value={statusCounts.excluded} />
       </div>
 
       {stagedCsv.length > 0 && (
@@ -2393,6 +2397,8 @@ export default function TransactionsPage() {
           </div>
         )}
       </div>
+        </>
+      )}
 
       {excludeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
