@@ -81,11 +81,13 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
   const [storeSearch, setStoreSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
   const sidebarStoreRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("theme");
@@ -122,22 +124,24 @@ function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    if (!showStoreDropdown) return;
+    if (!showStoreDropdown && !mobileMenuOpen) return;
 
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node;
       if (
         storeDropdownRef.current?.contains(target) ||
-        sidebarStoreRef.current?.contains(target)
+        sidebarStoreRef.current?.contains(target) ||
+        mobileMenuRef.current?.contains(target)
       ) {
         return;
       }
       setShowStoreDropdown(false);
+      setMobileMenuOpen(false);
     }
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showStoreDropdown]);
+  }, [showStoreDropdown, mobileMenuOpen]);
 
   function selectAllStores() {
     setSelectedStore(null);
@@ -416,14 +420,13 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <div className="app-main flex-1 flex flex-col overflow-hidden">
         {/* Topbar */}
         <header
-          className="px-6 flex items-center justify-between flex-shrink-0 transition-colors duration-300"
+          className="relative px-4 md:px-6 flex items-center justify-between flex-shrink-0 transition-colors duration-300 min-h-[56px] md:min-h-0 md:h-12 py-2 md:py-0"
           style={{
             background: "var(--bg-card)",
             borderBottom: "1px solid var(--border)",
-            height: "48px",
           }}
         >
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
             <button
               type="button"
               className="mobile-menu-btn"
@@ -432,21 +435,24 @@ function AppShell({ children }: { children: React.ReactNode }) {
             >
               {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
             </button>
-            <span className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
+            <span
+              className="topbar-page-title text-[14px] font-semibold truncate"
+              style={{ color: "var(--text-primary)" }}
+            >
               {pageTitles[pathname] ?? "LaundroCFO"}
             </span>
 
             {!storesLoading && stores.length > 0 && (
               <>
-                <span style={{ color: "var(--border2)" }}>|</span>
-                <div className="relative" ref={storeDropdownRef}>
+                <span className="hidden md:inline" style={{ color: "var(--border2)" }}>|</span>
+                <div className="relative min-w-0" ref={storeDropdownRef}>
                   <button
                     type="button"
                     onClick={() => setShowStoreDropdown((v) => !v)}
-                    className="topbar-store-badge flex items-center gap-1.5 text-[12px] transition-colors hover:opacity-80"
+                    className="topbar-store-badge flex items-center gap-1.5 text-[14px] md:text-[12px] transition-colors hover:opacity-80 min-h-[44px] md:min-h-0 truncate max-w-[140px] sm:max-w-[200px] md:max-w-none"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    <span>{dropdownLabel}</span>
+                    <span className="truncate">{dropdownLabel}</span>
                     <ChevronDownIcon />
                   </button>
 
@@ -459,7 +465,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
                         type="button"
                         onClick={selectAllStores}
                         className={clsx(
-                          "w-full px-3 py-2.5 text-left text-[12px] font-medium hover:bg-white/5 transition-colors",
+                          "w-full px-3 py-2.5 text-left text-[14px] md:text-[12px] font-medium hover:bg-white/5 transition-colors min-h-[44px]",
                           isAllStores && "font-semibold"
                         )}
                         style={{
@@ -477,28 +483,76 @@ function AppShell({ children }: { children: React.ReactNode }) {
             )}
 
             <span
-              className="topbar-synced text-[11px] hide-mobile"
+              className="topbar-synced text-[14px] md:text-[11px] truncate flex-shrink-0"
               style={{ color: "var(--text-muted)" }}
             >
               Last synced 2m ago
             </span>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               type="button"
-              className="btn-outline w-8 h-8 flex items-center justify-center p-0"
+              className="btn-outline w-11 h-11 md:w-8 md:h-8 flex items-center justify-center p-0 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0"
               onClick={toggleTheme}
               aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
-            <button type="button" className="btn-outline" onClick={handleSignOut}>
-              Sign Out
-            </button>
-            <button type="button" className="topbar-add-store btn-primary" onClick={() => router.push("/onboarding")}>
-              + Add Store
-            </button>
+
+            <div className="desktop-header-actions">
+              <button type="button" className="btn-outline" onClick={handleSignOut}>
+                Sign Out
+              </button>
+              <button type="button" className="topbar-add-store btn-primary" onClick={() => router.push("/onboarding")}>
+                + Add Store
+              </button>
+            </div>
+
+            <div className="mobile-header-menu" ref={mobileMenuRef}>
+              <button
+                type="button"
+                className="btn-outline w-11 h-11 flex items-center justify-center p-0 min-h-[44px] min-w-[44px]"
+                onClick={() => setMobileMenuOpen((v) => !v)}
+                aria-label="Account menu"
+                aria-expanded={mobileMenuOpen}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <circle cx="12" cy="5" r="2" />
+                  <circle cx="12" cy="12" r="2" />
+                  <circle cx="12" cy="19" r="2" />
+                </svg>
+              </button>
+              {mobileMenuOpen && (
+                <div
+                  className="absolute right-4 top-full mt-1 min-w-[180px] rounded-lg overflow-hidden z-50 surface-panel"
+                  style={{ border: "1px solid var(--border)" }}
+                >
+                  <button
+                    type="button"
+                    className="w-full px-4 py-3 text-left text-[14px] font-medium hover:opacity-90 transition-colors min-h-[44px]"
+                    style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--border)" }}
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      void handleSignOut();
+                    }}
+                  >
+                    Sign Out
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full px-4 py-3 text-left text-[14px] font-medium hover:opacity-90 transition-colors min-h-[44px]"
+                    style={{ color: "var(--text-primary)" }}
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      router.push("/onboarding");
+                    }}
+                  >
+                    + Add Store
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -506,7 +560,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Page content */}
         <main
-          className="flex-1 overflow-y-auto p-6 transition-colors duration-300"
+          className="flex-1 overflow-y-auto p-4 md:p-6 transition-colors duration-300"
           style={{ background: "var(--bg-page)" }}
         >
           {children}

@@ -349,7 +349,7 @@ export default function EquipmentPage() {
       <FormBanner message={message} />
 
       {/* Section 1 — Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 grid-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 grid-4">
         <MetricCard label="Total Washers" value={String(metrics.totalWashers)} sub="Front-load fleet" />
         <MetricCard label="Total Dryers" value={String(metrics.totalDryers)} sub="Dryer fleet" />
         <div className="card">
@@ -690,7 +690,7 @@ export default function EquipmentPage() {
           {/* Equipment Mix */}
           <div className="card">
             <div className="section-title">Equipment Mix</div>
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               <div className="card2 text-center">
                 <div className="metric-label">Washers</div>
                 <div className="text-[28px] font-bold text-blue-300">{metrics.totalWashers}</div>

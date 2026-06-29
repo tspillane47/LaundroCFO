@@ -30,6 +30,7 @@ import {
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
+import { DesktopOnlyGate } from "@/components/ui/DesktopOnlyGate";
 
 type SliderConfig = {
   label: string;
@@ -50,6 +51,14 @@ type SavedScenarioRow = {
 };
 
 export default function ScenariosPage() {
+  return (
+    <DesktopOnlyGate featureName="Scenarios">
+      <ScenariosPageContent />
+    </DesktopOnlyGate>
+  );
+}
+
+function ScenariosPageContent() {
   const supabase = createClient();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
   const [loading, setLoading] = useState(true);

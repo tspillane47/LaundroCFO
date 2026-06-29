@@ -535,19 +535,19 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-[15px] font-semibold truncate" style={{ color: "var(--text-primary)", maxWidth: "100%" }}>
             {store.name ?? "Store Dashboard"}
           </h1>
           <p
-            className="text-[12px] mt-0.5 truncate"
+            className="text-[14px] md:text-[12px] mt-0.5 truncate"
             style={{ color: "var(--text-muted)", maxWidth: "100%" }}
           >
             {store.address ?? "No address set"}
           </p>
         </div>
-        <Link href="/settings" className="btn-outline text-[12px]">
+        <Link href="/settings" className="btn-outline text-[14px] md:text-[12px] w-full sm:w-auto text-center">
           Edit Store
         </Link>
       </div>
@@ -585,13 +585,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Section 2: KPI Cards */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: "20px",
-        }}
-      >
+      <div className="metric-grid">
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0s" }}
@@ -663,13 +657,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Financial Position */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: "20px",
-        }}
-      >
+      <div className="metric-grid">
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.2s" }}
@@ -1037,7 +1025,7 @@ export default function DashboardPage() {
       {/* Valuation Summary */}
       <div className="card">
         <div className="section-title mb-4">Valuation Summary</div>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {[
             { label: "Est. Value", value: hasFinancialData ? fmtDollar(estimatedValue) : "—" },
             {

@@ -44,6 +44,7 @@ import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { DesktopOnlyGate } from "@/components/ui/DesktopOnlyGate";
 
 function parseDate(value: string | null): Date | null {
   if (!value) return null;
@@ -129,6 +130,14 @@ function formatLeaseExpiration(lease: any, isOwnerOccupied: boolean): string {
 }
 
 export default function ReportsPage() {
+  return (
+    <DesktopOnlyGate featureName="Reports">
+      <ReportsPageContent />
+    </DesktopOnlyGate>
+  );
+}
+
+function ReportsPageContent() {
   const supabase = createClient();
   const { stores, selectedStore, loading: storesLoading } = useStores();
 
@@ -682,13 +691,7 @@ export default function ReportsPage() {
             </p>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-              gap: "16px",
-            }}
-          >
+          <div className="metric-grid">
             <KpiCard label="Portfolio Value" value={<AnimatedNumber value={totals.portfolioValue} prefix="$" duration={1000} />} style={{ padding: "16px 18px" }} />
             <KpiCard label="Portfolio Debt" value={<AnimatedNumber value={totals.portfolioDebt} prefix="$" duration={1000} />} style={{ padding: "16px 18px" }} />
             <KpiCard label="Portfolio Equity" value={<AnimatedNumber value={totals.portfolioEquity} prefix="$" duration={1000} />} style={{ padding: "16px 18px" }} />

@@ -548,13 +548,7 @@ export default function PortfolioPage() {
       </div>
 
       {/* KPI Row - 8 cards */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: "20px",
-        }}
-      >
+      <div className="metric-grid">
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0s" }}
@@ -673,9 +667,7 @@ export default function PortfolioPage() {
           <Link href="/onboarding" className="btn-outline text-[12px] px-3 py-1.5">+ Add Store</Link>
         </div>
 
-        <div
-          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}
-        >
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {storeMetrics.map((m) => (
             <div key={m.store.id} className="card relative">
               {m.hasDscrWarning && (
@@ -695,7 +687,7 @@ export default function PortfolioPage() {
                 {m.store.address ?? "No address"}
               </div>
 
-              <div className="grid grid-cols-4 gap-3 mb-4 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
                 {[
                   {
                     label: "Value",

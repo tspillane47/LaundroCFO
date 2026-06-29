@@ -137,7 +137,7 @@ export default function AlertsPage() {
 
   if (storesLoading || loading) {
     return (
-      <div className="space-y-5 max-w-3xl">
+      <div className="space-y-5 max-w-3xl w-full">
         <LoadingSkeleton variant="card" />
       </div>
     );
@@ -149,7 +149,7 @@ export default function AlertsPage() {
 
   if (stores.length === 0) {
     return (
-      <div className="space-y-5 max-w-3xl">
+      <div className="space-y-5 max-w-3xl w-full">
         <EmptyState
           icon="Store"
           title="No stores yet"
@@ -163,7 +163,7 @@ export default function AlertsPage() {
 
   if (active.length === 0 && resolved.length === 0) {
     return (
-      <div className="space-y-5 max-w-3xl">
+      <div className="space-y-5 max-w-3xl w-full">
         <h1 className="text-[15px] font-semibold text-slate-100">Active Alerts</h1>
         <EmptyState
           icon="Bell"
@@ -175,7 +175,7 @@ export default function AlertsPage() {
   }
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5 max-w-3xl w-full">
       <div className="flex items-center gap-3">
         <h1 className="text-[15px] font-semibold text-slate-100">Active Alerts</h1>
         {active.length > 0 && <span className="badge badge-red">{active.length} Active</span>}
@@ -262,7 +262,7 @@ export default function AlertsPage() {
 
       <div className="card mt-6">
         <div className="section-title">Alert Thresholds</div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
             ["DSCR Minimum", "1.25x"],
             ["Global DSCR Minimum", "1.25x"],

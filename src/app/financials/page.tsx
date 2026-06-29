@@ -712,7 +712,7 @@ export default function FinancialsPage() {
         </div>
       )}
 
-      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", display: "flex", gap: "8px", paddingBottom: "4px" }}>
+      <div className="overflow-x-auto table-scroll flex gap-2 pb-1">
         <div className="flex flex-wrap gap-1 border-b border-white/[0.06]">
           {TABS.map((tab) => (
             <button
@@ -738,7 +738,7 @@ export default function FinancialsPage() {
       {/* ─── TAB 1: P&L ─── */}
       {activeTab === "pl" && (
         <div className="space-y-5">
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 grid-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 grid-4">
             <MetricCard
               label="TTM Revenue"
               value={fmtDollar(ttm.ttmRevenue || 0)}
@@ -872,7 +872,7 @@ export default function FinancialsPage() {
                   </div>
                 ))}
               </div>
-              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="card2">
                   <div className="metric-label">Total Expenses</div>
                   <div className="text-lg font-bold text-red-400">{fmtDollar(liveCalc.totalExpenses)}</div>
@@ -1400,7 +1400,7 @@ export default function FinancialsPage() {
               Map QuickBooks accounts to LaundroCFO fields. Saved to{" "}
               <code className="text-blue-300 text-[11px] bg-blue-500/10 px-1 rounded">quickbooks_mapping</code>.
             </p>
-            <div className="overflow-x-auto">
+            <div className="table-scroll">
               <table className="w-full text-[12px]">
                 <thead>
                   <tr className="text-left text-gray-700 dark:text-gray-800 dark:text-gray-300 border-b border-white/[0.06]">

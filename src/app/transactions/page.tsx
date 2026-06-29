@@ -12,6 +12,7 @@ import { KpiCard } from "@/components/ui/KpiCard";
 import { PageError } from "@/components/ui/PageError";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { DesktopOnlyGate } from "@/components/ui/DesktopOnlyGate";
 import { RuleApplyPrompt } from "@/components/financials/RuleApplyPrompt";
 import {
   BANK_IMPORT_CATEGORY_LABELS,
@@ -356,6 +357,14 @@ function AuditHistoryPanel({
 }
 
 export default function TransactionsPage() {
+  return (
+    <DesktopOnlyGate featureName="Transactions">
+      <TransactionsPageContent />
+    </DesktopOnlyGate>
+  );
+}
+
+function TransactionsPageContent() {
   const supabase = useMemo(() => createClient(), []);
   const { selectedStore, loading: storesLoading } = useStores();
 
@@ -1728,7 +1737,7 @@ export default function TransactionsPage() {
   const isEmpty = statusCounts.total === 0;
 
   return (
-    <div className="p-6 space-y-4 max-w-[1400px]">
+    <div className="space-y-4 max-w-[1400px]">
       <div>
         <h1 className="text-[20px] font-bold" style={{ color: "var(--text-primary)" }}>Transaction Review</h1>
         <p className="page-subtitle mt-1">

@@ -31,21 +31,21 @@ export function KpiCard({ label, value, sub, valueColor, className, style, label
         {renderKpiLabel(label)}
       </div>
       <div
+        className="text-[18px] sm:text-[22px] font-bold tracking-tight"
         style={{
-          fontSize: "22px",
-          fontWeight: 700,
           letterSpacing: "-0.02em",
           color: valueColor ?? "var(--text-primary)",
           lineHeight: 1.2,
           overflow: "visible",
-          whiteSpace: "nowrap",
+          whiteSpace: "normal",
+          wordBreak: "break-word",
           minWidth: 0,
         }}
       >
         {value}
       </div>
       {sub && (
-        <div style={{ fontSize: "12px", marginTop: "8px", color: "var(--text-muted)" }}>{sub}</div>
+        <div className="text-[14px] mt-2" style={{ color: "var(--text-muted)" }}>{sub}</div>
       )}
     </div>
   );

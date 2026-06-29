@@ -826,10 +826,7 @@ export default function ValuationPage() {
 
       {/* Section 2 — Valuation Breakdown */}
       <div className="card !p-3.5">
-        <div
-          className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-3 lg:gap-4"
-          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}
-        >
+        <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-3 lg:gap-4">
           {/* Left — adjustment waterfall */}
           <div className="min-w-0">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-800 dark:text-slate-400 mb-1.5">
@@ -999,10 +996,7 @@ export default function ValuationPage() {
       </button>
 
       {/* Section 3 — Qualitative inputs */}
-      <div
-        className="grid grid-cols-2 gap-4"
-        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}
-      >
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <PillSelector
           label="Market Density"
           options={MARKET_OPTIONS}
@@ -1032,7 +1026,7 @@ export default function ValuationPage() {
 
       <div className="card">
         <div className="section-title mb-4">Service Mix & Retool</div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {[
             { label: "Self Service %", value: selfServicePct, set: setSelfServicePct },
             { label: "WDF %", value: wdfPct, set: setWdfPct },
@@ -1141,7 +1135,7 @@ export default function ValuationPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="card">
           <div className="section-title mb-4">Equipment Summary</div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <div className="metric-label">Avg Age</div>
               <div className="text-[20px] font-bold text-slate-100">
@@ -1187,7 +1181,7 @@ export default function ValuationPage() {
               Owner-occupied — fee-simple real estate ownership applies instead of lease term control.
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <div className="metric-label">Years Remaining</div>
                 <div className="text-[20px] font-bold text-slate-100">

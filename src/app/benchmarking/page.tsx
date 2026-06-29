@@ -22,6 +22,7 @@ import { fmtMultiple, fmtPct } from "@/lib/calculations";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
+import { DesktopOnlyGate } from "@/components/ui/DesktopOnlyGate";
 
 type BenchmarkRowData = {
   metric: string;
@@ -95,6 +96,14 @@ function BenchmarkRow({
 }
 
 export default function BenchmarkingPage() {
+  return (
+    <DesktopOnlyGate featureName="Benchmarking">
+      <BenchmarkingPageContent />
+    </DesktopOnlyGate>
+  );
+}
+
+function BenchmarkingPageContent() {
   const supabase = createClient();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
   const [loading, setLoading] = useState(true);

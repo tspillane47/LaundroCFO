@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from "react";
 
 export const INPUT_CLASS =
-  "w-full bg-[var(--bg-input)] border border-[var(--border2)] rounded-lg px-3 py-2.5 text-[13px] text-[var(--text-primary)] outline-none focus:border-[#1a2b3c] dark:border-white/10 dark:text-slate-100 dark:focus:border-blue-500";
+  "w-full bg-[var(--bg-input)] border border-[var(--border2)] rounded-lg px-3 py-2.5 text-[14px] md:text-[13px] text-[var(--text-primary)] outline-none focus:border-[#1a2b3c] dark:border-white/10 dark:text-slate-100 dark:focus:border-blue-500 min-h-[44px]";
 
 export function preventEnterSubmit(e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) {
   if (e.key === "Enter") {

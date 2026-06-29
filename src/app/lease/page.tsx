@@ -137,14 +137,14 @@ export default function OccupancyPage() {
   if (!showSelector && store.occupancy_type === "leased" && !hasLease) {
     return (
       <div className="space-y-5">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-[15px] font-semibold text-slate-100">Occupancy & Real Estate</h1>
-            <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-0.5">
+            <p className="text-gray-700 dark:text-slate-500 text-[14px] md:text-[13px] mt-0.5">
               {store.address ?? "Store address not set"}
             </p>
           </div>
-          <button type="button" onClick={triggerLeaseEdit} className="btn-primary">
+          <button type="button" onClick={triggerLeaseEdit} className="btn-primary w-full sm:w-auto">
             Set Up Your Lease →
           </button>
         </div>
@@ -170,24 +170,24 @@ export default function OccupancyPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-[15px] font-semibold text-slate-100">Occupancy & Real Estate</h1>
-          <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-0.5">
+          <p className="text-gray-700 dark:text-slate-500 text-[14px] md:text-[13px] mt-0.5">
             {store.address ?? "Store address not set"}
             {store.occupancy_type && !showSelector && (
               <span className="text-gray-700 dark:text-slate-600"> · {OCCUPANCY_LABELS[store.occupancy_type]}</span>
             )}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           {isLeased && (
-            <button type="button" onClick={triggerLeaseEdit} className="btn-primary">
+            <button type="button" onClick={triggerLeaseEdit} className="btn-primary w-full sm:w-auto">
               {hasLease ? "Edit Lease" : "Set Up Your Lease →"}
             </button>
           )}
           {store.occupancy_type && !showSelector && (
-            <button type="button" onClick={handleChangeOccupancyType} className="btn-outline">
+            <button type="button" onClick={handleChangeOccupancyType} className="btn-outline w-full sm:w-auto">
               Change Occupancy Type
             </button>
           )}

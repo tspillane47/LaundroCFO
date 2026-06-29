@@ -715,13 +715,7 @@ export default function DebtPage() {
       </div>
 
       {/* Section 2 — KPI cards */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: "20px",
-        }}
-      >
+      <div className="metric-grid">
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0s" }}
@@ -881,7 +875,7 @@ export default function DebtPage() {
       {/* Section 4 — Debt Service Analysis */}
       <div className="card">
         <div className="section-title mb-4">Debt Service Analysis</div>
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b" style={{ borderColor: "var(--border)" }}>
@@ -1260,7 +1254,7 @@ export default function DebtPage() {
 
       {/* Section 9 — Loan breakdown table */}
       {enrichedLoans.length > 1 && (
-        <div className="card overflow-x-auto">
+        <div className="card table-scroll">
           <div className="section-title mb-4">Loan Breakdown</div>
           <table className="w-full text-[13px]">
             <thead>

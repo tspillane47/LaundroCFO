@@ -157,6 +157,10 @@ html, body {
     cursor: pointer;
     letter-spacing: 0.01em;
     transition: opacity 0.15s;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
   .btn-primary:hover { opacity: 0.9; }
   .btn-outline {
@@ -169,8 +173,34 @@ html, body {
     font-weight: 500;
     cursor: pointer;
     transition: background 0.15s;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
   .btn-outline:hover { background: var(--bg-card2); }
+
+  /* Responsive KPI / metric card grid: 1 col mobile, 2 tablet, 3-4 desktop */
+  .metric-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  @media (min-width: 640px) {
+    .metric-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (min-width: 1024px) {
+    .metric-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (min-width: 1280px) {
+    .metric-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  /* Horizontally scrollable tables */
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
   .nav-item {
     display: flex;
     align-items: center;
@@ -423,6 +453,9 @@ html, body {
   padding: 8px;
   color: var(--text-secondary);
   font-size: 20px;
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
 }
 
 .sidebar-overlay {
@@ -433,11 +466,21 @@ html, body {
   z-index: 40;
 }
 
-@media (max-width: 1023px) {
-  .mobile-menu-btn { display: flex; align-items: center; }
-  
+.mobile-header-menu {
+  display: none;
+}
+
+.desktop-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+@media (max-width: 767px) {
+  .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
+
   .sidebar-overlay.open { display: block; }
-  
+
   .app-sidebar {
     position: fixed !important;
     left: -220px !important;
@@ -446,69 +489,66 @@ html, body {
     z-index: 50 !important;
     transition: left 0.25s ease !important;
   }
-  
+
   .app-sidebar.open {
     left: 0 !important;
   }
-  
+
   .app-main {
     margin-left: 0 !important;
     width: 100% !important;
   }
-}
 
-@media (max-width: 1023px) {
-  .grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
-  .grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
-  .hide-tablet { display: none !important; }
-}
+  .topbar-page-title { display: none !important; }
 
-@media (max-width: 767px) {
+  .desktop-header-actions { display: none !important; }
+
+  .mobile-header-menu { display: block; position: relative; }
+
   .grid-4 { grid-template-columns: 1fr !important; }
   .grid-3 { grid-template-columns: 1fr !important; }
   .grid-2 { grid-template-columns: 1fr !important; }
   .grid-2-1 { grid-template-columns: 1fr !important; }
-  
-  .content { padding: 16px !important; }
-  
+
   .hide-mobile { display: none !important; }
-  
+
   .card { padding: 16px !important; }
-  
-  /* Mobile table scroll */
-  .table-scroll {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  
+
+  .hero-value-card { padding: 24px 20px !important; }
+
   /* Stack flex rows on mobile */
   .mobile-stack {
     flex-direction: column !important;
     align-items: flex-start !important;
   }
-  
+
   /* Full width buttons on mobile */
   .mobile-full { width: 100% !important; }
-  
+
   /* Reduce large text on mobile */
   .metric-value { font-size: 22px !important; }
-  
+
   /* Hero section on mobile */
   .hero-banner {
     flex-direction: column !important;
     gap: 20px !important;
   }
-  
+
   .hero-banner .hero-chart {
     display: none !important;
   }
-  
-  /* Topbar on mobile */
-  .topbar-store-badge { display: none !important; }
-  .topbar-synced { display: none !important; }
-  
-  /* Hide secondary topbar items */
-  .topbar-add-store { display: none !important; }
+
+  /* Minimum readable text size on mobile */
+  .metric-label { font-size: 12px !important; }
+
+  /* Full-width inputs inside multi-column form grids */
+  .form-grid-mobile-stack { grid-template-columns: 1fr !important; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
+  .hide-tablet { display: none !important; }
 }
 
 @keyframes fadeInOut {

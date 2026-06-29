@@ -329,7 +329,7 @@ export default function SettingsPage() {
                   <div className="metric-label mb-1.5">Address</div>
                   <input value={form.address} onChange={(e) => setField("address", e.target.value)} className={inputClass} />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 form-grid-mobile-stack">
                   <div>
                     <div className="metric-label mb-1.5">Square Footage</div>
                     <input type="number" value={form.square_footage} onChange={(e) => setField("square_footage", e.target.value)} className={inputClass} />
@@ -377,7 +377,7 @@ export default function SettingsPage() {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 form-grid-mobile-stack">
                   <div>
                     <div className="metric-label mb-1.5">Self-Service %</div>
                     <input type="number" value={form.self_service_pct} onChange={(e) => setField("self_service_pct", e.target.value)} className={inputClass} />

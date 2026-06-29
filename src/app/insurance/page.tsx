@@ -831,7 +831,7 @@ export default function InsurancePage() {
       <FormBanner message={message} />
 
       {/* Dashboard Summary */}
-      <div className="grid grid-cols-3 lg:grid-cols-6 gap-4 grid-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 grid-4">
         <MetricCard
           label="Total Annual Premium"
           value={formatCurrency(metrics.totalPremium)}
@@ -923,7 +923,7 @@ export default function InsurancePage() {
 
             <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
               <FormSection title="Policy Information">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <FormField label="Policy Type" className="col-span-2">
                     <select
                       className={INPUT_CLASS}
@@ -985,7 +985,7 @@ export default function InsurancePage() {
               </FormSection>
 
               <FormSection title="Policy Dates">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <FormField label="Effective Date">
                     <input
                       type="date"
@@ -1013,7 +1013,7 @@ export default function InsurancePage() {
               </FormSection>
 
               <FormSection title="Premium">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <FormField label="Annual Premium">
                     <input
                       className={INPUT_CLASS}
@@ -1047,7 +1047,7 @@ export default function InsurancePage() {
               </FormSection>
 
               <FormSection title="Coverage Details">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <FormField label="Building Coverage">
                     <input
                       className={INPUT_CLASS}
@@ -1148,7 +1148,7 @@ export default function InsurancePage() {
               </FormSection>
 
               <FormSection title="Additional Coverage">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {ADDITIONAL_COVERAGE_FIELDS.map(({ key, label }) => (
                     <label
                       key={key}
@@ -1167,7 +1167,7 @@ export default function InsurancePage() {
               </FormSection>
 
               <FormSection title="Deductibles">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <FormField label="Property Deductible">
                     <input
                       className={INPUT_CLASS}
@@ -1358,7 +1358,7 @@ export default function InsurancePage() {
         {showClaimForm && (
           <div className="card2 mb-4 space-y-3">
             <div className="text-[13px] font-semibold text-slate-900 dark:text-slate-200">New Claim</div>
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <FormField label="Policy">
                 <select
                   className={INPUT_CLASS}
@@ -1489,7 +1489,7 @@ export default function InsurancePage() {
       {/* Documents */}
       <div className="card">
         <div className="section-title">Documents</div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: "Policy Documents" },
             { label: "Declarations Pages" },
