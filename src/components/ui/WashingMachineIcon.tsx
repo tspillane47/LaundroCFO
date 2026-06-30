@@ -1,25 +1,38 @@
 interface WashingMachineIconProps {
   size?: number;
   color?: string;
+  className?: string;
 }
 
-export function WashingMachineIcon({ size = 28, color = "#3b82f6" }: WashingMachineIconProps) {
+export function WashingMachineIcon({
+  size = 24,
+  color,
+  className = "flex-shrink-0",
+}: WashingMachineIconProps) {
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 28 28"
+      viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
-      className="flex-shrink-0"
+      className={className}
+      style={color ? { color } : undefined}
     >
-      <path
-        fill={color}
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M6 3C4.343 3 3 4.343 3 6v18c0 1.657 1.343 3 3 3h16c1.657 0 3-1.343 3-3V6c0-1.657-1.343-3-3-3H6zm1.75 3.5a1.25 1.25 0 100 2.5 1.25 1.25 0 000-2.5zm5.75 0a1.25 1.25 0 100 2.5 1.25 1.25 0 000-2.5zm5.75 0a1.25 1.25 0 100 2.5 1.25 1.25 0 000-2.5zM14 14.5a5 5 0 100 10 5 5 0 000-10z"
+      <rect
+        x="4"
+        y="2"
+        width="16"
+        height="20"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.5"
       />
+      <circle cx="12" cy="13" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="8" cy="5.5" r="0.75" fill="currentColor" />
+      <circle cx="12" cy="5.5" r="0.75" fill="currentColor" />
+      <circle cx="16" cy="5.5" r="0.75" fill="currentColor" />
     </svg>
   );
 }

@@ -17,7 +17,7 @@ import {
   MenuIcon,
   CloseIcon,
 } from "@/components/ui/NavIcons";
-import { WashingMachineIcon } from "@/components/ui/WashingMachineIcon";
+import { Logo } from "@/components/ui/Logo";
 import { FeedbackModal } from "@/components/ui/FeedbackModal";
 import { BetaBanner } from "@/components/ui/BetaBanner";
 import { setTermsReturnPath } from "@/components/ui/TermsBackLink";
@@ -315,18 +315,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
           className="sidebar-brand flex items-center gap-2 px-5 py-4 border-b"
           style={{ borderColor: "var(--border)" }}
         >
-          <WashingMachineIcon size={28} color="#3b82f6" />
-          <div
-            className="sidebar-brand-text"
-            style={{
-              fontSize: "15px",
-              fontWeight: 700,
-              color: "var(--text-primary)",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            LaundroCFO
-          </div>
+          <Logo variant="sidebar" />
           {BETA_MODE && (
             <span className="sidebar-brand-badge badge badge-blue text-[9px] px-1.5 py-0.5 font-semibold uppercase tracking-wide">
               Beta
