@@ -15,8 +15,10 @@ import { calcEquipmentScore, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import {
   AreaChart,
   Area,
-  BarChart,
   Bar,
+  Line,
+  ComposedChart,
+  CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
@@ -115,6 +117,9 @@ type ActionItem = {
   href: string;
 };
 
+const REVENUE_BAR_COLOR = "#4A7FD4";
+const EBITDA_LINE_COLOR = "#22c55e";
+
 const ChartTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
@@ -128,6 +133,55 @@ const ChartTooltip = ({ active, payload, label }: any) => {
           {p.name}: {typeof p.value === "number" && p.dataKey !== "month" ? fmtDollar(p.value) : p.value}
         </div>
       ))}
+    </div>
+  );
+};
+
+const RevenueEbitdaTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+
+  const revenue = payload.find((p: any) => p.dataKey === "revenue")?.value as number | undefined;
+  const ebitda = payload.find((p: any) => p.dataKey === "ebitda")?.value as number | undefined;
+  const margin = revenue && revenue > 0 && ebitda != null ? (ebitda / revenue) * 100 : null;
+
+  return (
+    <div
+      className="rounded-xl px-3.5 py-2.5 text-xs min-w-[148px]"
+      style={{
+        background: "var(--bg-card)",
+        border: "1px solid var(--border)",
+        boxShadow: "0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04)",
+        color: "var(--text-primary)",
+      }}
+    >
+      <div className="text-[11px] font-medium mb-2" style={{ color: "var(--text-muted)" }}>
+        {label}
+      </div>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-4">
+          <span className="flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}>
+            <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: REVENUE_BAR_COLOR }} />
+            Revenue
+          </span>
+          <span className="font-semibold tabular-nums">{revenue != null ? fmtDollar(revenue) : "—"}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}>
+            <span className="w-3 h-0.5 rounded-full shrink-0" style={{ background: EBITDA_LINE_COLOR }} />
+            EBITDA
+          </span>
+          <span className="font-semibold tabular-nums">{ebitda != null ? fmtDollar(ebitda) : "—"}</span>
+        </div>
+        <div
+          className="flex items-center justify-between gap-4 pt-1.5 mt-0.5 border-t"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <span style={{ color: "var(--text-muted)" }}>EBITDA Margin</span>
+          <span className="font-semibold tabular-nums" style={{ color: EBITDA_LINE_COLOR }}>
+            {margin != null ? `${margin.toFixed(1)}%` : "—"}
+          </span>
+        </div>
+      </div>
     </div>
   );
 };
@@ -777,24 +831,68 @@ export default function DashboardPage() {
             <div className="h-[220px]">
               {revenueEbitdaData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenueEbitdaData} barGap={4}>
+                <ComposedChart
+                  data={revenueEbitdaData}
+                  margin={{ top: 8, right: 4, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid
+                    vertical={false}
+                    stroke="var(--border)"
+                    strokeOpacity={0.85}
+                  />
                   <XAxis
                     dataKey="month"
-                    tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                    tick={{ fill: "var(--text-muted)", fontSize: 11, fontWeight: 500 }}
                     axisLine={false}
                     tickLine={false}
+                    dy={6}
                   />
                   <YAxis
                     tickFormatter={formatAxisValue}
-                    tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                    tick={{ fill: "var(--text-muted)", fontSize: 11, fontWeight: 500 }}
                     axisLine={false}
                     tickLine={false}
-                    width={55}
+                    width={52}
+                    tickCount={5}
                   />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="ebitda" name="EBITDA" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                </BarChart>
+                  <Tooltip
+                    content={<RevenueEbitdaTooltip />}
+                    cursor={false}
+                    wrapperStyle={{ outline: "none" }}
+                  />
+                  <Bar
+                    dataKey="revenue"
+                    name="Revenue"
+                    fill={REVENUE_BAR_COLOR}
+                    radius={[5, 5, 0, 0]}
+                    maxBarSize={40}
+                    isAnimationActive
+                    animationDuration={900}
+                    animationEasing="ease-out"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="ebitda"
+                    name="EBITDA"
+                    stroke={EBITDA_LINE_COLOR}
+                    strokeWidth={2.5}
+                    dot={{
+                      fill: EBITDA_LINE_COLOR,
+                      stroke: "var(--bg-card)",
+                      strokeWidth: 2,
+                      r: 3.5,
+                    }}
+                    activeDot={{
+                      r: 5,
+                      fill: EBITDA_LINE_COLOR,
+                      stroke: "var(--bg-card)",
+                      strokeWidth: 2,
+                    }}
+                    isAnimationActive
+                    animationDuration={1100}
+                    animationEasing="ease-out"
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-full text-[13px]" style={{ color: "var(--text-muted)" }}>
@@ -802,12 +900,22 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-            <div className="flex gap-4 mt-3 text-[11px]" style={{ color: "var(--text-muted)" }}>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm bg-blue-500" /> Revenue
+            <div className="flex items-center justify-center gap-6 mt-3 text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
+              <span className="flex items-center gap-2">
+                <span
+                  className="w-2.5 h-2.5 rounded-[3px] shrink-0"
+                  style={{ background: REVENUE_BAR_COLOR }}
+                />
+                Revenue
               </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm bg-green-500" /> EBITDA
+              <span className="flex items-center gap-2">
+                <span className="flex items-center shrink-0">
+                  <span
+                    className="w-4 h-0.5 rounded-full"
+                    style={{ background: EBITDA_LINE_COLOR }}
+                  />
+                </span>
+                EBITDA
               </span>
             </div>
           </div>
