@@ -33,6 +33,7 @@ import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
 import { DesktopOnlyGate } from "@/components/ui/DesktopOnlyGate";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type SliderConfig = {
   label: string;
@@ -63,6 +64,7 @@ export default function ScenariosPage() {
 function ScenariosPageContent() {
   const supabase = createClient();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [ctx, setCtx] = useState<StoreScenarioContext | null>(null);
@@ -75,7 +77,6 @@ function ScenariosPageContent() {
   const [savedScenarios, setSavedScenarios] = useState<SavedScenarioRow[]>([]);
   const [savedExpanded, setSavedExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   const loadSavedScenarios = useCallback(
     async (storeId: string, uid: string) => {
@@ -250,7 +251,6 @@ function ScenariosPageContent() {
   const handleSaveScenario = useCallback(async () => {
     if (!ctx || !inputParams || !liveScenario || !selectedStore?.id || !userId) return;
     setSaving(true);
-    setSaveMessage(null);
     try {
       const outputs = {
         currentValue: liveScenario.currentValue,
@@ -276,14 +276,13 @@ function ScenariosPageContent() {
         outputs,
       });
       if (error) throw error;
-      setSaveMessage("Scenario saved");
+      toast.success("Scenario saved");
       await loadSavedScenarios(selectedStore.id, userId);
       setSavedExpanded(true);
     } catch {
-      setSaveMessage("Failed to save — try again");
+      toast.error("Failed to save — please try again");
     } finally {
       setSaving(false);
-      setTimeout(() => setSaveMessage(null), 3000);
     }
   }, [
     ctx,
@@ -294,6 +293,7 @@ function ScenariosPageContent() {
     selectedId,
     supabase,
     loadSavedScenarios,
+    toast,
   ]);
 
   const handleDeleteSaved = useCallback(
@@ -461,9 +461,6 @@ function ScenariosPageContent() {
               {saving ? "Saving…" : "Save Scenario"}
             </button>
           </div>
-          {saveMessage && (
-            <div className="text-[11px] text-blue-400 mb-3">{saveMessage}</div>
-          )}
 
           {/* Sliders */}
           <div className="space-y-4 mb-5 pb-5 border-b border-[var(--border)]">

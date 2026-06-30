@@ -24,8 +24,8 @@ import {
   formatAdjustment,
 } from "@/lib/equipment";
 import { fmtDollar } from "@/lib/calculations";
-import { FormBanner } from "@/components/ui/FormBanner";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { useToast } from "@/components/ui/ToastProvider";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
 
@@ -87,13 +87,13 @@ export default function EquipmentPage() {
   const router = useRouter();
   const supabase = createClient();
   const { selectedStore } = useStores();
+  const toast = useToast();
   const currentYear = new Date().getFullYear();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [store, setStore] = useState<Store | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
@@ -104,7 +104,6 @@ export default function EquipmentPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
-    setMessage(null);
 
     try {
       const {
@@ -117,7 +116,7 @@ export default function EquipmentPage() {
       setUserId(user.id);
 
       if (!selectedStore?.id) {
-        setMessage({ type: "error", text: "Select a store from the dropdown above." });
+        toast.error("Select a store from the dropdown above.");
         setStore(null);
         setEquipment([]);
         return;
@@ -218,17 +217,16 @@ export default function EquipmentPage() {
     const installationYear = parseInt(form.installation_year, 10);
 
     if (!quantity || quantity < 1) {
-      setMessage({ type: "error", text: "Quantity must be at least 1." });
+      toast.error("Quantity must be at least 1.");
       return;
     }
     if (!installationYear || installationYear < 1980 || installationYear > currentYear) {
-      setMessage({ type: "error", text: `Installation year must be between 1980 and ${currentYear}.` });
+      toast.error(`Installation year must be between 1980 and ${currentYear}.`);
       return;
     }
 
     setSaving(true);
     setSaveStatus("idle");
-    setMessage(null);
 
     try {
       const payload = {
@@ -251,16 +249,15 @@ export default function EquipmentPage() {
       if (saveError) {
         console.error("Equipment save error:", saveError);
         setSaveStatus("error");
-        setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+        toast.error("Failed to save — please try again");
         setSaving(false);
         return;
       }
 
       invalidateValuationCache(store.id);
       setSaveStatus("success");
-      setMessage({ type: "success", text: "Saved successfully." });
+      toast.success("Equipment updated");
       setTimeout(() => {
-        setMessage(null);
         setSaveStatus("idle");
       }, 3000);
       closeForm();
@@ -269,7 +266,7 @@ export default function EquipmentPage() {
     } catch (err) {
       console.error("Unexpected equipment save error:", err);
       setSaveStatus("error");
-      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+      toast.error("Failed to save — please try again");
       setSaving(false);
     }
   }
@@ -277,10 +274,9 @@ export default function EquipmentPage() {
   async function handleDelete(id: string) {
     if (!confirm("Delete this machine group? This cannot be undone.")) return;
 
-    setMessage(null);
     const { error: deleteError } = await supabase.from("equipment_inventory").delete().eq("id", id);
     if (deleteError) {
-      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+      toast.error("Failed to save — please try again");
       return;
     }
     if (editingId === id) closeForm();
@@ -345,8 +341,6 @@ export default function EquipmentPage() {
           + Add Machine Group
         </button>
       </div>
-
-      <FormBanner message={message} />
 
       {/* Section 1 — Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 grid-4">

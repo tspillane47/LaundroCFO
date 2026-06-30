@@ -17,6 +17,7 @@ import {
   parseDate,
   preventEnterSubmit,
 } from "./shared";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type Lease = {
   id: string;
@@ -238,12 +239,12 @@ type Props = {
 
 export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: Props) {
   const supabase = createClient();
+  const toast = useToast();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [mode, setMode] = useState<"view" | "edit">("view");
 
   const [lease, setLease] = useState<Lease | null>(null);
@@ -359,7 +360,6 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
     setSaveStatus("idle");
     setSaving(false);
     setError("");
-    setSuccess("");
   }
 
   useEffect(() => {
@@ -377,7 +377,6 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
     setSaveStatus("idle");
     setSaving(false);
     setError("");
-    setSuccess("");
   }
 
   async function handleSave() {
@@ -385,7 +384,6 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
     setSaving(true);
     setSaveStatus("idle");
     setError("");
-    setSuccess("");
 
     try {
       const {
@@ -393,7 +391,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       } = await supabase.auth.getUser();
       if (!user) {
         setSaveStatus("error");
-        setError("We couldn't save this lease. Please try again.");
+        toast.error("Failed to save — please try again");
         setSaving(false);
         return;
       }
@@ -428,7 +426,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       if (leaseError || !savedLease) {
         console.error("Lease save error:", leaseError);
         setSaveStatus("error");
-        setError("We couldn't save this lease. Please try again.");
+        toast.error("Failed to save — please try again");
         setSaving(false);
         return;
       }
@@ -478,15 +476,14 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
 
       invalidateValuationCache(store.id);
       setSaveStatus("success");
-      setSuccess("Saved successfully.");
-      setTimeout(() => setSuccess(""), 3000);
+      toast.success("Lease updated");
       setMode("view");
       setSaving(false);
       await loadData();
     } catch (err) {
       console.error("Unexpected lease save error:", err);
       setSaveStatus("error");
-      setError("We couldn't save this lease. Please try again.");
+      toast.error("Failed to save — please try again");
       setSaving(false);
     }
   }
@@ -550,14 +547,6 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
           style={{ background: "var(--bg-danger-tint)", color: "var(--text-danger)" }}
         >
           {error}
-        </div>
-      )}
-      {success && (
-        <div
-          className="rounded-lg p-3 text-[12px] mb-4"
-          style={{ background: "var(--bg-success-tint)", color: "var(--text-success)" }}
-        >
-          {success}
         </div>
       )}
 

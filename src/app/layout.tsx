@@ -22,6 +22,7 @@ import { FeedbackModal } from "@/components/ui/FeedbackModal";
 import { BetaBanner } from "@/components/ui/BetaBanner";
 import { setTermsReturnPath } from "@/components/ui/TermsBackLink";
 import { BETA_MODE } from "@/lib/config";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 
 const ADMIN_EMAIL = "tuckerspillane7@gmail.com";
 
@@ -691,7 +692,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   if (isAuthPage || isMarketingPage) {
     return (
       <html lang="en" className={isDark ? "dark" : ""}>
-        <body>{children}</body>
+        <body>
+          <ToastProvider>{children}</ToastProvider>
+        </body>
       </html>
     );
   }
@@ -700,7 +703,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     return (
       <html lang="en" className={isDark ? "dark" : ""}>
         <body>
-          <StoreProvider>{children}</StoreProvider>
+          <ToastProvider>
+            <StoreProvider>{children}</StoreProvider>
+          </ToastProvider>
         </body>
       </html>
     );
@@ -709,9 +714,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={isDark ? "dark" : ""}>
       <body>
-        <StoreProvider>
-          <AppShell>{children}</AppShell>
-        </StoreProvider>
+        <ToastProvider>
+          <StoreProvider>
+            <AppShell>{children}</AppShell>
+          </StoreProvider>
+        </ToastProvider>
       </body>
     </html>
   );

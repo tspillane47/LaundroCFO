@@ -29,7 +29,7 @@ import {
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { KpiCard } from "@/components/ui/KpiCard";
-import { FormBanner } from "@/components/ui/FormBanner";
+import { useToast } from "@/components/ui/ToastProvider";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
@@ -281,12 +281,12 @@ export default function DebtPage() {
   const router = useRouter();
   const supabase = createClient();
   const { selectedStore, isAllStores, stores } = useStores();
+  const toast = useToast();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loans, setLoans] = useState<StoreLoan[]>([]);
   const [valuation, setValuation] = useState<(ValuationResult & { store: Record<string, unknown> }) | null>(null);
@@ -354,12 +354,6 @@ export default function DebtPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  useEffect(() => {
-    if (!message) return;
-    const timer = setTimeout(() => setMessage(null), 3000);
-    return () => clearTimeout(timer);
-  }, [message]);
 
   const enrichedLoans = useMemo(() => loans.map(enrichLoan), [loans]);
 
@@ -476,17 +470,16 @@ export default function DebtPage() {
     if (!selectedStore || !userId || saving || saveStatus === "success") return;
 
     if (!form.lender_name.trim()) {
-      setMessage({ type: "error", text: "Enter a lender name before saving." });
+      toast.error("Enter a lender name before saving.");
       return;
     }
     if (parseNum(form.current_balance) == null && parseNum(form.monthly_payment) == null) {
-      setMessage({ type: "error", text: "Enter a current balance or monthly payment." });
+      toast.error("Enter a current balance or monthly payment.");
       return;
     }
 
     setSaving(true);
     setSaveStatus("idle");
-    setMessage(null);
 
     try {
       const payload = {
@@ -517,7 +510,7 @@ export default function DebtPage() {
         if (updateError) {
           console.error("Loan save error:", updateError);
           setSaveStatus("error");
-          setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+          toast.error("Failed to save — please try again");
           setSaving(false);
           return;
         }
@@ -526,22 +519,21 @@ export default function DebtPage() {
         if (insertError) {
           console.error("Loan save error:", insertError);
           setSaveStatus("error");
-          setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+          toast.error("Failed to save — please try again");
           setSaving(false);
           return;
         }
       }
 
       setSaveStatus("success");
-      setMessage({ type: "success", text: "Saved successfully." });
-      setTimeout(() => setMessage(null), 3000);
+      toast.success(editingId ? "Loan updated" : "Loan added");
       closeForm();
       setSaving(false);
       await loadData();
     } catch (err) {
       console.error("Unexpected loan save error:", err);
       setSaveStatus("error");
-      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+      toast.error("Failed to save — please try again");
       setSaving(false);
     }
   }
@@ -549,7 +541,6 @@ export default function DebtPage() {
   async function handleDelete(id: string) {
     if (deletingId) return;
     setDeletingId(id);
-    setMessage(null);
 
     const { error } = await supabase
       .from("store_loans")
@@ -557,10 +548,9 @@ export default function DebtPage() {
       .eq("id", id);
 
     if (error) {
-      setMessage({ type: "error", text: "We couldn't delete this loan. Please try again." });
+      toast.error("Failed to save — please try again");
     } else {
-      setMessage({ type: "success", text: "Loan removed." });
-      setTimeout(() => setMessage(null), 3000);
+      toast.success("Loan deleted");
       await loadData();
     }
     setDeletingId(null);
@@ -637,8 +627,6 @@ export default function DebtPage() {
           Track loans, monitor payoff progress, and calculate store equity
         </p>
       </div>
-
-      <FormBanner message={message} />
 
       {/* Section 1 — Hero */}
       <div className="hero-value-card" style={{ padding: "28px 32px" }}>

@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export const FEEDBACK_TYPES = [
   { value: "bug", label: "Bug" },
@@ -26,12 +27,12 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
   const supabase = createClient();
   const pathname = usePathname();
   const { selectedStore, isAllStores } = useStores();
+  const toast = useToast();
 
   const [feedbackType, setFeedbackType] = useState<FeedbackType>("bug");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -48,17 +49,8 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
       setMessage("");
       setError("");
       setSubmitting(false);
-      setSubmitted(false);
     }
   }, [open]);
-
-  useEffect(() => {
-    if (!submitted) return;
-    const timer = setTimeout(() => {
-      onClose();
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [submitted, onClose]);
 
   if (!open) return null;
 
@@ -99,7 +91,8 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
 
       if (insertError) throw insertError;
 
-      setSubmitted(true);
+      toast.success("Feedback submitted");
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit feedback.");
     } finally {
@@ -111,7 +104,7 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       onClick={() => {
-        if (!submitting && !submitted) onClose();
+        if (!submitting) onClose();
       }}
     >
       <div
@@ -121,20 +114,6 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
         aria-modal="true"
         aria-labelledby="feedback-modal-title"
       >
-        {submitted ? (
-          <div className="py-6 text-center">
-            <div
-              className="text-[15px] font-semibold mb-1"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Thank you for your feedback!
-            </div>
-            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-              We appreciate you helping us improve LaundroCFO.
-            </p>
-          </div>
-        ) : (
-          <>
             <div>
               <div
                 id="feedback-modal-title"
@@ -221,8 +200,6 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
                 {submitting ? "Submitting…" : "Submit Feedback"}
               </button>
             </div>
-          </>
-        )}
       </div>
     </div>
   );

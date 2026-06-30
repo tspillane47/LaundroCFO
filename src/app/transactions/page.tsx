@@ -8,6 +8,7 @@ import { fmtDollar } from "@/lib/calculations";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 import { FormBanner } from "@/components/ui/FormBanner";
+import { useToast } from "@/components/ui/ToastProvider";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { PageError } from "@/components/ui/PageError";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -367,6 +368,7 @@ export default function TransactionsPage() {
 function TransactionsPageContent() {
   const supabase = useMemo(() => createClient(), []);
   const { selectedStore, loading: storesLoading } = useStores();
+  const toast = useToast();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -961,7 +963,7 @@ function TransactionsPageContent() {
       const { error } = await excludeTransaction(supabase, id, reason, userId, store);
       if (error) {
         setSaving(false);
-        setMessage({ type: "error", text: error });
+        toast.error("Failed to save — please try again");
         return;
       }
     }
@@ -970,13 +972,7 @@ function TransactionsPageContent() {
     setExcludeModal(null);
     setSaving(false);
     setSelectedIds(new Set());
-    setMessage({
-      type: "success",
-      text:
-        excludeModal.ids.length === 1
-          ? "Transaction excluded."
-          : `Excluded ${excludeModal.ids.length} transactions.`,
-    });
+    toast.success("Transaction excluded");
     await loadData();
   }
 
@@ -1078,13 +1074,13 @@ function TransactionsPageContent() {
     setSaving(false);
 
     if (error) {
-      setMessage({ type: "error", text: error });
+      toast.error("Failed to save — please try again");
       return;
     }
 
     if (store?.id) invalidateValuationCache(store.id);
     setReclassifyModal(null);
-    setMessage({ type: "success", text: "Transaction reclassified and P&L updated." });
+    toast.success("Transactions reclassified");
     await loadData();
   }
 
@@ -1142,7 +1138,7 @@ function TransactionsPageContent() {
         );
         if (error) {
           setSaving(false);
-          setMessage({ type: "error", text: error });
+          toast.error("Failed to save — please try again");
           return;
         }
       } else {
@@ -1157,15 +1153,9 @@ function TransactionsPageContent() {
     setSaving(false);
     setBulkReclassifyModal(null);
     setSelectedIds(new Set());
-    setMessage({
-      type: "success",
-      text:
-        updatedCount === 1
-          ? "Reclassified 1 transaction."
-          : updatedCount === 0
-            ? "No transactions were reclassified."
-            : `Reclassified ${updatedCount} transactions.`,
-    });
+    if (updatedCount > 0) {
+      toast.success("Transactions reclassified");
+    }
     await loadData();
   }
 
@@ -1298,15 +1288,12 @@ function TransactionsPageContent() {
     setSaving(false);
 
     if (error) {
-      setMessage({ type: "error", text: error.message });
+      toast.error("Failed to save — please try again");
       return;
     }
 
     setStagedCsv([]);
-    setMessage({
-      type: "success",
-      text: `Saved ${rows.length} transaction${rows.length === 1 ? "" : "s"} to review queue.`,
-    });
+    toast.success(`CSV imported — ${rows.length} transaction${rows.length === 1 ? "" : "s"} added`);
     await loadData();
   }
 

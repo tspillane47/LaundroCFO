@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
+import { useToast } from "@/components/ui/ToastProvider";
 
 const inputClass = INPUT_CLASS;
 
@@ -77,11 +78,11 @@ export default function SettingsPage() {
   const router = useRouter();
   const supabase = createClient();
   const { stores, selectedStore, refreshStores } = useStores();
+  const toast = useToast();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [editingStore, setEditingStore] = useState(false);
   const [editingNotifications, setEditingNotifications] = useState(false);
   const [editingValuation, setEditingValuation] = useState(false);
@@ -199,7 +200,6 @@ export default function SettingsPage() {
     if (!selectedStore?.id) return;
     setSaving(true);
     setError("");
-    setSuccess("");
 
     const { error: updateError } = await supabase
       .from("stores")
@@ -223,8 +223,9 @@ export default function SettingsPage() {
 
     if (updateError) {
       setError(updateError.message);
+      toast.error("Failed to save — please try again");
     } else {
-      setSuccess("Store profile updated successfully.");
+      toast.success("Settings updated");
       setEditingStore(false);
       await refreshStores();
     }
@@ -235,7 +236,6 @@ export default function SettingsPage() {
     if (!selectedStore?.id) return;
     setSavingCash(true);
     setError("");
-    setSuccess("");
 
     const { error: updateError } = await supabase
       .from("stores")
@@ -254,8 +254,9 @@ export default function SettingsPage() {
 
     if (updateError) {
       setError(updateError.message);
+      toast.error("Failed to save — please try again");
     } else {
-      setSuccess("Cash balances updated successfully.");
+      toast.success("Settings updated");
       setEditingCash(false);
       await refreshStores();
     }
@@ -265,16 +266,14 @@ export default function SettingsPage() {
   function handleSaveNotifications() {
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify(notifications));
     setEditingNotifications(false);
-    setSuccess("Notification preferences saved.");
-    setTimeout(() => setSuccess(""), 3000);
+    toast.success("Settings updated");
   }
 
   function handleSaveValuation() {
     localStorage.setItem(VALUATION_SETTINGS_KEY, JSON.stringify(valuationSettings));
     setSavedValuationSettings(valuationSettings);
     setEditingValuation(false);
-    setSuccess("Valuation settings saved.");
-    setTimeout(() => setSuccess(""), 3000);
+    toast.success("Settings updated");
   }
 
   function handleCancelValuation() {
@@ -308,9 +307,6 @@ export default function SettingsPage() {
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[12px] text-red-400">{error}</div>
-      )}
-      {success && (
-        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-[12px] text-green-400">{success}</div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

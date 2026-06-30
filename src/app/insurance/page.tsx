@@ -10,6 +10,7 @@ import { ScoreRing } from "@/components/ui/ScoreRing";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormBanner } from "@/components/ui/FormBanner";
+import { useToast } from "@/components/ui/ToastProvider";
 import { PageError } from "@/components/ui/PageError";
 import {
   INPUT_CLASS,
@@ -446,6 +447,7 @@ export default function InsurancePage() {
   const router = useRouter();
   const supabase = createClient();
   const { selectedStore } = useStores();
+  const toast = useToast();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -650,7 +652,6 @@ export default function InsurancePage() {
     if (!store || !userId || saving || saveStatus === "success") return;
     setSaving(true);
     setSaveStatus("idle");
-    setMessage(null);
 
     try {
       const payload = {
@@ -703,7 +704,7 @@ export default function InsurancePage() {
         if (updateError) {
           console.error("Insurance policy save error:", updateError);
           setSaveStatus("error");
-          setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+          toast.error("Failed to save — please try again");
           setSaving(false);
           return;
         }
@@ -712,21 +713,20 @@ export default function InsurancePage() {
         if (insertError) {
           console.error("Insurance policy save error:", insertError);
           setSaveStatus("error");
-          setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+          toast.error("Failed to save — please try again");
           setSaving(false);
           return;
         }
       }
 
       setSaveStatus("success");
-      setMessage({ type: "success", text: "Saved successfully." });
-      setTimeout(() => setMessage(null), 3000);
+      toast.success(editingPolicyId ? "Policy updated" : "Policy added");
       closePolicyForm();
       await loadData();
     } catch (err) {
       console.error("Unexpected insurance policy save error:", err);
       setSaveStatus("error");
-      setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+      toast.error("Failed to save — please try again");
     } finally {
       setSaving(false);
     }
@@ -765,6 +765,7 @@ export default function InsurancePage() {
     const { error: insertError } = await supabase.from("insurance_claims").insert(payload);
     if (insertError) {
       setMessage({ type: "error", text: "We couldn't save this. Please try again." });
+      toast.error("Failed to save — please try again");
       setSaving(false);
       return;
     }
