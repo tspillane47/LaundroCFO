@@ -117,8 +117,10 @@ type ActionItem = {
   href: string;
 };
 
-const REVENUE_BAR_COLOR = "#4A7FD4";
-const EBITDA_LINE_COLOR = "#22c55e";
+const REVENUE_BAR_FILL = "rgba(34, 197, 94, 0.35)";
+const REVENUE_BAR_STROKE = "rgba(34, 197, 94, 0.8)";
+const EBITDA_LINE_COLOR = "#38bdf8";
+const EBITDA_GLOW = "drop-shadow(0 0 4px rgba(56, 189, 248, 0.95)) drop-shadow(0 0 10px rgba(56, 189, 248, 0.55))";
 
 const ChartTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -146,37 +148,54 @@ const RevenueEbitdaTooltip = ({ active, payload, label }: any) => {
 
   return (
     <div
-      className="rounded-xl px-3.5 py-2.5 text-xs min-w-[148px]"
+      className="rounded-xl px-3.5 py-2.5 text-xs min-w-[156px]"
       style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border)",
-        boxShadow: "0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04)",
-        color: "var(--text-primary)",
+        background: "rgba(10, 15, 28, 0.72)",
+        backdropFilter: "blur(14px)",
+        WebkitBackdropFilter: "blur(14px)",
+        border: "1px solid rgba(56, 189, 248, 0.55)",
+        boxShadow:
+          "0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(56, 189, 248, 0.12), 0 0 20px rgba(56, 189, 248, 0.18)",
+        color: "#f1f5f9",
       }}
     >
-      <div className="text-[11px] font-medium mb-2" style={{ color: "var(--text-muted)" }}>
+      <div className="text-[11px] font-semibold mb-2 tracking-wide uppercase" style={{ color: EBITDA_LINE_COLOR }}>
         {label}
       </div>
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}>
-            <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: REVENUE_BAR_COLOR }} />
+          <span className="flex items-center gap-1.5 text-slate-300">
+            <span
+              className="w-2.5 h-2.5 rounded-[3px] shrink-0"
+              style={{
+                background: REVENUE_BAR_FILL,
+                border: `1px solid ${REVENUE_BAR_STROKE}`,
+              }}
+            />
             Revenue
           </span>
-          <span className="font-semibold tabular-nums">{revenue != null ? fmtDollar(revenue) : "—"}</span>
+          <span className="font-semibold tabular-nums text-white">{revenue != null ? fmtDollar(revenue) : "—"}</span>
         </div>
         <div className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}>
-            <span className="w-3 h-0.5 rounded-full shrink-0" style={{ background: EBITDA_LINE_COLOR }} />
+          <span className="flex items-center gap-1.5 text-slate-300">
+            <span
+              className="w-4 h-0.5 rounded-full shrink-0"
+              style={{
+                background: EBITDA_LINE_COLOR,
+                boxShadow: "0 0 6px rgba(56, 189, 248, 0.9)",
+              }}
+            />
             EBITDA
           </span>
-          <span className="font-semibold tabular-nums">{ebitda != null ? fmtDollar(ebitda) : "—"}</span>
+          <span className="font-semibold tabular-nums" style={{ color: EBITDA_LINE_COLOR }}>
+            {ebitda != null ? fmtDollar(ebitda) : "—"}
+          </span>
         </div>
         <div
           className="flex items-center justify-between gap-4 pt-1.5 mt-0.5 border-t"
-          style={{ borderColor: "var(--border)" }}
+          style={{ borderColor: "rgba(56, 189, 248, 0.2)" }}
         >
-          <span style={{ color: "var(--text-muted)" }}>EBITDA Margin</span>
+          <span className="text-slate-400">EBITDA Margin</span>
           <span className="font-semibold tabular-nums" style={{ color: EBITDA_LINE_COLOR }}>
             {margin != null ? `${margin.toFixed(1)}%` : "—"}
           </span>
@@ -834,11 +853,19 @@ export default function DashboardPage() {
                 <ComposedChart
                   data={revenueEbitdaData}
                   margin={{ top: 8, right: 4, left: 0, bottom: 0 }}
+                  barCategoryGap="12%"
                 >
+                  <defs>
+                    <filter id="ebitdaLineGlow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor="#38bdf8" floodOpacity="0.95" />
+                      <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#38bdf8" floodOpacity="0.45" />
+                    </filter>
+                  </defs>
                   <CartesianGrid
                     vertical={false}
-                    stroke="var(--border)"
-                    strokeOpacity={0.85}
+                    stroke="var(--text-muted)"
+                    strokeOpacity={0.12}
+                    strokeDasharray="3 6"
                   />
                   <XAxis
                     dataKey="month"
@@ -863,9 +890,10 @@ export default function DashboardPage() {
                   <Bar
                     dataKey="revenue"
                     name="Revenue"
-                    fill={REVENUE_BAR_COLOR}
-                    radius={[5, 5, 0, 0]}
-                    maxBarSize={40}
+                    fill={REVENUE_BAR_FILL}
+                    stroke={REVENUE_BAR_STROKE}
+                    strokeWidth={1.5}
+                    radius={[6, 6, 0, 0]}
                     isAnimationActive
                     animationDuration={900}
                     animationEasing="ease-out"
@@ -875,19 +903,17 @@ export default function DashboardPage() {
                     dataKey="ebitda"
                     name="EBITDA"
                     stroke={EBITDA_LINE_COLOR}
-                    strokeWidth={2.5}
-                    dot={{
-                      fill: EBITDA_LINE_COLOR,
-                      stroke: "var(--bg-card)",
-                      strokeWidth: 2,
-                      r: 3.5,
-                    }}
+                    strokeWidth={3}
+                    dot={false}
                     activeDot={{
-                      r: 5,
+                      r: 4,
                       fill: EBITDA_LINE_COLOR,
-                      stroke: "var(--bg-card)",
+                      stroke: "#0ea5e9",
                       strokeWidth: 2,
+                      style: { filter: EBITDA_GLOW },
                     }}
+                    style={{ filter: EBITDA_GLOW }}
+                    filter="url(#ebitdaLineGlow)"
                     isAnimationActive
                     animationDuration={1100}
                     animationEasing="ease-out"
@@ -903,18 +929,22 @@ export default function DashboardPage() {
             <div className="flex items-center justify-center gap-6 mt-3 text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
               <span className="flex items-center gap-2">
                 <span
-                  className="w-2.5 h-2.5 rounded-[3px] shrink-0"
-                  style={{ background: REVENUE_BAR_COLOR }}
+                  className="w-3 h-3 rounded-[4px] shrink-0"
+                  style={{
+                    background: REVENUE_BAR_FILL,
+                    border: `1.5px solid ${REVENUE_BAR_STROKE}`,
+                  }}
                 />
                 Revenue
               </span>
               <span className="flex items-center gap-2">
-                <span className="flex items-center shrink-0">
-                  <span
-                    className="w-4 h-0.5 rounded-full"
-                    style={{ background: EBITDA_LINE_COLOR }}
-                  />
-                </span>
+                <span
+                  className="w-5 h-[3px] rounded-full shrink-0"
+                  style={{
+                    background: EBITDA_LINE_COLOR,
+                    boxShadow: "0 0 8px rgba(56, 189, 248, 0.85), 0 0 2px rgba(56, 189, 248, 1)",
+                  }}
+                />
                 EBITDA
               </span>
             </div>
