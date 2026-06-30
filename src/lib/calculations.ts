@@ -6,12 +6,23 @@ function safeDivide(numerator: number, denominator: number, fallback = 0): numbe
   return Number.isFinite(result) ? result : fallback;
 }
 
-export function calcDSCR(cashFlow: number, annualDebtService: number) {
-  return safeDivide(cashFlow, annualDebtService, 0);
+export const DSCR_NO_DEBT_LABEL = "N/A — No Debt";
+
+export function calcDSCR(
+  cashFlow: number,
+  annualDebtService: number | null | undefined
+): number | null {
+  if (!annualDebtService || annualDebtService <= 0) return null;
+  if (!Number.isFinite(cashFlow) || !Number.isFinite(annualDebtService)) return null;
+  const result = cashFlow / annualDebtService;
+  return Number.isFinite(result) ? result : null;
 }
 
-export function calcGlobalDSCR(globalCashFlow: number, globalDebtService: number) {
-  return safeDivide(globalCashFlow, globalDebtService, 0);
+export function calcGlobalDSCR(
+  globalCashFlow: number,
+  globalDebtService: number | null | undefined
+): number | null {
+  return calcDSCR(globalCashFlow, globalDebtService);
 }
 
 export function calcEbitdaMargin(ebitda: number, revenue: number) {
@@ -117,8 +128,8 @@ export function leaseRiskLabel(yearsRemaining: number): string {
 
 // Valuation multiple adjustments
 export function calcValuationMultiple(params: {
-  dscr: number;
-  globalDscr: number;
+  dscr: number | null;
+  globalDscr: number | null;
   leaseYearsRemaining: number;
   rentToRevenue: number;
   utilityRatio: number;
@@ -129,10 +140,12 @@ export function calcValuationMultiple(params: {
   let multiple = 4.5; // base
 
   // Positive adjustments
-  if (params.dscr >= 2.0) multiple += 0.15;
-  else if (params.dscr >= 1.5) multiple += 0.1;
+  if (params.dscr != null) {
+    if (params.dscr >= 2.0) multiple += 0.15;
+    else if (params.dscr >= 1.5) multiple += 0.1;
+  }
 
-  if (params.globalDscr >= 1.75) multiple += 0.1;
+  if (params.globalDscr != null && params.globalDscr >= 1.75) multiple += 0.1;
 
   if (params.leaseYearsRemaining >= 10) multiple += 0.25;
   else if (params.leaseYearsRemaining >= 7) multiple += 0.15;
@@ -159,7 +172,7 @@ export function calcValuationMultiple(params: {
 
   if (params.ebitdaMargin < 20) multiple -= 0.3;
 
-  if (params.dscr < 1.25) multiple -= 0.4;
+  if (params.dscr != null && params.dscr < 1.25) multiple -= 0.4;
 
   return Math.max(1.5, multiple);
 }

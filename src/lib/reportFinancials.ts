@@ -2,6 +2,7 @@ import { calcEstimatedBalance, calcRemainingMonths } from "@/lib/amortization";
 import { calcDSCR } from "@/lib/calculations";
 import { computeTurnsPerDay, DEFAULT_DRYER_REVENUE_PCT, type EquipmentRecord, type TurnsPerDayResult } from "@/lib/equipment";
 import {
+  applyLoanDebtServiceToTtm,
   buildUtilitiesLookup,
   calcTtmMetrics,
   enrichMonthlyRecords,
@@ -521,8 +522,9 @@ export async function fetchReportFinancialContext(
       ttmEbitda: monthlyEbitda * 12,
       ttmEbitdaMargin: monthlyRevenue > 0 ? (monthlyEbitda / monthlyRevenue) * 100 : 0,
       ttmDebtService: debtService * 12,
+      ttmActualDebtService: 0,
       ttmNoi: monthlyEbitda * 12 - debtService * 12,
-      dscr: dscr ?? 0,
+      dscr: dscr ?? null,
       monthsUsed: 0,
     };
 
@@ -596,7 +598,8 @@ export async function fetchReportFinancialContext(
         )
       : records.slice(0, 12);
 
-  const ttm = calcTtmMetrics(ttmRecords);
+  const baseTtm = calcTtmMetrics(ttmRecords);
+  const ttm = applyLoanDebtServiceToTtm(baseTtm, annualDebtService);
   const monthsUsed = ttm.monthsUsed;
   const camMonthly = options?.camMonthly ?? 0;
 
@@ -621,12 +624,7 @@ export async function fetchReportFinancialContext(
   const waterKPI = computeWaterKpi(waterMonthlyAverage, selfServiceMonthlyAverage);
 
   const monthlyEbitda = monthlyAverages.ebitda;
-  const dscr =
-    totalMonthlyDebtService > 0
-      ? calcDSCR(monthlyEbitda * 12, totalMonthlyDebtService * 12)
-      : ttm.ttmDebtService > 0
-        ? calcDSCR(ttm.ttmEbitda, ttm.ttmDebtService)
-        : null;
+  const dscr = ttm.dscr;
 
   const store = options?.store ?? {};
   const isOwnerOccupied = store.occupancy_type === "owner_occupied";

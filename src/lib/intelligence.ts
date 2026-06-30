@@ -3,6 +3,7 @@ import {
   formatRentEscalationAlert,
   getNextRentEscalation,
 } from "@/lib/rent-escalation";
+import { calcDSCR } from "@/lib/calculations";
 
 export interface FeedItem {
   id: string;
@@ -18,7 +19,13 @@ export interface FeedItem {
 
 type FeedItemDraft = Omit<FeedItem, "storeId">;
 
-export function generateStoreFeed(store: any, lease?: any, equipment?: any[], insurance?: any[]): FeedItem[] {
+export function generateStoreFeed(
+  store: any,
+  lease?: any,
+  equipment?: any[],
+  insurance?: any[],
+  options?: { scheduledAnnualDebtService?: number }
+): FeedItem[] {
   const items: FeedItemDraft[] = [];
   const now = new Date();
 
@@ -69,23 +76,26 @@ export function generateStoreFeed(store: any, lease?: any, equipment?: any[], in
     });
   }
 
-  if (store.annual_debt_service > 0) {
+  const scheduledAnnualDebtService = options?.scheduledAnnualDebtService ?? 0;
+  if (scheduledAnnualDebtService > 0) {
     const annualEbitda = (store.monthly_revenue - store.monthly_expenses) * 12;
-    const dscr = annualEbitda / store.annual_debt_service;
-    items.push({
-      id: 'dscr-' + store.id,
-      date: formatDate(now),
-      category: 'financial',
-      icon: '🏦',
-      headline: `DSCR: ${dscr.toFixed(2)}x`,
-      description: dscr >= 1.5
-        ? 'Strong debt coverage. Lender-ready position.'
-        : dscr >= 1.25
-        ? 'Meets minimum lender threshold of 1.25x.'
-        : '⚠ Below 1.25x minimum. Review debt service.',
-      severity: dscr >= 1.5 ? 'success' : dscr >= 1.25 ? 'info' : 'danger',
-      storeName: store.name,
-    });
+    const dscr = calcDSCR(annualEbitda, scheduledAnnualDebtService);
+    if (dscr != null) {
+      items.push({
+        id: 'dscr-' + store.id,
+        date: formatDate(now),
+        category: 'financial',
+        icon: '🏦',
+        headline: `DSCR: ${dscr.toFixed(2)}x`,
+        description: dscr >= 1.5
+          ? 'Strong debt coverage. Lender-ready position.'
+          : dscr >= 1.25
+          ? 'Meets minimum lender threshold of 1.25x.'
+          : '⚠ Below 1.25x minimum. Review debt service.',
+        severity: dscr >= 1.5 ? 'success' : dscr >= 1.25 ? 'info' : 'danger',
+        storeName: store.name,
+      });
+    }
   }
 
   // Valuation items

@@ -42,7 +42,8 @@ export function generatePortfolioAlerts(
   stores: Record<string, unknown>[],
   leasesByStore: Record<string, Record<string, unknown>>,
   equipmentByStore: Record<string, Record<string, unknown>[]>,
-  insuranceByStore: Record<string, Record<string, unknown>[]>
+  insuranceByStore: Record<string, Record<string, unknown>[]>,
+  scheduledDebtServiceByStore?: Record<string, number>
 ): AlertItem[] {
   const items = stores.flatMap((store) => {
     const id = String(store.id);
@@ -50,7 +51,8 @@ export function generatePortfolioAlerts(
       store,
       leasesByStore[id],
       equipmentByStore[id],
-      insuranceByStore[id]
+      insuranceByStore[id],
+      { scheduledAnnualDebtService: scheduledDebtServiceByStore?.[id] ?? 0 }
     );
   });
 

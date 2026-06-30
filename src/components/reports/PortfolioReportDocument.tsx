@@ -1,6 +1,8 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
+import { DSCR_NO_DEBT_LABEL } from "@/lib/calculations";
 import type { PortfolioReportData } from "@/lib/getPortfolioReport";
+import { formatDscrDisplay } from "@/lib/financials";
 import { PdfPageChrome } from "@/components/reports/PdfPageChrome";
 import { PdfMetricGrid, PdfMetricTile } from "@/components/reports/PdfMetricGrid";
 
@@ -283,7 +285,7 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
           <MetricTile label="Portfolio Cash" value={fmtCurrency(totals.portfolioCash)} />
           <MetricTile
             label="Global DSCR"
-            value={totals.annualDebtService > 0 ? fmtMultiple(totals.globalDSCR) : "N/A"}
+            value={formatDscrDisplay(totals.globalDSCR, totals.annualDebtService)}
           />
           <MetricTile label="Global LTV" value={fmtPercent(totals.globalLTV)} />
           <MetricTile label="Annual Revenue" value={fmtCurrency(totals.annualRevenue)} />
@@ -323,7 +325,7 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
             <Text style={[styles.tableCellRight, { width: "10%" }]}>{fmtCurrency(d.annualRevenue)}</Text>
             <Text style={[styles.tableCellRight, { width: "10%" }]}>{fmtCurrency(d.annualEbitda)}</Text>
             <Text style={[styles.tableCellRight, { width: "8%" }]}>
-              {d.annualDebtService > 0 && d.dscr != null ? fmtMultiple(d.dscr) : "N/A"}
+              {formatDscrDisplay(d.dscr, d.annualDebtService)}
             </Text>
             <Text style={[styles.tableCellRight, { width: "10%" }]}>{fmtCurrency(d.valuation.businessValue)}</Text>
             <Text style={[styles.tableCellRight, { width: "10%" }]}>{fmtCurrency(d.debt)}</Text>
@@ -351,7 +353,7 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
         <SectionHeader>Credit Metrics</SectionHeader>
         <DataRow
           label="Global DSCR"
-          value={totals.annualDebtService > 0 ? fmtMultiple(totals.globalDSCR) : "N/A"}
+          value={formatDscrDisplay(totals.globalDSCR, totals.annualDebtService)}
         />
         <Text style={[styles.bodyText, { fontSize: 8, marginTop: -4 }]}>
           Combined EBITDA ÷ total annual debt service across all stores.

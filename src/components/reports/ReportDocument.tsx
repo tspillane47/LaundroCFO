@@ -11,11 +11,12 @@ import {
   calcUtilityRatio,
   calcLeaseScore,
   leaseRiskLabel,
+  DSCR_NO_DEBT_LABEL,
   fmtDollar,
   fmtMultiple,
   fmtPct,
 } from "@/lib/calculations";
-import type { PortfolioTtmCashFlow, PortfolioTtmSummary, TtmMetrics } from "@/lib/financials";
+import { formatDscrDisplay, type PortfolioTtmCashFlow, type PortfolioTtmSummary, type TtmMetrics } from "@/lib/financials";
 import type { ValuationResult } from "@/lib/valuation";
 import { PdfPageChrome } from "@/components/reports/PdfPageChrome";
 import { PdfMetricGrid, PdfMetricTile, PdfScorecard, PdfScorecardRow } from "@/components/reports/PdfMetricGrid";
@@ -537,8 +538,9 @@ export function ReportDocument(props: ReportProps) {
         <PdfScorecardRow>
           <PdfScorecard
             label="DSCR"
-            value={m.ttmDebtService > 0 && m.dscr != null ? fmtMultiple(m.dscr) : "N/A"}
-            verdict={dscrVerdict(m.ttmDebtService > 0 ? m.dscr : null)}
+            value={formatDscrDisplay(m.dscr, m.ttmDebtService)}
+            verdict={dscrVerdict(m.dscr, m.ttmDebtService > 0)}
+            verdictLabel={m.ttmDebtService <= 0 ? "No Debt" : undefined}
           />
           <PdfScorecard
             label="EBITDA Margin"
@@ -556,8 +558,8 @@ export function ReportDocument(props: ReportProps) {
           />
         </PdfScorecardRow>
         <PdfMetricGrid>
-          <MetricTile label="DSCR" value={m.ttmDebtService > 0 && m.dscr != null ? fmtMultiple(m.dscr) : "N/A"} />
-          <MetricTile label="Global DSCR" value={m.portfolioDebtService > 0 && m.globalDscr != null ? fmtMultiple(m.globalDscr) : "N/A"} />
+          <MetricTile label="DSCR" value={formatDscrDisplay(m.dscr, m.ttmDebtService)} />
+          <MetricTile label="Global DSCR" value={formatDscrDisplay(m.globalDscr, m.portfolioDebtService)} />
           <MetricTile label="EBITDA Margin" value={fmtPct(m.ebitdaMargin)} />
           <MetricTile label="Rent / Revenue" value={fmtPct(m.rentToRevenue)} />
           <MetricTile label="Utility / Revenue" value={fmtPct(m.utilityRatio)} />

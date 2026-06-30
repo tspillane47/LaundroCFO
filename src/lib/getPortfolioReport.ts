@@ -39,7 +39,7 @@ export interface PortfolioReportData {
     annualRevenue: number;
     annualEbitda: number;
     annualDebtService: number;
-    globalDSCR: number;
+    globalDSCR: number | null;
     globalLTV: number;
     debtYield: number;
     debtToEbitda: number;

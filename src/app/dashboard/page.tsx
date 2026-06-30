@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
-import { getStoreValuation, getStoreDebt, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
+import { getStoreValuation, getStoreDebt, getStoreScheduledDebtService, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
+import { calcDSCR, DSCR_NO_DEBT_LABEL } from "@/lib/calculations";
 import {
   calcBuildingEquity,
   calcOccupancyCostRatioFromRent,
@@ -220,6 +221,7 @@ export default function DashboardPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [valuation, setValuation] = useState<StoreValuationResult | null>(null);
   const [totalDebt, setTotalDebt] = useState(0);
+  const [scheduledDebtService, setScheduledDebtService] = useState(0);
   const supabase = createClient();
 
   const loadDashboardData = useCallback(async () => {
@@ -227,6 +229,7 @@ export default function DashboardPage() {
       setStore(null);
       setValuation(null);
       setTotalDebt(0);
+      setScheduledDebtService(0);
       setLoadError(false);
       return;
     }
@@ -241,8 +244,12 @@ export default function DashboardPage() {
       const storeValuation = await getStoreValuation(loadedStore.id);
       setValuation(storeValuation);
 
-      const debt = await getStoreDebt(loadedStore.id);
+      const [debt, scheduledAnnual] = await Promise.all([
+        getStoreDebt(loadedStore.id),
+        getStoreScheduledDebtService(loadedStore.id),
+      ]);
       setTotalDebt(debt);
+      setScheduledDebtService(scheduledAnnual);
 
       const [{ data: policiesData, error: policiesError }, { data: equipmentData, error: equipmentError }] =
         await Promise.all([
@@ -323,10 +330,10 @@ export default function DashboardPage() {
   const expenses = hasFinancialData ? (resolvedFinancials?.monthlyExpenses ?? 0) : 0;
   const ebitda = hasFinancialData ? revenue - expenses : 0;
   const annualEbitda = hasFinancialData ? (resolvedFinancials?.annualEbitda ?? 0) : 0;
-  const debtService = hasFinancialData ? (store?.annual_debt_service ?? 0) : 0;
+  const debtService = scheduledDebtService;
   const annualCashFlow = hasFinancialData ? annualEbitda - debtService : 0;
   const monthlyCashFlow = hasFinancialData ? annualCashFlow / 12 : 0;
-  const dscrNum = hasFinancialData && debtService > 0 ? annualCashFlow / debtService : 0;
+  const dscrNum = hasFinancialData ? calcDSCR(annualEbitda, debtService) : null;
   const ebitdaMargin = hasFinancialData && revenue > 0 ? (ebitda / revenue) * 100 : 0;
   const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
   const utilities = hasFinancialData ? (store?.monthly_utilities ?? 0) : 0;
@@ -440,7 +447,7 @@ export default function DashboardPage() {
       });
     }
 
-    if (hasFinancialData && dscrNum < 1.25) {
+    if (hasFinancialData && dscrNum != null && dscrNum < 1.25) {
       items.push({
         id: "dscr",
         severity: "urgent",
@@ -514,8 +521,13 @@ export default function DashboardPage() {
   };
 
   const feedItems = useMemo(
-    () => (store ? generateStoreFeed(store, lease, equipment, insurancePolicies) : []),
-    [store, lease, equipment, insurancePolicies]
+    () =>
+      store
+        ? generateStoreFeed(store, lease, equipment, insurancePolicies, {
+            scheduledAnnualDebtService: scheduledDebtService,
+          })
+        : [],
+    [store, lease, equipment, insurancePolicies, scheduledDebtService]
   );
 
   if (loadError) {
@@ -590,9 +602,9 @@ export default function DashboardPage() {
     },
     {
       label: "DSCR",
-      value: hasFinancialData && debtService > 0 ? `${dscrNum.toFixed(2)}x` : "—",
+      value: hasFinancialData && debtService > 0 && dscrNum != null ? `${dscrNum.toFixed(2)}x` : DSCR_NO_DEBT_LABEL,
       median: 1.5,
-      storeValue: dscrNum,
+      storeValue: dscrNum ?? 0,
       displayMedian: "1.5x",
       invert: false,
     },
@@ -664,8 +676,10 @@ export default function DashboardPage() {
           style={{ animationDelay: "0s" }}
           label={<DisclaimerLabel>DSCR</DisclaimerLabel>}
           value={
-            hasFinancialData && debtService > 0 ? (
+            hasFinancialData && debtService > 0 && dscrNum != null ? (
               <AnimatedNumber value={dscrNum} decimals={2} suffix="x" duration={1000} />
+            ) : hasFinancialData ? (
+              <span className="text-green-400">{DSCR_NO_DEBT_LABEL}</span>
             ) : (
               "—"
             )
@@ -674,21 +688,23 @@ export default function DashboardPage() {
             !hasFinancialData
               ? "Add monthly financials"
               : debtService <= 0
-                ? "Add debt service"
-                : dscrNum >= 1.5
+                ? "No debt — strong position"
+                : dscrNum != null && dscrNum >= 1.5
                   ? "Strong coverage"
-                  : dscrNum >= 1.25
+                  : dscrNum != null && dscrNum >= 1.25
                     ? "Adequate"
                     : "Below threshold"
           }
           valueColor={
-            !hasFinancialData || debtService <= 0
+            !hasFinancialData
               ? "var(--text-muted)"
-              : dscrNum >= 1.5
+              : debtService <= 0
                 ? "var(--text-success)"
-                : dscrNum >= 1.25
-                  ? "var(--text-warning)"
-                  : "var(--text-danger)"
+                : dscrNum != null && dscrNum >= 1.5
+                  ? "var(--text-success)"
+                  : dscrNum != null && dscrNum >= 1.25
+                    ? "var(--text-warning)"
+                    : "var(--text-danger)"
           }
         />
 
@@ -1181,7 +1197,12 @@ export default function DashboardPage() {
             },
             {
               label: "DSCR",
-              value: hasFinancialData && debtService > 0 ? `${dscrNum.toFixed(2)}x` : "—",
+              value:
+                hasFinancialData && debtService > 0 && dscrNum != null
+                  ? `${dscrNum.toFixed(2)}x`
+                  : hasFinancialData
+                    ? DSCR_NO_DEBT_LABEL
+                    : "—",
             },
             { label: "Cash Flow", value: hasFinancialData ? fmtDollar(annualCashFlow) : "—" },
           ].map((item) => (

@@ -21,7 +21,7 @@ import {
   calcPayoffDate,
   generatePayoffSchedule,
 } from "@/lib/amortization";
-import { calcDSCR, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import { calcDSCR, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import {
   calcStoreTtmFromFinancials,
   type MonthlyFinancialRecord,
@@ -369,8 +369,8 @@ export default function DebtPage() {
     const scheduledMonthly = enrichedLoans.reduce((s, l) => s + (l.monthly_payment ?? 0), 0);
     const scheduledAnnual = scheduledMonthly * 12;
     const hasActualData = ttm.monthsUsed > 0;
-    const actualMonthlyAvg = hasActualData ? ttm.ttmDebtService / ttm.monthsUsed : null;
-    const actualAnnualTotal = hasActualData ? ttm.ttmDebtService : null;
+    const actualMonthlyAvg = hasActualData ? ttm.ttmActualDebtService / ttm.monthsUsed : null;
+    const actualAnnualTotal = hasActualData ? ttm.ttmActualDebtService : null;
     const monthlyVariance =
       actualMonthlyAvg != null ? actualMonthlyAvg - scheduledMonthly : null;
     const annualVariance =
@@ -378,14 +378,8 @@ export default function DebtPage() {
     const monthlyVariancePct =
       monthlyVariance != null ? variancePct(monthlyVariance, scheduledMonthly) : null;
 
-    const scheduledDscr =
-      scheduledAnnual > 0 && ttm.ttmEbitda > 0
-        ? calcDSCR(ttm.ttmEbitda, scheduledAnnual)
-        : null;
-    const actualDscr =
-      actualAnnualTotal != null && actualAnnualTotal > 0 && ttm.ttmEbitda > 0
-        ? calcDSCR(ttm.ttmEbitda, actualAnnualTotal)
-        : null;
+    const scheduledDscr = calcDSCR(ttm.ttmEbitda, scheduledAnnual);
+    const actualDscr = calcDSCR(ttm.ttmEbitda, actualAnnualTotal ?? 0);
 
     return {
       scheduledMonthly,
@@ -981,12 +975,12 @@ export default function DebtPage() {
                 "text-[28px] font-bold tabular-nums mt-1",
                 debtServiceAnalysis.scheduledDscr != null
                   ? dscrColorClass(debtServiceAnalysis.scheduledDscr)
-                  : "text-gray-700 dark:text-gray-800 dark:text-slate-400"
+                  : "text-green-400"
               )}
             >
               {debtServiceAnalysis.scheduledDscr != null
                 ? fmtMultiple(debtServiceAnalysis.scheduledDscr)
-                : "N/A"}
+                : DSCR_NO_DEBT_LABEL}
             </div>
             <div className="text-[12px] mt-2" style={{ color: "var(--text-muted)" }}>
               TTM EBITDA {fmtDollar(ttm.ttmEbitda)} ÷ scheduled annual debt service

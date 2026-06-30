@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
-import { fmtDollar, fmtMultiple } from "@/lib/calculations";
+import { calcDSCR, calcGlobalDSCR, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import { formatDscrDisplay } from "@/lib/financials";
 import { getStoreValuation, getStoreDebt, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
 import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
@@ -104,6 +105,7 @@ export default function PortfolioPage() {
   >([]);
   const [totalDebt, setTotalDebt] = useState(0);
   const [totalAnnualDebtServiceFromLoans, setTotalAnnualDebtServiceFromLoans] = useState(0);
+  const [scheduledDebtServiceByStore, setScheduledDebtServiceByStore] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (localStorage.getItem("laundrocfo_show_welcome") === "true") {
@@ -197,6 +199,14 @@ export default function PortfolioPage() {
       );
       setTotalAnnualDebtServiceFromLoans(annualDebtServiceFromLoans);
 
+      const debtServiceByStore: Record<string, number> = {};
+      for (const loan of loansData ?? []) {
+        const storeId = String(loan.store_id);
+        debtServiceByStore[storeId] =
+          (debtServiceByStore[storeId] ?? 0) + (loan.monthly_payment ?? 0) * 12;
+      }
+      setScheduledDebtServiceByStore(debtServiceByStore);
+
       const totalPortfolioValue = valuations.reduce((s, sv) => s + sv.valuation.businessValue, 0);
       if (stores.length === 1 && valuations.length === 1) {
         const singleStoreValue = valuations[0].valuation.businessValue;
@@ -235,9 +245,9 @@ export default function PortfolioPage() {
       const monthlyExpenses = hasFinancialData ? (resolved?.monthlyExpenses ?? 0) : 0;
       const monthlyEbitda = hasFinancialData ? monthlyRevenue - monthlyExpenses : 0;
       const annualEbitda = hasFinancialData ? (resolved?.annualEbitda ?? 0) : 0;
-      const debtService = hasFinancialData ? (store.annual_debt_service ?? 0) : 0;
+      const debtService = hasFinancialData ? (scheduledDebtServiceByStore[store.id] ?? 0) : 0;
       const annualCashFlow = hasFinancialData ? annualEbitda - debtService : 0;
-      const dscr = hasFinancialData && debtService > 0 ? annualCashFlow / debtService : 0;
+      const dscr = hasFinancialData ? calcDSCR(annualEbitda, debtService) : null;
       const estimatedValue = hasFinancialData ? (storeValuation?.businessValue ?? 0) : 0;
       const loanBalance = store.loan_balance ?? 0;
       const storeCash = hasFinancialData
@@ -256,7 +266,7 @@ export default function PortfolioPage() {
           : null;
 
       const healthScore = hasFinancialData
-        ? calcHealthScore(dscr, monthlyRevenue, avgMachineAge, leaseYearsRemaining, loanBalance)
+        ? calcHealthScore(dscr ?? (debtService > 0 ? 0 : 2), monthlyRevenue, avgMachineAge, leaseYearsRemaining, loanBalance)
         : 0;
 
       return {
@@ -271,11 +281,11 @@ export default function PortfolioPage() {
         avgMachineAge,
         storeCash,
         debtService,
-        hasDscrWarning: hasFinancialData && debtService > 0 && dscr < 1.25,
+        hasDscrWarning: hasFinancialData && dscr != null && dscr < 1.25,
         hasFinancialData,
       };
     });
-  }, [stores, leases, valuationByStoreId]);
+  }, [stores, leases, valuationByStoreId, scheduledDebtServiceByStore]);
 
   const aggregates = useMemo(() => {
     const withFinancials = storeMetrics.filter((m) => m.hasFinancialData);
@@ -286,7 +296,7 @@ export default function PortfolioPage() {
     const totalCash = withFinancials.reduce((s, m) => s + m.storeCash, 0);
     const totalAnnualDebtService = totalAnnualDebtServiceFromLoans;
     const hasDebtData = totalAnnualDebtServiceFromLoans > 0 && withFinancials.length > 0;
-    const globalDSCR = hasDebtData ? totalAnnualEbitda / totalAnnualDebtService : 0;
+    const globalDSCR = hasDebtData ? calcGlobalDSCR(totalAnnualEbitda, totalAnnualDebtService) : null;
     const portfolioNetWorth = totalPortfolioValue - totalDebt + totalCash;
     const ebitdaMargin = totalAnnualRevenue > 0 ? (totalAnnualEbitda / totalAnnualRevenue) * 100 : 0;
     const availableMonthlyCashFlow = Math.max(0, (totalAnnualEbitda - totalAnnualDebtService) / 12);
@@ -318,16 +328,20 @@ export default function PortfolioPage() {
       const storeLease = leases.find((l) => l.store_id === store.id);
       const equipment = equipmentByStore[store.id] ?? [];
       const insurance = insuranceByStore[store.id] ?? [];
-      return generateStoreFeed(store, storeLease, equipment, insurance);
+      return generateStoreFeed(store, storeLease, equipment, insurance, {
+        scheduledAnnualDebtService: scheduledDebtServiceByStore[store.id] ?? 0,
+      });
     });
     const order = { danger: 0, warning: 1, success: 2, info: 3 };
     return items.sort((a, b) => order[a.severity] - order[b.severity]);
-  }, [stores, leases, equipmentByStore, insuranceByStore]);
+  }, [stores, leases, equipmentByStore, insuranceByStore, scheduledDebtServiceByStore]);
 
   const acquisitionMessage =
-    aggregates.globalDSCR > 2.0
+    !aggregates.hasDebtData
+      ? "No portfolio debt — strong equity position for future acquisitions."
+      : aggregates.globalDSCR != null && aggregates.globalDSCR > 2.0
       ? "Strong position. Well-qualified for additional acquisition financing."
-      : aggregates.globalDSCR > 1.5
+      : aggregates.globalDSCR != null && aggregates.globalDSCR > 1.5
         ? "Good position. Consider building reserves before expanding."
         : "Focus on improving store performance before acquiring.";
 
@@ -537,8 +551,10 @@ export default function PortfolioPage() {
               <DisclaimerLabel className="!text-gray-800 dark:text-slate-300">Global DSCR</DisclaimerLabel>
             </div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'white' }}>
-              {aggregates.hasDebtData ? (
+              {aggregates.hasDebtData && aggregates.globalDSCR != null ? (
                 <AnimatedNumber value={aggregates.globalDSCR} decimals={2} suffix="x" duration={1000} />
+              ) : aggregates.hasAnyFinancialData ? (
+                <span className="text-green-400">{DSCR_NO_DEBT_LABEL}</span>
               ) : (
                 "—"
               )}
@@ -649,14 +665,22 @@ export default function PortfolioPage() {
             />
           }
           value={
-            aggregates.hasDebtData ? (
+            aggregates.hasDebtData && aggregates.globalDSCR != null ? (
               <AnimatedNumber value={aggregates.globalDSCR} decimals={2} suffix="x" duration={1000} />
+            ) : aggregates.hasAnyFinancialData ? (
+              <span className="text-green-400">{DSCR_NO_DEBT_LABEL}</span>
             ) : (
               "—"
             )
           }
-          sub={aggregates.hasDebtData ? undefined : "Add debt data"}
-          valueColor={aggregates.hasDebtData ? undefined : "var(--text-muted)"}
+          sub={aggregates.hasDebtData ? undefined : aggregates.hasAnyFinancialData ? "No debt — strong position" : "Add debt data"}
+          valueColor={
+            aggregates.hasDebtData
+              ? undefined
+              : aggregates.hasAnyFinancialData
+                ? "var(--text-success)"
+                : "var(--text-muted)"
+          }
         />
       </div>
 
@@ -703,9 +727,15 @@ export default function PortfolioPage() {
                   },
                   {
                     label: "DSCR",
-                    value: m.hasFinancialData && m.debtService > 0 ? fmtMultiple(m.dscr) : "—",
+                    value: m.hasFinancialData
+                      ? formatDscrDisplay(m.dscr, m.debtService)
+                      : "—",
                     color:
-                      m.hasFinancialData && m.debtService > 0 ? dscrColorClass(m.dscr) : undefined,
+                      m.hasFinancialData && m.debtService > 0 && m.dscr != null
+                        ? dscrColorClass(m.dscr)
+                        : m.hasFinancialData && m.debtService <= 0
+                          ? "text-green-500"
+                          : undefined,
                   },
                 ].map((metric) => (
                   <div key={metric.label}>
@@ -828,10 +858,25 @@ export default function PortfolioPage() {
               <DisclaimerLabel>Global DSCR</DisclaimerLabel>
             </span>
             <span
-              className={clsx("font-semibold", aggregates.hasDebtData && dscrColorClass(aggregates.globalDSCR))}
-              style={aggregates.hasDebtData ? undefined : { color: "var(--text-muted)" }}
+              className={clsx(
+                "font-semibold",
+                aggregates.hasDebtData &&
+                  aggregates.globalDSCR != null &&
+                  dscrColorClass(aggregates.globalDSCR)
+              )}
+              style={
+                aggregates.hasDebtData
+                  ? undefined
+                  : aggregates.hasAnyFinancialData
+                    ? { color: "var(--text-success)" }
+                    : { color: "var(--text-muted)" }
+              }
             >
-              {aggregates.hasDebtData ? fmtMultiple(aggregates.globalDSCR) : "—"}
+              {aggregates.hasDebtData && aggregates.globalDSCR != null
+                ? fmtMultiple(aggregates.globalDSCR)
+                : aggregates.hasAnyFinancialData
+                  ? DSCR_NO_DEBT_LABEL
+                  : "—"}
             </span>
           </div>
           <div className="flex justify-between text-[13px]">

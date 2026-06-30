@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import {
+  applyLoanDebtServiceToTtm,
   calcTtmMetrics,
   enrichMonthlyRecords,
+  fetchAnnualDebtServiceByStore,
   sortRecordsDesc,
   type MonthlyFinancialRecord,
 } from "@/lib/financials";
@@ -113,6 +115,7 @@ function ScenariosPageContent() {
         { data: storeData, error: storeError },
         { data: equipmentData, error: equipError },
         { data: financialsData, error: financialsError },
+        annualDebtByStore,
       ] = await Promise.all([
         supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
         supabase.from("equipment_inventory").select("*").eq("store_id", selectedStore.id),
@@ -122,6 +125,7 @@ function ScenariosPageContent() {
           .eq("store_id", selectedStore.id)
           .order("year", { ascending: false })
           .order("month", { ascending: false }),
+        fetchAnnualDebtServiceByStore(supabase, [selectedStore.id]),
       ]);
 
       if (storeError) throw storeError;
@@ -132,7 +136,11 @@ function ScenariosPageContent() {
       const sorted = enrichMonthlyRecords(
         sortRecordsDesc((financialsData ?? []) as MonthlyFinancialRecord[])
       );
-      const ttmMetrics = sorted.length > 0 ? calcTtmMetrics(sorted) : null;
+      const scheduledAnnualDebtService = annualDebtByStore[selectedStore.id] ?? 0;
+      const ttmMetrics =
+        sorted.length > 0
+          ? applyLoanDebtServiceToTtm(calcTtmMetrics(sorted), scheduledAnnualDebtService)
+          : null;
       const resolvedFinancials = resolveStoreFinancials(storeData, ttmMetrics);
       const ownerOccupied = storeData.occupancy_type === "owner_occupied";
       let totalLeaseControl = ownerOccupied ? 15 : 0;
@@ -180,7 +188,7 @@ function ScenariosPageContent() {
         isOwnerOccupied: ownerOccupied,
         realEstateValue,
         resolvedFinancials,
-        annualDebtService: ttmMetrics?.ttmDebtService ?? 0,
+        annualDebtService: scheduledAnnualDebtService,
       };
 
       setCtx(nextCtx);

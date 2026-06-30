@@ -18,6 +18,7 @@ import {
   calcEbitdaPerSF,
   calcUtilityRatio,
   calcLeaseScore,
+  DSCR_NO_DEBT_LABEL,
   fmtDollar,
   fmtMultiple,
   fmtPct,
@@ -35,6 +36,7 @@ import {
   EMPTY_TTM_METRICS,
   fetchAnnualDebtServiceByStore,
   fetchMonthlyFinancialsForStores,
+  formatDscrDisplay,
   type PortfolioTtmCashFlow,
   type PortfolioTtmSummary,
   type TtmMetrics,
@@ -64,7 +66,8 @@ function calcYearsRemaining(endDate: string | null): number {
   return Math.max(0, (end.getTime() - Date.now()) / (365.25 * 24 * 60 * 60 * 1000));
 }
 
-function financeabilityRating(dscr: number | null, globalDscr: number | null): string {
+function financeabilityRating(dscr: number | null, globalDscr: number | null, hasDebt: boolean): string {
+  if (!hasDebt) return "No Debt";
   if (dscr == null || globalDscr == null) return "—";
   if (dscr >= 1.5 && globalDscr >= 1.5) return "Strong";
   if (dscr >= 1.25 && globalDscr >= 1.25) return "Acceptable";
@@ -434,7 +437,7 @@ function ReportsPageContent() {
       monthlyRent,
       camCharges,
       occupancyCostRatio,
-      financeRating: financeabilityRating(dscr, globalDscr),
+      financeRating: financeabilityRating(dscr, globalDscr, ttmDebtService > 0),
       isOwnerOccupied,
     };
   }, [store, valuation, stores, lease, leaseOptions, totalLeaseControl, storeTtm, portfolioTtm]);
@@ -716,10 +719,10 @@ function ReportsPageContent() {
             <KpiCard
               label="Global DSCR"
               value={
-                totals.annualDebtService > 0 ? (
+                totals.annualDebtService > 0 && totals.globalDSCR != null ? (
                   <AnimatedNumber value={totals.globalDSCR} decimals={2} suffix="x" duration={1000} />
                 ) : (
-                  "—"
+                  <span className="text-green-400">{DSCR_NO_DEBT_LABEL}</span>
                 )
               }
               style={{ padding: "16px 18px" }}
@@ -756,7 +759,7 @@ function ReportsPageContent() {
                       <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(d.annualRevenue)}</td>
                       <td className="py-2.5 pr-3 text-right tabular-nums text-green-600 dark:text-green-400">{fmtDollar(d.annualEbitda)}</td>
                       <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
-                        {d.annualDebtService > 0 && d.dscr != null ? fmtMultiple(d.dscr) : "N/A"}
+                        {formatDscrDisplay(d.dscr, d.annualDebtService)}
                       </td>
                       <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(d.valuation.businessValue)}</td>
                       <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(d.debt)}</td>
@@ -810,7 +813,7 @@ function ReportsPageContent() {
               {[
                 {
                   label: "Global DSCR",
-                  value: totals.annualDebtService > 0 ? fmtMultiple(totals.globalDSCR) : "N/A",
+                  value: formatDscrDisplay(totals.globalDSCR, totals.annualDebtService),
                 },
                 { label: "Global LTV", value: fmtPct(totals.globalLTV) },
                 {
@@ -951,13 +954,13 @@ function ReportsPageContent() {
           <div className="divide-y divide-white/[0.04] text-[13px]">
             <PreviewRow
               label="DSCR"
-              value={metrics.dscr != null ? fmtMultiple(metrics.dscr) : "N/A"}
-              className={metrics.dscr != null ? ratioColorClass(metrics.dscr, 1.25, 1.0) : "text-gray-700 dark:text-gray-800 dark:text-slate-400"}
+              value={formatDscrDisplay(metrics.dscr, metrics.ttmDebtService)}
+              className={metrics.ttmDebtService > 0 && metrics.dscr != null ? ratioColorClass(metrics.dscr, 1.25, 1.0) : "text-green-400"}
             />
             <PreviewRow
               label="Global DSCR"
-              value={metrics.globalDscr != null ? fmtMultiple(metrics.globalDscr) : "N/A"}
-              className={metrics.globalDscr != null ? ratioColorClass(metrics.globalDscr, 1.25, 1.0) : "text-gray-700 dark:text-gray-800 dark:text-slate-400"}
+              value={formatDscrDisplay(metrics.globalDscr, metrics.portfolioTtmDebtService)}
+              className={metrics.portfolioTtmDebtService > 0 && metrics.globalDscr != null ? ratioColorClass(metrics.globalDscr, 1.25, 1.0) : "text-green-400"}
             />
             <PreviewRow label="Rating" value={metrics.financeRating} className="text-green-400" />
           </div>
@@ -1050,8 +1053,9 @@ function ReportsPageContent() {
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
           <MetricScorecard
             label={<DisclaimerLabel>DSCR</DisclaimerLabel>}
-            value={metrics.dscr != null ? fmtMultiple(metrics.dscr) : "N/A"}
-            verdict={dscrVerdict(metrics.ttmDebtService > 0 ? metrics.dscr : null)}
+            value={formatDscrDisplay(metrics.dscr, metrics.ttmDebtService)}
+            verdict={dscrVerdict(metrics.dscr, metrics.ttmDebtService > 0)}
+            verdictLabel={metrics.ttmDebtService <= 0 ? "No Debt" : undefined}
           />
           <MetricScorecard
             label={<DisclaimerLabel>EBITDA Margin</DisclaimerLabel>}
@@ -1070,8 +1074,8 @@ function ReportsPageContent() {
         </div>
         <div className="report-metric-grid">
           {[
-            ["DSCR", metrics.dscr != null ? fmtMultiple(metrics.dscr) : "N/A"],
-            ["Global DSCR", metrics.globalDscr != null ? fmtMultiple(metrics.globalDscr) : "N/A"],
+            ["DSCR", formatDscrDisplay(metrics.dscr, metrics.ttmDebtService)],
+            ["Global DSCR", formatDscrDisplay(metrics.globalDscr, metrics.portfolioTtmDebtService)],
             ["EBITDA Margin", fmtPct(metrics.ebitdaMargin)],
             ["Rent / Revenue", fmtPct(metrics.rentToRevenue)],
             ["Utility / Revenue", fmtPct(metrics.utilityRatio)],

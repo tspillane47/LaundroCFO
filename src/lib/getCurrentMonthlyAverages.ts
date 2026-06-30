@@ -334,10 +334,7 @@ function buildCurrentMonthlyAveragesFromContext(
       totalOutstandingBalance,
     },
     surplusCashFlow: ebitdaMonthly - totalMonthlyDebtService,
-    dscr:
-      totalMonthlyDebtService > 0
-        ? calcDSCR(ebitdaMonthly * 12, totalMonthlyDebtService * 12)
-        : null,
+    dscr: calcDSCR(ebitdaMonthly * 12, totalMonthlyDebtService * 12),
     equity,
     waterKPI,
     monthsUsed,

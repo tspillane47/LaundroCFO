@@ -7,8 +7,8 @@ export const SCORECARD_COLORS: Record<ScorecardVerdict, string> = {
   Poor: "#ef4444",
 };
 
-export function dscrVerdict(dscr: number | null): ScorecardVerdict {
-  if (dscr == null) return "Poor";
+export function dscrVerdict(dscr: number | null, hasDebt = true): ScorecardVerdict | null {
+  if (!hasDebt || dscr == null) return null;
   if (dscr > 2) return "Excellent";
   if (dscr >= 1.5) return "Good";
   if (dscr >= 1.25) return "Watch";

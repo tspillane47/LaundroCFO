@@ -306,6 +306,17 @@ export async function getPortfolioValuation(userId: string) {
   return { totalValue, storeValuations };
 }
 
+export async function getStoreScheduledDebtService(storeId: string): Promise<number> {
+  const supabase = createClient();
+  const { data: loans } = await supabase
+    .from("store_loans")
+    .select("monthly_payment")
+    .eq("store_id", storeId)
+    .eq("is_active", true);
+  if (!loans) return 0;
+  return loans.reduce((sum, loan) => sum + (loan.monthly_payment ?? 0) * 12, 0);
+}
+
 export async function getStoreDebt(storeId: string): Promise<number> {
   const supabase = createClient();
   const { data: loans } = await supabase

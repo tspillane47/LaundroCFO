@@ -40,14 +40,18 @@ import {
   MONTH_SHORT,
   PL_CATEGORY_FIELDS,
   BANK_IMPORT_CATEGORY_LABELS,
+  applyLoanDebtServiceToTtm,
   buildRatioBenchmarks,
+  fetchAnnualDebtServiceByStore,
   mapBankCategoryToPlField,
   calcMonthly,
   calcRatios,
   calcTtmMetrics,
   calcYoYMetrics,
+  DSCR_NO_DEBT_LABEL,
   dscrSubColor,
   dscrTextColor,
+  formatDscrDisplay,
   emptyMonthlyForm,
   enrichMonthlyRecords,
   getChartRecords,
@@ -170,23 +174,34 @@ function ChartTooltip({
 }
 
 function RatioCard({ item }: { item: RatioBenchmark }) {
+  const hasValue = item.value != null;
   const max = item.progressMax ?? (item.unit === "x" ? 3 : item.unit === "$" ? item.top25 * 1.5 : 30);
-  const progress = Math.min(100, Math.max(0, (item.value / max) * 100));
-  const isGood = item.lowerIsBetter
-    ? item.value <= item.top25
-    : item.value >= item.top25;
-  const isWarn = item.lowerIsBetter
-    ? item.value <= item.bottom25
-    : item.value >= item.bottom25;
-  const color = isGood ? "text-green-400" : isWarn ? "text-amber-400" : "text-red-400";
-  const barColor = isGood ? "bg-green-500" : isWarn ? "bg-amber-500" : "bg-red-500";
+  const progress = hasValue ? Math.min(100, Math.max(0, ((item.value ?? 0) / max) * 100)) : 0;
+  const isNoDebtDscr = item.label === "DSCR" && !hasValue;
+  const isGood = isNoDebtDscr
+    ? true
+    : hasValue
+      ? item.lowerIsBetter
+        ? (item.value ?? 0) <= item.top25
+        : (item.value ?? 0) >= item.top25
+      : false;
+  const isWarn = isNoDebtDscr
+    ? false
+    : hasValue
+      ? item.lowerIsBetter
+        ? (item.value ?? 0) <= item.bottom25
+        : (item.value ?? 0) >= item.bottom25
+      : false;
+  const color = isNoDebtDscr ? "text-green-400" : isGood ? "text-green-400" : isWarn ? "text-amber-400" : "text-red-400";
+  const barColor = isNoDebtDscr ? "bg-green-500" : isGood ? "bg-green-500" : isWarn ? "bg-amber-500" : "bg-red-500";
 
-  const display =
-    item.unit === "$"
-      ? `$${Math.round(item.value).toLocaleString()}`
+  const display = isNoDebtDscr
+    ? DSCR_NO_DEBT_LABEL
+    : item.unit === "$"
+      ? `$${Math.round(item.value ?? 0).toLocaleString()}`
       : item.unit === "x"
-        ? fmtMultiple(item.value)
-        : fmtPct(item.value);
+        ? fmtMultiple(item.value ?? 0)
+        : fmtPct(item.value ?? 0);
 
   const benchDisplay =
     item.unit === "$"
@@ -266,6 +281,7 @@ export default function FinancialsPage() {
   const [store, setStore] = useState<StoreFinancialProfile | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [records, setRecords] = useState<CalculatedMonthly[]>([]);
+  const [scheduledAnnualDebtService, setScheduledAnnualDebtService] = useState(0);
   const [bankTransactions, setBankTransactions] = useState<BankTransaction[]>([]);
   const [stagedTransactions, setStagedTransactions] = useState<StagedTransaction[]>([]);
   const [qbMappings, setQbMappings] = useState<QBMappingRow[]>(DEFAULT_QB_MAPPINGS);
@@ -305,6 +321,7 @@ export default function FinancialsPage() {
       { data: financialsData, error: financialsError },
       { data: bankData, error: bankError },
       { data: mappingData, error: mappingError },
+      annualDebtByStore,
     ] = await Promise.all([
       supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
       supabase
@@ -320,6 +337,7 @@ export default function FinancialsPage() {
         .eq("is_reviewed", false)
         .order("transaction_date", { ascending: false }),
       supabase.from("quickbooks_mapping").select("*").eq("store_id", selectedStore.id),
+      fetchAnnualDebtServiceByStore(supabase, [selectedStore.id]),
     ]);
 
     const errors = [storeError, financialsError, bankError, mappingError]
@@ -328,6 +346,7 @@ export default function FinancialsPage() {
     if (errors.length > 0) setError(errors.join(" · "));
 
     setStore(storeData as StoreFinancialProfile);
+    setScheduledAnnualDebtService(annualDebtByStore[selectedStore.id] ?? 0);
     const sorted = enrichMonthlyRecords(sortRecordsDesc((financialsData ?? []) as MonthlyFinancialRecord[]));
     setRecords(sorted);
     setBankTransactions((bankData ?? []) as BankTransaction[]);
@@ -361,7 +380,10 @@ export default function FinancialsPage() {
     loadData();
   }, [storesLoading, loadData]);
 
-  const ttm = useMemo(() => calcTtmMetrics(records), [records]);
+  const ttm = useMemo(
+    () => applyLoanDebtServiceToTtm(calcTtmMetrics(records), scheduledAnnualDebtService),
+    [records, scheduledAnnualDebtService]
+  );
   const yoy = useMemo(() => calcYoYMetrics(records), [records]);
   const ratios = useMemo(() => (store ? calcRatios(store, records, ttm) : null), [store, records, ttm]);
   const ratioBenchmarks = useMemo(
@@ -692,7 +714,8 @@ export default function FinancialsPage() {
 
   const occupancyPct = ratios && ttm.ttmRevenue > 0 ? (ratios.annualRent / ttm.ttmRevenue) * 100 : 0;
   const reviewCount = bankTransactions.length + stagedTransactions.length;
-  const displayDscr = ttm.ttmDebtService > 0 ? ttm.dscr : null;
+  const displayDscr = ttm.dscr;
+  const hasScheduledDebt = scheduledAnnualDebtService > 0;
 
   return (
     <div className="space-y-5">
@@ -759,11 +782,11 @@ export default function FinancialsPage() {
               <div className="metric-label">
                 <DisclaimerLabel>DSCR</DisclaimerLabel>
               </div>
-              <div className="metric-value">
-                {displayDscr != null ? fmtMultiple(displayDscr) : "—"}
+              <div className={clsx("metric-value", !hasScheduledDebt && "text-green-400")}>
+                {formatDscrDisplay(displayDscr, scheduledAnnualDebtService)}
               </div>
               <div className="text-[12px] mt-1 text-gray-700 dark:text-slate-500">Net cash flow ÷ annual debt service</div>
-              {displayDscr != null && (
+              {hasScheduledDebt && displayDscr != null ? (
                 <div
                   className={clsx(
                     "text-[12px] mt-1",
@@ -780,7 +803,7 @@ export default function FinancialsPage() {
                       ? "Adequate"
                       : "Below threshold"}
                 </div>
-              )}
+              ) : null}
             </div>
             <div className="card">
               <div className="metric-label">

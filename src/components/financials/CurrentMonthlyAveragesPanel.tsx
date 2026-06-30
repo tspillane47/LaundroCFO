@@ -2,8 +2,8 @@
 
 import type { ReactNode } from "react";
 import clsx from "clsx";
-import { fmtDollar, fmtMultiple, fmtPct } from "@/lib/calculations";
-import { dscrTextColor } from "@/lib/financials";
+import { fmtDollar, fmtPct } from "@/lib/calculations";
+import { dscrTextColor, formatDscrDisplay } from "@/lib/financials";
 import { metricValueStyle } from "@/lib/metricStyles";
 import type { CurrentMonthlyAverages } from "@/lib/getCurrentMonthlyAverages";
 
@@ -241,15 +241,13 @@ export function CurrentMonthlyAveragesPanel({
         />
       </div>
 
-      {data.dscr != null && (
-        <div className="rounded-lg bg-[var(--bg-page)] dark:bg-white/[0.03] border border-[var(--border)] dark:border-white/[0.06] px-4 py-1">
-          <HeroMetric
-            label="Current DSCR (based on active loan terms)"
-            value={fmtMultiple(data.dscr)}
-            valueClassName={dscrTextColor(data.dscr)}
-          />
-        </div>
-      )}
+      <div className="rounded-lg bg-[var(--bg-page)] dark:bg-white/[0.03] border border-[var(--border)] dark:border-white/[0.06] px-4 py-1">
+        <HeroMetric
+          label="Current DSCR (based on active loan terms)"
+          value={formatDscrDisplay(data.dscr, data.debt.totalMonthlyDebtService * 12)}
+          valueClassName={dscrTextColor(data.dscr, data.debt.totalMonthlyDebtService > 0)}
+        />
+      </div>
 
       {data.equity && (
         <div>

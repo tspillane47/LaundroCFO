@@ -50,9 +50,12 @@ export type TtmMetrics = {
   ttmRevenue: number;
   ttmEbitda: number;
   ttmEbitdaMargin: number;
+  /** Scheduled annual debt service from store_loans (via applyLoanDebtServiceToTtm). */
   ttmDebtService: number;
+  /** Actual TTM debt service from monthly_financials P&L entries. */
+  ttmActualDebtService: number;
   ttmNoi: number;
-  dscr: number;
+  dscr: number | null;
   monthsUsed: number;
 };
 
@@ -310,18 +313,18 @@ export function calcTtmMetrics(records: CalculatedMonthly[]): TtmMetrics {
   const ttm = records.slice(0, 12);
   const ttmRevenue = ttm.reduce((sum, r) => sum + r.revenue, 0);
   const ttmEbitda = ttm.reduce((sum, r) => sum + r.ebitda, 0);
-  const ttmDebtService = ttm.reduce((sum, r) => sum + r.debt_service, 0);
+  const ttmActualDebtService = ttm.reduce((sum, r) => sum + r.debt_service, 0);
   const ttmNoi = ttm.reduce((sum, r) => sum + r.noi, 0);
   const ttmEbitdaMargin = ttmRevenue > 0 ? (ttmEbitda / ttmRevenue) * 100 : 0;
-  const dscr = ttmDebtService > 0 ? ttmEbitda / ttmDebtService : 0;
 
   return {
     ttmRevenue,
     ttmEbitda,
     ttmEbitdaMargin,
-    ttmDebtService,
+    ttmDebtService: ttmActualDebtService,
+    ttmActualDebtService,
     ttmNoi,
-    dscr,
+    dscr: null,
     monthsUsed: ttm.length,
   };
 }
@@ -331,8 +334,9 @@ export const EMPTY_TTM_METRICS: TtmMetrics = {
   ttmEbitda: 0,
   ttmEbitdaMargin: 0,
   ttmDebtService: 0,
+  ttmActualDebtService: 0,
   ttmNoi: 0,
-  dscr: 0,
+  dscr: null,
   monthsUsed: 0,
 };
 
@@ -357,21 +361,20 @@ export type PortfolioTtmSummary = {
   byStoreId: Record<string, TtmMetrics>;
   ttmEbitda: number;
   ttmDebtService: number;
-  globalDscr: number;
+  globalDscr: number | null;
 };
 
-/** Prefer store_loans annual debt service for DSCR; fall back to monthly_financials debt_service. */
+/** Apply scheduled annual debt service from store_loans for DSCR (single source of truth). */
 export function applyLoanDebtServiceToTtm(
   ttm: TtmMetrics,
-  annualDebtServiceFromLoans: number
+  scheduledAnnualDebtService: number
 ): TtmMetrics {
-  const ttmDebtService =
-    annualDebtServiceFromLoans > 0 ? annualDebtServiceFromLoans : ttm.ttmDebtService;
+  const scheduled = scheduledAnnualDebtService > 0 ? scheduledAnnualDebtService : 0;
   return {
     ...ttm,
-    ttmDebtService,
-    dscr: ttmDebtService > 0 ? ttm.ttmEbitda / ttmDebtService : 0,
-    ttmNoi: ttm.ttmEbitda - ttmDebtService,
+    ttmDebtService: scheduled,
+    dscr: calcDSCR(ttm.ttmEbitda, scheduled),
+    ttmNoi: ttm.ttmEbitda - scheduled,
   };
 }
 
@@ -397,7 +400,7 @@ export function buildPortfolioTtmSummary(
     byStoreId,
     ttmEbitda,
     ttmDebtService,
-    globalDscr: ttmDebtService > 0 ? ttmEbitda / ttmDebtService : 0,
+    globalDscr: calcGlobalDSCR(ttmEbitda, ttmDebtService),
   };
 }
 
@@ -463,8 +466,7 @@ export function buildPortfolioTtmCashFlow(
     );
     ebitda += sumTtmRecords(records, (r) => r.ebitda);
     const loanDebt = annualDebtServiceByStore?.[id] ?? 0;
-    debtService +=
-      loanDebt > 0 ? loanDebt : sumTtmRecords(records, (r) => r.debt_service);
+    debtService += loanDebt;
   }
 
   return {
@@ -481,6 +483,7 @@ export function buildPortfolioTtmCashFlow(
 }
 
 import type { createClient } from "@/lib/supabase";
+import { calcDSCR, calcGlobalDSCR, DSCR_NO_DEBT_LABEL, fmtMultiple } from "@/lib/calculations";
 import { toNum, toNullableText } from "@/lib/formHelpers";
 
 type FinancialsSupabaseClient = ReturnType<typeof createClient>;
@@ -624,17 +627,36 @@ export function calcRatios(
   };
 }
 
-export function dscrSubColor(dscr: number): "positive" | "warning" | "negative" {
+export function dscrSubColor(
+  dscr: number | null | undefined,
+  hasDebt = true
+): "positive" | "warning" | "negative" {
+  if (!hasDebt || dscr == null) return "positive";
   if (dscr >= 1.5) return "positive";
   if (dscr >= 1.25) return "warning";
   return "negative";
 }
 
-export function dscrTextColor(dscr: number): string {
+export function dscrTextColor(dscr: number | null | undefined, hasDebt = true): string {
+  if (!hasDebt || dscr == null) return "text-green-400";
   if (dscr >= 1.5) return "text-green-400";
   if (dscr >= 1.25) return "text-amber-400";
   return "text-red-400";
 }
+
+export function formatDscrDisplay(
+  dscr: number | null | undefined,
+  scheduledAnnualDebtService: number
+): string {
+  if (scheduledAnnualDebtService <= 0 || dscr == null) return DSCR_NO_DEBT_LABEL;
+  return fmtMultiple(dscr);
+}
+
+export function hasScheduledDebt(annualDebtService: number | null | undefined): boolean {
+  return annualDebtService != null && annualDebtService > 0;
+}
+
+export { DSCR_NO_DEBT_LABEL };
 
 export function ratioStatusColor(
   pct: number,
@@ -1798,7 +1820,7 @@ export function parseBankCsv(text: string): ParsedCsvTransaction[] {
 
 export type RatioBenchmark = {
   label: string;
-  value: number;
+  value: number | null;
   unit: "%" | "$" | "x";
   benchmark: number;
   top25: number;
@@ -1811,10 +1833,13 @@ export function buildRatioBenchmarks(
   ttm: TtmMetrics,
   ratios: FinancialRatios
 ): RatioBenchmark[] {
+  const hasDebt = ttm.ttmDebtService > 0;
+  const dscrValue = hasDebt && ttm.dscr != null ? ttm.dscr : null;
+
   return [
     {
       label: "DSCR",
-      value: ttm.dscr,
+      value: dscrValue,
       unit: "x",
       benchmark: 1.5,
       top25: 2.0,

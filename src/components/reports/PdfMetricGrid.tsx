@@ -113,12 +113,20 @@ export function PdfScorecard({
   label,
   value,
   verdict,
+  verdictLabel,
 }: {
   label: string;
   value: string;
-  verdict: ScorecardVerdict;
+  verdict?: ScorecardVerdict | null;
+  verdictLabel?: string;
 }) {
-  const accent = SCORECARD_COLORS[verdict];
+  const displayVerdict = verdictLabel ?? verdict;
+  const accent =
+    verdictLabel === "No Debt" || (verdict == null && verdictLabel)
+      ? SCORECARD_COLORS.Excellent
+      : verdict
+        ? SCORECARD_COLORS[verdict]
+        : SCORECARD_COLORS.Excellent;
 
   return (
     <View style={[styles.scorecard, { borderLeftWidth: 4, borderLeftColor: accent }]}>
@@ -128,12 +136,14 @@ export function PdfScorecard({
       <Text style={styles.scorecardValue} wrap={false}>
         {value}
       </Text>
-      <View style={styles.scorecardVerdictRow}>
-        <View style={[styles.scorecardDot, { backgroundColor: accent }]} />
-        <Text style={styles.scorecardVerdict} wrap={false}>
-          {verdict}
-        </Text>
-      </View>
+      {displayVerdict ? (
+        <View style={styles.scorecardVerdictRow}>
+          <View style={[styles.scorecardDot, { backgroundColor: accent }]} />
+          <Text style={styles.scorecardVerdict} wrap={false}>
+            {displayVerdict}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }

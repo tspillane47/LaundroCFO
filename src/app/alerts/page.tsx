@@ -71,7 +71,7 @@ export default function AlertsPage() {
 
     try {
       const storeIds = stores.map((s) => s.id);
-      const [{ data: leasesData, error: leaseError }, { data: equipmentData, error: equipError }, { data: insuranceData, error: insError }] =
+      const [{ data: leasesData, error: leaseError }, { data: equipmentData, error: equipError }, { data: insuranceData, error: insError }, { data: loansData, error: loansError }] =
         await Promise.all([
           supabase.from("leases").select("*").in("store_id", storeIds),
           supabase.from("equipment_inventory").select("*").in("store_id", storeIds),
@@ -80,11 +80,17 @@ export default function AlertsPage() {
             .select("*")
             .in("store_id", storeIds)
             .eq("is_active", true),
+          supabase
+            .from("store_loans")
+            .select("store_id, monthly_payment")
+            .in("store_id", storeIds)
+            .eq("is_active", true),
         ]);
 
       if (leaseError) throw leaseError;
       if (equipError) throw equipError;
       if (insError) throw insError;
+      if (loansError) throw loansError;
 
       const leasesByStore: Record<string, Record<string, unknown>> = {};
       for (const l of leasesData ?? []) {
@@ -103,8 +109,21 @@ export default function AlertsPage() {
         insuranceByStore[p.store_id].push(p);
       }
 
+      const scheduledDebtServiceByStore: Record<string, number> = {};
+      for (const loan of loansData ?? []) {
+        const storeId = String(loan.store_id);
+        scheduledDebtServiceByStore[storeId] =
+          (scheduledDebtServiceByStore[storeId] ?? 0) + (loan.monthly_payment ?? 0) * 12;
+      }
+
       setAlerts(
-        generatePortfolioAlerts(stores, leasesByStore, equipmentByStore, insuranceByStore)
+        generatePortfolioAlerts(
+          stores,
+          leasesByStore,
+          equipmentByStore,
+          insuranceByStore,
+          scheduledDebtServiceByStore
+        )
       );
     } catch {
       setLoadError(true);
