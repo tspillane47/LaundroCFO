@@ -531,10 +531,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         {/* Topbar */}
         <header
           className="relative px-4 md:px-6 flex items-center justify-between flex-shrink-0 transition-colors duration-300 min-h-[56px] md:min-h-0 md:h-12 py-2 md:py-0"
-          style={{
-            background: "var(--bg-card)",
-            borderBottom: "1px solid var(--border)",
-          }}
+          style={{ background: "var(--bg-page)" }}
         >
           <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
             <button
@@ -674,10 +671,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         <BetaBanner onFeedbackClick={() => setFeedbackOpen(true)} />
 
         {/* Page content */}
-        <main
-          className="flex-1 overflow-y-auto p-4 md:p-6 transition-colors duration-300"
-          style={{ background: "var(--bg-page)" }}
-        >
+        <main className="app-page-content flex-1 overflow-y-auto p-4 md:p-6 transition-colors duration-300">
           {children}
         </main>
 

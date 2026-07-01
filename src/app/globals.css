@@ -508,6 +508,17 @@ html, body {
 
 .app-main {
   transition: width 0.25s ease, flex 0.25s ease;
+  background: var(--bg-page);
+  border-top: none;
+  box-shadow: none;
+  outline: none;
+}
+
+.app-page-content {
+  background: var(--bg-page);
+  border-top: none;
+  box-shadow: none;
+  outline: none;
 }
 
 .sidebar-collapse-toggle {
