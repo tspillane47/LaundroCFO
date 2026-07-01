@@ -17,6 +17,7 @@ import {
   type TransactionType,
 } from "@/lib/financials";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
+import { isOnboardingComplete } from "@/lib/onboarding";
 
 const TOTAL_STEPS = 5;
 const VALUATION_MULTIPLE = 3.47;
@@ -207,15 +208,11 @@ export default function OnboardingPage() {
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_completed")
-        .eq("id", user.id)
-        .maybeSingle();
+      const completed = await isOnboardingComplete(supabase, user.id);
 
       if (cancelled) return;
 
-      if (profile?.onboarding_completed) {
+      if (completed) {
         router.replace("/portfolio");
         return;
       }

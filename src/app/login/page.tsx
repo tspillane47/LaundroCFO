@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
+import { isOnboardingComplete } from "@/lib/onboarding";
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -20,9 +21,22 @@ function LoginForm() {
   async function handleLogin() {
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message);
-    else router.push("/onboarding");
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+      return;
+    }
+
+    const userId = data.user?.id;
+    if (!userId) {
+      setError("Sign in failed. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    const completed = await isOnboardingComplete(supabase, userId);
+    router.push(completed ? "/portfolio" : "/onboarding");
     setLoading(false);
   }
 

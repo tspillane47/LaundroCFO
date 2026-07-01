@@ -23,6 +23,7 @@ import { BetaBanner } from "@/components/ui/BetaBanner";
 import { setTermsReturnPath } from "@/components/ui/TermsBackLink";
 import { BETA_MODE } from "@/lib/config";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import { isOnboardingComplete } from "@/lib/onboarding";
 
 const ADMIN_EMAIL = "tuckerspillane7@gmail.com";
 
@@ -134,22 +135,20 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_completed")
-        .eq("id", user.id)
-        .maybeSingle();
+      const completed = await isOnboardingComplete(supabase, user.id);
 
       if (cancelled) return;
 
-      const completed = profile?.onboarding_completed === true;
-
-      if (completed && pathname === "/onboarding") {
-        router.replace("/portfolio");
+      if (completed) {
+        if (pathname === "/onboarding") {
+          router.replace("/portfolio");
+          return;
+        }
+        setChecked(true);
         return;
       }
 
-      if (!completed && !isExempt) {
+      if (!isExempt) {
         router.replace("/onboarding");
         return;
       }

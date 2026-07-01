@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { isOnboardingComplete } from '@/lib/onboarding'
 
 const PUBLIC_ROUTES = [
   '/',
@@ -34,6 +35,13 @@ const PROTECTED_PREFIXES = [
 function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_ROUTES.includes(pathname)) return true
   if (pathname.startsWith('/auth/callback')) return true
+  return false
+}
+
+/** Paths where incomplete onboarding should not trigger a redirect to /onboarding. */
+function isOnboardingRedirectExempt(pathname: string): boolean {
+  if (isPublicRoute(pathname)) return true
+  if (pathname === '/onboarding' || pathname.startsWith('/onboarding/')) return true
   return false
 }
 
@@ -76,13 +84,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('onboarding_completed')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    const onboardingCompleted = profile?.onboarding_completed === true
+    const onboardingCompleted = await isOnboardingComplete(supabase, user.id)
 
     if (onboardingCompleted && pathname === '/onboarding') {
       return NextResponse.redirect(new URL('/portfolio', request.url))
@@ -90,8 +92,7 @@ export async function middleware(request: NextRequest) {
 
     if (
       !onboardingCompleted &&
-      pathname !== '/onboarding' &&
-      !isPublicRoute(pathname)
+      !isOnboardingRedirectExempt(pathname)
     ) {
       return NextResponse.redirect(new URL('/onboarding', request.url))
     }
