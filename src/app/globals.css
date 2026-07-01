@@ -6,8 +6,8 @@
 /* ============ LIGHT MODE (default) ============ */
 :root {
   --bg-page: #f4f6f9;
-  --bg-card: #ffffff;
-  --bg-card2: #ffffff;
+  --bg-card: #f4f6f9;
+  --bg-card2: #eef0f3;
   --bg-sidebar: #1a2b3c;
   --bg-sidebar-hover: #243548;
   --bg-nav-active: #166534;
