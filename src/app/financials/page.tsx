@@ -24,6 +24,11 @@ import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple, fmtPct } from "@/lib/calculations";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
+import { CurrentMonthlyAveragesPanel } from "@/components/financials/CurrentMonthlyAveragesPanel";
+import {
+  getCurrentMonthlyAverages,
+  type CurrentMonthlyAverages,
+} from "@/lib/getCurrentMonthlyAverages";
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import { PageError } from "@/components/ui/PageError";
@@ -289,6 +294,8 @@ export default function FinancialsPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<MonthlyForm>(() => emptyMonthlyForm());
+  const [monthlyAverages, setMonthlyAverages] = useState<CurrentMonthlyAverages | null>(null);
+  const [monthlyAveragesLoading, setMonthlyAveragesLoading] = useState(false);
 
   const currentYear = new Date().getFullYear();
   const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
@@ -379,6 +386,31 @@ export default function FinancialsPage() {
     if (storesLoading) return;
     loadData();
   }, [storesLoading, loadData]);
+
+  useEffect(() => {
+    if (!selectedStore?.id || loading) return;
+
+    if (records.length === 0) {
+      setMonthlyAverages(null);
+      setMonthlyAveragesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setMonthlyAveragesLoading(true);
+
+    void getCurrentMonthlyAverages(selectedStore.id)
+      .then((data) => {
+        if (!cancelled) setMonthlyAverages(data);
+      })
+      .finally(() => {
+        if (!cancelled) setMonthlyAveragesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStore?.id, records, loading]);
 
   const ttm = useMemo(
     () => applyLoanDebtServiceToTtm(calcTtmMetrics(records), scheduledAnnualDebtService),
@@ -828,6 +860,12 @@ export default function FinancialsPage() {
               <div className="text-[12px] mt-1 text-[var(--text-muted)]">Net operating income after rent and operating expenses</div>
             </div>
           </div>
+
+          <CurrentMonthlyAveragesPanel
+            storeName={store?.name ?? selectedStore.name}
+            data={monthlyAverages}
+            loading={monthlyAveragesLoading}
+          />
 
           <div className="card">
             <div className="flex flex-wrap items-center gap-4 justify-between">
