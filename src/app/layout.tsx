@@ -26,6 +26,21 @@ import { ToastProvider } from "@/components/ui/ToastProvider";
 
 const ADMIN_EMAIL = "tuckerspillane7@gmail.com";
 
+function getUserInitials(fullName: string | null, email: string | null): string {
+  const name = fullName?.trim();
+  if (name) {
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return parts[0][0]?.toUpperCase() ?? "?";
+  }
+  if (email) {
+    return email[0]?.toUpperCase() ?? "?";
+  }
+  return "?";
+}
+
 const navSections = [
   {
     label: "PORTFOLIO",
@@ -100,6 +115,9 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
+  const [userFullName, setUserFullName] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(false);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
   const sidebarStoreRef = useRef<HTMLDivElement>(null);
@@ -125,11 +143,30 @@ function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    void supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!cancelled) {
-        setIsAdminUser(user?.email === ADMIN_EMAIL);
-      }
-    });
+    async function loadUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled || !user) return;
+
+      setIsAdminUser(user.email === ADMIN_EMAIL);
+      setUserEmail(user.email ?? null);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      setUserFullName(
+        (profile?.full_name as string | null) ?? (user.user_metadata?.full_name as string | undefined) ?? null
+      );
+      setUserAvatarUrl((profile?.avatar_url as string | null) ?? null);
+    }
+
+    void loadUser();
 
     return () => {
       cancelled = true;
@@ -573,12 +610,28 @@ function AppShell({ children }: { children: React.ReactNode }) {
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
 
+            <Link
+              href="/account"
+              className="flex items-center justify-center w-11 h-11 md:w-8 md:h-8 rounded-full overflow-hidden flex-shrink-0 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 transition-opacity hover:opacity-80"
+              style={{
+                background: "var(--bg-card2)",
+                border: "1px solid var(--border)",
+              }}
+              aria-label="Account"
+            >
+              {userAvatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={userAvatarUrl} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {getUserInitials(userFullName, userEmail)}
+                </span>
+              )}
+            </Link>
+
             <div className="desktop-header-actions">
               <button type="button" className="btn-outline" onClick={handleSignOut}>
                 Sign Out
-              </button>
-              <button type="button" className="topbar-add-store btn-primary" onClick={() => router.push("/onboarding")}>
-                + Add Store
               </button>
             </div>
 
@@ -587,7 +640,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
                 type="button"
                 className="btn-outline w-11 h-11 flex items-center justify-center p-0 min-h-[44px] min-w-[44px]"
                 onClick={() => setMobileMenuOpen((v) => !v)}
-                aria-label="Account menu"
+                aria-label="More actions"
                 aria-expanded={mobileMenuOpen}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -604,24 +657,13 @@ function AppShell({ children }: { children: React.ReactNode }) {
                   <button
                     type="button"
                     className="w-full px-4 py-3 text-left text-[14px] font-medium hover:opacity-90 transition-colors min-h-[44px]"
-                    style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--border)" }}
+                    style={{ color: "var(--text-primary)" }}
                     onClick={() => {
                       setMobileMenuOpen(false);
                       void handleSignOut();
                     }}
                   >
                     Sign Out
-                  </button>
-                  <button
-                    type="button"
-                    className="w-full px-4 py-3 text-left text-[14px] font-medium hover:opacity-90 transition-colors min-h-[44px]"
-                    style={{ color: "var(--text-primary)" }}
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      router.push("/onboarding");
-                    }}
-                  >
-                    + Add Store
                   </button>
                 </div>
               )}
