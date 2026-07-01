@@ -26,7 +26,7 @@
   --hero-bg: linear-gradient(135deg, #1a2b3c 0%, #243548 100%);
 
   /* Semantic tints */
-  --bg-info-tint: #EFF6FF;
+  --bg-info-tint: #dbeafe;
   --bg-success-tint: #F0FDF4;
   --bg-warning-tint: #FFFBEB;
   --bg-danger-tint: #FEF2F2;
