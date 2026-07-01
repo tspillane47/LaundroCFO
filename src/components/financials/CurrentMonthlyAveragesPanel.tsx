@@ -34,7 +34,7 @@ function LineItem({
   badge?: string;
 }) {
   return (
-    <div className="py-1.5 text-[11px] border-b border-[var(--border)] last:border-0 min-w-0 space-y-1">
+    <div className="py-0.5 text-[11px] border-b border-[var(--border)] last:border-0 min-w-0 space-y-0.5">
       <span className="block text-adaptive-muted leading-snug break-words" title={label}>
         {label}
       </span>
@@ -54,7 +54,7 @@ function LineItem({
 
 function TotalLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="pt-2 mt-1 border-t border-[var(--border)] min-w-0 space-y-1">
+    <div className="pt-1 mt-0.5 border-t border-[var(--border)] min-w-0 space-y-0.5">
       <span className="block text-[10px] font-semibold text-adaptive-secondary leading-snug break-words" title={label}>
         {label}
       </span>
@@ -67,7 +67,7 @@ function TotalLine({ label, value }: { label: string; value: string }) {
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="text-[10px] font-semibold uppercase tracking-wider text-adaptive-muted mb-2">
+    <div className="text-[10px] font-semibold uppercase tracking-wider text-adaptive-muted mb-1">
       {children}
     </div>
   );
@@ -85,8 +85,8 @@ function HeroMetric({
   valueClassName?: string;
 }) {
   return (
-    <div className="py-2 overflow-hidden min-w-0">
-      <div className="text-[9px] font-semibold uppercase tracking-wider text-adaptive-muted mb-1 leading-snug break-words">
+    <div className="py-1 overflow-hidden min-w-0">
+      <div className="text-[9px] font-semibold uppercase tracking-wider text-adaptive-muted mb-0.5 leading-snug break-words">
         {label}
       </div>
       <div
@@ -97,7 +97,7 @@ function HeroMetric({
         {value}
       </div>
       {sub && (
-        <div className="text-[10px] text-adaptive-muted mt-1 leading-snug break-words text-right" title={sub}>
+        <div className="text-[10px] text-adaptive-muted mt-0.5 leading-snug break-words text-right" title={sub}>
           {sub}
         </div>
       )}
@@ -176,13 +176,13 @@ export function CurrentMonthlyAveragesPanel({
     data.surplusCashFlow >= 0 ? "text-green-400" : "text-red-400";
 
   return (
-    <div className="card h-full min-w-0 overflow-hidden space-y-4">
+    <div className="card h-full min-w-0 overflow-hidden space-y-2.5">
       <div className="min-w-0">
         <div className="section-title">Current Monthly Averages</div>
-        <div className="text-[12px] font-medium text-adaptive-secondary mt-0.5 truncate" title={storeName}>
+        <div className="text-[12px] font-medium text-adaptive-secondary mt-0 truncate" title={storeName}>
           {storeName}
         </div>
-        <div className="text-[10px] text-adaptive-muted mt-1 leading-snug">{periodSubtext(data.monthsUsed)}</div>
+        <div className="text-[10px] text-adaptive-muted mt-0.5 leading-snug">{periodSubtext(data.monthsUsed)}</div>
       </div>
 
       <div>
@@ -192,7 +192,7 @@ export function CurrentMonthlyAveragesPanel({
             <LineItem key={item.category} label={item.category} value={fmtDollar(item.monthlyAverage)} />
           ))}
           {revenueLines.length === 0 && (
-            <p className="text-[12px] text-adaptive-muted py-1">No revenue categories recorded.</p>
+            <p className="text-[12px] text-adaptive-muted py-0.5">No revenue categories recorded.</p>
           )}
           <TotalLine label="Average Monthly Revenue" value={fmtDollar(data.revenue.total)} />
         </div>
@@ -210,13 +210,13 @@ export function CurrentMonthlyAveragesPanel({
             />
           ))}
           {expenseLines.length === 0 && (
-            <p className="text-[12px] text-adaptive-muted py-1">No expense categories recorded.</p>
+            <p className="text-[12px] text-adaptive-muted py-0.5">No expense categories recorded.</p>
           )}
           <TotalLine label="Average Monthly Expenses" value={fmtDollar(data.expenses.total)} />
         </div>
       </div>
 
-      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2.5 py-1 min-w-0">
+      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2.5 py-0.5 min-w-0">
         <HeroMetric
           label="Average Monthly EBITDA"
           value={fmtDollar(data.ebitda.monthly)}
@@ -246,7 +246,7 @@ export function CurrentMonthlyAveragesPanel({
         )}
       </div>
 
-      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2.5 py-1 min-w-0">
+      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2.5 py-0.5 min-w-0">
         <HeroMetric
           label="Surplus Cash Flow"
           value={fmtDollar(data.surplusCashFlow)}
@@ -255,7 +255,7 @@ export function CurrentMonthlyAveragesPanel({
         />
       </div>
 
-      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2.5 py-1 min-w-0">
+      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2.5 py-0.5 min-w-0">
         <HeroMetric
           label="Current DSCR"
           sub="Based on active loan terms"
@@ -275,15 +275,15 @@ export function CurrentMonthlyAveragesPanel({
         </div>
       )}
 
-      <div className="flex flex-col gap-2 pt-1 border-t border-[var(--border)] min-w-0">
+      <div className="flex flex-col gap-1 pt-0.5 border-t border-[var(--border)] min-w-0">
         <div className="min-w-0">
-          <div className="text-[9px] font-semibold uppercase tracking-wider text-adaptive-muted mb-1">
+          <div className="text-[9px] font-semibold uppercase tracking-wider text-adaptive-muted mb-0.5">
             Water KPI
           </div>
           <div className="text-[14px] font-bold tabular-nums text-adaptive-primary text-right">
             {fmtPct(data.waterKPI.ratio * 100)}
           </div>
-          <div className="text-[10px] text-adaptive-muted mt-0.5 leading-snug">
+          <div className="text-[10px] text-adaptive-muted leading-snug">
             Water ÷ self-service revenue
           </div>
         </div>

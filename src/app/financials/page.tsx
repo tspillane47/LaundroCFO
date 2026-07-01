@@ -1001,25 +1001,25 @@ export default function FinancialsPage() {
                   </colgroup>
                   <thead>
                     <tr className="bg-[var(--bg-sidebar)] text-slate-100">
-                      <th className="py-2.5 px-4 text-left text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
+                      <th className="py-1.5 px-4 text-left text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
                         Month
                       </th>
-                      <th className="py-2.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
+                      <th className="py-1.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
                         Revenue
                       </th>
-                      <th className="py-2.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
+                      <th className="py-1.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
                         Expenses
                       </th>
-                      <th className="py-2.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
+                      <th className="py-1.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
                         EBITDA
                       </th>
-                      <th className="py-2.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
+                      <th className="py-1.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
                         Margin
                       </th>
-                      <th className="py-2.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
+                      <th className="py-1.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
                         Debt Svc
                       </th>
-                      <th className="py-2.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
+                      <th className="py-1.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
                         NOI
                       </th>
                     </tr>
@@ -1043,7 +1043,7 @@ export default function FinancialsPage() {
                           )}
                           onClick={() => setSelectedMonth(month)}
                         >
-                          <td className="py-2.5 px-4 text-left font-medium text-[var(--text-primary)]">
+                          <td className="py-1.5 px-4 text-left font-medium text-[var(--text-primary)]">
                             {MONTH_NAMES[i]}
                             {isCalendarCurrentMonth && (
                               <span className="ml-1.5 text-[9px] font-semibold uppercase tracking-wide text-blue-400">
@@ -1051,27 +1051,27 @@ export default function FinancialsPage() {
                               </span>
                             )}
                           </td>
-                          <td className="py-2.5 px-4 text-right tabular-nums text-green-400/90">
+                          <td className="py-1.5 px-4 text-right tabular-nums text-green-400/90">
                             {r ? fmtDollar(r.revenue) : "—"}
                           </td>
-                          <td className="py-2.5 px-4 text-right tabular-nums text-[var(--text-primary)]">
+                          <td className="py-1.5 px-4 text-right tabular-nums text-[var(--text-primary)]">
                             {r ? fmtDollar(r.totalExpenses) : "—"}
                           </td>
                           <td
                             className={clsx(
-                              "py-2.5 px-4 text-right tabular-nums font-bold text-green-400",
+                              "py-1.5 px-4 text-right tabular-nums font-bold text-green-400",
                               "bg-green-500/[0.08] border-l-2 border-l-green-500"
                             )}
                           >
                             {r ? fmtDollar(r.ebitda) : "—"}
                           </td>
-                          <td className="py-2.5 px-4 text-right tabular-nums text-[var(--text-secondary)]">
+                          <td className="py-1.5 px-4 text-right tabular-nums text-[var(--text-secondary)]">
                             {r ? fmtPct(r.ebitdaMargin) : "—"}
                           </td>
-                          <td className="py-2.5 px-4 text-right tabular-nums text-[var(--text-secondary)]">
+                          <td className="py-1.5 px-4 text-right tabular-nums text-[var(--text-secondary)]">
                             {r ? fmtDollar(r.debt_service) : "—"}
                           </td>
-                          <td className="py-2.5 px-4 text-right tabular-nums text-[var(--accent-blue)]">
+                          <td className="py-1.5 px-4 text-right tabular-nums text-[var(--accent-blue)]">
                             {r ? fmtDollar(r.noi) : "—"}
                           </td>
                         </tr>
@@ -1079,65 +1079,65 @@ export default function FinancialsPage() {
                     })}
                     {yearTotals && (
                       <tr className="font-semibold bg-[var(--bg-page)]/60 border-t border-[var(--border)]">
-                        <td className="py-3 px-4 text-left text-[var(--text-primary)]">
+                        <td className="py-2 px-4 text-left text-[var(--text-primary)]">
                           {selectedYear} Total
                         </td>
-                        <td className="py-3 px-4 text-right tabular-nums text-green-400/90">
+                        <td className="py-2 px-4 text-right tabular-nums text-green-400/90">
                           {fmtDollar(yearTotals.revenue)}
                         </td>
-                        <td className="py-3 px-4 text-right tabular-nums text-[var(--text-primary)]">
+                        <td className="py-2 px-4 text-right tabular-nums text-[var(--text-primary)]">
                           {fmtDollar(yearTotals.totalExpenses)}
                         </td>
                         <td
                           className={clsx(
-                            "py-3 px-4 text-right tabular-nums font-bold text-green-400",
+                            "py-2 px-4 text-right tabular-nums font-bold text-green-400",
                             "bg-green-500/[0.08] border-l-2 border-l-green-500"
                           )}
                         >
                           {fmtDollar(yearTotals.ebitda)}
                         </td>
-                        <td className="py-3 px-4 text-right tabular-nums text-[var(--text-primary)]">
+                        <td className="py-2 px-4 text-right tabular-nums text-[var(--text-primary)]">
                           {yearTotals.revenue > 0
                             ? fmtPct((yearTotals.ebitda / yearTotals.revenue) * 100)
                             : "—"}
                         </td>
-                        <td className="py-3 px-4 text-right tabular-nums text-[var(--text-primary)]">
+                        <td className="py-2 px-4 text-right tabular-nums text-[var(--text-primary)]">
                           {fmtDollar(yearTotals.debt_service)}
                         </td>
-                        <td className="py-3 px-4 text-right tabular-nums text-[var(--accent-blue)]">
+                        <td className="py-2 px-4 text-right tabular-nums text-[var(--accent-blue)]">
                           {fmtDollar(yearTotals.noi)}
                         </td>
                       </tr>
                     )}
                     {ttmTableTotals.monthsUsed > 0 && (
                       <tr className="font-bold border-t-2 border-[var(--border2)] bg-[var(--bg-card2)]/40">
-                        <td className="py-3 px-4 text-left text-[var(--text-primary)]">
+                        <td className="py-2 px-4 text-left text-[var(--text-primary)]">
                           TTM
                           <span className="ml-1 text-[10px] font-medium text-[var(--text-muted)]">
                             ({ttmTableTotals.monthsUsed} mo.)
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-right tabular-nums text-green-400">
+                        <td className="py-2 px-4 text-right tabular-nums text-green-400">
                           {fmtDollar(ttmTableTotals.revenue)}
                         </td>
-                        <td className="py-3 px-4 text-right tabular-nums text-[var(--text-primary)]">
+                        <td className="py-2 px-4 text-right tabular-nums text-[var(--text-primary)]">
                           {fmtDollar(ttmTableTotals.expenses)}
                         </td>
                         <td
                           className={clsx(
-                            "py-3 px-4 text-right tabular-nums font-bold text-green-400",
+                            "py-2 px-4 text-right tabular-nums font-bold text-green-400",
                             "bg-green-500/10 border-l-2 border-l-green-500"
                           )}
                         >
                           {fmtDollar(ttmTableTotals.ebitda)}
                         </td>
-                        <td className="py-3 px-4 text-right tabular-nums text-[var(--text-primary)]">
+                        <td className="py-2 px-4 text-right tabular-nums text-[var(--text-primary)]">
                           {fmtPct(ttmTableTotals.margin)}
                         </td>
-                        <td className="py-3 px-4 text-right tabular-nums text-[var(--text-primary)]">
+                        <td className="py-2 px-4 text-right tabular-nums text-[var(--text-primary)]">
                           {fmtDollar(ttmTableTotals.debtService)}
                         </td>
-                        <td className="py-3 px-4 text-right tabular-nums text-[var(--accent-blue)]">
+                        <td className="py-2 px-4 text-right tabular-nums text-[var(--accent-blue)]">
                           {fmtDollar(ttmTableTotals.noi)}
                         </td>
                       </tr>
