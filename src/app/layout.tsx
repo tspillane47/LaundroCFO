@@ -56,6 +56,7 @@ const navSections = [
     label: "ACCOUNT",
     items: [
       { href: "/alerts", label: "Alerts", icon: "alerts" },
+      { href: "/account", label: "Account", icon: "account" },
       { href: "/settings", label: "Settings", icon: "settings" },
     ],
   },
@@ -75,6 +76,7 @@ const pageTitles: Record<string, string> = {
   "/debt": "Debt Management",
   "/alerts": "Alerts",
   "/integrations": "Integrations",
+  "/account": "Account",
   "/settings": "Settings",
   "/settings/manage-stores": "Manage Stores",
   "/settings/edit-store": "Edit Store",

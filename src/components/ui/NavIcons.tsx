@@ -1,3 +1,5 @@
+import { User } from "lucide-react";
+
 export function NavIcon({ name }: { name: string }) {
   const props = {
     width: 14,
@@ -98,6 +100,8 @@ export function NavIcon({ name }: { name: string }) {
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
       );
+    case "account":
+      return <User {...props} />;
     case "settings":
       return (
         <svg {...props}>
