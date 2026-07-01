@@ -248,7 +248,7 @@ export default function AccountPage() {
   }
 
   if (loading) {
-    return <LoadingSkeleton rows={8} />;
+    return <LoadingSkeleton variant="page" />;
   }
 
   return (

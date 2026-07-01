@@ -565,7 +565,16 @@ export default function DebtPage() {
   }
 
   if (loading) {
-    return <LoadingSkeleton variant="card" />;
+    return (
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <LoadingSkeleton key={i} variant="metric-card" />
+          ))}
+        </div>
+        <LoadingSkeleton variant="table" />
+      </div>
+    );
   }
 
   if (stores.length === 0) {

@@ -227,7 +227,7 @@ export default function DashboardPage() {
   const [equipment, setEquipment] = useState<any[]>([]);
   const [insurancePolicies, setInsurancePolicies] = useState<any[]>([]);
   const [loadError, setLoadError] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(true);
   const [valuation, setValuation] = useState<StoreValuationResult | null>(null);
   const [totalDebt, setTotalDebt] = useState(0);
   const [scheduledDebtService, setScheduledDebtService] = useState(0);
@@ -244,6 +244,7 @@ export default function DashboardPage() {
       setMonthlyFinancials([]);
       setMonthlyUtilities([]);
       setLoadError(false);
+      setDetailLoading(false);
       return;
     }
 
@@ -570,8 +571,21 @@ export default function DashboardPage() {
     return <PageError onRetry={loadDashboardData} />;
   }
 
-  if (storesLoading || detailLoading) {
-    return <LoadingSkeleton variant="card" />;
+  const isDashboardLoading =
+    storesLoading ||
+    (!loadError && !!selectedStore && !isAllStores && (detailLoading || valuation === null));
+
+  if (isDashboardLoading) {
+    return (
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <LoadingSkeleton key={i} variant="metric-card" />
+          ))}
+        </div>
+        <LoadingSkeleton variant="chart" />
+      </div>
+    );
   }
 
   if (isAllStores && stores.length > 1) {
@@ -616,7 +630,16 @@ export default function DashboardPage() {
   }
 
   if (!store) {
-    return <LoadingSkeleton variant="card" />;
+    return (
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <LoadingSkeleton key={i} variant="metric-card" />
+          ))}
+        </div>
+        <LoadingSkeleton variant="chart" />
+      </div>
+    );
   }
 
   const benchmarks = [

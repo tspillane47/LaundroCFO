@@ -30,7 +30,7 @@ import {
 } from "recharts";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
-import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
 import { Disclaimer, DisclaimerLabel } from "@/components/ui/Disclaimer";
 
@@ -635,12 +635,12 @@ export default function ValuationPage() {
   if (loading) {
     return (
       <div className="space-y-5">
-        <CardSkeleton />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <CardSkeleton key={i} />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <LoadingSkeleton key={i} variant="metric-card" />
           ))}
         </div>
+        <LoadingSkeleton variant="chart" />
       </div>
     );
   }

@@ -157,7 +157,7 @@ export default function AlertsPage() {
   if (storesLoading || loading) {
     return (
       <div className="space-y-5 max-w-3xl w-full">
-        <LoadingSkeleton variant="card" />
+        <LoadingSkeleton variant="table" withIcon rows={4} />
       </div>
     );
   }

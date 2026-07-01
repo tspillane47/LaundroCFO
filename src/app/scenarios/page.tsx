@@ -306,7 +306,13 @@ function ScenariosPageContent() {
   );
 
   if (storesLoading || loading) {
-    return <LoadingSkeleton variant="card" />;
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <LoadingSkeleton key={i} variant="metric-card" />
+        ))}
+      </div>
+    );
   }
 
   if (loadError) {

@@ -646,7 +646,20 @@ function BenchmarkingPageContent() {
   ];
 
   if (storesLoading || loading) {
-    return <LoadingSkeleton variant="metric" />;
+    return (
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <LoadingSkeleton key={i} variant="dial" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <LoadingSkeleton key={i} variant="track" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (loadError) {

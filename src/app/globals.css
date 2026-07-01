@@ -894,3 +894,49 @@ html, body {
     stroke-dashoffset: 0;
   }
 }
+
+/* ============ SKELETON SHIMMER ============ */
+@keyframes skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: #f1f5f9;
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(226, 232, 240, 0.6) 45%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(226, 232, 240, 0.6) 55%,
+    transparent 100%
+  );
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+.dark .skeleton-shimmer {
+  background-color: #1e293b;
+}
+
+.dark .skeleton-shimmer::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(51, 65, 85, 0.5) 45%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(51, 65, 85, 0.5) 55%,
+    transparent 100%
+  );
+}

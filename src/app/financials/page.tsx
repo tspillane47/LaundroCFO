@@ -674,8 +674,20 @@ export default function FinancialsPage() {
     return <PageError onRetry={loadData} />;
   }
 
-  if (storesLoading || loading) {
-    return <LoadingSkeleton variant="table" />;
+  const isFinancialsLoading =
+    storesLoading || (!loadError && !!selectedStore?.id && (loading || store === null));
+
+  if (isFinancialsLoading) {
+    return (
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <LoadingSkeleton key={i} variant="metric-card" />
+          ))}
+        </div>
+        <LoadingSkeleton variant="table" />
+      </div>
+    );
   }
 
   if (stores.length === 0) {
