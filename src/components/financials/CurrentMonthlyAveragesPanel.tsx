@@ -34,15 +34,19 @@ function LineItem({
   badge?: string;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 py-1 text-[12px] border-b border-[var(--border)] last:border-0 min-w-0">
-      <span className="text-adaptive-muted truncate" title={label}>{label}</span>
-      <span className="flex items-center gap-1.5 shrink-0">
+    <div className="py-1.5 text-[11px] border-b border-[var(--border)] last:border-0 min-w-0 space-y-1">
+      <span className="block text-adaptive-muted leading-snug break-words" title={label}>
+        {label}
+      </span>
+      <span className="flex items-center justify-end gap-1 flex-wrap min-w-0">
         {badge && (
-          <span className="text-[9px] font-medium uppercase tracking-wide text-adaptive-muted bg-white/[0.04] px-1.5 py-0.5 rounded">
+          <span className="text-[8px] font-medium uppercase tracking-wide text-adaptive-muted bg-white/[0.04] px-1 py-0.5 rounded">
             {badge}
           </span>
         )}
-        <span className="text-adaptive-secondary tabular-nums whitespace-nowrap" title={value}>{value}</span>
+        <span className="text-adaptive-secondary tabular-nums text-[11px] leading-none" title={value}>
+          {value}
+        </span>
       </span>
     </div>
   );
@@ -50,9 +54,13 @@ function LineItem({
 
 function TotalLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 pt-2 mt-1 border-t border-[var(--border)] min-w-0">
-      <span className="text-[12px] font-semibold text-adaptive-secondary truncate" title={label}>{label}</span>
-      <span className="text-[13px] font-bold text-adaptive-primary tabular-nums shrink-0 whitespace-nowrap" title={value}>{value}</span>
+    <div className="pt-2 mt-1 border-t border-[var(--border)] min-w-0 space-y-1">
+      <span className="block text-[10px] font-semibold text-adaptive-secondary leading-snug break-words" title={label}>
+        {label}
+      </span>
+      <span className="block text-[12px] font-bold text-adaptive-primary tabular-nums text-right leading-none" title={value}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -77,18 +85,22 @@ function HeroMetric({
   valueClassName?: string;
 }) {
   return (
-    <div className="py-3 overflow-hidden min-w-0">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-adaptive-muted mb-1">
+    <div className="py-2 overflow-hidden min-w-0">
+      <div className="text-[9px] font-semibold uppercase tracking-wider text-adaptive-muted mb-1 leading-snug break-words">
         {label}
       </div>
       <div
-        className={clsx("font-bold tabular-nums leading-none", valueClassName ?? "text-adaptive-primary")}
-        style={metricValueStyle(value, { base: 28, compact: 22, xs: 18, inheritColor: !!valueClassName })}
+        className={clsx("font-bold tabular-nums leading-none text-right", valueClassName ?? "text-adaptive-primary")}
+        style={metricValueStyle(value, { base: 20, compact: 16, xs: 14, inheritColor: !!valueClassName })}
         title={value}
       >
         {value}
       </div>
-      {sub && <div className="text-[12px] text-adaptive-muted mt-1.5 truncate" title={sub}>{sub}</div>}
+      {sub && (
+        <div className="text-[10px] text-adaptive-muted mt-1 leading-snug break-words text-right" title={sub}>
+          {sub}
+        </div>
+      )}
     </div>
   );
 }
@@ -164,11 +176,13 @@ export function CurrentMonthlyAveragesPanel({
     data.surplusCashFlow >= 0 ? "text-green-400" : "text-red-400";
 
   return (
-    <div className="card h-full space-y-5">
-      <div>
+    <div className="card h-full min-w-0 overflow-hidden space-y-4">
+      <div className="min-w-0">
         <div className="section-title">Current Monthly Averages</div>
-        <div className="text-[13px] font-medium text-adaptive-secondary mt-0.5">{storeName}</div>
-        <div className="text-[11px] text-adaptive-muted mt-1">{periodSubtext(data.monthsUsed)}</div>
+        <div className="text-[12px] font-medium text-adaptive-secondary mt-0.5 truncate" title={storeName}>
+          {storeName}
+        </div>
+        <div className="text-[10px] text-adaptive-muted mt-1 leading-snug">{periodSubtext(data.monthsUsed)}</div>
       </div>
 
       <div>
@@ -202,7 +216,7 @@ export function CurrentMonthlyAveragesPanel({
         </div>
       </div>
 
-      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-4 py-1">
+      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2.5 py-1 min-w-0">
         <HeroMetric
           label="Average Monthly EBITDA"
           value={fmtDollar(data.ebitda.monthly)}
@@ -232,7 +246,7 @@ export function CurrentMonthlyAveragesPanel({
         )}
       </div>
 
-      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-4 py-1">
+      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2.5 py-1 min-w-0">
         <HeroMetric
           label="Surplus Cash Flow"
           value={fmtDollar(data.surplusCashFlow)}
@@ -241,9 +255,10 @@ export function CurrentMonthlyAveragesPanel({
         />
       </div>
 
-      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-4 py-1">
+      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2.5 py-1 min-w-0">
         <HeroMetric
-          label="Current DSCR (based on active loan terms)"
+          label="Current DSCR"
+          sub="Based on active loan terms"
           value={formatDscrDisplay(data.dscr, data.debt.totalMonthlyDebtService * 12)}
           valueClassName={dscrTextColor(data.dscr, data.debt.totalMonthlyDebtService > 0)}
         />
@@ -260,17 +275,19 @@ export function CurrentMonthlyAveragesPanel({
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3 pt-1 border-t border-[var(--border)]">
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-adaptive-muted mb-1">
+      <div className="flex flex-col gap-2 pt-1 border-t border-[var(--border)] min-w-0">
+        <div className="min-w-0">
+          <div className="text-[9px] font-semibold uppercase tracking-wider text-adaptive-muted mb-1">
             Water KPI
           </div>
-          <div className="text-[16px] font-bold tabular-nums text-adaptive-primary">
+          <div className="text-[14px] font-bold tabular-nums text-adaptive-primary text-right">
             {fmtPct(data.waterKPI.ratio * 100)}
           </div>
-          <div className="text-[11px] text-adaptive-muted mt-0.5">Water ÷ self-service revenue</div>
+          <div className="text-[10px] text-adaptive-muted mt-0.5 leading-snug">
+            Water ÷ self-service revenue
+          </div>
         </div>
-        <span className={clsx("badge text-[10px]", waterStatusBadgeClass(data.waterKPI.status))}>
+        <span className={clsx("badge text-[9px] self-end", waterStatusBadgeClass(data.waterKPI.status))}>
           {data.waterKPI.status}
         </span>
       </div>
