@@ -139,7 +139,7 @@ export function CurrentMonthlyAveragesPanel({
 }: CurrentMonthlyAveragesPanelProps) {
   if (loading) {
     return (
-      <div className="card">
+      <div className="card h-full">
         <div className="text-[13px]" style={{ color: "var(--text-muted)" }}>
           Loading averages…
         </div>
@@ -149,7 +149,7 @@ export function CurrentMonthlyAveragesPanel({
 
   if (!data) {
     return (
-      <div className="card">
+      <div className="card h-full">
         <div className="section-title">Current Monthly Averages</div>
         <p className="text-[12px] text-adaptive-muted">
           Add financial data to see monthly averages for {storeName || "this store"}.
@@ -164,7 +164,7 @@ export function CurrentMonthlyAveragesPanel({
     data.surplusCashFlow >= 0 ? "text-green-400" : "text-red-400";
 
   return (
-    <div className="card space-y-5">
+    <div className="card h-full space-y-5">
       <div>
         <div className="section-title">Current Monthly Averages</div>
         <div className="text-[13px] font-medium text-adaptive-secondary mt-0.5">{storeName}</div>

@@ -452,6 +452,19 @@ export default function FinancialsPage() {
     );
   }, [yearRecords]);
 
+  const ttmTableTotals = useMemo(() => {
+    const ttmRecords = records.slice(0, ttm.monthsUsed);
+    return {
+      revenue: ttm.ttmRevenue,
+      expenses: ttmRecords.reduce((sum, r) => sum + r.totalExpenses, 0),
+      ebitda: ttm.ttmEbitda,
+      margin: ttm.ttmEbitdaMargin,
+      debtService: ttmRecords.reduce((sum, r) => sum + r.debt_service, 0),
+      noi: ttm.ttmNoi,
+      monthsUsed: ttm.monthsUsed,
+    };
+  }, [records, ttm]);
+
   const yearChartData = useMemo(
     () =>
       yearRecords.map((r, i) => ({
@@ -861,12 +874,6 @@ export default function FinancialsPage() {
             </div>
           </div>
 
-          <CurrentMonthlyAveragesPanel
-            storeName={store?.name ?? selectedStore.name}
-            data={monthlyAverages}
-            loading={monthlyAveragesLoading}
-          />
-
           <div className="card">
             <div className="flex flex-wrap items-center gap-4 justify-between">
               <div className="flex flex-wrap items-center gap-4">
@@ -978,73 +985,165 @@ export default function FinancialsPage() {
             </div>
           )}
 
-          <div className="card">
-            <div className="section-title">P&L — {selectedYear}</div>
-            <div className="table-scroll">
-            <table className="w-full text-[12px]">
-              <thead>
-                <tr className="text-left text-[var(--text-secondary)]border-b border-[var(--border)]">
-                  <th className="pb-3 pr-3 font-medium">Month</th>
-                  <th className="pb-3 pr-3 font-medium text-right">Revenue</th>
-                  <th className="pb-3 pr-3 font-medium text-right">Expenses</th>
-                  <th className="pb-3 pr-3 font-medium text-right">EBITDA</th>
-                  <th className="pb-3 pr-3 font-medium text-right">Margin</th>
-                  <th className="pb-3 pr-3 font-medium text-right">Debt Svc</th>
-                  <th className="pb-3 font-medium text-right">NOI</th>
-                </tr>
-              </thead>
-              <tbody>
-                {yearRecords.map((r, i) => (
-                  <tr
-                    key={i}
-                    className={clsx(
-                      "border-b border-[var(--border)] cursor-pointer hover:bg-[var(--bg-card2)]",
-                      selectedMonth === i + 1 && "bg-blue-500/5"
+          <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4 items-stretch">
+            <div className="card flex flex-col min-h-0 h-full">
+              <div className="section-title">P&L — {selectedYear}</div>
+              <div className="table-scroll flex-1 -mx-1 px-1">
+                <table className="w-full text-[12px] border-collapse">
+                  <thead>
+                    <tr className="bg-[var(--bg-sidebar)] text-slate-100">
+                      <th className="py-2.5 px-3 text-left text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
+                        Month
+                      </th>
+                      <th className="py-2.5 px-3 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
+                        Revenue
+                      </th>
+                      <th className="py-2.5 px-3 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
+                        Expenses
+                      </th>
+                      <th className="py-2.5 px-3 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
+                        EBITDA
+                      </th>
+                      <th className="py-2.5 px-3 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
+                        Margin
+                      </th>
+                      <th className="py-2.5 px-3 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
+                        Debt Svc
+                      </th>
+                      <th className="py-2.5 px-3 text-right text-[10px] font-semibold uppercase tracking-wider border-b border-white/10">
+                        NOI
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {yearRecords.map((r, i) => {
+                      const month = i + 1;
+                      const isSelected = selectedMonth === month;
+                      const isCalendarCurrentMonth =
+                        selectedYear === currentYear && month === new Date().getMonth() + 1;
+                      return (
+                        <tr
+                          key={i}
+                          className={clsx(
+                            "border-b border-[var(--border)] cursor-pointer transition-colors hover:bg-[var(--bg-card2)]/80",
+                            i % 2 === 1 && "bg-[var(--bg-card2)]/25",
+                            isSelected && "bg-blue-500/10 ring-1 ring-inset ring-blue-500/20",
+                            isCalendarCurrentMonth &&
+                              !isSelected &&
+                              "bg-blue-500/[0.06] ring-1 ring-inset ring-blue-400/15"
+                          )}
+                          onClick={() => setSelectedMonth(month)}
+                        >
+                          <td className="py-2.5 px-3 text-left font-medium text-[var(--text-primary)]">
+                            {MONTH_NAMES[i]}
+                            {isCalendarCurrentMonth && (
+                              <span className="ml-1.5 text-[9px] font-semibold uppercase tracking-wide text-blue-400">
+                                Now
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-right tabular-nums text-green-400/90">
+                            {r ? fmtDollar(r.revenue) : "—"}
+                          </td>
+                          <td className="py-2.5 px-3 text-right tabular-nums text-[var(--text-primary)]">
+                            {r ? fmtDollar(r.totalExpenses) : "—"}
+                          </td>
+                          <td
+                            className={clsx(
+                              "py-2.5 px-3 text-right tabular-nums font-bold text-green-400",
+                              "bg-green-500/[0.08] border-l-2 border-l-green-500"
+                            )}
+                          >
+                            {r ? fmtDollar(r.ebitda) : "—"}
+                          </td>
+                          <td className="py-2.5 px-3 text-right tabular-nums text-[var(--text-secondary)]">
+                            {r ? fmtPct(r.ebitdaMargin) : "—"}
+                          </td>
+                          <td className="py-2.5 px-3 text-right tabular-nums text-[var(--text-secondary)]">
+                            {r ? fmtDollar(r.debt_service) : "—"}
+                          </td>
+                          <td className="py-2.5 px-3 text-right tabular-nums text-[var(--accent-blue)]">
+                            {r ? fmtDollar(r.noi) : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {yearTotals && (
+                      <tr className="font-semibold bg-[var(--bg-page)]/60 border-t border-[var(--border)]">
+                        <td className="py-3 px-3 text-left text-[var(--text-primary)]">
+                          {selectedYear} Total
+                        </td>
+                        <td className="py-3 px-3 text-right tabular-nums text-green-400/90">
+                          {fmtDollar(yearTotals.revenue)}
+                        </td>
+                        <td className="py-3 px-3 text-right tabular-nums text-[var(--text-primary)]">
+                          {fmtDollar(yearTotals.totalExpenses)}
+                        </td>
+                        <td
+                          className={clsx(
+                            "py-3 px-3 text-right tabular-nums font-bold text-green-400",
+                            "bg-green-500/[0.08] border-l-2 border-l-green-500"
+                          )}
+                        >
+                          {fmtDollar(yearTotals.ebitda)}
+                        </td>
+                        <td className="py-3 px-3 text-right tabular-nums text-[var(--text-primary)]">
+                          {yearTotals.revenue > 0
+                            ? fmtPct((yearTotals.ebitda / yearTotals.revenue) * 100)
+                            : "—"}
+                        </td>
+                        <td className="py-3 px-3 text-right tabular-nums text-[var(--text-primary)]">
+                          {fmtDollar(yearTotals.debt_service)}
+                        </td>
+                        <td className="py-3 px-3 text-right tabular-nums text-[var(--accent-blue)]">
+                          {fmtDollar(yearTotals.noi)}
+                        </td>
+                      </tr>
                     )}
-                    onClick={() => setSelectedMonth(i + 1)}
-                  >
-                    <td className="py-2.5 pr-3 text-[var(--text-primary)]">{MONTH_NAMES[i]}</td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">
-                      {r ? fmtDollar(r.revenue) : "—"}
-                    </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">
-                      {r ? fmtDollar(r.totalExpenses) : "—"}
-                    </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-success)]">
-                      {r ? fmtDollar(r.ebitda) : "—"}
-                    </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">
-                      {r ? fmtPct(r.ebitdaMargin) : "—"}
-                    </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">
-                      {r ? fmtDollar(r.debt_service) : "—"}
-                    </td>
-                    <td className="py-2.5 text-right tabular-nums text-[var(--accent-blue)]">
-                      {r ? fmtDollar(r.noi) : "—"}
-                    </td>
-                  </tr>
-                ))}
-                {yearTotals && (
-                  <tr className="font-semibold bg-[var(--bg-page)]/50">
-                    <td className="py-3 pr-3 text-[var(--text-primary)]">Total</td>
-                    <td className="py-3 pr-3 text-right tabular-nums text-[var(--text-primary)]">{fmtDollar(yearTotals.revenue)}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums text-[var(--text-primary)]">
-                      {fmtDollar(yearTotals.totalExpenses)}
-                    </td>
-                    <td className="py-3 pr-3 text-right tabular-nums text-[var(--text-success)]">
-                      {fmtDollar(yearTotals.ebitda)}
-                    </td>
-                    <td className="py-3 pr-3 text-right tabular-nums text-[var(--text-primary)]">
-                      {yearTotals.revenue > 0
-                        ? fmtPct((yearTotals.ebitda / yearTotals.revenue) * 100)
-                        : "—"}
-                    </td>
-                    <td className="py-3 pr-3 text-right tabular-nums text-[var(--text-primary)]">{fmtDollar(yearTotals.debt_service)}</td>
-                    <td className="py-3 text-right tabular-nums text-[var(--accent-blue)]">{fmtDollar(yearTotals.noi)}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                    {ttmTableTotals.monthsUsed > 0 && (
+                      <tr className="font-bold border-t-2 border-[var(--border2)] bg-[var(--bg-card2)]/40">
+                        <td className="py-3 px-3 text-left text-[var(--text-primary)]">
+                          TTM
+                          <span className="ml-1 text-[10px] font-medium text-[var(--text-muted)]">
+                            ({ttmTableTotals.monthsUsed} mo.)
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right tabular-nums text-green-400">
+                          {fmtDollar(ttmTableTotals.revenue)}
+                        </td>
+                        <td className="py-3 px-3 text-right tabular-nums text-[var(--text-primary)]">
+                          {fmtDollar(ttmTableTotals.expenses)}
+                        </td>
+                        <td
+                          className={clsx(
+                            "py-3 px-3 text-right tabular-nums font-bold text-green-400",
+                            "bg-green-500/10 border-l-2 border-l-green-500"
+                          )}
+                        >
+                          {fmtDollar(ttmTableTotals.ebitda)}
+                        </td>
+                        <td className="py-3 px-3 text-right tabular-nums text-[var(--text-primary)]">
+                          {fmtPct(ttmTableTotals.margin)}
+                        </td>
+                        <td className="py-3 px-3 text-right tabular-nums text-[var(--text-primary)]">
+                          {fmtDollar(ttmTableTotals.debtService)}
+                        </td>
+                        <td className="py-3 px-3 text-right tabular-nums text-[var(--accent-blue)]">
+                          {fmtDollar(ttmTableTotals.noi)}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex flex-col [&>div]:h-full">
+              <CurrentMonthlyAveragesPanel
+                storeName={store?.name ?? selectedStore.name}
+                data={monthlyAverages}
+                loading={monthlyAveragesLoading}
+              />
             </div>
           </div>
 
