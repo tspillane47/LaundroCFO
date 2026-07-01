@@ -25,7 +25,7 @@ export function BetaBanner({ onFeedbackClick }: BetaBannerProps) {
 
   return (
     <div
-      className="flex-shrink-0 px-6 py-2.5 flex items-center justify-between gap-4 border-b"
+      className="flex-shrink-0 px-6 py-2.5 flex items-center justify-between gap-4"
       style={{
         background: "var(--bg-info-tint)",
         borderColor: "var(--border)",
