@@ -46,7 +46,7 @@ export default function PricingPage() {
   const ctaLabel = BETA_MODE ? "Join Beta — Free" : "Get Started";
 
   return (
-    <div className="pt-32 pb-24 bg-white">
+    <div className="pt-32 pb-24 bg-[var(--bg-page)]">
       <div className="max-w-5xl mx-auto px-6 space-y-8">
         {BETA_MODE && (
           <div className="rounded-lg px-4 py-3 text-center text-[13px] font-medium border border-blue-200 bg-blue-50 text-blue-700">
@@ -86,7 +86,7 @@ export default function PricingPage() {
                     <span className="text-[32px] font-extrabold tracking-tight text-slate-900">
                       ${plan.price}
                     </span>
-                    <span className="text-[14px] text-gray-700">/month</span>
+                    <span className="text-[14px] text-[var(--text-secondary)]">/month</span>
                   </div>
                 </div>
                 <ul className="space-y-2 mb-6 flex-1">

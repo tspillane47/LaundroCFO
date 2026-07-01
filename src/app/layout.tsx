@@ -8,8 +8,6 @@ import { StoreProvider, useStores } from "@/lib/store-context";
 import clsx from "clsx";
 import {
   NavIcon,
-  SunIcon,
-  MoonIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -201,22 +199,9 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [userFullName, setUserFullName] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [isDark, setIsDark] = useState(false);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
   const sidebarStoreRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("theme");
-    let dark: boolean;
-    if (saved === "dark") dark = true;
-    else if (saved === "light") dark = false;
-    else dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-    setIsDark(dark);
-    if (dark) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem("sidebar-collapsed");
@@ -255,14 +240,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [supabase]);
-
-  function toggleTheme() {
-    const newDark = !isDark;
-    setIsDark(newDark);
-    localStorage.setItem("theme", newDark ? "dark" : "light");
-    if (newDark) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-  }
 
   function toggleSidebarCollapsed() {
     setSidebarCollapsed((prev) => {
@@ -454,10 +431,11 @@ function AppShell({ children }: { children: React.ReactNode }) {
                 className="sidebar-section-label"
                 style={{
                   fontSize: "10px",
-                  color: "var(--text-muted)",
+                  color: "var(--sidebar-section)",
                   padding: "16px 20px 4px",
                   letterSpacing: "0.08em",
                   fontWeight: 600,
+                  textTransform: "uppercase",
                 }}
               >
                 {section.label}
@@ -478,8 +456,9 @@ function AppShell({ children }: { children: React.ReactNode }) {
                       fontSize: "13px",
                       textDecoration: "none",
                       fontWeight: active ? 500 : 400,
-                      color: active ? "var(--nav-active-text)" : "var(--text-muted)",
+                      color: active ? "var(--nav-active-text)" : "var(--sidebar-text-muted)",
                       background: active ? "var(--bg-nav-active)" : "transparent",
+                      borderLeft: active ? "3px solid var(--nav-active-border)" : "3px solid transparent",
                     }}
                     onMouseEnter={(e) => {
                       showSidebarTooltip(e, item.label);
@@ -510,7 +489,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
                     padding: "7px 20px",
                     fontSize: "13px",
                     fontWeight: 400,
-                    color: "var(--text-muted)",
+                    color: "var(--sidebar-text-muted)",
                     background: "transparent",
                     border: "none",
                     width: "100%",
@@ -655,7 +634,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
                         type="button"
                         onClick={selectAllStores}
                         className={clsx(
-                          "w-full px-3 py-2.5 text-left text-[14px] md:text-[12px] font-medium hover:bg-white/5 transition-colors min-h-[44px]",
+                          "w-full px-3 py-2.5 text-left text-[14px] md:text-[12px] font-medium hover:bg-[var(--bg-card2)] transition-colors min-h-[44px]",
                           isAllStores && "font-semibold"
                         )}
                         style={{
@@ -681,15 +660,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              type="button"
-              className="btn-outline w-11 h-11 md:w-8 md:h-8 flex items-center justify-center p-0 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0"
-              onClick={toggleTheme}
-              aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-            >
-              {isDark ? <SunIcon /> : <MoonIcon />}
-            </button>
-
             <Link
               href="/account"
               className="flex items-center justify-center w-11 h-11 md:w-8 md:h-8 rounded-full overflow-hidden flex-shrink-0 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 transition-opacity hover:opacity-80"
@@ -793,26 +763,13 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [isDark, setIsDark] = useState(false);
   const isAuthPage = authPages.includes(pathname);
   const isPublicPage = publicPages.includes(pathname);
   const isMarketingPage = marketingPages.includes(pathname);
 
-  useEffect(() => {
-    const saved = localStorage.getItem("theme");
-    let dark: boolean;
-    if (saved === "dark") dark = true;
-    else if (saved === "light") dark = false;
-    else dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-    setIsDark(dark);
-    if (dark) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-  }, []);
-
   if (isAuthPage || isMarketingPage) {
     return (
-      <html lang="en" className={isDark ? "dark" : ""}>
+      <html lang="en">
         <body>
           <ToastProvider>
             <Suspense fallback={<OnboardingGuardFallback />}>
@@ -826,7 +783,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   if (isPublicPage) {
     return (
-      <html lang="en" className={isDark ? "dark" : ""}>
+      <html lang="en">
         <body>
           <ToastProvider>
             <Suspense fallback={<OnboardingGuardFallback />}>
@@ -841,7 +798,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <html lang="en" className={isDark ? "dark" : ""}>
+    <html lang="en">
       <body>
         <ToastProvider>
           <Suspense fallback={<OnboardingGuardFallback />}>

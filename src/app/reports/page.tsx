@@ -106,7 +106,7 @@ function ReportMetricTile({ label, value }: { label: string; value: string }) {
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[11px] font-bold text-gray-700 dark:text-slate-500 uppercase tracking-widest mb-3 pb-2.5 border-b border-white/[0.06]">
+    <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-3 pb-2.5border-b border-[var(--border)]">
       {children}
     </div>
   );
@@ -115,8 +115,8 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 function PreviewRow({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
     <div className="flex justify-between py-2">
-      <span className="text-gray-700 dark:text-gray-800 dark:text-gray-300">{label}</span>
-      <span className={clsx("font-semibold", className ?? "text-gray-900 dark:text-white")}>{value}</span>
+      <span className="text-[var(--text-secondary)]">{label}</span>
+      <span className={clsx("font-semibold", className ?? "text-[var(--text-primary)]")}>{value}</span>
     </div>
   );
 }
@@ -606,7 +606,7 @@ function ReportsPageContent() {
     (reportMode === "portfolio" ? !portfolioReady : !isStoreReady);
 
   return (
-    <div className="space-y-4 max-w-4xl">
+    <div className="report-mode space-y-4 max-w-4xl">
       <div className="flex gap-1 p-1 rounded-full w-fit" style={{ background: "var(--bg-card2)", border: "1px solid var(--border)" }}>
         {(["store", "portfolio"] as ReportMode[]).map((mode) => (
           <button
@@ -615,7 +615,7 @@ function ReportsPageContent() {
             onClick={() => setReportMode(mode)}
             className={clsx(
               "px-4 py-1.5 rounded-full text-[12px] font-medium transition-colors",
-              reportMode === mode ? "text-white" : "text-gray-700 dark:text-gray-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+              reportMode === mode ? "text-white" : "text-[var(--text-secondary)] hover:text-slate-900"
             )}
             style={reportMode === mode ? { background: "var(--accent)" } : undefined}
           >
@@ -629,7 +629,7 @@ function ReportsPageContent() {
           <h1 className="text-[15px] font-semibold text-slate-100">
             {reportMode === "portfolio" ? "Portfolio Underwriting Report" : "Underwriting Report"}
           </h1>
-          <p className="text-gray-700 dark:text-slate-500 text-[12px] mt-0.5">
+          <p className="text-[var(--text-muted)] text-[12px] mt-0.5">
             {reportMode === "portfolio"
               ? `${totals?.storeCount ?? stores.length} store${(totals?.storeCount ?? stores.length) !== 1 ? "s" : ""} — ${generatedDate}`
               : `${storeName} — ${generatedDate}`}
@@ -706,7 +706,7 @@ function ReportsPageContent() {
               Portfolio Net Worth
             </div>
             <AnimatedNumber value={totals.portfolioNetWorth} prefix="$" className="hero-value-text" duration={1200} />
-            <p className="text-[13px] text-gray-700 dark:text-gray-800 dark:text-slate-400 mt-4">
+            <p className="text-[13px] text-[var(--text-secondary)] mt-4">
               Portfolio Value {fmtDollar(totals.portfolioValue)} − Debt {fmtDollar(totals.portfolioDebt)} + Cash {fmtDollar(totals.portfolioCash)}
             </p>
           </div>
@@ -737,7 +737,7 @@ function ReportsPageContent() {
             <div className="table-scroll">
               <table className="w-full text-[12px] min-w-[900px]">
                 <thead>
-                  <tr className="text-left text-gray-700 dark:text-gray-800 dark:text-gray-300 border-b border-white/[0.06]">
+                  <tr className="text-left text-[var(--text-secondary)]border-b border-[var(--border)]">
                     <th className="pb-3 pr-3 font-medium">Store Name</th>
                     <th className="pb-3 pr-3 font-medium">Address</th>
                     <th className="pb-3 pr-3 font-medium text-right">Revenue</th>
@@ -753,20 +753,20 @@ function ReportsPageContent() {
                 </thead>
                 <tbody>
                   {storeDetails.map((d) => (
-                    <tr key={d.store.id} className="border-b border-white/[0.04]">
-                      <td className="py-2.5 pr-3 text-gray-900 dark:text-white">{d.store.name ?? "Store"}</td>
-                      <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-800 dark:text-gray-300">{d.store.address ?? "—"}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(d.annualRevenue)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-600 dark:text-green-400">{fmtDollar(d.annualEbitda)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
+                    <tr key={d.store.id} className="border-b border-[var(--border)]">
+                      <td className="py-2.5 pr-3 text-[var(--text-primary)]">{d.store.name ?? "Store"}</td>
+                      <td className="py-2.5 pr-3 text-[var(--text-secondary)]">{d.store.address ?? "—"}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">{fmtDollar(d.annualRevenue)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-success)]">{fmtDollar(d.annualEbitda)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">
                         {formatDscrDisplay(d.dscr, d.annualDebtService)}
                       </td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(d.valuation.businessValue)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(d.debt)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(d.cash)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-600 dark:text-green-400">{fmtDollar(d.equity)}</td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{d.leaseScore}</td>
-                      <td className="py-2.5 text-right tabular-nums text-gray-900 dark:text-white">{d.equipmentGrade}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">{fmtDollar(d.valuation.businessValue)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">{fmtDollar(d.debt)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">{fmtDollar(d.cash)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-success)]">{fmtDollar(d.equity)}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">{d.leaseScore}</td>
+                      <td className="py-2.5 text-right tabular-nums text-[var(--text-primary)]">{d.equipmentGrade}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -790,13 +790,13 @@ function ReportsPageContent() {
                   ["Cash Flow After Debt", cashFlow.cashFlowAfterDebt],
                 ].map(([label, amount]) => (
                   <tr key={label as string}>
-                    <td className="py-2.5 text-gray-700 dark:text-gray-800 dark:text-gray-300">{label}</td>
+                    <td className="py-2.5 text-[var(--text-secondary)]">{label}</td>
                     <td
                       className={clsx(
                         "py-2.5 text-right font-semibold tabular-nums",
                         label === "EBITDA" || label === "Cash Flow After Debt"
-                          ? "text-green-600 dark:text-green-400"
-                          : "text-gray-900 dark:text-white"
+                          ? "text-[var(--text-success)]"
+                          : "text-[var(--text-primary)]"
                       )}
                     >
                       {fmtDollar(amount as number)}
@@ -838,7 +838,7 @@ function ReportsPageContent() {
             <div className="table-scroll">
               <table className="w-full text-[12px] min-w-[640px]">
                 <thead>
-                  <tr className="text-left text-gray-700 dark:text-gray-800 dark:text-gray-300 border-b border-white/[0.06]">
+                  <tr className="text-left text-[var(--text-secondary)]border-b border-[var(--border)]">
                     <th className="pb-3 pr-3 font-medium">Store</th>
                     <th className="pb-3 pr-3 font-medium">Lease Expiration</th>
                     <th className="pb-3 pr-3 font-medium text-right">Years Remaining</th>
@@ -848,18 +848,18 @@ function ReportsPageContent() {
                 </thead>
                 <tbody>
                   {storeDetails.map((d) => (
-                    <tr key={`lease-${d.store.id}`} className="border-b border-white/[0.04]">
-                      <td className="py-2.5 pr-3 text-gray-900 dark:text-white">{d.store.name ?? "Store"}</td>
-                      <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-800 dark:text-gray-300">
+                    <tr key={`lease-${d.store.id}`} className="border-b border-[var(--border)]">
+                      <td className="py-2.5 pr-3 text-[var(--text-primary)]">{d.store.name ?? "Store"}</td>
+                      <td className="py-2.5 pr-3 text-[var(--text-secondary)]">
                         {formatLeaseExpiration(d.lease, d.store.occupancy_type === "owner_occupied")}
                       </td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">
                         {d.lease ? d.yearsRemaining.toFixed(1) : "—"}
                       </td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">
                         {d.availableLeaseOptions > 0 ? d.availableLeaseOptions : "—"}
                       </td>
-                      <td className="py-2.5 text-right tabular-nums text-gray-900 dark:text-white">{d.leaseScore}</td>
+                      <td className="py-2.5 text-right tabular-nums text-[var(--text-primary)]">{d.leaseScore}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -872,7 +872,7 @@ function ReportsPageContent() {
             <div className="table-scroll">
               <table className="w-full text-[12px] min-w-[720px]">
                 <thead>
-                  <tr className="text-left text-gray-700 dark:text-gray-800 dark:text-gray-300 border-b border-white/[0.06]">
+                  <tr className="text-left text-[var(--text-secondary)]border-b border-[var(--border)]">
                     <th className="pb-3 pr-3 font-medium">Store</th>
                     <th className="pb-3 pr-3 font-medium text-right">Equipment Grade</th>
                     <th className="pb-3 pr-3 font-medium text-right">Avg Age</th>
@@ -886,14 +886,14 @@ function ReportsPageContent() {
                   {storeDetails.map((d) => {
                     const equipMetrics = computeEquipmentMetrics(d.equipment as EquipmentRecord[]);
                     return (
-                      <tr key={`equip-${d.store.id}`} className="border-b border-white/[0.04]">
-                        <td className="py-2.5 pr-3 text-gray-900 dark:text-white">{d.store.name ?? "Store"}</td>
-                        <td className="py-2.5 pr-3 text-right text-gray-900 dark:text-white">{d.equipmentGrade}</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{d.avgEquipmentAge.toFixed(1)} yrs</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{equipMetrics.totalWashers}</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{equipMetrics.totalDryers}</td>
-                        <td className="py-2.5 pr-3 text-gray-900 dark:text-white">{getLargestMachine(d.equipment as EquipmentRecord[])}</td>
-                        <td className="py-2.5 text-right tabular-nums text-gray-900 dark:text-white">{equipMetrics.qualityScore}</td>
+                      <tr key={`equip-${d.store.id}`} className="border-b border-[var(--border)]">
+                        <td className="py-2.5 pr-3 text-[var(--text-primary)]">{d.store.name ?? "Store"}</td>
+                        <td className="py-2.5 pr-3 text-right text-[var(--text-primary)]">{d.equipmentGrade}</td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">{d.avgEquipmentAge.toFixed(1)} yrs</td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">{equipMetrics.totalWashers}</td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">{equipMetrics.totalDryers}</td>
+                        <td className="py-2.5 pr-3 text-[var(--text-primary)]">{getLargestMachine(d.equipment as EquipmentRecord[])}</td>
+                        <td className="py-2.5 text-right tabular-nums text-[var(--text-primary)]">{equipMetrics.qualityScore}</td>
                       </tr>
                     );
                   })}
@@ -905,20 +905,20 @@ function ReportsPageContent() {
           <div className="card">
             <SectionHeading>Portfolio Net Worth</SectionHeading>
             <div className="text-[14px] space-y-2 font-mono">
-              <div className="flex justify-between text-slate-900 dark:text-gray-800 dark:text-slate-300">
+              <div className="flex justify-between text-[var(--text-secondary)]">
                 <span>Portfolio Value:</span>
                 <span>{fmtDollar(totals.portfolioValue)}</span>
               </div>
-              <div className="flex justify-between text-slate-900 dark:text-gray-800 dark:text-slate-300">
+              <div className="flex justify-between text-[var(--text-secondary)]">
                 <span>+ Cash:</span>
                 <span>{fmtDollar(totals.portfolioCash)}</span>
               </div>
-              <div className="flex justify-between text-slate-900 dark:text-gray-800 dark:text-slate-300">
+              <div className="flex justify-between text-[var(--text-secondary)]">
                 <span>− Debt:</span>
                 <span className="text-red-400">−{fmtDollar(totals.portfolioDebt).replace("$", "")}</span>
               </div>
-              <div className="border-t border-white/[0.06] pt-3 flex justify-between items-baseline">
-                <span className="text-slate-900 dark:text-slate-200 font-semibold">= Portfolio Net Worth:</span>
+              <div className="border-t border-[var(--border)] pt-3 flex justify-between items-baseline">
+                <span className="text-slate-900 font-semibold">= Portfolio Net Worth:</span>
                 <span className="text-[28px] font-bold text-green-400">{fmtDollar(totals.portfolioNetWorth)}</span>
               </div>
             </div>
@@ -936,7 +936,7 @@ function ReportsPageContent() {
         <>
       <div className="card">
         <SectionHeading>Executive Summary</SectionHeading>
-        <p className="text-[13px] text-slate-900 dark:text-gray-800 dark:text-slate-300 leading-relaxed">{executiveSummary}</p>
+        <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{executiveSummary}</p>
       </div>
 
       {/* Three-column summary */}
@@ -971,14 +971,14 @@ function ReportsPageContent() {
             {metrics.utilityRatio > 17 ? (
               <div className="py-2 text-amber-400">Utility ratio {fmtPct(metrics.utilityRatio)}</div>
             ) : (
-              <div className="py-2 text-slate-900 dark:text-gray-800 dark:text-slate-300">Utility ratio {fmtPct(metrics.utilityRatio)}</div>
+              <div className="py-2 text-[var(--text-secondary)]">Utility ratio {fmtPct(metrics.utilityRatio)}</div>
             )}
-            <div className="py-2 text-slate-900 dark:text-gray-800 dark:text-slate-300">
+            <div className="py-2 text-[var(--text-secondary)]">
               {metrics.isOwnerOccupied
                 ? "Owner-occupied — fee simple"
                 : `Lease — ${metrics.totalLeaseControl.toFixed(1)}yr control`}
             </div>
-            <div className="py-2 text-slate-900 dark:text-gray-800 dark:text-slate-300">
+            <div className="py-2 text-[var(--text-secondary)]">
               Equipment — {equipMetrics.weightedAvgAge.toFixed(1)}yr avg
             </div>
           </div>
@@ -988,12 +988,12 @@ function ReportsPageContent() {
       {/* Lease summary */}
       <div className="card">
         <SectionHeading>{metrics.isOwnerOccupied ? "Real Estate" : "Lease Summary"}</SectionHeading>
-        <div className="text-[13px] text-gray-700 dark:text-gray-800 dark:text-slate-400 space-y-2">
+        <div className="text-[13px] text-[var(--text-secondary)] space-y-2">
           {metrics.isOwnerOccupied ? (
             <>
               <div>
                 Value:{" "}
-                <span className="text-gray-900 dark:text-white">
+                <span className="text-[var(--text-primary)]">
                   {realEstate?.estimated_value ? fmtDollar(realEstate.estimated_value) : "—"}
                 </span>
               </div>
@@ -1010,27 +1010,27 @@ function ReportsPageContent() {
             <>
               <div>
                 Expires:{" "}
-                <span className="text-gray-900 dark:text-white">
+                <span className="text-[var(--text-primary)]">
                   {metrics.leaseExpiresStr} — {metrics.yearsRemaining.toFixed(1)} years remaining
                 </span>
               </div>
               <div>
                 Renewals:{" "}
-                <span className="text-gray-900 dark:text-white">
+                <span className="text-[var(--text-primary)]">
                   {metrics.availableOptions.length} option{metrics.availableOptions.length !== 1 ? "s" : ""} (total{" "}
                   {metrics.totalLeaseControl.toFixed(1)}yr)
                 </span>
               </div>
               <div>
                 Monthly Rent:{" "}
-                <span className="text-gray-900 dark:text-white">
+                <span className="text-[var(--text-primary)]">
                   {metrics.monthlyRent ? fmtDollar(metrics.monthlyRent) : "—"}
                   {metrics.camCharges > 0 ? " + CAM" : ""}
                 </span>
               </div>
               <div>
                 Occupancy Cost:{" "}
-                <span className="text-gray-900 dark:text-white">
+                <span className="text-[var(--text-primary)]">
                   {fmtPct(metrics.occupancyCostRatio)} of revenue
                 </span>
               </div>
@@ -1107,11 +1107,11 @@ function ReportsPageContent() {
         <div className="card">
           <SectionHeading>Value Drivers</SectionHeading>
           {valuation.valueDrivers.length === 0 ? (
-            <p className="text-[12px] text-gray-700 dark:text-slate-500">No major drivers identified.</p>
+            <p className="text-[12px] text-[var(--text-muted)]">No major drivers identified.</p>
           ) : (
             <ul className="space-y-2">
               {valuation.valueDrivers.slice(0, 5).map((d) => (
-                <li key={d} className="text-[12px] text-slate-900 dark:text-gray-800 dark:text-slate-300">
+                <li key={d} className="text-[12px] text-[var(--text-secondary)]">
                   {d}
                 </li>
               ))}
@@ -1121,11 +1121,11 @@ function ReportsPageContent() {
         <div className="card">
           <SectionHeading>Value Risks</SectionHeading>
           {valuation.valueRisks.length === 0 ? (
-            <p className="text-[12px] text-gray-700 dark:text-slate-500">No significant risks flagged.</p>
+            <p className="text-[12px] text-[var(--text-muted)]">No significant risks flagged.</p>
           ) : (
             <ul className="space-y-2">
               {valuation.valueRisks.slice(0, 5).map((r) => (
-                <li key={r} className="text-[12px] text-slate-900 dark:text-gray-800 dark:text-slate-300">
+                <li key={r} className="text-[12px] text-[var(--text-secondary)]">
                   {r}
                 </li>
               ))}
@@ -1138,10 +1138,10 @@ function ReportsPageContent() {
       {insurance.length > 0 && (
         <div className="card">
           <SectionHeading>Insurance ({insurance.length} active policies)</SectionHeading>
-          <div className="text-[13px] text-gray-700 dark:text-gray-800 dark:text-slate-400 space-y-1">
+          <div className="text-[13px] text-[var(--text-secondary)] space-y-1">
             {insurance.map((p) => (
               <div key={p.id}>
-                <span className="text-slate-900 dark:text-slate-200">{p.policy_type ?? "Policy"}</span>
+                <span className="text-slate-900">{p.policy_type ?? "Policy"}</span>
                 {" — "}
                 {p.carrier ?? "Unknown carrier"}
                 {p.annual_premium ? ` — ${fmtDollar(p.annual_premium)}/yr` : ""}
@@ -1164,7 +1164,7 @@ function ReportsPageContent() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
           <div className="card max-w-lg w-full">
             <div className="text-[15px] font-semibold text-slate-100 mb-1">Share with Lender</div>
-            <p className="text-[12px] text-gray-700 dark:text-gray-800 dark:text-slate-400 mb-4">
+            <p className="text-[12px] text-[var(--text-secondary)] mb-4">
               This secure link expires on {shareExpires} (7 days).
             </p>
             <div className="flex gap-2">
@@ -1172,7 +1172,7 @@ function ReportsPageContent() {
                 type="text"
                 readOnly
                 value={shareUrl}
-                className="flex-1 bg-[var(--bg-input)] dark:bg-[#1e2a3a] border border-[var(--border2)] dark:border-white/[0.08] rounded-lg px-3 py-2 text-[12px] text-[var(--text-primary)] dark:text-gray-800 dark:text-slate-300"
+                className="flex-1 bg-[var(--bg-input)] border border-[var(--border2)] rounded-lg px-3 py-2 text-[12px] text-[var(--text-primary)]"
               />
               <button type="button" className="btn-primary text-[12px] px-4" onClick={handleCopyLink}>
                 {copied ? "Copied!" : "Copy"}

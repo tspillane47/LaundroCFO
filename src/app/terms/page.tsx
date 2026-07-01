@@ -140,12 +140,12 @@ const sections = [
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0d1520]">
+    <div className="min-h-screen bg-[var(--bg-page)]">
       <div className="max-w-3xl mx-auto px-6 py-12">
         <div className="mb-8">
           <TermsBackLink />
           <h1 className="text-[28px] font-bold text-slate-100 mb-2">Terms of Service</h1>
-          <p className="text-[14px] text-gray-700 dark:text-gray-800 dark:text-slate-400">
+          <p className="text-[14px] text-[var(--text-secondary)]">
             Last updated: June 28, 2026
           </p>
         </div>
@@ -156,12 +156,12 @@ export default function TermsPage() {
           {sections.map((section) => (
             <section key={section.id} id={section.id}>
               <h2 className="text-[16px] font-semibold text-slate-100 mb-3">{section.title}</h2>
-              <div className="text-[14px] text-gray-700 dark:text-gray-800 dark:text-slate-400 leading-relaxed">{section.content}</div>
+              <div className="text-[14px] text-[var(--text-secondary)] leading-relaxed">{section.content}</div>
             </section>
           ))}
         </div>
 
-        <p className="text-center text-[12px] text-gray-700 dark:text-slate-600 mt-8">
+        <p className="text-center text-[12px] text-[var(--text-muted)] mt-8">
           Questions? Contact support@laundrocfo.com
         </p>
       </div>

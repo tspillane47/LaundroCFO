@@ -20,11 +20,11 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0d1520] flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="text-[22px] font-bold text-blue-300 mb-1">LaundroCFO</div>
-          <div className="text-gray-700 dark:text-slate-500 text-[13px]">Reset your password</div>
+          <div className="text-[var(--text-muted)] text-[13px]">Reset your password</div>
         </div>
         <div className="card space-y-4">
           {sent ? (
@@ -53,7 +53,7 @@ export default function ForgotPasswordPage() {
               </button>
             </>
           )}
-          <div className="text-center text-[12px] text-gray-700 dark:text-slate-500 pt-1">
+          <div className="text-center text-[12px] text-[var(--text-muted)] pt-1">
             <Link href="/login" className="text-blue-400 hover:text-blue-300">Back to sign in</Link>
           </div>
         </div>

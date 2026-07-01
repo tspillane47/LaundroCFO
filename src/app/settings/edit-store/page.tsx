@@ -131,7 +131,7 @@ function EditStoreForm() {
   if (fetching) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="text-gray-700 dark:text-slate-500 text-[13px]">Loading store data...</div>
+        <div className="text-[var(--text-muted)] text-[13px]">Loading store data...</div>
       </div>
     );
   }
@@ -140,7 +140,7 @@ function EditStoreForm() {
     <div className="max-w-md mx-auto">
       <div className="mb-6">
         <h1 className="text-[15px] font-semibold text-slate-100">Edit Store</h1>
-        <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-1">Update your store profile and financials</p>
+        <p className="text-[var(--text-muted)] text-[13px] mt-1">Update your store profile and financials</p>
       </div>
 
       <FormBanner message={message} />
@@ -303,7 +303,7 @@ export default function EditStorePage() {
     <Suspense
       fallback={
         <div className="flex items-center justify-center py-20">
-          <div className="text-gray-700 dark:text-slate-500 text-[13px]">Loading store data...</div>
+          <div className="text-[var(--text-muted)] text-[13px]">Loading store data...</div>
         </div>
       }
     >

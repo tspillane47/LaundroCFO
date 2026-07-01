@@ -160,13 +160,13 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
   const fmt = formatter ?? ((v: number) => fmtDollar(v));
   return (
-    <div className="bg-[var(--bg-card)] dark:bg-[#1e2a3a] border border-[var(--border)] dark:border-white/10 rounded-lg p-3 text-xs shadow-sm">
-      <div className="text-[var(--text-secondary)] dark:text-gray-800 dark:text-slate-400 mb-1">{label}</div>
+    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg p-3 text-xs shadow-sm">
+      <div className="text-[var(--text-secondary)] mb-1">{label}</div>
       {payload.map((entry) => (
         <div key={entry.name} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full" style={{ background: entry.color }} />
-          <span className="text-[var(--text-secondary)] dark:text-gray-800 dark:text-slate-300">{entry.name}:</span>
-          <span className="text-[var(--text-primary)] dark:text-slate-100 font-semibold">{fmt(entry.value)}</span>
+          <span className="text-[var(--text-secondary)]">{entry.name}:</span>
+          <span className="text-[var(--text-primary)] font-semibold">{fmt(entry.value)}</span>
         </div>
       ))}
     </div>
@@ -214,11 +214,11 @@ function RatioCard({ item }: { item: RatioBenchmark }) {
     <div className="card2">
       <div className="metric-label">{item.label}</div>
       <div className={clsx("text-[20px] font-bold tabular-nums", color)}>{display}</div>
-      <div className="text-[11px] text-gray-700 dark:text-slate-500 mt-1">Industry median: {benchDisplay}</div>
+      <div className="text-[11px] text-[var(--text-muted)] mt-1">Industry median: {benchDisplay}</div>
       <div className="progress-bar mt-3">
         <div className={clsx("h-full rounded-full", barColor)} style={{ width: `${progress}%` }} />
       </div>
-      <div className="flex justify-between text-[10px] text-gray-700 dark:text-slate-600 mt-1.5">
+      <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1.5">
         <span>Top 25%: {item.unit === "$" ? `$${Math.round(item.top25).toLocaleString()}` : item.unit === "x" ? fmtMultiple(item.top25) : fmtPct(item.top25)}</span>
         <span>Bottom 25%: {item.unit === "$" ? `$${Math.round(item.bottom25).toLocaleString()}` : item.unit === "x" ? fmtMultiple(item.bottom25) : fmtPct(item.bottom25)}</span>
       </div>
@@ -733,7 +733,7 @@ export default function FinancialsPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-[15px] font-semibold text-slate-100">Financials</h1>
-        <p className="text-[12px] text-gray-700 dark:text-slate-500 mt-1">
+        <p className="text-[12px] text-[var(--text-muted)] mt-1">
           {store?.name ?? selectedStore.name} — P&L, trends, ratios, bank import & QuickBooks
         </p>
       </div>
@@ -748,7 +748,7 @@ export default function FinancialsPage() {
       )}
 
       <div className="overflow-x-auto table-scroll flex gap-2 pb-1">
-        <div className="flex flex-wrap gap-1 border-b border-white/[0.06]">
+        <div className="flex flex-wrap gap-1border-b border-[var(--border)]">
           {TABS.map((tab) => (
             <button
               key={tab.id}
@@ -758,7 +758,7 @@ export default function FinancialsPage() {
                 "px-4 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
                 activeTab === tab.id
                   ? "border-blue-500 text-blue-400"
-                  : "border-transparent text-gray-700 dark:text-gray-800 dark:text-slate-300 hover:text-slate-900 dark:hover:text-gray-800 dark:text-slate-300"
+                  : "border-transparent text-[var(--text-secondary)] hover:text-slate-900"
               )}
             >
               {tab.label}
@@ -785,7 +785,7 @@ export default function FinancialsPage() {
                 <DisclaimerLabel>TTM EBITDA</DisclaimerLabel>
               </div>
               <div className="metric-value">{fmtDollar(ttm.ttmEbitda || 0)}</div>
-              <div className="text-[12px] mt-1 text-gray-700 dark:text-slate-500">
+              <div className="text-[12px] mt-1 text-[var(--text-muted)]">
                 Earnings before interest, taxes, depreciation, amortization
               </div>
             </div>
@@ -797,7 +797,7 @@ export default function FinancialsPage() {
               <div className={clsx("metric-value", !hasScheduledDebt && "text-green-400")}>
                 {formatDscrDisplay(displayDscr, scheduledAnnualDebtService)}
               </div>
-              <div className="text-[12px] mt-1 text-gray-700 dark:text-slate-500">Net cash flow ÷ annual debt service</div>
+              <div className="text-[12px] mt-1 text-[var(--text-muted)]">Net cash flow ÷ annual debt service</div>
               {hasScheduledDebt && displayDscr != null ? (
                 <div
                   className={clsx(
@@ -825,7 +825,7 @@ export default function FinancialsPage() {
                 />
               </div>
               <div className="metric-value">{fmtDollar(ttm.ttmNoi || 0)}</div>
-              <div className="text-[12px] mt-1 text-gray-700 dark:text-slate-500">Net operating income after rent and operating expenses</div>
+              <div className="text-[12px] mt-1 text-[var(--text-muted)]">Net operating income after rent and operating expenses</div>
             </div>
           </div>
 
@@ -866,8 +866,8 @@ export default function FinancialsPage() {
                             isSelected
                               ? "bg-blue-600/20 border-blue-500/40 text-blue-300"
                               : hasData
-                                ? "bg-[var(--bg-page)] dark:bg-[#243347] border-[var(--border2)] dark:border-white/10 text-[var(--text-primary)] dark:text-gray-800 dark:text-slate-300 hover:border-blue-500/30"
-                                : "bg-transparent border-[var(--border)] dark:border-white/[0.06] text-[var(--text-secondary)] dark:text-slate-600 hover:text-[var(--text-primary)] dark:hover:text-gray-800 dark:text-slate-400"
+                                ? "bg-[var(--bg-page)] border-[var(--border2)] text-[var(--text-primary)] hover:border-blue-500/30"
+                                : "bg-transparent border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                           )}
                         >
                           {label}
@@ -945,7 +945,7 @@ export default function FinancialsPage() {
             <div className="table-scroll">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="text-left text-gray-700 dark:text-gray-800 dark:text-gray-300 border-b border-white/[0.06]">
+                <tr className="text-left text-[var(--text-secondary)]border-b border-[var(--border)]">
                   <th className="pb-3 pr-3 font-medium">Month</th>
                   <th className="pb-3 pr-3 font-medium text-right">Revenue</th>
                   <th className="pb-3 pr-3 font-medium text-right">Expenses</th>
@@ -960,49 +960,49 @@ export default function FinancialsPage() {
                   <tr
                     key={i}
                     className={clsx(
-                      "border-b border-white/[0.04] cursor-pointer hover:bg-white/[0.02]",
+                      "border-b border-[var(--border)] cursor-pointer hover:bg-[var(--bg-card2)]",
                       selectedMonth === i + 1 && "bg-blue-500/5"
                     )}
                     onClick={() => setSelectedMonth(i + 1)}
                   >
-                    <td className="py-2.5 pr-3 text-gray-900 dark:text-white">{MONTH_NAMES[i]}</td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
+                    <td className="py-2.5 pr-3 text-[var(--text-primary)]">{MONTH_NAMES[i]}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">
                       {r ? fmtDollar(r.revenue) : "—"}
                     </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">
                       {r ? fmtDollar(r.totalExpenses) : "—"}
                     </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-green-600 dark:text-green-400">
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-success)]">
                       {r ? fmtDollar(r.ebitda) : "—"}
                     </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">
                       {r ? fmtPct(r.ebitdaMargin) : "—"}
                     </td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-primary)]">
                       {r ? fmtDollar(r.debt_service) : "—"}
                     </td>
-                    <td className="py-2.5 text-right tabular-nums text-blue-600 dark:text-blue-400">
+                    <td className="py-2.5 text-right tabular-nums text-[var(--accent-blue)]">
                       {r ? fmtDollar(r.noi) : "—"}
                     </td>
                   </tr>
                 ))}
                 {yearTotals && (
-                  <tr className="font-semibold bg-[var(--bg-page)] dark:bg-[#243347]/50">
-                    <td className="py-3 pr-3 text-gray-900 dark:text-white">Total</td>
-                    <td className="py-3 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(yearTotals.revenue)}</td>
-                    <td className="py-3 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
+                  <tr className="font-semibold bg-[var(--bg-page)]/50">
+                    <td className="py-3 pr-3 text-[var(--text-primary)]">Total</td>
+                    <td className="py-3 pr-3 text-right tabular-nums text-[var(--text-primary)]">{fmtDollar(yearTotals.revenue)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums text-[var(--text-primary)]">
                       {fmtDollar(yearTotals.totalExpenses)}
                     </td>
-                    <td className="py-3 pr-3 text-right tabular-nums text-green-600 dark:text-green-400">
+                    <td className="py-3 pr-3 text-right tabular-nums text-[var(--text-success)]">
                       {fmtDollar(yearTotals.ebitda)}
                     </td>
-                    <td className="py-3 pr-3 text-right tabular-nums text-gray-900 dark:text-white">
+                    <td className="py-3 pr-3 text-right tabular-nums text-[var(--text-primary)]">
                       {yearTotals.revenue > 0
                         ? fmtPct((yearTotals.ebitda / yearTotals.revenue) * 100)
                         : "—"}
                     </td>
-                    <td className="py-3 pr-3 text-right tabular-nums text-gray-900 dark:text-white">{fmtDollar(yearTotals.debt_service)}</td>
-                    <td className="py-3 text-right tabular-nums text-blue-600 dark:text-blue-400">{fmtDollar(yearTotals.noi)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums text-[var(--text-primary)]">{fmtDollar(yearTotals.debt_service)}</td>
+                    <td className="py-3 text-right tabular-nums text-[var(--accent-blue)]">{fmtDollar(yearTotals.noi)}</td>
                   </tr>
                 )}
               </tbody>
@@ -1089,7 +1089,7 @@ export default function FinancialsPage() {
           </div>
 
           {trendChartData.length === 0 ? (
-            <div className="card text-center py-10 text-[14px] text-gray-700 dark:text-slate-500">
+            <div className="card text-center py-10 text-[14px] text-[var(--text-muted)]">
               Add monthly data on the P&L tab to see trends.
             </div>
           ) : (
@@ -1149,7 +1149,7 @@ export default function FinancialsPage() {
               <div className="card">
                 <div className="section-title">
                   EBITDA Margin Trend
-                  <span className="text-[11px] text-gray-700 dark:text-slate-600 font-normal ml-auto">22% industry median reference</span>
+                  <span className="text-[11px] text-[var(--text-muted)] font-normal ml-auto">22% industry median reference</span>
                 </div>
                 <div className="h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -1203,14 +1203,14 @@ export default function FinancialsPage() {
                 <div className={clsx("text-[20px] font-bold", ratioStatusColor(ratios.rentPct, { good: 12, warn: 15 }))}>
                   {fmtPct(ratios.rentPct)}
                 </div>
-                <div className="text-[11px] text-gray-700 dark:text-slate-500 mt-1">Target: below 15%</div>
+                <div className="text-[11px] text-[var(--text-muted)] mt-1">Target: below 15%</div>
               </div>
               <div className="card2">
                 <div className="metric-label">Occupancy Cost Ratio</div>
                 <div className={clsx("text-[20px] font-bold", ratioStatusColor(occupancyPct, { good: 15, warn: 20 }))}>
                   {fmtPct(occupancyPct)}
                 </div>
-                <div className="text-[11px] text-gray-700 dark:text-slate-500 mt-1">Rent as % of TTM revenue</div>
+                <div className="text-[11px] text-[var(--text-muted)] mt-1">Rent as % of TTM revenue</div>
               </div>
             </div>
             <div className="mt-4 progress-bar">
@@ -1222,12 +1222,12 @@ export default function FinancialsPage() {
                 style={{ width: `${Math.min(100, (occupancyPct / 25) * 100)}%` }}
               />
             </div>
-            <div className="flex justify-between text-[11px] text-gray-700 dark:text-slate-600 mt-2">
+            <div className="flex justify-between text-[11px] text-[var(--text-muted)] mt-2">
               <span>0%</span>
               <span>15% alert</span>
               <span>20% critical</span>
             </div>
-            <div className="mt-4 text-[12px] text-gray-700 dark:text-gray-800 dark:text-slate-400 leading-relaxed">
+            <div className="mt-4 text-[12px] text-[var(--text-secondary)] leading-relaxed">
               {occupancyPct <= 15
                 ? "Occupancy costs are healthy — well below the 20% lender alert threshold."
                 : occupancyPct <= 20
@@ -1244,7 +1244,7 @@ export default function FinancialsPage() {
           <div className="card flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="text-[14px] font-semibold text-slate-100">Import Bank Transactions</div>
-              <div className="text-[12px] text-gray-700 dark:text-slate-500 mt-1">
+              <div className="text-[12px] text-[var(--text-muted)] mt-1">
                 Upload a CSV with Date, Description, and Amount columns. Transactions are parsed client-side.
               </div>
             </div>
@@ -1273,19 +1273,19 @@ export default function FinancialsPage() {
           <div className="card">
             <div className="section-title">
               Transaction Review
-              <span className="text-[11px] text-gray-700 dark:text-slate-600 font-normal ml-auto">
+              <span className="text-[11px] text-[var(--text-muted)] font-normal ml-auto">
                 {reviewCount} pending
               </span>
             </div>
             {reviewCount === 0 ? (
-              <p className="text-[13px] text-gray-700 dark:text-slate-500 py-6 text-center">
+              <p className="text-[13px] text-[var(--text-muted)] py-6 text-center">
                 No transactions to review. Upload a CSV to get started.
               </p>
             ) : (
               <div className="table-scroll">
               <table className="w-full text-[12px]">
                 <thead>
-                  <tr className="text-left text-gray-700 dark:text-gray-800 dark:text-gray-300 border-b border-white/[0.06]">
+                  <tr className="text-left text-[var(--text-secondary)]border-b border-[var(--border)]">
                     <th className="pb-3 pr-3 font-medium">Date</th>
                     <th className="pb-3 pr-3 font-medium">Description</th>
                     <th className="pb-3 pr-3 font-medium text-right">Amount</th>
@@ -1296,12 +1296,12 @@ export default function FinancialsPage() {
                 </thead>
                 <tbody>
                   {stagedTransactions.map((txn) => (
-                    <tr key={txn.tempId} className="border-b border-white/[0.04]">
-                      <td className="py-3 pr-3 text-gray-900 dark:text-white whitespace-nowrap">
+                    <tr key={txn.tempId} className="border-b border-[var(--border)]">
+                      <td className="py-3 pr-3 text-[var(--text-primary)] whitespace-nowrap">
                         {new Date(txn.transaction_date + "T12:00:00").toLocaleDateString()}
                       </td>
-                      <td className="py-3 pr-3 text-gray-900 dark:text-white max-w-[200px] truncate">{txn.description ?? "—"}</td>
-                      <td className={clsx("py-3 pr-3 text-right font-semibold tabular-nums", txn.amount < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>
+                      <td className="py-3 pr-3 text-[var(--text-primary)] max-w-[200px] truncate">{txn.description ?? "—"}</td>
+                      <td className={clsx("py-3 pr-3 text-right font-semibold tabular-nums", txn.amount < 0 ? "text-[var(--text-danger)]" : "text-[var(--text-success)]")}>
                         {fmtDollar(txn.amount)}
                       </td>
                       <td className="py-3 pr-3">
@@ -1341,12 +1341,12 @@ export default function FinancialsPage() {
                   {bankTransactions.map((txn) => {
                     const suggested = suggestTransactionCategory(txn.description);
                     return (
-                      <tr key={txn.id} className="border-b border-white/[0.04]">
-                        <td className="py-3 pr-3 text-gray-900 dark:text-white whitespace-nowrap">
+                      <tr key={txn.id} className="border-b border-[var(--border)]">
+                        <td className="py-3 pr-3 text-[var(--text-primary)] whitespace-nowrap">
                           {new Date(txn.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
                         </td>
-                        <td className="py-3 pr-3 text-gray-900 dark:text-white max-w-[200px] truncate">{txn.description ?? "—"}</td>
-                        <td className={clsx("py-3 pr-3 text-right font-semibold tabular-nums", txn.amount < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>
+                        <td className="py-3 pr-3 text-[var(--text-primary)] max-w-[200px] truncate">{txn.description ?? "—"}</td>
+                        <td className={clsx("py-3 pr-3 text-right font-semibold tabular-nums", txn.amount < 0 ? "text-[var(--text-danger)]" : "text-[var(--text-success)]")}>
                           {fmtDollar(txn.amount)}
                         </td>
                         <td className="py-3 pr-3">
@@ -1420,7 +1420,7 @@ export default function FinancialsPage() {
                 <div className="text-[14px] font-semibold text-slate-100">QuickBooks Online</div>
                 <span className="badge badge-amber text-[10px]">Not Connected</span>
               </div>
-              <div className="text-[12px] text-gray-700 dark:text-gray-800 dark:text-slate-400">
+              <div className="text-[12px] text-[var(--text-secondary)]">
                 Connect QuickBooks to automatically sync monthly revenue, expenses, and debt service.
               </div>
             </div>
@@ -1431,21 +1431,21 @@ export default function FinancialsPage() {
 
           <div className="card">
             <div className="section-title">Account Mapping</div>
-            <p className="text-[12px] text-gray-700 dark:text-slate-500 mb-4">
+            <p className="text-[12px] text-[var(--text-muted)] mb-4">
               Map QuickBooks accounts to LaundroCFO fields. Saved to{" "}
               <code className="text-blue-300 text-[11px] bg-blue-500/10 px-1 rounded">quickbooks_mapping</code>.
             </p>
             <div className="table-scroll">
               <table className="w-full text-[12px]">
                 <thead>
-                  <tr className="text-left text-gray-700 dark:text-gray-800 dark:text-gray-300 border-b border-white/[0.06]">
+                  <tr className="text-left text-[var(--text-secondary)]border-b border-[var(--border)]">
                     <th className="pb-3 pr-4 font-medium">QuickBooks Account</th>
                     <th className="pb-3 font-medium">LaundroCFO Field</th>
                   </tr>
                 </thead>
                 <tbody>
                   {qbMappings.map((row, idx) => (
-                    <tr key={idx} className="border-b border-white/[0.04]">
+                    <tr key={idx} className="border-b border-[var(--border)]">
                       <td className="py-2.5 pr-4">
                         <input
                           type="text"
@@ -1505,9 +1505,9 @@ export default function FinancialsPage() {
               {ROADMAP.map((item) => (
                 <div
                   key={item.feature}
-                  className="flex items-center justify-between py-2.5 border-b border-white/[0.04] last:border-b-0"
+                  className="flex items-center justify-between py-2.5border-b border-[var(--border)] last:border-b-0"
                 >
-                  <span className="text-[13px] text-slate-900 dark:text-gray-800 dark:text-slate-300">{item.feature}</span>
+                  <span className="text-[13px] text-[var(--text-secondary)]">{item.feature}</span>
                   {item.status === "live" ? (
                     <span className="badge badge-green text-[10px]">Live</span>
                   ) : (

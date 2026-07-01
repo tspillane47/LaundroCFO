@@ -1565,10 +1565,10 @@ function TransactionsPageContent() {
     const sample = rawDescription || "(no description)";
     return (
       <div className="min-w-0">
-        <div className="review-vendor-name truncate text-gray-900 dark:text-white" title={vendorPattern}>
+        <div className="review-vendor-name truncate text-[var(--text-primary)]" title={vendorPattern}>
           {vendorPattern}
         </div>
-        <div className="review-vendor-desc text-[10px] text-gray-700 dark:text-gray-800 dark:text-gray-300 truncate mt-0.5" title={sample}>
+        <div className="review-vendor-desc text-[10px] text-[var(--text-secondary)] truncate mt-0.5" title={sample}>
           {prefixSample && sample !== "(no description)" ? `e.g. ${sample}` : sample}
         </div>
       </div>
@@ -1578,7 +1578,7 @@ function TransactionsPageContent() {
   function renderGroupSubRow(item: ReviewRow) {
     const storedCategory = transactions.find((t) => t.id === item.id)?.category ?? null;
     return (
-      <tr key={`sub-${item.id}`} className="border-b border-white/[0.02] bg-white/[0.015]">
+      <tr key={`sub-${item.id}`} className="border-b border-[var(--border)] bg-[var(--bg-card2)]">
         <td className="py-2 pr-2 pl-2">
           <input
             type="checkbox"
@@ -1591,10 +1591,10 @@ function TransactionsPageContent() {
         </td>
         <td className="py-2 pr-3 pl-6">
           <div className="min-w-0">
-            <div className="text-gray-700 dark:text-gray-800 dark:text-gray-300 whitespace-nowrap text-[11px]">
+            <div className="text-[var(--text-secondary)] whitespace-nowrap text-[11px]">
               {new Date(item.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
             </div>
-            <div className="text-[11px] text-gray-900 dark:text-white truncate mt-0.5" title={item.description ?? undefined}>
+            <div className="text-[11px] text-[var(--text-primary)] truncate mt-0.5" title={item.description ?? undefined}>
               {item.description ?? "—"}
             </div>
           </div>
@@ -1603,7 +1603,7 @@ function TransactionsPageContent() {
           <TypeBadge type={item.type} />
         </td>
         <td className="py-2 pr-3" />
-        <td className="py-2 pr-3 text-right font-semibold tabular-nums text-[11px] text-gray-900 dark:text-white">{fmtDollar(item.amount)}</td>
+        <td className="py-2 pr-3 text-right font-semibold tabular-nums text-[11px] text-[var(--text-primary)]">{fmtDollar(item.amount)}</td>
         <td className="py-2 pr-3">
           <select
             value={item.category}
@@ -1670,7 +1670,7 @@ function TransactionsPageContent() {
     const expanded = expandedHistory.has(row.id);
     return (
       <>
-        <tr className="border-b border-white/[0.02]">
+        <tr className="border-b border-[var(--border)]">
           <td colSpan={colSpan} className="py-1 px-0">
             <button
               type="button"
@@ -1682,7 +1682,7 @@ function TransactionsPageContent() {
           </td>
         </tr>
         {expanded && (
-          <tr className="border-b border-white/[0.04] bg-white/[0.02]">
+          <tr className="border-b border-[var(--border)] bg-[var(--bg-card2)]">
             <td colSpan={colSpan} className="py-1 px-3">
               <AuditHistoryPanel
                 entries={auditLogsByTxn.get(row.id) ?? []}
@@ -1807,7 +1807,7 @@ function TransactionsPageContent() {
               "px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors",
               activeTab === tab
                 ? "bg-blue-500/20 text-adaptive-info border border-blue-500/30"
-                : "text-adaptive-muted border border-white/[0.06] hover:text-adaptive-secondary"
+                : "text-adaptive-muted border border-[var(--border)] hover:text-adaptive-secondary"
             )}
           >
             {label}
@@ -1876,7 +1876,7 @@ function TransactionsPageContent() {
         </div>
 
         {showManageRules && (
-          <div className="mb-4 p-4 rounded-lg bg-[var(--bg-page)] dark:bg-[#243347]/50 border border-[var(--border)] dark:border-white/[0.06]">
+          <div className="mb-4 p-4 rounded-lg bg-[var(--bg-page)]/50 border border-[var(--border)]">
             <div className="text-[13px] font-medium text-adaptive-secondary mb-3">Categorization Rules</div>
             {categorizationRules.length === 0 ? (
               <p className="text-[12px] text-adaptive-muted">
@@ -1889,7 +1889,7 @@ function TransactionsPageContent() {
                   return (
                     <div
                       key={rule.id}
-                      className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-white/[0.04] last:border-b-0"
+                      className="flex flex-wrap items-center justify-between gap-2 py-2border-b border-[var(--border)] last:border-b-0"
                     >
                       <div className="text-[12px] text-adaptive-secondary">
                         {isAmountRule ? (
@@ -1959,7 +1959,7 @@ function TransactionsPageContent() {
         )}
 
         {reviewRows.length > 0 && (
-          <div className="flex flex-wrap items-end gap-4 mb-4 p-3 rounded-lg border border-white/[0.06] bg-white/[0.02]">
+          <div className="flex flex-wrap items-end gap-4 mb-4 p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-card2)]">
             <div>
               <div className="metric-label mb-1.5">Vendor</div>
               <select
@@ -2037,7 +2037,7 @@ function TransactionsPageContent() {
           <div className="table-scroll">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="text-left text-gray-700 dark:text-gray-800 dark:text-gray-300 review-table-header">
+                <tr className="text-left text-[var(--text-secondary)] review-table-header">
                   <th className="pb-3 pr-2 font-medium w-8">
                     <input
                       type="checkbox"
@@ -2078,7 +2078,7 @@ function TransactionsPageContent() {
                             <button
                               type="button"
                               onClick={() => toggleGroupExpanded(group.groupKey)}
-                              className="text-gray-700 dark:text-gray-800 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white w-5 shrink-0 mt-0.5 text-[13px] leading-none"
+                              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] w-5 shrink-0 mt-0.5 text-[13px] leading-none"
                               aria-label={isExpanded ? "Collapse group" : "Expand group"}
                             >
                               {isExpanded ? "▾" : "▸"}
@@ -2096,8 +2096,8 @@ function TransactionsPageContent() {
                       <td className="py-3 pr-3">
                         <TypeBadge type={group.type} />
                       </td>
-                      <td className="py-3 pr-3 text-gray-700 dark:text-gray-800 dark:text-gray-300">{group.count}</td>
-                      <td className="py-3 pr-3 text-right font-semibold tabular-nums text-gray-900 dark:text-white">{fmtDollar(group.totalAmount)}</td>
+                      <td className="py-3 pr-3 text-[var(--text-secondary)]">{group.count}</td>
+                      <td className="py-3 pr-3 text-right font-semibold tabular-nums text-[var(--text-primary)]">{fmtDollar(group.totalAmount)}</td>
                       <td className="py-3 pr-3">
                         <select
                           value={group.category}
@@ -2113,7 +2113,7 @@ function TransactionsPageContent() {
                           ))}
                         </select>
                       </td>
-                      <td className="py-3 pr-3 text-gray-700 dark:text-gray-800 dark:text-gray-300 text-[11px]">—</td>
+                      <td className="py-3 pr-3 text-[var(--text-secondary)] text-[11px]">—</td>
                       <td className="py-3 text-right whitespace-nowrap">
                         <button
                           type="button"
@@ -2155,7 +2155,7 @@ function TransactionsPageContent() {
                       group.items.map((item) => renderGroupSubRow(item))}
                     {group.count === 1 && renderHistoryToggle(group.items[0], 8)}
                     {ruleFormKey === group.groupKey && (
-                      <tr className="border-b border-white/[0.04] bg-blue-500/5">
+                      <tr className="border-b border-[var(--border)] bg-blue-500/5">
                         <td colSpan={8} className="py-3 px-3">
                           <RuleFormPanel
                             type={group.type}
@@ -2187,7 +2187,7 @@ function TransactionsPageContent() {
           <div className="table-scroll">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="text-left text-gray-700 dark:text-gray-800 dark:text-gray-300 review-table-header">
+                <tr className="text-left text-[var(--text-secondary)] review-table-header">
                   <th className="pb-3 pr-2 font-medium w-8">
                     <input
                       type="checkbox"
@@ -2228,10 +2228,10 @@ function TransactionsPageContent() {
                             aria-label={`Select ${row.description ?? "transaction"}`}
                           />
                         </td>
-                        <td className="py-3 pr-3 whitespace-nowrap text-gray-900 dark:text-white">
+                        <td className="py-3 pr-3 whitespace-nowrap text-[var(--text-primary)]">
                           {new Date(row.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
                         </td>
-                        <td className="py-3 pr-3 text-gray-900 dark:text-white max-w-[180px]">
+                        <td className="py-3 pr-3 text-[var(--text-primary)] max-w-[180px]">
                           {renderVendorDescription(
                             normalizeVendorPattern(row.description) || "—",
                             row.description ?? "—"
@@ -2246,13 +2246,13 @@ function TransactionsPageContent() {
                         <td className="py-3 pr-3">
                           <TypeBadge type={row.type} />
                         </td>
-                        <td className="py-3 pr-3 text-right font-semibold tabular-nums text-gray-900 dark:text-white">{fmtDollar(row.amount)}</td>
+                        <td className="py-3 pr-3 text-right font-semibold tabular-nums text-[var(--text-primary)]">{fmtDollar(row.amount)}</td>
                         <td className="py-3 pr-3">
                           <StatusBadge status={row.status} excluded={row.excluded} />
                         </td>
                         <td className="py-3 pr-3">
                           {excluded ? (
-                            <span className="text-gray-700 dark:text-gray-800 dark:text-gray-300">
+                            <span className="text-[var(--text-secondary)]">
                               {row.original_category
                                 ? BANK_IMPORT_CATEGORY_LABELS[row.original_category as BankImportCategory] ??
                                   row.original_category
@@ -2363,7 +2363,7 @@ function TransactionsPageContent() {
                       </tr>
                       {renderHistoryToggle(row, colSpan)}
                       {ruleFormKey === row.id && activeTab === "needs_review" && (
-                        <tr className="border-b border-white/[0.04] bg-blue-500/5">
+                        <tr className="border-b border-[var(--border)] bg-blue-500/5">
                           <td colSpan={colSpan} className="py-3 px-3">
                             <RuleFormPanel
                               type={row.type}

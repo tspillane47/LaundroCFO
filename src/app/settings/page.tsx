@@ -293,7 +293,7 @@ export default function SettingsPage() {
   if (!selectedStore) {
     return (
       <div className="card text-center py-12">
-        <p className="text-gray-700 dark:text-gray-800 dark:text-slate-400 text-[14px]">Select a store from the dropdown above to manage settings.</p>
+        <p className="text-[var(--text-secondary)] text-[14px]">Select a store from the dropdown above to manage settings.</p>
       </div>
     );
   }
@@ -415,7 +415,7 @@ export default function SettingsPage() {
                     ["Commercial %", form.commercial_pct ? `${form.commercial_pct}%` : "—"],
                   ].map(([label, value]) => (
                     <div key={String(label)} className="flex justify-between py-2.5 text-[13px]">
-                      <span className="text-gray-700 dark:text-gray-800 dark:text-slate-400">{label}</span>
+                      <span className="text-[var(--text-secondary)]">{label}</span>
                       <span className="font-semibold text-slate-100">{value}</span>
                     </div>
                   ))}
@@ -516,7 +516,7 @@ export default function SettingsPage() {
                     ],
                   ].map(([label, value]) => (
                     <div key={String(label)} className="flex justify-between py-2.5 text-[13px]">
-                      <span className="text-gray-700 dark:text-gray-800 dark:text-slate-400">{label}</span>
+                      <span className="text-[var(--text-secondary)]">{label}</span>
                       <span className="font-semibold text-slate-100">{value}</span>
                     </div>
                   ))}
@@ -543,12 +543,12 @@ export default function SettingsPage() {
                   ["smsAlerts", "SMS Alerts"],
                 ] as const).map(([key, label]) => (
                   <label key={key} className="flex items-center justify-between py-2 text-[13px] cursor-pointer">
-                    <span className="text-gray-700 dark:text-gray-800 dark:text-slate-400">{label}</span>
+                    <span className="text-[var(--text-secondary)]">{label}</span>
                     <input
                       type="checkbox"
                       checked={notifications[key]}
                       onChange={(e) => setNotifications((n) => ({ ...n, [key]: e.target.checked }))}
-                      className="rounded border-[var(--border2)] dark:border-white/20 bg-[var(--bg-input)] dark:bg-[#1e2a3a]"
+                      className="rounded border-[var(--border2)] bg-[var(--bg-input)]"
                     />
                   </label>
                 ))}
@@ -580,8 +580,8 @@ export default function SettingsPage() {
                     ["SMS Alerts", notifications.smsAlerts],
                   ] as const).map(([label, on]) => (
                     <div key={label} className="flex justify-between py-2.5 text-[13px]">
-                      <span className="text-gray-700 dark:text-gray-800 dark:text-slate-400">{label}</span>
-                      <span className={on ? "text-green-400 font-semibold" : "text-gray-700 dark:text-slate-600"}>
+                      <span className="text-[var(--text-secondary)]">{label}</span>
+                      <span className={on ? "text-green-400 font-semibold" : "text-[var(--text-muted)]"}>
                         {on ? "Enabled" : "Disabled"}
                       </span>
                     </div>
@@ -634,7 +634,7 @@ export default function SettingsPage() {
                     ["Equipment Age Alert", "12 years avg"],
                   ].map(([label, value]) => (
                     <div key={label} className="flex justify-between py-2.5 text-[13px]">
-                      <span className="text-gray-700 dark:text-gray-800 dark:text-slate-400">{label}</span>
+                      <span className="text-[var(--text-secondary)]">{label}</span>
                       <span className="font-semibold text-slate-100">{value}</span>
                     </div>
                   ))}
@@ -657,7 +657,7 @@ export default function SettingsPage() {
                 ["Stores", String(stores.length)],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between py-2.5 text-[13px]">
-                  <span className="text-gray-700 dark:text-gray-800 dark:text-slate-400">{label}</span>
+                  <span className="text-[var(--text-secondary)]">{label}</span>
                   <span className="font-semibold text-slate-100">{value}</span>
                 </div>
               ))}

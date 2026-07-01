@@ -294,7 +294,7 @@ function calcDaysRemaining(expirationDate: string | null): number | null {
 }
 
 function daysColor(days: number | null): string {
-  if (days == null) return "text-gray-700 dark:text-gray-800 dark:text-slate-400";
+  if (days == null) return "text-[var(--text-secondary)]";
   if (days < 0) return "text-red-400";
   if (days < 60) return "text-red-400";
   if (days < 90) return "text-amber-400";
@@ -367,7 +367,7 @@ function calcCoverageStatus(policies: InsurancePolicy[]): {
 function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-3">
-      <div className="text-[13px] font-semibold text-slate-900 dark:text-slate-200 border-b border-white/[0.06] pb-2">
+      <div className="text-[13px] font-semibold text-slate-900border-b border-[var(--border)] pb-2">
         {title}
       </div>
       {children}
@@ -403,13 +403,13 @@ function ToggleField({
 }) {
   return (
     <div className="flex items-center justify-between py-2">
-      <span className="text-[13px] text-slate-900 dark:text-gray-800 dark:text-slate-300">{label}</span>
+      <span className="text-[13px] text-[var(--text-secondary)]">{label}</span>
       <button
         type="button"
         onClick={() => onChange(!value)}
         className={clsx(
           "relative w-10 h-5 rounded-full transition-colors",
-          value ? "bg-blue-600" : "bg-[var(--border)] dark:bg-[#243347]"
+          value ? "bg-blue-600" : "bg-[var(--border)]"
         )}
       >
         <span
@@ -804,7 +804,7 @@ export default function InsurancePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[15px] font-semibold text-slate-100">Insurance Management</h1>
-            <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-0.5">
+            <p className="text-[var(--text-muted)] text-[13px] mt-0.5">
               {store?.name ?? "Store"} · {store?.address ?? "Address not set"}
             </p>
           </div>
@@ -829,7 +829,7 @@ export default function InsurancePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[15px] font-semibold text-slate-100">Insurance Management</h1>
-          <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-0.5">
+          <p className="text-[var(--text-muted)] text-[13px] mt-0.5">
             {store?.name ?? "Store"} · {store?.address ?? "Address not set"}
           </p>
         </div>
@@ -909,8 +909,8 @@ export default function InsurancePage() {
               <div className={clsx("text-[18px] font-bold", metrics.risk.color)}>
                 {metrics.risk.label}
               </div>
-              <div className="text-[12px] text-gray-700 dark:text-slate-500 mt-1">Score: {metrics.risk.score}/100</div>
-              <div className="text-[11px] text-gray-700 dark:text-slate-600 mt-2 leading-relaxed">
+              <div className="text-[12px] text-[var(--text-muted)] mt-1">Score: {metrics.risk.score}/100</div>
+              <div className="text-[11px] text-[var(--text-muted)] mt-2 leading-relaxed">
                 Based on coverage completeness, renewal timing, and liability limits.
               </div>
             </div>
@@ -1162,13 +1162,13 @@ export default function InsurancePage() {
                   {ADDITIONAL_COVERAGE_FIELDS.map(({ key, label }) => (
                     <label
                       key={key}
-                      className="flex items-center gap-2 text-[13px] text-slate-900 dark:text-gray-800 dark:text-slate-300 cursor-pointer"
+                      className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)] cursor-pointer"
                     >
                       <input
                         type="checkbox"
                         checked={policyForm[key] as boolean}
                         onChange={(e) => updatePolicyForm(key, e.target.checked as PolicyForm[typeof key])}
-                        className="rounded border-[var(--border2)] dark:border-white/20 bg-[var(--bg-input)] dark:bg-[#1e2a3a] text-blue-500"
+                        className="rounded border-[var(--border2)] bg-[var(--bg-input)] text-blue-500"
                       />
                       {label}
                     </label>
@@ -1219,7 +1219,7 @@ export default function InsurancePage() {
               </FormSection>
             </div>
 
-            <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-white/[0.06]">
+            <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-[var(--border)]">
               <button type="button" onClick={closePolicyForm} className="btn-outline">
                 Cancel
               </button>
@@ -1264,7 +1264,7 @@ export default function InsurancePage() {
                       <div className="text-[13px] font-semibold text-slate-100 mt-2">
                         {policy.carrier ?? "Unknown Carrier"}
                       </div>
-                      <div className="text-[11px] text-gray-700 dark:text-slate-500">
+                      <div className="text-[11px] text-[var(--text-muted)]">
                         #{policy.policy_number ?? "—"}
                       </div>
                     </div>
@@ -1276,25 +1276,25 @@ export default function InsurancePage() {
                     </div>
                   </div>
 
-                  <div className="space-y-1 text-[12px] border-t border-white/[0.04] pt-3">
+                  <div className="space-y-1 text-[12px] border-t border-[var(--border)] pt-3">
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-gray-800 dark:text-gray-300">Effective</span>
-                      <span className="text-gray-900 dark:text-white">{formatDate(policy.effective_date)}</span>
+                      <span className="text-[var(--text-secondary)]">Effective</span>
+                      <span className="text-[var(--text-primary)]">{formatDate(policy.effective_date)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-gray-800 dark:text-gray-300">Expiration</span>
-                      <span className="text-gray-900 dark:text-white">{formatDate(policy.expiration_date)}</span>
+                      <span className="text-[var(--text-secondary)]">Expiration</span>
+                      <span className="text-[var(--text-primary)]">{formatDate(policy.expiration_date)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-700 dark:text-gray-800 dark:text-gray-300">Annual Premium</span>
-                      <span className="text-gray-900 dark:text-white font-semibold">
+                      <span className="text-[var(--text-secondary)]">Annual Premium</span>
+                      <span className="text-[var(--text-primary)] font-semibold">
                         {formatCurrency(policy.annual_premium)}
                       </span>
                     </div>
                     {(policy.building_coverage || policy.contents_coverage || policy.equipment_coverage) && (
                       <div className="flex justify-between">
-                        <span className="text-gray-700 dark:text-gray-800 dark:text-gray-300">Property Coverage</span>
-                        <span className="text-gray-900 dark:text-white">
+                        <span className="text-[var(--text-secondary)]">Property Coverage</span>
+                        <span className="text-[var(--text-primary)]">
                           {formatCurrency(
                             (policy.building_coverage ?? 0) +
                               (policy.contents_coverage ?? 0) +
@@ -1305,8 +1305,8 @@ export default function InsurancePage() {
                     )}
                     {policy.liability_per_occurrence != null && (
                       <div className="flex justify-between">
-                        <span className="text-gray-700 dark:text-gray-800 dark:text-gray-300">Liability / Occurrence</span>
-                        <span className="text-gray-900 dark:text-white">
+                        <span className="text-[var(--text-secondary)]">Liability / Occurrence</span>
+                        <span className="text-[var(--text-primary)]">
                           {formatCurrency(policy.liability_per_occurrence)}
                         </span>
                       </div>
@@ -1335,10 +1335,10 @@ export default function InsurancePage() {
                   </div>
 
                   {viewClaimsPolicyId === policy.id && policyClaims.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-white/[0.04] space-y-2">
+                    <div className="mt-3 pt-3 border-t border-[var(--border)] space-y-2">
                       {policyClaims.map((c) => (
                         <div key={c.id} className="text-[11px] flex justify-between items-center">
-                          <span className="text-gray-700 dark:text-gray-800 dark:text-slate-400">
+                          <span className="text-[var(--text-secondary)]">
                             {formatDate(c.claim_date)} · {c.claim_type}
                           </span>
                           <span className={clsx("badge", claimStatusBadge(c.status))}>
@@ -1367,7 +1367,7 @@ export default function InsurancePage() {
 
         {showClaimForm && (
           <div className="card2 mb-4 space-y-3">
-            <div className="text-[13px] font-semibold text-slate-900 dark:text-slate-200">New Claim</div>
+            <div className="text-[13px] font-semibold text-slate-900">New Claim</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <FormField label="Policy">
                 <select
@@ -1453,7 +1453,7 @@ export default function InsurancePage() {
         )}
 
         {claims.length === 0 ? (
-          <div className="text-gray-700 dark:text-slate-500 text-[13px] py-4">No claims on file.</div>
+          <div className="text-[var(--text-muted)] text-[13px] py-4">No claims on file.</div>
         ) : (
           <div className="space-y-5">
             {policies.map((policy) => {
@@ -1461,7 +1461,7 @@ export default function InsurancePage() {
               if (!policyClaims || policyClaims.length === 0) return null;
               return (
                 <div key={policy.id}>
-                  <div className="text-[12px] font-semibold text-gray-700 dark:text-gray-800 dark:text-slate-400 mb-2 uppercase tracking-wider">
+                  <div className="text-[12px] font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wider">
                     {policy.policy_type} — {policy.carrier}
                   </div>
                   <div className="space-y-2">
@@ -1471,15 +1471,15 @@ export default function InsurancePage() {
                         className="card2 flex items-center justify-between gap-4"
                       >
                         <div className="min-w-0">
-                          <div className="text-[13px] text-gray-900 dark:text-white">
+                          <div className="text-[13px] text-[var(--text-primary)]">
                             {formatDate(claim.claim_date)} · {claim.claim_type}
                           </div>
-                          <div className="text-[12px] text-gray-700 dark:text-slate-500 truncate">
+                          <div className="text-[12px] text-[var(--text-muted)] truncate">
                             {claim.description ?? "No description"}
                           </div>
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
-                          <span className="text-[13px] font-semibold text-gray-900 dark:text-white">
+                          <span className="text-[13px] font-semibold text-[var(--text-primary)]">
                             {formatCurrency(claim.amount)}
                           </span>
                           <span className={clsx("badge", claimStatusBadge(claim.status))}>
@@ -1510,7 +1510,7 @@ export default function InsurancePage() {
               key={doc.label}
               className="card2 text-center py-6 border-dashed border-white/[0.12] relative overflow-hidden"
             >
-              <div className="text-[12px] font-semibold text-gray-700 dark:text-gray-800 dark:text-slate-400">{doc.label}</div>
+              <div className="text-[12px] font-semibold text-[var(--text-secondary)]">{doc.label}</div>
               <div className="mt-2">
                 <span className="badge badge-amber">Coming Soon</span>
               </div>

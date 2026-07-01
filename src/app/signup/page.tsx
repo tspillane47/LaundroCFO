@@ -61,14 +61,14 @@ export default function SignupPage() {
 
   if (pending) {
     return (
-      <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0d1520] flex items-center justify-center px-4">
+      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
           <h1 className="text-[28px] font-bold text-slate-100 mb-3">Check your email</h1>
-          <p className="text-[15px] text-gray-700 dark:text-gray-800 dark:text-slate-400 leading-relaxed mb-2">
+          <p className="text-[15px] text-[var(--text-secondary)] leading-relaxed mb-2">
             We sent a confirmation link to{" "}
             <span className="text-blue-300 font-medium">{pendingEmail}</span>.
           </p>
-          <p className="text-[15px] text-gray-700 dark:text-gray-800 dark:text-slate-400 leading-relaxed mb-8">
+          <p className="text-[15px] text-[var(--text-secondary)] leading-relaxed mb-8">
             Click the link to activate your account.
           </p>
 
@@ -89,12 +89,12 @@ export default function SignupPage() {
           <Link
             href="/signup"
             onClick={() => { setPending(false); setEmail(""); setPassword(""); }}
-            className="text-[13px] text-gray-700 dark:text-gray-800 dark:text-slate-300 hover:text-slate-900 dark:hover:text-gray-800 dark:text-slate-300"
+            className="text-[13px] text-[var(--text-secondary)] hover:text-slate-900"
           >
             Wrong email? Go back
           </Link>
 
-          <p className="text-[12px] text-gray-700 dark:text-slate-600 mt-6">
+          <p className="text-[12px] text-[var(--text-muted)] mt-6">
             Check your spam folder if you don&apos;t see it within a minute.
           </p>
         </div>
@@ -103,11 +103,11 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0d1520] flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="text-[22px] font-bold text-blue-300 mb-1">LaundroCFO</div>
-          <div className="text-gray-700 dark:text-slate-500 text-[13px]">Create your free account</div>
+          <div className="text-[var(--text-muted)] text-[13px]">Create your free account</div>
         </div>
         <div className="card space-y-4">
           {error && (
@@ -143,7 +143,7 @@ export default function SignupPage() {
               onChange={(e) => setTermsAccepted(e.target.checked)}
               className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500/30"
             />
-            <span className="text-[12px] text-gray-700 dark:text-gray-800 dark:text-slate-400 leading-relaxed group-hover:text-slate-900 dark:group-hover:text-gray-800 dark:text-slate-300">
+            <span className="text-[12px] text-[var(--text-secondary)] leading-relaxed group-hover:text-[var(--text-primary)]">
               I have read and agree to the{" "}
               <Link href="/terms" className="text-blue-400 hover:text-blue-300">
                 Terms of Service
@@ -162,7 +162,7 @@ export default function SignupPage() {
           >
             {loading ? "Creating account..." : "Create Account"}
           </button>
-          <div className="text-center text-[12px] text-gray-700 dark:text-slate-500 pt-1">
+          <div className="text-center text-[12px] text-[var(--text-muted)] pt-1">
             Already have an account?{" "}
             <Link href="/login" className="text-blue-400 hover:text-blue-300">Sign in</Link>
           </div>

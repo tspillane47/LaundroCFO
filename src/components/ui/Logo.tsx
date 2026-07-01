@@ -7,7 +7,7 @@ interface LogoProps {
   className?: string;
 }
 
-const ACCENT_CLASS = "text-emerald-400 dark:text-blue-400";
+const ACCENT_CLASS = "text-[var(--text-success)]";
 
 export function Logo({ variant = "marketing", iconSize, className }: LogoProps) {
   const size = iconSize ?? (variant === "sidebar" ? 20 : 24);

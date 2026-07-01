@@ -49,11 +49,11 @@ type BenchmarkRowData = {
   lowerIsBetter: boolean;
 };
 
-const GRADE_COLORS: Record<LetterGrade, { bg: string; text: string; darkBg: string }> = {
-  A: { bg: "bg-emerald-500", text: "text-white", darkBg: "dark:bg-emerald-400" },
-  B: { bg: "bg-blue-500", text: "text-white", darkBg: "dark:bg-blue-400" },
-  C: { bg: "bg-amber-500", text: "text-white", darkBg: "dark:bg-amber-400" },
-  D: { bg: "bg-red-500", text: "text-white", darkBg: "dark:bg-red-400" },
+const GRADE_COLORS: Record<LetterGrade, { bg: string; text: string }> = {
+  A: { bg: "bg-emerald-500", text: "text-white" },
+  B: { bg: "bg-blue-500", text: "text-white" },
+  C: { bg: "bg-amber-500", text: "text-white" },
+  D: { bg: "bg-red-500", text: "text-white" },
 };
 
 const GRADE_NUMERIC: Record<LetterGrade, number> = { A: 4, B: 3, C: 2, D: 1 };
@@ -148,13 +148,11 @@ function SlidingScale({
   return (
     <div
       className={clsx(
-        "rounded-xl border p-4",
-        "bg-white border-slate-200",
-        "dark:bg-[#111827] dark:border-slate-700/60",
+        "rounded-xl border p-4 bg-[var(--bg-card)] border-[var(--border)]",
         !hasData && "opacity-60"
       )}
     >
-      <div className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 mb-3">{metric}</div>
+      <div className="text-[13px] font-semibold text-[var(--text-secondary)] mb-3">{metric}</div>
 
       <div className="flex items-center gap-4">
         <div className="flex-1 min-w-0">
@@ -165,7 +163,7 @@ function SlidingScale({
                 className="absolute top-0 -translate-x-1/2 transition-all duration-[1200ms] ease-[cubic-bezier(0.34,1.2,0.64,1)]"
                 style={{ left: `${mounted ? dotPct : 0}%` }}
               >
-                <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-800 text-white dark:bg-white dark:text-slate-900 whitespace-nowrap">
+                <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[var(--bg-card2)] text-[var(--text-primary)] border border-[var(--border)] whitespace-nowrap">
                   {fmtVal(store)}
                 </span>
               </div>
@@ -181,7 +179,7 @@ function SlidingScale({
             >
               {/* Median tick */}
               <div
-                className="absolute top-[-2px] w-0.5 h-[calc(100%+4px)] bg-slate-400/60 dark:bg-slate-500/60"
+                className="absolute top-[-2px] w-0.5 h-[calc(100%+4px)] bg-[var(--text-muted)]/60"
                 style={{
                   left: `${max === min ? 50 : ((median - min) / (max - min)) * 100}%`,
                   transform: "translateX(-50%)",
@@ -192,20 +190,20 @@ function SlidingScale({
             {/* Dot marker */}
             {hasData ? (
               <div
-                className="absolute top-[26px] w-4 h-4 rounded-full -translate-x-1/2 bg-slate-800 dark:bg-white transition-all duration-[1200ms] ease-[cubic-bezier(0.34,1.2,0.64,1)] animate-pulse"
+                className="absolute top-[26px] w-4 h-4 rounded-full -translate-x-1/2 bg-[var(--text-primary)] transition-all duration-[1200ms] ease-[cubic-bezier(0.34,1.2,0.64,1)] animate-pulse"
                 style={{
                   left: `${mounted ? dotPct : 0}%`,
                   boxShadow: `0 0 8px 2px ${zoneColor.glow}, 0 0 16px 4px ${zoneColor.glow}`,
                 }}
               />
             ) : (
-              <div className="absolute top-[26px] left-0 text-[12px] text-slate-400 dark:text-slate-500 italic">
+              <div className="absolute top-[26px] left-0 text-[12px] text-[var(--text-muted)] italic">
                 Add data
               </div>
             )}
 
             {/* Tick labels */}
-            <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-3">
+            <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-3">
               <span>Worst 25% — {fmtVal(worstVal)}</span>
               <span>Median — {fmtVal(median)}</span>
               <span>Best 25% — {fmtVal(bestVal)}</span>
@@ -220,7 +218,6 @@ function SlidingScale({
               className={clsx(
                 "w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold",
                 GRADE_COLORS[grade].bg,
-                GRADE_COLORS[grade].darkBg,
                 GRADE_COLORS[grade].text
               )}
             >
@@ -230,7 +227,7 @@ function SlidingScale({
           <div
             className={clsx(
               "text-[18px] font-bold tabular-nums text-right leading-tight",
-              hasData ? "text-slate-900 dark:text-white" : "text-slate-400 dark:text-slate-600"
+              hasData ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
             )}
           >
             {hasData ? fmtVal(store) : "—"}
@@ -264,30 +261,28 @@ function NetworkBenchmarkingSection({
 
   return (
     <div>
-      <h2 className="text-[13px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
+      <h2 className="text-[13px] font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-3">
         Network Benchmarking
       </h2>
       <div
         className={clsx(
-          "rounded-xl border p-6",
-          "bg-white border-slate-200",
-          "dark:bg-[#111827] dark:border-slate-700/60"
+          "rounded-xl border p-6 bg-[var(--bg-card)] border-[var(--border)]"
         )}
       >
         {thresholdMet ? (
           <div className="space-y-4">
             <div>
-              <h3 className="text-[16px] font-semibold text-slate-900 dark:text-white">
+              <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">
                 Network data available — coming soon
               </h3>
-              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+              <p className="text-[13px] text-[var(--text-secondary)] mt-2 leading-relaxed">
                 {count} LaundroCFO {count === 1 ? "store has" : "stores have"} opted in. Anonymized peer
                 comparisons will appear here as network benchmarking rolls out.
               </p>
             </div>
             {optedIn && (
-              <div className="flex items-center gap-2 text-[13px] text-emerald-600 dark:text-emerald-400">
-                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[12px]">
+              <div className="flex items-center gap-2 text-[13px] text-[var(--text-success)]">
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-[var(--text-success)] font-bold text-[12px]">
                   ✓
                 </span>
                 You are opted in — we will notify you when network benchmarking launches
@@ -297,33 +292,33 @@ function NetworkBenchmarkingSection({
         ) : (
           <div className="space-y-5">
             <div>
-              <h3 className="text-[16px] font-semibold text-slate-900 dark:text-white">
+              <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">
                 Compare Your Store Against Real Laundromats
               </h3>
-              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-2 leading-relaxed max-w-2xl">
+              <p className="text-[13px] text-[var(--text-secondary)] mt-2 leading-relaxed max-w-2xl">
                 Once 15 LaundroCFO stores opt in, you will be able to see how your store compares against
                 real anonymized peer data — not just industry averages. Be one of the first.
               </p>
             </div>
 
             <div>
-              <div className="flex items-center justify-between text-[12px] text-slate-500 dark:text-slate-400 mb-2">
+              <div className="flex items-center justify-between text-[12px] text-[var(--text-secondary)] mb-2">
                 <span>
                   {count} of {NETWORK_OPT_IN_THRESHOLD} stores needed
                 </span>
                 <span className="tabular-nums">{Math.round(progressPct)}%</span>
               </div>
-              <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+              <div className="h-2 rounded-full bg-[var(--bg-card2)] overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-blue-500/70 dark:bg-blue-400/70 transition-all duration-500"
+                  className="h-full rounded-full bg-[var(--accent-blue)]/70 transition-all duration-500"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
             </div>
 
             {optedIn ? (
-              <div className="flex items-center gap-2 text-[13px] text-emerald-600 dark:text-emerald-400">
-                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[12px]">
+              <div className="flex items-center gap-2 text-[13px] text-[var(--text-success)]">
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-[var(--text-success)] font-bold text-[12px]">
                   ✓
                 </span>
                 You are opted in — we will notify you when network benchmarking launches
@@ -334,9 +329,7 @@ function NetworkBenchmarkingSection({
                 onClick={onOptIn}
                 disabled={saving}
                 className={clsx(
-                  "inline-flex items-center justify-center px-4 py-2 rounded-lg text-[13px] font-semibold transition-colors",
-                  "bg-slate-900 text-white hover:bg-slate-800",
-                  "dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100",
+                  "inline-flex items-center justify-center px-4 py-2 rounded-lg text-[13px] font-semibold transition-colors btn-primary",
                   saving && "opacity-60 cursor-not-allowed"
                 )}
               >
@@ -668,8 +661,8 @@ function BenchmarkingPageContent() {
 
   if (stores.length === 0 || isAllStores || !selectedStore) {
     return (
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111827] text-center py-10">
-        <p className="text-[14px] text-slate-500 dark:text-slate-400">Select a store to see benchmarks</p>
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-center py-10">
+        <p className="text-[14px] text-[var(--text-secondary)]">Select a store to see benchmarks</p>
       </div>
     );
   }
@@ -679,35 +672,31 @@ function BenchmarkingPageContent() {
       className="min-h-full -m-4 sm:-m-6 p-4 sm:p-6 space-y-6"
       style={{ background: "var(--bg-page)" }}
     >
-      <style>{`
-        .dark [data-benchmark-page] { --benchmark-bg: #0a0f1a; }
-        [data-benchmark-page] { --benchmark-bg: var(--bg-page); }
-      `}</style>
       <div data-benchmark-page className="space-y-6" style={{ background: "var(--bg-page)" }}>
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
-            <h1 className="text-[20px] font-bold text-slate-900 dark:text-white tracking-tight">
+            <h1 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">
               Store vs Industry Benchmarks
             </h1>
             {lastUpdated && (
-              <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">
+              <p className="text-[12px] text-[var(--text-secondary)] mt-1">
                 Last updated: {lastUpdated}
                 {metrics?.storeName ? ` · ${metrics.storeName}` : ""}
               </p>
             )}
             {!lastUpdated && metrics?.storeName && (
-              <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">{metrics.storeName}</p>
+              <p className="text-[12px] text-[var(--text-secondary)] mt-1">{metrics.storeName}</p>
             )}
           </div>
           {allGrades.length > 0 && (
             <div className="flex items-center gap-3 shrink-0">
-              <span className="text-[12px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <span className="text-[12px] font-medium text-[var(--text-secondary)] uppercase tracking-wider">
                 Overall
               </span>
-              <div className="px-5 py-2.5 rounded-xl bg-slate-900 dark:bg-white/10 border border-slate-700/50 dark:border-white/10">
-                <span className="text-[28px] font-bold text-white dark:text-white leading-none tabular-nums">
+              <div className="px-5 py-2.5 rounded-xl bg-[var(--bg-card2)] border border-[var(--border)]">
+                <span className="text-[28px] font-bold text-[var(--text-primary)] leading-none tabular-nums">
                   {overallGrade}
                 </span>
               </div>
@@ -764,7 +753,7 @@ function BenchmarkingPageContent() {
 
         {/* Section 2 — Sliding Scales */}
         <div>
-          <h2 className="text-[13px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
+          <h2 className="text-[13px] font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-3">
             Detailed Metrics
           </h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -783,7 +772,7 @@ function BenchmarkingPageContent() {
         />
 
         {/* Footnote */}
-        <p className="text-[11px] text-slate-400 dark:text-slate-500 pt-2 border-t border-slate-200 dark:border-slate-700/50">
+        <p className="text-[11px] text-[var(--text-muted)] pt-2 border-t border-slate-200">
           Industry data sourced from Coin Laundry Association, LaundroCFO peer database (2024).
           Utility ratio uses trailing 12-month P&amp;L when available.
         </p>

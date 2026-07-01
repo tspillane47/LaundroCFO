@@ -19,11 +19,11 @@ export function MetricScorecard({ label, value, verdict, verdictLabel }: MetricS
 
   return (
     <div
-      className="rounded-lg border border-gray-200 bg-white p-4"
+      className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-4"
       style={{ borderLeftWidth: 4, borderLeftColor: accent }}
     >
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-[#374151]">{label}</div>
-      <div className="mt-1 mb-2 text-[28px] font-bold tabular-nums text-[#0f172a]">{value}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{label}</div>
+      <div className="mt-1 mb-2 text-[28px] font-bold tabular-nums text-[var(--text-primary)]">{value}</div>
       {displayVerdict ? (
         <div className="flex items-center gap-1.5">
           <span

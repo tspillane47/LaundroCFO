@@ -49,17 +49,17 @@ export default function AboutPage() {
           <h1 className="text-[36px] lg:text-[48px] font-bold text-white tracking-tight leading-tight mb-6">
             Built by people who understand laundromats and finance.
           </h1>
-          <p className="text-[18px] lg:text-[20px] text-gray-700 dark:text-gray-800 dark:text-slate-400 leading-relaxed">
+          <p className="text-[18px] lg:text-[20px] text-[var(--text-secondary)] leading-relaxed">
             LaundroCFO was created because laundromat owners deserve the same financial tools that large businesses
             take for granted.
           </p>
         </div>
       </section>
 
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-[var(--bg-page)]">
         <div className="max-w-3xl mx-auto px-6">
           <h2 className="text-[32px] font-bold text-slate-900 mb-6">Our Mission</h2>
-          <p className="text-[16px] text-gray-700 leading-relaxed">
+          <p className="text-[16px] text-[var(--text-secondary)] leading-relaxed">
             Laundromats are one of America&apos;s most resilient small businesses — recession-resistant, cash-flowing,
             and community-essential. But most owners manage them with spreadsheets, gut instinct, and outdated
             financial tools. LaundroCFO changes that. We built a platform that gives every laundromat owner, buyer,
@@ -76,27 +76,27 @@ export default function AboutPage() {
             {beliefs.map((item) => (
               <div
                 key={item.title}
-                className="p-8 rounded-2xl bg-white border border-slate-200 hover:shadow-lg transition-shadow"
+                className="p-8 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] hover:shadow-lg transition-shadow"
               >
                 <h3 className="text-[18px] font-bold text-slate-900 mb-3">{item.title}</h3>
-                <p className="text-[15px] text-gray-700 leading-relaxed">{item.description}</p>
+                <p className="text-[15px] text-[var(--text-secondary)] leading-relaxed">{item.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-[var(--bg-page)]">
         <div className="max-w-7xl mx-auto px-6">
           <h2 className="text-[32px] font-bold text-slate-900 text-center mb-16">Who uses LaundroCFO</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {audiences.map((item) => (
               <div
                 key={item.title}
-                className="p-7 rounded-2xl bg-white border border-slate-200 hover:shadow-lg transition-shadow"
+                className="p-7 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] hover:shadow-lg transition-shadow"
               >
                 <h3 className="text-[16px] font-bold text-slate-900 mb-2">{item.title}</h3>
-                <p className="text-[13px] text-gray-700 leading-relaxed">{item.description}</p>
+                <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{item.description}</p>
               </div>
             ))}
           </div>

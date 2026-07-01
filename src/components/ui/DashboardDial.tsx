@@ -7,11 +7,11 @@ export type ColorZone = { start: number; end: number; color: string; darkGlow: s
 
 export type LetterGrade = "A" | "B" | "C" | "D";
 
-export const GRADE_COLORS: Record<LetterGrade, { bg: string; text: string; darkBg: string }> = {
-  A: { bg: "bg-emerald-500", text: "text-white", darkBg: "dark:bg-emerald-400" },
-  B: { bg: "bg-blue-500", text: "text-white", darkBg: "dark:bg-blue-400" },
-  C: { bg: "bg-amber-500", text: "text-white", darkBg: "dark:bg-amber-400" },
-  D: { bg: "bg-red-500", text: "text-white", darkBg: "dark:bg-red-400" },
+export const GRADE_COLORS: Record<LetterGrade, { bg: string; text: string }> = {
+  A: { bg: "bg-emerald-500", text: "text-white" },
+  B: { bg: "bg-blue-500", text: "text-white" },
+  C: { bg: "bg-amber-500", text: "text-white" },
+  D: { bg: "bg-red-500", text: "text-white" },
 };
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
@@ -127,7 +127,7 @@ export function DashboardDial({
         stroke={hasData ? z.color : "#cbd5e1"}
         strokeWidth={strokeWidth}
         strokeLinecap="butt"
-        className={clsx(hasData && "dark:[filter:drop-shadow(0_0_6px_currentColor)]")}
+        className={clsx(hasData && "[filter:drop-shadow(0_0_6px_currentColor)]")}
         style={{ opacity: hasData ? 1 : 0.35 }}
       />
     );
@@ -138,12 +138,11 @@ export function DashboardDial({
       className={clsx(
         "rounded-2xl border flex flex-col items-center transition-colors",
         compact ? "p-3" : "p-5",
-        "bg-white border-slate-200",
-        "dark:bg-[#111827] dark:border-slate-700/60",
+        "bg-[var(--bg-card)] border-[var(--border)]",
         !hasData && "opacity-60"
       )}
     >
-      <div className="text-[13px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400 mb-1 text-center whitespace-nowrap">
+      <div className="text-[13px] font-semibold tracking-wide uppercase text-[var(--text-secondary)] mb-1 text-center whitespace-nowrap">
         {label}
       </div>
 
@@ -154,7 +153,7 @@ export function DashboardDial({
             fill="none"
             stroke="currentColor"
             strokeWidth={strokeWidth}
-            className="text-slate-100 dark:text-slate-800/80"
+            className="text-[var(--bg-card2)]"
             strokeLinecap="round"
           />
           {zoneArcs}
@@ -173,10 +172,10 @@ export function DashboardDial({
                 y2={cy}
                 strokeWidth={3}
                 strokeLinecap="round"
-                className="stroke-slate-800 dark:stroke-white"
+                className="stroke-[var(--text-primary)]"
                 style={{ filter: `drop-shadow(0 0 4px ${zoneGlow.glow})` }}
               />
-              <circle cx={cx} cy={cy} r={6} className="fill-slate-800 dark:fill-white" />
+              <circle cx={cx} cy={cy} r={6} className="fill-[var(--text-primary)]" />
             </g>
           )}
         </svg>
@@ -189,7 +188,7 @@ export function DashboardDial({
             <>
               <div
                 className={clsx(
-                  "font-bold leading-none text-slate-900 dark:text-white tabular-nums whitespace-nowrap",
+                  "font-bold leading-none text-[var(--text-primary)] tabular-nums whitespace-nowrap",
                   compact ? "text-[24px]" : "text-[32px]"
                 )}
               >
@@ -203,28 +202,27 @@ export function DashboardDial({
                     displayGrade in GRADE_COLORS
                       ? [
                           GRADE_COLORS[displayGrade as LetterGrade].bg,
-                          GRADE_COLORS[displayGrade as LetterGrade].darkBg,
                           GRADE_COLORS[displayGrade as LetterGrade].text,
                         ]
-                      : ["bg-slate-600", "dark:bg-slate-500", "text-white"]
+                      : ["bg-slate-600", "text-white"]
                   )}
                 >
                   {displayGrade}
                 </div>
               )}
               {potentialScore != null && potentialScore > (value ?? 0) && (
-                <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500 text-center max-w-[140px] leading-snug">
+                <p className="mt-2 text-[10px] text-[var(--text-muted)] text-center max-w-[140px] leading-snug">
                   Your score could reach {potentialScore} with complete data
                 </p>
               )}
             </>
           ) : (
-            <div className="text-[14px] font-medium text-slate-400 dark:text-slate-500 italic">Add data</div>
+            <div className="text-[14px] font-medium text-[var(--text-muted)] italic">Add data</div>
           )}
         </div>
       </div>
 
-      <div className="w-full flex justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-1 px-1">
+      <div className="w-full flex justify-between text-[10px] text-[var(--text-muted)] mt-1 px-1">
         <span className="text-left max-w-[80px] leading-tight">{worstLabel}</span>
         <span className="text-center">{medianLabel}</span>
         <span className="text-right max-w-[80px] leading-tight">{bestLabel}</span>

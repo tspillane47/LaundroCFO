@@ -141,13 +141,13 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-[var(--bg-card)] dark:bg-[#1e2a3a] border border-[var(--border)] dark:border-white/10 rounded-lg p-3 text-xs shadow-sm">
-      <div className="text-[var(--text-secondary)] dark:text-gray-800 dark:text-slate-400 mb-1">{label}</div>
+    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg p-3 text-xs shadow-sm">
+      <div className="text-[var(--text-secondary)] mb-1">{label}</div>
       {payload.map((entry) => (
         <div key={entry.name} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full" style={{ background: entry.color }} />
-          <span className="text-[var(--text-secondary)] dark:text-gray-800 dark:text-slate-300">{entry.name}:</span>
-          <span className="text-[var(--text-primary)] dark:text-slate-100 font-semibold">{fmtDollar(entry.value)}</span>
+          <span className="text-[var(--text-secondary)]">{entry.name}:</span>
+          <span className="text-[var(--text-primary)] font-semibold">{fmtDollar(entry.value)}</span>
         </div>
       ))}
     </div>
@@ -670,8 +670,8 @@ export default function UtilitiesPage() {
                         isSelected
                           ? "bg-blue-600/20 border-blue-500/40 text-adaptive-info"
                           : hasData
-                            ? "bg-[var(--bg-page)] dark:bg-[#243347] border-[var(--border2)] dark:border-white/10 text-[var(--text-primary)] dark:text-gray-800 dark:text-slate-300 hover:border-blue-500/30"
-                            : "bg-transparent border-white/[0.06] text-adaptive-muted hover:text-adaptive-muted"
+                            ? "bg-[var(--bg-page)] border-[var(--border2)] text-[var(--text-primary)] hover:border-blue-500/30"
+                            : "bg-transparent border-[var(--border)] text-adaptive-muted hover:text-adaptive-muted"
                       )}
                     >
                       {label}
@@ -953,7 +953,7 @@ export default function UtilitiesPage() {
         <div className="table-scroll">
           <table className="w-full text-[12px]">
             <thead>
-              <tr className="text-left text-adaptive-muted border-b border-white/[0.06]">
+              <tr className="text-left text-adaptive-mutedborder-b border-[var(--border)]">
                 <th className="pb-3 pr-3 font-medium">Month</th>
                 <th className="pb-3 pr-3 font-medium text-right">Water</th>
                 <th className="pb-3 pr-3 font-medium text-right">Gas</th>
@@ -972,7 +972,7 @@ export default function UtilitiesPage() {
                 return (
                   <tr
                     key={`${r.year}-${r.month}`}
-                    className="border-b border-white/[0.04] hover:bg-white/[0.02] cursor-pointer"
+                    className="border-b border-[var(--border)] hover:bg-[var(--bg-card2)] cursor-pointer"
                     onClick={() => openMonthForm(r.month)}
                   >
                     <td className="py-2.5 pr-3 text-adaptive-secondary">

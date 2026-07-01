@@ -40,12 +40,12 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
   }, [pathname]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col bg-[var(--bg-page)]">
       <header
         className={clsx(
           "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
           navSolid
-            ? "bg-white/95 backdrop-blur-md shadow-sm border-b border-slate-200/80"
+            ? "bg-[var(--bg-card)]/95 backdrop-blur-md shadow-sm border-b border-[var(--border)]"
             : "bg-transparent"
         )}
       >
@@ -61,7 +61,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
                 href={link.href}
                 className={clsx(
                   "text-[14px] font-medium transition-colors",
-                  navSolid ? "text-slate-600 hover:text-slate-900" : "text-gray-700 dark:text-gray-800 dark:text-slate-300 hover:text-white"
+                  navSolid ? "text-[var(--text-secondary)] hover:text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:text-white"
                 )}
               >
                 {link.label}
@@ -75,7 +75,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               className={clsx(
                 "px-4 py-2 rounded-lg text-[13px] font-semibold border transition-colors",
                 navSolid
-                  ? "border-slate-300 text-slate-700 hover:bg-slate-50"
+                  ? "border-[var(--border2)] text-[var(--text-secondary)] hover:bg-[var(--bg-card2)]"
                   : "border-white/30 text-white hover:bg-white/10"
               )}
             >
@@ -93,7 +93,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             type="button"
             className={clsx(
               "md:hidden p-2 rounded-lg transition-colors",
-              navSolid ? "text-slate-700 hover:bg-slate-100" : "text-white hover:bg-white/10"
+              navSolid ? "text-[var(--text-secondary)] hover:bg-[var(--bg-card2)]" : "text-white hover:bg-white/10"
             )}
             onClick={() => setMobileOpen((v) => !v)}
             aria-label="Toggle menu"
@@ -109,21 +109,21 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
         </div>
 
         {mobileOpen && (
-          <div className="md:hidden bg-white border-t border-slate-200 shadow-lg px-6 py-4 space-y-1">
+          <div className="md:hidden bg-[var(--bg-card)] border-t border-[var(--border)] shadow-lg px-6 py-4 space-y-1">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="block py-3 text-[15px] font-medium text-slate-700 hover:text-[#2563eb]"
+                className="block py-3 text-[15px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent-blue)]"
                 onClick={() => setMobileOpen(false)}
               >
                 {link.label}
               </Link>
             ))}
-            <div className="pt-4 flex flex-col gap-2 border-t border-slate-100 mt-2">
+            <div className="pt-4 flex flex-col gap-2 border-t border-[var(--border)] mt-2">
               <Link
                 href="/login"
-                className="w-full text-center py-2.5 rounded-lg text-[13px] font-semibold border border-slate-300 text-slate-700"
+                className="w-full text-center py-2.5 rounded-lg text-[13px] font-semibold border border-[var(--border2)] text-[var(--text-secondary)]"
                 onClick={() => setMobileOpen(false)}
               >
                 Sign In
@@ -147,7 +147,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10">
             <div>
               <div className="text-[20px] font-bold text-[#60a5fa] tracking-tight">LaundroCFO</div>
-              <p className="text-[14px] text-gray-700 dark:text-gray-800 dark:text-slate-400 mt-2 max-w-xs leading-relaxed">
+              <p className="text-[14px] text-[var(--text-secondary)] mt-2 max-w-xs leading-relaxed">
                 The financial operating system for laundromat owners, buyers, brokers, and lenders.
               </p>
             </div>
@@ -156,7 +156,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="text-[14px] text-gray-700 dark:text-gray-800 dark:text-slate-400 hover:text-white transition-colors"
+                  className="text-[14px] text-[var(--text-secondary)] hover:text-white transition-colors"
                 >
                   {link.label}
                 </Link>

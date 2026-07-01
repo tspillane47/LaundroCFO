@@ -367,9 +367,9 @@ function ScenariosPageContent() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-[15px] font-semibold text-gray-900 dark:text-slate-100">
+        <h1 className="text-[15px] font-semibold text-[var(--text-primary)]">
           Scenario Planner{" "}
-          <span className="text-[12px] text-gray-700 dark:text-slate-500 font-normal ml-2">
+          <span className="text-[12px] text-[var(--text-muted)] font-normal ml-2">
             {String(ctx.store.name ?? "Store")} — based on live financials
           </span>
         </h1>
@@ -380,7 +380,7 @@ function ScenariosPageContent() {
             "text-[12px] font-medium px-3 py-1.5 rounded-lg border transition-colors",
             compareMode
               ? "bg-blue-500/10 border-blue-500/40 text-blue-400"
-              : "border-[var(--border)] text-gray-700 dark:text-slate-400 hover:border-blue-500/30"
+              : "border-[var(--border)] text-[var(--text-secondary)] hover:border-blue-500/30"
           )}
         >
           {compareMode ? "Close Compare" : "Compare Scenarios"}
@@ -390,7 +390,7 @@ function ScenariosPageContent() {
       {/* Section 1 — Top Opportunities */}
       {topOpportunities.length > 0 && (
         <section className="card card-success">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-green-600 dark:text-green-400 mb-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-success)] mb-3">
             Your Top {topOpportunities.length} Opportunities
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -406,14 +406,14 @@ function ScenariosPageContent() {
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-lg">{opp.emoji}</span>
-                  <span className="text-[12px] font-bold text-gray-900 dark:text-slate-100">
+                  <span className="text-[12px] font-bold text-[var(--text-primary)]">
                     #{opp.rank} {opp.title}
                   </span>
                 </div>
-                <div className="text-[18px] font-bold text-green-500 dark:text-green-400">
+                <div className="text-[18px] font-bold text-[var(--text-success)]">
                   +{fmtDollar(opp.valueImpact)}
                 </div>
-                <p className="text-[11px] text-gray-600 dark:text-slate-400 mt-1.5 leading-relaxed">
+                <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 leading-relaxed">
                   {opp.opportunityReason}
                 </p>
               </div>
@@ -455,14 +455,14 @@ function ScenariosPageContent() {
 
         <div className="card xl:sticky xl:top-0 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
           <div className="flex items-start justify-between gap-2 mb-4">
-            <div className="text-[13px] font-bold text-gray-900 dark:text-slate-100">
+            <div className="text-[13px] font-bold text-[var(--text-primary)]">
               {liveScenario.emoji} {liveScenario.title}
             </div>
             <button
               type="button"
               onClick={handleSaveScenario}
               disabled={saving}
-              className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-[var(--border)] text-gray-700 dark:text-slate-400 hover:border-blue-500/40 hover:text-blue-400 transition-colors shrink-0 disabled:opacity-50"
+              className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-[var(--border)] text-[var(--text-secondary)] hover:border-blue-500/40 hover:text-blue-400 transition-colors shrink-0 disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save Scenario"}
             </button>
@@ -470,20 +470,20 @@ function ScenariosPageContent() {
 
           {/* Sliders */}
           <div className="space-y-4 mb-5 pb-5 border-b border-[var(--border)]">
-            <div className="text-[11px] text-gray-700 dark:text-slate-600 uppercase tracking-wider">
+            <div className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider">
               Adjust Assumptions
             </div>
             {sliders.length > 0 ? (
               sliders.map((slider) => <ScenarioSlider key={slider.label} {...slider} />)
             ) : (
-              <p className="text-[11px] text-gray-600 dark:text-slate-500">
+              <p className="text-[11px] text-[var(--text-secondary)]">
                 No adjustable inputs for this scenario.
               </p>
             )}
           </div>
 
           {/* Key Metrics Grid */}
-          <div className="text-[11px] text-gray-700 dark:text-slate-600 uppercase tracking-wider mb-2">
+          <div className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider mb-2">
             Key Metrics
           </div>
           <div className="grid grid-cols-2 gap-2 mb-4">
@@ -574,10 +574,10 @@ function ScenariosPageContent() {
             onClick={() => setSavedExpanded((v) => !v)}
             className="w-full flex items-center justify-between text-left"
           >
-            <span className="text-[13px] font-semibold text-gray-900 dark:text-slate-100">
+            <span className="text-[13px] font-semibold text-[var(--text-primary)]">
               Saved Scenarios ({savedScenarios.length})
             </span>
-            <span className="text-[11px] text-gray-600 dark:text-slate-500">
+            <span className="text-[11px] text-[var(--text-secondary)]">
               {savedExpanded ? "Collapse ▲" : "Expand ▼"}
             </span>
           </button>
@@ -621,7 +621,7 @@ function MetricTile({
           "text-[14px] font-bold tabular-nums",
           accent === "green" && "text-green-400",
           accent === "red" && "text-red-400",
-          !accent && "text-gray-900 dark:text-slate-100"
+          !accent && "text-[var(--text-primary)]"
         )}
       >
         {value}
@@ -693,14 +693,14 @@ function ComparePanel({
 
   return (
     <section className="card">
-      <div className="text-[13px] font-semibold text-gray-900 dark:text-slate-100 mb-4">
+      <div className="text-[13px] font-semibold text-[var(--text-primary)] mb-4">
         Side-by-Side Comparison
       </div>
       <div className="grid grid-cols-2 gap-3 mb-4">
         <select
           value={compareA}
           onChange={(e) => onCompareAChange(e.target.value)}
-          className="text-[12px] bg-[var(--bg-card2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-gray-900 dark:text-slate-100"
+          className="text-[12px] bg-[var(--bg-card2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-[var(--text-primary)]"
         >
           {scenarios.map((s) => (
             <option key={s.id} value={s.id}>
@@ -711,7 +711,7 @@ function ComparePanel({
         <select
           value={compareB}
           onChange={(e) => onCompareBChange(e.target.value)}
-          className="text-[12px] bg-[var(--bg-card2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-gray-900 dark:text-slate-100"
+          className="text-[12px] bg-[var(--bg-card2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-[var(--text-primary)]"
         >
           {scenarios.map((s) => (
             <option key={s.id} value={s.id}>
@@ -724,13 +724,13 @@ function ComparePanel({
         <table className="w-full text-[12px]">
           <thead>
             <tr className="border-b border-[var(--border)]">
-              <th className="text-left py-2 text-gray-600 dark:text-slate-500 font-medium">
+              <th className="text-left py-2 text-[var(--text-secondary)] font-medium">
                 Metric
               </th>
-              <th className="text-right py-2 text-gray-900 dark:text-slate-100 font-semibold">
+              <th className="text-right py-2 text-[var(--text-primary)] font-semibold">
                 {scenarioA.emoji} {scenarioA.title}
               </th>
-              <th className="text-right py-2 text-gray-900 dark:text-slate-100 font-semibold">
+              <th className="text-right py-2 text-[var(--text-primary)] font-semibold">
                 {scenarioB.emoji} {scenarioB.title}
               </th>
             </tr>
@@ -738,11 +738,11 @@ function ComparePanel({
           <tbody>
             {rows.map((row) => (
               <tr key={row.label} className="border-b border-[var(--border)] last:border-0">
-                <td className="py-2.5 text-gray-600 dark:text-slate-500">{row.label}</td>
-                <td className="py-2.5 text-right font-semibold text-gray-900 dark:text-slate-100 tabular-nums">
+                <td className="py-2.5 text-[var(--text-secondary)]">{row.label}</td>
+                <td className="py-2.5 text-right font-semibold text-[var(--text-primary)] tabular-nums">
                   {row.a}
                 </td>
-                <td className="py-2.5 text-right font-semibold text-gray-900 dark:text-slate-100 tabular-nums">
+                <td className="py-2.5 text-right font-semibold text-[var(--text-primary)] tabular-nums">
                   {row.b}
                 </td>
               </tr>
@@ -772,10 +772,10 @@ function SavedScenarioItem({
   return (
     <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-[var(--bg-card2)] border border-[var(--border)]">
       <div>
-        <div className="text-[12px] font-semibold text-gray-900 dark:text-slate-100">
+        <div className="text-[12px] font-semibold text-[var(--text-primary)]">
           {saved.scenario_name}
         </div>
-        <div className="text-[11px] text-gray-600 dark:text-slate-500 mt-0.5">
+        <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
           {new Date(saved.created_at).toLocaleDateString()} · Value{" "}
           {outputs.scenarioValue != null ? fmtDollar(outputs.scenarioValue) : "—"} · EBITDA{" "}
           {outputs.newEbitda != null ? fmtDollar(outputs.newEbitda) : "—"}
@@ -794,7 +794,7 @@ function SavedScenarioItem({
         <button
           type="button"
           onClick={onDelete}
-          className="text-[10px] text-gray-600 dark:text-slate-500 hover:text-red-400"
+          className="text-[10px] text-[var(--text-secondary)] hover:text-red-400"
         >
           Delete
         </button>
@@ -815,8 +815,8 @@ function ScenarioSlider({
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <label className="text-[11px] text-gray-700 dark:text-slate-500">{label}</label>
-        <span className="text-[12px] font-semibold text-gray-900 dark:text-slate-100 tabular-nums">
+        <label className="text-[11px] text-[var(--text-muted)]">{label}</label>
+        <span className="text-[12px] font-semibold text-[var(--text-primary)] tabular-nums">
           {format(value)}
         </span>
       </div>
@@ -830,10 +830,10 @@ function ScenarioSlider({
         className="scenario-slider"
       />
       <div className="flex justify-between mt-1">
-        <span className="text-[10px] text-gray-600 dark:text-slate-600 tabular-nums">
+        <span className="text-[10px] text-[var(--text-muted)] tabular-nums">
           {format(min)}
         </span>
-        <span className="text-[10px] text-gray-600 dark:text-slate-600 tabular-nums">
+        <span className="text-[10px] text-[var(--text-muted)] tabular-nums">
           {format(max)}
         </span>
       </div>
@@ -1006,23 +1006,23 @@ function ScenarioCard({
           className={clsx(
             "absolute top-2 right-2 text-[10px] font-bold px-1.5 py-0.5 rounded",
             rank <= 3 && !neg
-              ? "bg-amber-500/15 text-amber-500 dark:text-amber-400"
-              : "bg-[var(--bg-card2)] text-gray-600 dark:text-slate-500"
+              ? "bg-amber-500/15 text-[var(--text-warning)]"
+              : "bg-[var(--bg-card2)] text-[var(--text-secondary)]"
           )}
         >
           {formatRank(rank)}
         </span>
       )}
 
-      <div className="text-[13px] font-semibold text-gray-900 dark:text-slate-100 pr-10">
+      <div className="text-[13px] font-semibold text-[var(--text-primary)] pr-10">
         {scenario.emoji} {scenario.title}
       </div>
-      <div className="text-[11px] text-gray-700 dark:text-slate-500 mt-1">
+      <div className="text-[11px] text-[var(--text-muted)] mt-1">
         {scenario.description}
       </div>
 
       <div className="mt-4 pt-3 border-t border-[var(--border)]">
-        <div className="text-[10px] text-gray-700 dark:text-slate-600 uppercase tracking-wider">
+        <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">
           Value Impact
         </div>
         <div
@@ -1036,7 +1036,7 @@ function ScenarioCard({
         </div>
 
         {isInvestmentScenario(scenario.id) && scenario.paybackMonths != null && (
-          <div className="text-[11px] text-gray-600 dark:text-slate-500 mt-1.5">
+          <div className="text-[11px] text-[var(--text-secondary)] mt-1.5">
             Payback: {formatPayback(scenario.paybackMonths)}
           </div>
         )}

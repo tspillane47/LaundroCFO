@@ -646,8 +646,8 @@ function OnboardingContent() {
         .onboarding-confetti-piece { animation-name: onboarding-confetti-fall; animation-timing-function: linear; animation-iteration-count: infinite; }
       `}</style>
 
-      <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0f1e3d] flex flex-col">
-        <header className="sticky top-0 z-30 bg-[var(--bg-page)]/95 dark:bg-[#0f1e3d]/95 backdrop-blur border-b border-[var(--border)] dark:border-white/10">
+      <div className="min-h-screen bg-[var(--bg-page)] flex flex-col">
+        <header className="sticky top-0 z-30 bg-[var(--bg-page)]/95 backdrop-blur border-b border-[var(--border)]">
           <div className="max-w-3xl mx-auto px-4 pt-4 pb-3">
             <div className="flex items-center justify-between mb-3">
               <Logo variant="sidebar" />
@@ -660,7 +660,7 @@ function OnboardingContent() {
 
             {!showCompletion && (
               <>
-                <div className="h-1.5 rounded-full bg-[var(--border)] dark:bg-white/10 overflow-hidden mb-2">
+                <div className="h-1.5 rounded-full bg-[var(--border)]  overflow-hidden mb-2">
                   <div
                     className="h-full bg-blue-500 transition-all duration-500 ease-out"
                     style={{ width: `${progressPct}%` }}
@@ -697,7 +697,7 @@ function OnboardingContent() {
             <div
               key={showCompletion ? "complete" : `${step}-${slideKey}`}
               className={clsx(
-                "card bg-white dark:bg-[#152238] border border-[var(--border)] dark:border-white/10 shadow-sm relative z-10",
+                "card bg-[var(--bg-card)] border border-[var(--border)] shadow-sm relative z-10",
                 !showCompletion && slideClass
               )}
             >
@@ -744,7 +744,7 @@ function OnboardingContent() {
                         {FEATURES.map((feature) => (
                           <div
                             key={feature.label}
-                            className="rounded-xl p-4 bg-[var(--bg-page)] dark:bg-white/5 border border-[var(--border)] dark:border-white/10"
+                            className="rounded-xl p-4 bg-[var(--bg-page)]  border border-[var(--border)]"
                           >
                             <div className="mb-2 text-blue-500">
                               <NavIcon name={feature.icon} />
@@ -896,8 +896,8 @@ function OnboardingContent() {
                             className={clsx(
                               "rounded-xl border-2 px-4 py-5 text-[15px] font-semibold transition-colors min-h-[72px]",
                               form.occupancy === option.value
-                                ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                                : "border-[var(--border)] dark:border-white/10 text-[var(--text-secondary)] hover:border-blue-400/50"
+                                ? "border-blue-500 bg-blue-500/10 text-[var(--accent-blue)]"
+                                : "border-[var(--border)] text-[var(--text-secondary)] hover:border-blue-400/50"
                             )}
                           >
                             {option.label}
@@ -906,7 +906,7 @@ function OnboardingContent() {
                       </div>
 
                       {form.occupancy === "lease" && (
-                        <div className="space-y-4 border-t border-[var(--border)] dark:border-white/10 pt-5">
+                        <div className="space-y-4 border-t border-[var(--border)] pt-5">
                           <Field label="Monthly Rent">
                             <input
                               type="number"
@@ -942,7 +942,7 @@ function OnboardingContent() {
                       )}
 
                       {form.occupancy === "own" && (
-                        <div className="space-y-4 border-t border-[var(--border)] dark:border-white/10 pt-5">
+                        <div className="space-y-4 border-t border-[var(--border)] pt-5">
                           <Field label="Monthly Mortgage Payment">
                             <input
                               type="number"
@@ -1021,7 +1021,7 @@ function OnboardingContent() {
                         </Field>
                       </div>
 
-                      <div className="flex items-center justify-between mt-5 pt-4 border-t border-[var(--border)] dark:border-white/10">
+                      <div className="flex items-center justify-between mt-5 pt-4 border-t border-[var(--border)]">
                         <div>
                           <div className="text-[13px] font-medium text-[var(--text-primary)]">
                             High Speed Extract (200G+)
@@ -1062,7 +1062,7 @@ function OnboardingContent() {
                               "rounded-xl border-2 p-4 text-left transition-colors min-h-[88px]",
                               form.financialMode === option.value
                                 ? "border-blue-500 bg-blue-500/10"
-                                : "border-[var(--border)] dark:border-white/10 hover:border-blue-400/50"
+                                : "border-[var(--border)] hover:border-blue-400/50"
                             )}
                           >
                             <div className="text-[15px] font-semibold text-[var(--text-primary)] mb-1">
@@ -1074,7 +1074,7 @@ function OnboardingContent() {
                       </div>
 
                       {form.financialMode === "csv" && (
-                        <div className="rounded-lg border border-dashed border-[var(--border)] dark:border-white/20 p-5">
+                        <div className="rounded-lg border border-dashed border-[var(--border)] p-5">
                           <label className="block cursor-pointer">
                             <input
                               type="file"
@@ -1125,7 +1125,7 @@ function OnboardingContent() {
                   )}
 
                   {!showCompletion && step > 1 && (
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-8 pt-6 border-t border-[var(--border)] dark:border-white/10">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-8 pt-6 border-t border-[var(--border)]">
                       <button
                         type="button"
                         onClick={() => {

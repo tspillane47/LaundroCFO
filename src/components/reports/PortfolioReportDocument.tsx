@@ -1,4 +1,5 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+// PDF export always uses light/white styling (independent of app dark theme).
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import { DSCR_NO_DEBT_LABEL } from "@/lib/calculations";
 import type { PortfolioReportData } from "@/lib/getPortfolioReport";

@@ -202,7 +202,7 @@ export function CurrentMonthlyAveragesPanel({
         </div>
       </div>
 
-      <div className="rounded-lg bg-[var(--bg-page)] dark:bg-white/[0.03] border border-[var(--border)] dark:border-white/[0.06] px-4 py-1">
+      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-4 py-1">
         <HeroMetric
           label="Average Monthly EBITDA"
           value={fmtDollar(data.ebitda.monthly)}
@@ -232,7 +232,7 @@ export function CurrentMonthlyAveragesPanel({
         )}
       </div>
 
-      <div className="rounded-lg bg-[var(--bg-page)] dark:bg-white/[0.03] border border-[var(--border)] dark:border-white/[0.06] px-4 py-1">
+      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-4 py-1">
         <HeroMetric
           label="Surplus Cash Flow"
           value={fmtDollar(data.surplusCashFlow)}
@@ -241,7 +241,7 @@ export function CurrentMonthlyAveragesPanel({
         />
       </div>
 
-      <div className="rounded-lg bg-[var(--bg-page)] dark:bg-white/[0.03] border border-[var(--border)] dark:border-white/[0.06] px-4 py-1">
+      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-4 py-1">
         <HeroMetric
           label="Current DSCR (based on active loan terms)"
           value={formatDscrDisplay(data.dscr, data.debt.totalMonthlyDebtService * 12)}
@@ -260,7 +260,7 @@ export function CurrentMonthlyAveragesPanel({
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3 pt-1 border-t border-[var(--border)] dark:border-white/[0.06]">
+      <div className="flex items-center justify-between gap-3 pt-1 border-t border-[var(--border)]">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-adaptive-muted mb-1">
             Water KPI

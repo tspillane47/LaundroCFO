@@ -15,8 +15,8 @@ type DisclaimerProps = {
 };
 
 const variantStyles: Record<DisclaimerVariant, string> = {
-  valuation: "text-[10px] text-gray-700 dark:text-slate-500 leading-snug mt-1",
-  "report-footer": "text-[10px] text-gray-700 dark:text-slate-500 leading-snug",
+  valuation: "text-[10px] text-[var(--text-muted)] leading-snug mt-1",
+  "report-footer": "text-[10px] text-[var(--text-muted)] leading-snug",
   tooltip: "text-[11px] text-[var(--text-secondary)] leading-relaxed",
   full: "text-[13px] text-[var(--text-secondary)] leading-relaxed space-y-4",
 };

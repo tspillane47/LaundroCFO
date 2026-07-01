@@ -84,7 +84,7 @@ export function RuleApplyPrompt({
       )}
 
       {postPrompt && (
-        <div className="p-4 rounded-lg bg-[var(--bg-card)] dark:bg-[#243347]/80 border border-[var(--border)] dark:border-white/[0.08] text-[12px] text-[var(--text-primary)] dark:text-slate-200 shadow-sm">
+        <div className="p-4 rounded-lg bg-[var(--bg-card)]/80 border border-[var(--border)] text-[12px] text-[var(--text-primary)] shadow-sm">
           <p>
             Would you like to post all {postPrompt.count} transaction{postPrompt.count === 1 ? "" : "s"} to P&L
             now?

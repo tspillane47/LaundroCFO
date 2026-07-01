@@ -24,7 +24,7 @@ const subColors = {
   positive: "text-green-400",
   negative: "text-red-400",
   warning: "text-amber-400",
-  muted: "text-gray-700 dark:text-slate-500",
+  muted: "text-[var(--text-muted)]",
 };
 
 export function MetricCard({
@@ -60,7 +60,7 @@ export function MetricCard({
   );
 }
 
-export function SmallMetric({ label, value, color = "text-slate-900 dark:text-slate-100" }: {
+export function SmallMetric({ label, value, color = "text-slate-900" }: {
   label: string; value: string; color?: string;
 }) {
   return (

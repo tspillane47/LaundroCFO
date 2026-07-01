@@ -38,7 +38,7 @@ export function OccupancySelector({ saving, onSelect }: Props) {
       <h2 className="text-[16px] font-semibold text-slate-100 text-center mb-1">
         How does this laundromat occupy its space?
       </h2>
-      <p className="text-gray-700 dark:text-slate-500 text-[13px] text-center mb-6">
+      <p className="text-[var(--text-muted)] text-[13px] text-center mb-6">
         This determines which occupancy module we show — lease analysis or real estate ownership.
       </p>
 
@@ -55,18 +55,18 @@ export function OccupancySelector({ saving, onSelect }: Props) {
               "card2 text-left p-6 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
               hovered === opt.type
                 ? "border-blue-500/40 bg-blue-500/5"
-                : "hover:border-[var(--border2)] dark:hover:border-white/20 hover:bg-[var(--bg-page)] dark:hover:bg-white/[0.02]"
+                : "hover:border-[var(--border2)] hover:bg-[var(--bg-card2)]"
             )}
           >
             <div className="text-2xl mb-3">{opt.emoji}</div>
-            <div className="text-[14px] font-semibold text-[var(--text-primary)] dark:text-slate-100 mb-1.5">{opt.title}</div>
-            <p className="text-[12px] text-gray-700 dark:text-slate-500 leading-relaxed">{opt.description}</p>
+            <div className="text-[14px] font-semibold text-[var(--text-primary)] mb-1.5">{opt.title}</div>
+            <p className="text-[12px] text-[var(--text-muted)] leading-relaxed">{opt.description}</p>
           </button>
         ))}
       </div>
 
       {saving && (
-        <p className="text-center text-gray-700 dark:text-slate-500 text-[12px] mt-4">Saving selection...</p>
+        <p className="text-center text-[var(--text-muted)] text-[12px] mt-4">Saving selection...</p>
       )}
     </div>
   );

@@ -535,7 +535,7 @@ export default function PortfolioPage() {
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
             <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
-              <DisclaimerLabel className="!text-gray-800 dark:text-slate-300">EBITDA</DisclaimerLabel>
+              <DisclaimerLabel className="!text-[var(--text-secondary)]">EBITDA</DisclaimerLabel>
             </div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'white' }}>
               {aggregates.hasAnyFinancialData ? (
@@ -548,7 +548,7 @@ export default function PortfolioPage() {
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
             <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
-              <DisclaimerLabel className="!text-gray-800 dark:text-slate-300">Global DSCR</DisclaimerLabel>
+              <DisclaimerLabel className="!text-[var(--text-secondary)]">Global DSCR</DisclaimerLabel>
             </div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'white' }}>
               {aggregates.hasDebtData && aggregates.globalDSCR != null ? (

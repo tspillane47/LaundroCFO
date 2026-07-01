@@ -41,11 +41,11 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0d1520] flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="text-[22px] font-bold text-blue-300 mb-1">LaundroCFO</div>
-          <div className="text-gray-700 dark:text-slate-500 text-[13px]">Sign in to your account</div>
+          <div className="text-[var(--text-muted)] text-[13px]">Sign in to your account</div>
         </div>
         <div className="card space-y-4">
           {urlError === "verification_failed" && (
@@ -91,8 +91,8 @@ function LoginForm() {
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
-          <div className="flex justify-between text-[12px] text-gray-700 dark:text-slate-500 pt-1">
-            <Link href="/forgot-password" className="text-gray-700 dark:text-gray-800 dark:text-slate-300 hover:text-slate-900 dark:hover:text-gray-800 dark:text-slate-300">Forgot password?</Link>
+          <div className="flex justify-between text-[12px] text-[var(--text-muted)] pt-1">
+            <Link href="/forgot-password" className="text-[var(--text-secondary)] hover:text-slate-900">Forgot password?</Link>
           </div>
           <div className="text-center pt-2 border-t border-[var(--border)]">
             <Link href="/signup" className="text-[13px] text-blue-400 hover:text-blue-300 font-medium">
@@ -108,8 +108,8 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[var(--bg-page)] dark:bg-[#0d1520] flex items-center justify-center">
-        <div className="text-gray-700 dark:text-slate-500 text-[13px]">Loading...</div>
+      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center">
+        <div className="text-[var(--text-muted)] text-[13px]">Loading...</div>
       </div>
     }>
       <LoginForm />

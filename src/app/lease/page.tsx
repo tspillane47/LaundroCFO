@@ -139,8 +139,8 @@ export default function OccupancyPage() {
   if (!store) {
     return (
       <div className="card text-center py-12">
-        <div className="text-slate-900 dark:text-gray-800 dark:text-slate-300 text-[14px]">No store found.</div>
-        <p className="text-gray-700 dark:text-slate-500 text-[13px] mt-2">
+        <div className="text-[var(--text-secondary)] text-[14px]">No store found.</div>
+        <p className="text-[var(--text-muted)] text-[13px] mt-2">
           Complete onboarding to manage occupancy and real estate.
         </p>
       </div>
@@ -153,7 +153,7 @@ export default function OccupancyPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-[15px] font-semibold text-slate-100">Occupancy & Real Estate</h1>
-            <p className="text-gray-700 dark:text-slate-500 text-[14px] md:text-[13px] mt-0.5">
+            <p className="text-[var(--text-muted)] text-[14px] md:text-[13px] mt-0.5">
               {store.address ?? "Store address not set"}
             </p>
           </div>
@@ -186,10 +186,10 @@ export default function OccupancyPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-[15px] font-semibold text-slate-100">Occupancy & Real Estate</h1>
-          <p className="text-gray-700 dark:text-slate-500 text-[14px] md:text-[13px] mt-0.5">
+          <p className="text-[var(--text-muted)] text-[14px] md:text-[13px] mt-0.5">
             {store.address ?? "Store address not set"}
             {store.occupancy_type && !showSelector && (
-              <span className="text-gray-700 dark:text-slate-600"> · {OCCUPANCY_LABELS[store.occupancy_type]}</span>
+              <span className="text-[var(--text-muted)]"> · {OCCUPANCY_LABELS[store.occupancy_type]}</span>
             )}
           </p>
         </div>

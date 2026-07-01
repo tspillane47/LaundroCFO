@@ -232,7 +232,7 @@ export function Toast({ item, index, onDismiss }: ToastProps) {
           <button
             type="button"
             onClick={dismiss}
-            className="toast-dismiss absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center rounded-md opacity-0 transition-opacity duration-200 hover:bg-black/10 dark:hover:bg-white/10"
+            className="toast-dismiss absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center rounded-md opacity-0 transition-opacity duration-200 hover:bg-[var(--bg-card2)]"
             style={{ color: "var(--toast-text-muted)" }}
             aria-label="Dismiss notification"
           >

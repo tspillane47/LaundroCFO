@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from "react";
 
 export const INPUT_CLASS =
-  "w-full bg-[var(--bg-input)] border border-[var(--border2)] rounded-lg px-3 py-2.5 text-[14px] md:text-[13px] text-[var(--text-primary)] outline-none focus:border-[#1a2b3c] dark:border-white/10 dark:text-slate-100 dark:focus:border-blue-500 min-h-[44px]";
+  "w-full bg-[var(--bg-input)] border border-[var(--border2)] rounded-lg px-3 py-2.5 text-[14px] md:text-[13px] text-[var(--text-primary)] placeholder:text-[var(--input-placeholder)] outline-none focus:border-[var(--input-focus-border)] min-h-[44px]";
 
 export function preventEnterSubmit(e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) {
   if (e.key === "Enter") {
@@ -76,7 +76,7 @@ export function YesNoToggle({
           className={
             value
               ? "flex-1 py-2 rounded-lg text-[13px] font-semibold bg-blue-600/20 border border-blue-500/40 text-blue-300"
-              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[var(--bg-input)] dark:bg-[#1e2a3a] border border-[var(--border2)] dark:border-white/10 text-[var(--text-secondary)] dark:text-gray-800 dark:text-slate-400 hover:border-[var(--border)] dark:hover:border-white/20"
+              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[var(--bg-input)] border border-[var(--border2)] text-[var(--text-secondary)] hover:border-[var(--border)]"
           }
         >
           Yes
@@ -87,7 +87,7 @@ export function YesNoToggle({
           className={
             !value
               ? "flex-1 py-2 rounded-lg text-[13px] font-semibold bg-blue-600/20 border border-blue-500/40 text-blue-300"
-              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[var(--bg-input)] dark:bg-[#1e2a3a] border border-[var(--border2)] dark:border-white/10 text-[var(--text-secondary)] dark:text-gray-800 dark:text-slate-400 hover:border-[var(--border)] dark:hover:border-white/20"
+              : "flex-1 py-2 rounded-lg text-[13px] font-medium bg-[var(--bg-input)] border border-[var(--border2)] text-[var(--text-secondary)] hover:border-[var(--border)]"
           }
         >
           No
