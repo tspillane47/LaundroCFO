@@ -75,8 +75,32 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (user && (pathname === '/login' || pathname === '/signup')) {
-    return NextResponse.redirect(new URL('/portfolio', request.url))
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('onboarding_completed')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const onboardingCompleted = profile?.onboarding_completed === true
+
+    if (onboardingCompleted && pathname === '/onboarding') {
+      return NextResponse.redirect(new URL('/portfolio', request.url))
+    }
+
+    if (
+      !onboardingCompleted &&
+      pathname !== '/onboarding' &&
+      !isPublicRoute(pathname)
+    ) {
+      return NextResponse.redirect(new URL('/onboarding', request.url))
+    }
+
+    if (pathname === '/login' || pathname === '/signup') {
+      return NextResponse.redirect(
+        new URL(onboardingCompleted ? '/portfolio' : '/onboarding', request.url)
+      )
+    }
   }
 
   return response

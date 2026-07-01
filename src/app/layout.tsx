@@ -101,6 +101,80 @@ const pageTitles: Record<string, string> = {
 const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password", "/auth/callback"];
 const publicPages = ["/terms"];
 const marketingPages = ["/", "/about", "/pricing"];
+const onboardingExemptPaths = [
+  ...publicPages,
+  ...marketingPages,
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/auth/callback",
+  "/onboarding",
+];
+
+function OnboardingGuard({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
+  const [checked, setChecked] = useState(false);
+  const isExempt = onboardingExemptPaths.includes(pathname) || pathname.startsWith("/auth/callback");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkOnboarding() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (cancelled) return;
+
+      if (!user) {
+        setChecked(true);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_completed")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      const completed = profile?.onboarding_completed === true;
+
+      if (completed && pathname === "/onboarding") {
+        router.replace("/portfolio");
+        return;
+      }
+
+      if (!completed && !isExempt) {
+        router.replace("/onboarding");
+        return;
+      }
+
+      setChecked(true);
+    }
+
+    setChecked(false);
+    void checkOnboarding();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, isExempt, router, supabase]);
+
+  if (!checked && !isExempt) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center">
+        <div className="text-[13px] text-[var(--text-muted)]">Loading...</div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -731,7 +805,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     return (
       <html lang="en" className={isDark ? "dark" : ""}>
         <body>
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            <OnboardingGuard>{children}</OnboardingGuard>
+          </ToastProvider>
         </body>
       </html>
     );
@@ -742,7 +818,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <html lang="en" className={isDark ? "dark" : ""}>
         <body>
           <ToastProvider>
-            <StoreProvider>{children}</StoreProvider>
+            <OnboardingGuard>
+              <StoreProvider>{children}</StoreProvider>
+            </OnboardingGuard>
           </ToastProvider>
         </body>
       </html>
@@ -753,9 +831,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={isDark ? "dark" : ""}>
       <body>
         <ToastProvider>
-          <StoreProvider>
-            <AppShell>{children}</AppShell>
-          </StoreProvider>
+          <OnboardingGuard>
+            <StoreProvider>
+              <AppShell>{children}</AppShell>
+            </StoreProvider>
+          </OnboardingGuard>
         </ToastProvider>
       </body>
     </html>
