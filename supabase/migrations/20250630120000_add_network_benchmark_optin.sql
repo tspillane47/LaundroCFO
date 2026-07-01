@@ -1,5 +1,4 @@
--- Run in the Supabase SQL Editor.
--- Adds per-store opt-in for LaundroCFO Network Benchmarks (default: off).
+-- Per-store opt-in for LaundroCFO Network Benchmarking (default: off).
 
 alter table stores
   add column if not exists network_benchmark_opted_in boolean not null default false;

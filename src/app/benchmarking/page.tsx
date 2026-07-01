@@ -29,6 +29,7 @@ import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
 import { DesktopOnlyGate } from "@/components/ui/DesktopOnlyGate";
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
+import { useToast } from "@/components/ui/ToastProvider";
 import {
   DashboardDial,
   zoneLetterGrade,
@@ -240,6 +241,115 @@ function SlidingScale({
   );
 }
 
+const NETWORK_OPT_IN_THRESHOLD = 15;
+
+/* ─── Network Benchmarking ─── */
+
+type NetworkBenchmarkingSectionProps = {
+  optedIn: boolean;
+  optInCount: number | null;
+  saving: boolean;
+  onOptIn: () => void;
+};
+
+function NetworkBenchmarkingSection({
+  optedIn,
+  optInCount,
+  saving,
+  onOptIn,
+}: NetworkBenchmarkingSectionProps) {
+  const count = optInCount ?? 0;
+  const thresholdMet = count >= NETWORK_OPT_IN_THRESHOLD;
+  const progressPct = Math.min(100, (count / NETWORK_OPT_IN_THRESHOLD) * 100);
+
+  return (
+    <div>
+      <h2 className="text-[13px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
+        Network Benchmarking
+      </h2>
+      <div
+        className={clsx(
+          "rounded-xl border p-6",
+          "bg-white border-slate-200",
+          "dark:bg-[#111827] dark:border-slate-700/60"
+        )}
+      >
+        {thresholdMet ? (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-[16px] font-semibold text-slate-900 dark:text-white">
+                Network data available — coming soon
+              </h3>
+              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                {count} LaundroCFO {count === 1 ? "store has" : "stores have"} opted in. Anonymized peer
+                comparisons will appear here as network benchmarking rolls out.
+              </p>
+            </div>
+            {optedIn && (
+              <div className="flex items-center gap-2 text-[13px] text-emerald-600 dark:text-emerald-400">
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[12px]">
+                  ✓
+                </span>
+                You are opted in — we will notify you when network benchmarking launches
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-5">
+            <div>
+              <h3 className="text-[16px] font-semibold text-slate-900 dark:text-white">
+                Compare Your Store Against Real Laundromats
+              </h3>
+              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-2 leading-relaxed max-w-2xl">
+                Once 15 LaundroCFO stores opt in, you will be able to see how your store compares against
+                real anonymized peer data — not just industry averages. Be one of the first.
+              </p>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between text-[12px] text-slate-500 dark:text-slate-400 mb-2">
+                <span>
+                  {count} of {NETWORK_OPT_IN_THRESHOLD} stores needed
+                </span>
+                <span className="tabular-nums">{Math.round(progressPct)}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-blue-500/70 dark:bg-blue-400/70 transition-all duration-500"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+            </div>
+
+            {optedIn ? (
+              <div className="flex items-center gap-2 text-[13px] text-emerald-600 dark:text-emerald-400">
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[12px]">
+                  ✓
+                </span>
+                You are opted in — we will notify you when network benchmarking launches
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onOptIn}
+                disabled={saving}
+                className={clsx(
+                  "inline-flex items-center justify-center px-4 py-2 rounded-lg text-[13px] font-semibold transition-colors",
+                  "bg-slate-900 text-white hover:bg-slate-800",
+                  "dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100",
+                  saving && "opacity-60 cursor-not-allowed"
+                )}
+              >
+                {saving ? "Saving..." : "Opt In Early"}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Page ─── */
 
 export default function BenchmarkingPage() {
@@ -252,10 +362,14 @@ export default function BenchmarkingPage() {
 
 function BenchmarkingPageContent() {
   const supabase = createClient();
+  const toast = useToast();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [store, setStore] = useState<StoreFinancialProfile | null>(null);
+  const [networkOptedIn, setNetworkOptedIn] = useState(false);
+  const [networkOptInCount, setNetworkOptInCount] = useState<number | null>(null);
+  const [networkOptInSaving, setNetworkOptInSaving] = useState(false);
   const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
   const [records, setRecords] = useState<CalculatedMonthly[]>([]);
   const [annualDebtService, setAnnualDebtService] = useState(0);
@@ -273,6 +387,8 @@ function BenchmarkingPageContent() {
       setRealEstate(null);
       setMonthlyUtilities([]);
       setLaundroScore(null);
+      setNetworkOptedIn(false);
+      setNetworkOptInCount(null);
       setLoading(false);
       return;
     }
@@ -297,6 +413,7 @@ function BenchmarkingPageContent() {
         { data: leaseData },
         { data: reData },
         { data: utilitiesData },
+        { data: networkCountData, error: networkCountError },
       ] = await Promise.all([
         supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
         fetchStoreMonthlyFinancials(supabase, selectedStore.id),
@@ -305,6 +422,7 @@ function BenchmarkingPageContent() {
         supabase.from("leases").select("*").eq("store_id", selectedStore.id).maybeSingle(),
         supabase.from("real_estate").select("*").eq("store_id", selectedStore.id).maybeSingle(),
         supabase.from("monthly_utilities").select("*").eq("store_id", selectedStore.id),
+        supabase.rpc("get_network_benchmark_contributor_count"),
       ]);
 
       const errors = [storeError, equipError].filter(Boolean).map((e) => e!.message);
@@ -320,6 +438,14 @@ function BenchmarkingPageContent() {
       );
 
       setStore(storeProfile);
+      setNetworkOptedIn(
+        Boolean((storeData as Record<string, unknown> | null)?.network_benchmark_opted_in)
+      );
+      if (!networkCountError && typeof networkCountData === "number") {
+        setNetworkOptInCount(networkCountData);
+      } else {
+        setNetworkOptInCount(null);
+      }
       setEquipment(equip);
       setAnnualDebtService(debt);
       setRecords(sorted);
@@ -344,10 +470,40 @@ function BenchmarkingPageContent() {
       setRecords([]);
       setAnnualDebtService(0);
       setLaundroScore(null);
+      setNetworkOptedIn(false);
+      setNetworkOptInCount(null);
     } finally {
       setLoading(false);
     }
   }, [selectedStore?.id, supabase]);
+
+  const handleNetworkOptIn = useCallback(async () => {
+    if (!selectedStore?.id || networkOptedIn || networkOptInSaving) return;
+
+    setNetworkOptInSaving(true);
+    const optedInAt = new Date().toISOString();
+
+    const { error } = await supabase
+      .from("stores")
+      .update({
+        network_benchmark_opted_in: true,
+        network_benchmark_opted_in_at: optedInAt,
+      })
+      .eq("id", selectedStore.id);
+
+    if (error) {
+      toast.error("Failed to opt in — please try again");
+    } else {
+      setNetworkOptedIn(true);
+      toast.success("You are opted in to Network Benchmarking");
+      const { data: refreshedCount } = await supabase.rpc("get_network_benchmark_contributor_count");
+      if (typeof refreshedCount === "number") {
+        setNetworkOptInCount(refreshedCount);
+      }
+    }
+
+    setNetworkOptInSaving(false);
+  }, [networkOptedIn, networkOptInSaving, selectedStore?.id, supabase, toast]);
 
   useEffect(() => {
     if (storesLoading) return;
@@ -587,6 +743,14 @@ function BenchmarkingPageContent() {
             ))}
           </div>
         </div>
+
+        {/* Section 3 — Network Benchmarking */}
+        <NetworkBenchmarkingSection
+          optedIn={networkOptedIn}
+          optInCount={networkOptInCount}
+          saving={networkOptInSaving}
+          onOptIn={handleNetworkOptIn}
+        />
 
         {/* Footnote */}
         <p className="text-[11px] text-slate-400 dark:text-slate-500 pt-2 border-t border-slate-200 dark:border-slate-700/50">
