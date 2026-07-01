@@ -306,11 +306,11 @@ function AppShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside
         className={clsx(
-          "app-sidebar flex flex-col flex-shrink-0 border-r transition-colors duration-300",
+          "app-sidebar flex flex-col flex-shrink-0 transition-colors duration-300",
           sidebarOpen && "open",
           sidebarCollapsed && "sidebar-collapsed"
         )}
-        style={{ background: "var(--bg-sidebar)", borderColor: "var(--border)" }}
+        style={{ background: "var(--bg-sidebar)" }}
       >
         <div
           className="sidebar-brand flex items-center gap-2 px-5 py-4 border-b"

@@ -503,6 +503,7 @@ html, body {
 .app-sidebar {
   width: 220px;
   transition: width 0.25s ease;
+  border-right: none;
 }
 
 .app-main {
