@@ -677,13 +677,13 @@ function BenchmarkingPageContent() {
   return (
     <div
       className="min-h-full -m-4 sm:-m-6 p-4 sm:p-6 space-y-6"
-      style={{ background: "var(--benchmark-bg, #f4f6f9)" }}
+      style={{ background: "var(--bg-page)" }}
     >
       <style>{`
         .dark [data-benchmark-page] { --benchmark-bg: #0a0f1a; }
-        [data-benchmark-page] { --benchmark-bg: #f4f6f9; }
+        [data-benchmark-page] { --benchmark-bg: var(--bg-page); }
       `}</style>
-      <div data-benchmark-page className="space-y-6" style={{ background: "var(--benchmark-bg)" }}>
+      <div data-benchmark-page className="space-y-6" style={{ background: "var(--bg-page)" }}>
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
