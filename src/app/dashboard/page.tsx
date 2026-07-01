@@ -8,11 +8,20 @@ import { useStores } from "@/lib/store-context";
 import { getStoreValuation, getStoreDebt, getStoreScheduledDebtService, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
 import { calcDSCR, DSCR_NO_DEBT_LABEL } from "@/lib/calculations";
 import {
+  enrichMonthlyRecords,
+  fetchStoreMonthlyFinancials,
+  sortRecordsDesc,
+  type MonthlyFinancialRecord,
+  type MonthlyUtilityRecord,
+} from "@/lib/financials";
+import { computeLaundroCfoScoreFromRaw, type LaundroCfoScoreResult } from "@/lib/laundroCfoScore";
+import {
   calcBuildingEquity,
   calcOccupancyCostRatioFromRent,
   calcRealEstateLTV,
 } from "@/lib/real-estate-calculations";
 import { calcEquipmentScore, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import type { EquipmentRecord } from "@/lib/equipment";
 import {
   AreaChart,
   Area,
@@ -222,6 +231,8 @@ export default function DashboardPage() {
   const [valuation, setValuation] = useState<StoreValuationResult | null>(null);
   const [totalDebt, setTotalDebt] = useState(0);
   const [scheduledDebtService, setScheduledDebtService] = useState(0);
+  const [monthlyFinancials, setMonthlyFinancials] = useState<MonthlyFinancialRecord[]>([]);
+  const [monthlyUtilities, setMonthlyUtilities] = useState<MonthlyUtilityRecord[]>([]);
   const supabase = createClient();
 
   const loadDashboardData = useCallback(async () => {
@@ -230,6 +241,8 @@ export default function DashboardPage() {
       setValuation(null);
       setTotalDebt(0);
       setScheduledDebtService(0);
+      setMonthlyFinancials([]);
+      setMonthlyUtilities([]);
       setLoadError(false);
       return;
     }
@@ -244,12 +257,18 @@ export default function DashboardPage() {
       const storeValuation = await getStoreValuation(loadedStore.id);
       setValuation(storeValuation);
 
-      const [debt, scheduledAnnual] = await Promise.all([
+      const [debt, scheduledAnnual, financialsData, { data: utilitiesData, error: utilitiesError }] =
+        await Promise.all([
         getStoreDebt(loadedStore.id),
         getStoreScheduledDebtService(loadedStore.id),
+        fetchStoreMonthlyFinancials(supabase, loadedStore.id),
+        supabase.from("monthly_utilities").select("*").eq("store_id", loadedStore.id),
       ]);
       setTotalDebt(debt);
       setScheduledDebtService(scheduledAnnual);
+      setMonthlyFinancials(enrichMonthlyRecords(sortRecordsDesc(financialsData)));
+      if (utilitiesError) throw utilitiesError;
+      setMonthlyUtilities((utilitiesData ?? []) as MonthlyUtilityRecord[]);
 
       const [{ data: policiesData, error: policiesError }, { data: equipmentData, error: equipmentError }] =
         await Promise.all([
@@ -426,12 +445,29 @@ export default function DashboardPage() {
       ? ((estimatedValue - valuationTrend[0].value) / valuationTrend[0].value) * 100
       : 0;
 
-  const leaseScore = leaseMetrics?.score ?? 0;
-  const insuranceScore = 0;
-  const financialScore = 0;
-  const laundrocfoScore = Math.round(
-    (leaseScore + equipmentScore + financialScore + insuranceScore) / 4
-  );
+  const laundroCfoScoreResult = useMemo((): LaundroCfoScoreResult | null => {
+    if (!store || !hasFinancialData) return null;
+
+    const resolved = valuation?.resolvedFinancials;
+    return computeLaundroCfoScoreFromRaw({
+      store: {
+        ...store,
+        monthly_revenue: resolved?.monthlyRevenue ?? store.monthly_revenue,
+        monthly_expenses: resolved?.monthlyExpenses ?? store.monthly_expenses,
+        annual_debt_service: scheduledDebtService,
+      },
+      equipment: equipment as EquipmentRecord[],
+      lease,
+      realEstate,
+      monthlyFinancials: monthlyFinancials.map((r) => ({
+        revenue: r.revenue,
+        utilities: r.utilities,
+      })),
+      monthlyUtilities,
+    });
+  }, [store, hasFinancialData, valuation, scheduledDebtService, equipment, lease, realEstate, monthlyFinancials, monthlyUtilities]);
+
+  const laundrocfoScore = laundroCfoScoreResult?.total ?? 0;
 
   const actions = useMemo(() => {
     const items: ActionItem[] = [];
@@ -725,9 +761,31 @@ export default function DashboardPage() {
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.1s" }}
-          label="LaundroCFO Score"
-          value={<AnimatedNumber value={laundrocfoScore} duration={1000} />}
-          sub={`Lease ${leaseScore} · Equipment ${equipmentScore} · Financial ${financialScore} · Insurance ${insuranceScore}`}
+          label={<DisclaimerLabel>LaundroCFO Score</DisclaimerLabel>}
+          value={
+            hasFinancialData && laundroCfoScoreResult ? (
+              <AnimatedNumber value={laundrocfoScore} duration={1000} />
+            ) : (
+              "—"
+            )
+          }
+          sub={
+            !hasFinancialData
+              ? "Add monthly financials"
+              : laundroCfoScoreResult
+                ? [
+                    `Grade ${laundroCfoScoreResult.grade}`,
+                    laundroCfoScoreResult.metricsIncluded < laundroCfoScoreResult.metricsTotal
+                      ? `${laundroCfoScoreResult.metricsIncluded}/${laundroCfoScoreResult.metricsTotal} metrics`
+                      : null,
+                    laundroCfoScoreResult.potentialScore != null
+                      ? `Could reach ${laundroCfoScoreResult.potentialScore} with complete data`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                : "—"
+          }
         />
 
         <KpiCard

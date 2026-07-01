@@ -454,8 +454,24 @@ function BenchmarkingPageContent() {
       setMonthlyUtilities((utilitiesData ?? []) as MonthlyUtilityRecord[]);
 
       const ttm = applyLoanDebtServiceToTtm(calcTtmMetrics(sorted), debt);
+      const ttmMonthlyRevenue =
+        ttm.monthsUsed > 0 && ttm.ttmRevenue > 0 ? ttm.ttmRevenue / ttm.monthsUsed : null;
+      const ttmMonthlyExpenses =
+        ttmMonthlyRevenue != null && ttm.monthsUsed > 0
+          ? ttmMonthlyRevenue - ttm.ttmEbitda / ttm.monthsUsed
+          : null;
+
       const scoreResult = computeLaundroCfoScoreFromRaw({
-        store: { ...storeProfile, annual_debt_service: debt },
+        store: {
+          ...storeProfile,
+          annual_debt_service: debt,
+          ...(ttmMonthlyRevenue != null
+            ? {
+                monthly_revenue: ttmMonthlyRevenue,
+                monthly_expenses: ttmMonthlyExpenses,
+              }
+            : {}),
+        },
         equipment: equip,
         lease: leaseData as Record<string, unknown> | null,
         realEstate: reData as Record<string, unknown> | null,
@@ -596,7 +612,7 @@ function BenchmarkingPageContent() {
       grades.push(zoneLetterGrade(metrics.dscr, 1.25, 1.5, 3));
     }
     if (laundroScore) {
-      grades.push(zoneLetterGrade(laundroScore.total, 50, 70, 100));
+      grades.push(zoneLetterGrade(laundroScore.total, 40, 55, 100));
     }
     for (const r of scaleMetrics) {
       if (r.store != null) {
@@ -622,9 +638,11 @@ function BenchmarkingPageContent() {
   ];
 
   const scoreZones: ColorZone[] = [
-    { start: 0, end: 50, color: "#ef4444", darkGlow: "rgba(239,68,68,0.6)" },
-    { start: 50, end: 70, color: "#f59e0b", darkGlow: "rgba(245,158,11,0.6)" },
-    { start: 70, end: 100, color: "#22c55e", darkGlow: "rgba(34,197,94,0.6)" },
+    { start: 0, end: 40, color: "#ef4444", darkGlow: "rgba(239,68,68,0.6)" },
+    { start: 40, end: 55, color: "#f97316", darkGlow: "rgba(249,115,22,0.6)" },
+    { start: 55, end: 70, color: "#f59e0b", darkGlow: "rgba(245,158,11,0.6)" },
+    { start: 70, end: 85, color: "#84cc16", darkGlow: "rgba(132,204,22,0.6)" },
+    { start: 85, end: 100, color: "#22c55e", darkGlow: "rgba(34,197,94,0.6)" },
   ];
 
   if (storesLoading || loading) {
@@ -721,14 +739,13 @@ function BenchmarkingPageContent() {
             min={0}
             max={100}
             zones={scoreZones}
-            grade={
-              laundroScore ? zoneLetterGrade(laundroScore.total, 50, 70, 100) : null
-            }
-            redEnd={50}
-            yellowEnd={70}
+            grade={laundroScore?.grade ?? null}
+            redEnd={40}
+            yellowEnd={55}
             worstLabel="Worst — 0"
             medianLabel="Median — 65"
-            bestLabel="Best — 90+"
+            bestLabel="Best — 85+"
+            potentialScore={laundroScore?.potentialScore ?? null}
           />
         </div>
 

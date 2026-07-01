@@ -4,22 +4,18 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import {
   formatNetworkScoreHint,
+  formatPotentialScoreNote,
   scoreArcColor,
+  type LaundroCfoScoreMetric,
   type LaundroCfoScoreResult,
 } from "@/lib/laundroCfoScore";
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
-
-const CATEGORY_LABELS: Record<keyof LaundroCfoScoreResult["categories"], string> = {
-  financialPerformance: "Financial Performance",
-  debtCoverage: "Debt & Coverage",
-  assetQuality: "Asset Quality",
-  profileCompleteness: "Profile Completeness",
-};
 
 type ArcGaugeProps = {
   score: number;
   grade: string;
   size?: number;
+  potentialScore?: number | null;
 };
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
@@ -43,15 +39,37 @@ function describeArc(
   return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`;
 }
 
-export function LaundroCfoScoreGauge({ score, grade, size = 200 }: ArcGaugeProps) {
+export function LaundroCfoScoreGauge({ score, grade, size = 200, potentialScore = null }: ArcGaugeProps) {
   const strokeWidth = 14;
   const cx = size / 2;
   const cy = size * 0.58;
   const radius = size * 0.38;
   const arcPath = describeArc(cx, cy, radius, 0, 180);
   const arcLength = Math.PI * radius;
-  const fillOffset = arcLength - (Math.min(100, Math.max(0, score)) / 100) * arcLength;
+  const clampedScore = Math.min(100, Math.max(0, score));
+  const fillOffset = arcLength - (clampedScore / 100) * arcLength;
   const color = scoreArcColor(score);
+  const needleAngle = (clampedScore / 100) * 180;
+  const needleRotation = needleAngle - 180;
+  const needleLength = radius * 0.92;
+  const [mounted, setMounted] = useState(false);
+  const [animatedRotation, setAnimatedRotation] = useState(-180);
+
+  useEffect(() => {
+    setMounted(false);
+    setAnimatedRotation(-180);
+    const t = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setMounted(true);
+        setAnimatedRotation(needleRotation);
+      });
+    });
+    return () => cancelAnimationFrame(t);
+  }, [needleRotation]);
+
+  const potentialNote = formatPotentialScoreNote(
+    potentialScore != null && potentialScore > score ? potentialScore : null
+  );
 
   return (
     <div className="flex flex-col items-center" style={{ width: size }}>
@@ -78,6 +96,25 @@ export function LaundroCfoScoreGauge({ score, grade, size = 200 }: ArcGaugeProps
           strokeDashoffset={fillOffset}
           style={{ transition: "stroke-dashoffset 0.8s ease, stroke 0.3s ease" }}
         />
+        <g
+          style={{
+            transform: `rotate(${animatedRotation}deg)`,
+            transformOrigin: `${cx}px ${cy}px`,
+            transition: mounted ? "transform 1.2s cubic-bezier(0.34, 1.2, 0.64, 1)" : "none",
+          }}
+        >
+          <line
+            x1={cx}
+            y1={cy}
+            x2={cx + needleLength}
+            y2={cy}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            stroke="var(--text-primary, #0f172a)"
+            style={{ filter: "drop-shadow(0 0 3px rgba(148,163,184,0.5))" }}
+          />
+          <circle cx={cx} cy={cy} r={5} fill="var(--text-primary, #0f172a)" />
+        </g>
       </svg>
       <div
         className="flex flex-col items-center"
@@ -95,6 +132,11 @@ export function LaundroCfoScoreGauge({ score, grade, size = 200 }: ArcGaugeProps
         >
           {grade}
         </div>
+        {potentialNote ? (
+          <p className="text-[10px] text-adaptive-muted mt-1.5 text-center max-w-[160px] leading-snug">
+            {potentialNote}
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -127,6 +169,7 @@ export function LaundroCfoScoreCard({ result, className = "", compact = false }:
   }, [supabase]);
 
   const gaugeSize = compact ? 160 : 200;
+  const metricRows = Object.values(result.metrics) as LaundroCfoScoreMetric[];
 
   return (
     <div className={`card ${className}`}>
@@ -135,35 +178,44 @@ export function LaundroCfoScoreCard({ result, className = "", compact = false }:
       </div>
 
       <div className="flex flex-col items-center">
-        <LaundroCfoScoreGauge score={result.total} grade={result.grade} size={gaugeSize} />
+        <LaundroCfoScoreGauge
+          score={result.total}
+          grade={result.grade}
+          size={gaugeSize}
+          potentialScore={result.potentialScore}
+        />
 
         <p className="text-[11px] text-adaptive-muted mt-1 mb-4">
           {formatNetworkScoreHint(contributorCount)}
+          {result.metricsIncluded < result.metricsTotal
+            ? ` · ${result.metricsIncluded}/${result.metricsTotal} metrics scored`
+            : null}
         </p>
       </div>
 
       <div className="space-y-2.5">
-        {(Object.entries(result.categories) as [keyof LaundroCfoScoreResult["categories"], LaundroCfoScoreResult["categories"][keyof LaundroCfoScoreResult["categories"]]][]).map(
-          ([key, cat]) => {
-            const pct = cat.max > 0 ? (cat.score / cat.max) * 100 : 0;
-            return (
-              <div key={key}>
-                <div className="flex justify-between text-[11px] mb-1">
-                  <span className="text-adaptive-muted">{CATEGORY_LABELS[key]}</span>
-                  <span className="text-adaptive-secondary font-medium">
-                    {cat.score}/{cat.max}
-                  </span>
-                </div>
-                <div className="progress-bar" style={{ marginTop: 0 }}>
-                  <div
-                    className="h-full rounded-full bg-blue-500/70 transition-all duration-500"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
+        {metricRows.map((metric) => {
+          const pct = metric.included && metric.points != null ? metric.points : 0;
+          const weightPct = Math.round(metric.weight * 100);
+          return (
+            <div key={metric.label}>
+              <div className="flex justify-between text-[11px] mb-1">
+                <span className="text-adaptive-muted">{metric.label}</span>
+                <span className="text-adaptive-secondary font-medium">
+                  {metric.included && metric.points != null
+                    ? `${metric.points} pts · ${weightPct}%`
+                    : "—"}
+                </span>
               </div>
-            );
-          }
-        )}
+              <div className="progress-bar" style={{ marginTop: 0 }}>
+                <div
+                  className="h-full rounded-full bg-blue-500/70 transition-all duration-500"
+                  style={{ width: `${pct}%`, opacity: metric.included ? 1 : 0.25 }}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {result.improvementTips.length > 0 ? (

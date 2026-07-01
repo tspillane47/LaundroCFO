@@ -88,9 +88,9 @@ export function PdfDashboardDial({
     );
   });
 
-  const needleAngle = hasData ? 180 - valueToAngle(value, min, max) : 180;
+  const needleAngle = hasData ? valueToAngle(value, min, max) - 180 : -180;
   const needleRad = (needleAngle * Math.PI) / 180;
-  const needleLen = r * 0.78;
+  const needleLen = r * 0.92;
   const needleX = cx + needleLen * Math.cos(needleRad);
   const needleY = cy + needleLen * Math.sin(needleRad);
   const valueColor = hasData ? zoneColor(value, zones) : PDF_CHART.slate400;

@@ -61,13 +61,14 @@ export type DashboardDialProps = {
   min: number;
   max: number;
   zones: ColorZone[];
-  grade?: LetterGrade | null;
+  grade?: LetterGrade | string | null;
   worstLabel: string;
   medianLabel: string;
   bestLabel: string;
   redEnd: number;
   yellowEnd: number;
   compact?: boolean;
+  potentialScore?: number | null;
 };
 
 export function DashboardDial({
@@ -84,6 +85,7 @@ export function DashboardDial({
   redEnd,
   yellowEnd,
   compact = false,
+  potentialScore = null,
 }: DashboardDialProps) {
   const size = compact ? 200 : 260;
   const cx = size / 2;
@@ -107,11 +109,11 @@ export function DashboardDial({
     return () => cancelAnimationFrame(t);
   }, [targetAngle]);
 
-  const needleLength = radius * 0.78;
+  const needleLength = radius * 0.92;
   const zoneGlow = hasData ? getZoneColor(value, zones) : { color: "#64748b", glow: "rgba(100,116,139,0.4)" };
   const displayGrade =
     grade ?? (hasData ? zoneLetterGrade(value!, redEnd, yellowEnd, max) : null);
-  const needleRotation = 180 - needleAngle;
+  const needleRotation = needleAngle - 180;
 
   const zoneArcs = zones.map((z) => {
     const startAngle = valueToAngle(z.start, min, max);
@@ -198,13 +200,22 @@ export function DashboardDial({
                   className={clsx(
                     "mt-2 rounded-full flex items-center justify-center font-bold",
                     compact ? "w-7 h-7 text-[13px]" : "w-9 h-9 text-[15px]",
-                    GRADE_COLORS[displayGrade].bg,
-                    GRADE_COLORS[displayGrade].darkBg,
-                    GRADE_COLORS[displayGrade].text
+                    displayGrade in GRADE_COLORS
+                      ? [
+                          GRADE_COLORS[displayGrade as LetterGrade].bg,
+                          GRADE_COLORS[displayGrade as LetterGrade].darkBg,
+                          GRADE_COLORS[displayGrade as LetterGrade].text,
+                        ]
+                      : ["bg-slate-600", "dark:bg-slate-500", "text-white"]
                   )}
                 >
                   {displayGrade}
                 </div>
+              )}
+              {potentialScore != null && potentialScore > (value ?? 0) && (
+                <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500 text-center max-w-[140px] leading-snug">
+                  Your score could reach {potentialScore} with complete data
+                </p>
               )}
             </>
           ) : (
