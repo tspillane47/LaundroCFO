@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { fmtDollar } from "@/lib/calculations";
@@ -154,10 +154,26 @@ function Confetti() {
 }
 
 export default function OnboardingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center">
+          <div className="text-[13px] text-[var(--text-muted)]">Loading...</div>
+        </div>
+      }
+    >
+      <OnboardingContent />
+    </Suspense>
+  );
+}
+
+function OnboardingContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isAddingStore = searchParams.get("add") === "true";
   const supabase = createClient();
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(isAddingStore ? 2 : 1);
   const [showCompletion, setShowCompletion] = useState(false);
   const [slideDirection, setSlideDirection] = useState<SlideDirection>("left");
   const [slideKey, setSlideKey] = useState(0);
@@ -212,7 +228,7 @@ export default function OnboardingPage() {
 
       if (cancelled) return;
 
-      if (completed) {
+      if (completed && !isAddingStore) {
         router.replace("/portfolio");
         return;
       }
@@ -224,7 +240,7 @@ export default function OnboardingPage() {
     return () => {
       cancelled = true;
     };
-  }, [router, supabase]);
+  }, [router, supabase, isAddingStore]);
 
   async function createStore(): Promise<string | null> {
     const {
@@ -588,12 +604,14 @@ export default function OnboardingPage() {
       return;
     }
 
-    await supabase
-      .from("profiles")
-      .update({ onboarding_completed: true })
-      .eq("id", user.id);
+    if (!isAddingStore) {
+      await supabase
+        .from("profiles")
+        .update({ onboarding_completed: true })
+        .eq("id", user.id);
+    }
 
-    router.push("/dashboard");
+    router.push(isAddingStore ? "/portfolio" : "/dashboard");
   }
 
   if (!ready) {
@@ -686,12 +704,14 @@ export default function OnboardingPage() {
               {showCompletion ? (
                 <div className="text-center py-4">
                   <h1 className="text-[28px] sm:text-[32px] font-bold text-[var(--text-primary)] mb-3">
-                    You&apos;re all set! 🎉
+                    {isAddingStore ? "Store added!" : "You\u2019re all set! 🎉"}
                   </h1>
                   <p className="text-[15px] text-[var(--text-secondary)] mb-8 max-w-md mx-auto">
                     {hasValuationEstimate
                       ? `Based on what you've shared, your estimated store value is ${fmtDollar(estimatedValue)}.`
-                      : "Your dashboard is ready — add more data to unlock your full valuation."}
+                      : isAddingStore
+                        ? "Your new store is in your portfolio — add more data anytime to unlock its full valuation."
+                        : "Your dashboard is ready — add more data to unlock your full valuation."}
                   </p>
                   <button
                     type="button"
@@ -699,7 +719,13 @@ export default function OnboardingPage() {
                     disabled={completing}
                     className="btn-primary px-10 py-3.5 text-[15px] font-semibold disabled:opacity-50"
                   >
-                    {completing ? "Opening dashboard..." : "Go to My Dashboard →"}
+                    {completing
+                      ? isAddingStore
+                        ? "Opening portfolio..."
+                        : "Opening dashboard..."
+                      : isAddingStore
+                        ? "Back to Portfolio →"
+                        : "Go to My Dashboard →"}
                   </button>
                 </div>
               ) : (
@@ -1102,7 +1128,13 @@ export default function OnboardingPage() {
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-8 pt-6 border-t border-[var(--border)] dark:border-white/10">
                       <button
                         type="button"
-                        onClick={() => goToStep(step - 1, "right")}
+                        onClick={() => {
+                          if (step === 2 && isAddingStore) {
+                            router.push("/portfolio");
+                            return;
+                          }
+                          goToStep(step - 1, "right");
+                        }}
                         disabled={busy}
                         className="btn-outline px-5 py-2.5 text-[13px] order-2 sm:order-1"
                       >

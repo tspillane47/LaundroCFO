@@ -1,8 +1,8 @@
 "use client";
 import "./globals.css";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase";
 import { StoreProvider, useStores } from "@/lib/store-context";
 import clsx from "clsx";
@@ -115,10 +115,12 @@ const onboardingExemptPaths = [
 
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const supabase = createClient();
   const [checked, setChecked] = useState(false);
   const isExempt = onboardingExemptPaths.includes(pathname) || pathname.startsWith("/auth/callback");
+  const isAddingStore = pathname === "/onboarding" && searchParams.get("add") === "true";
 
   useEffect(() => {
     let cancelled = false;
@@ -140,7 +142,7 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
 
       if (completed) {
-        if (pathname === "/onboarding") {
+        if (pathname === "/onboarding" && !isAddingStore) {
           router.replace("/portfolio");
           return;
         }
@@ -162,7 +164,7 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [pathname, isExempt, router, supabase]);
+  }, [pathname, isExempt, isAddingStore, router, supabase]);
 
   if (!checked && !isExempt) {
     return (
@@ -173,6 +175,14 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>;
+}
+
+function OnboardingGuardFallback() {
+  return (
+    <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center">
+      <div className="text-[13px] text-[var(--text-muted)]">Loading...</div>
+    </div>
+  );
 }
 
 function AppShell({ children }: { children: React.ReactNode }) {
@@ -805,7 +815,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <html lang="en" className={isDark ? "dark" : ""}>
         <body>
           <ToastProvider>
-            <OnboardingGuard>{children}</OnboardingGuard>
+            <Suspense fallback={<OnboardingGuardFallback />}>
+              <OnboardingGuard>{children}</OnboardingGuard>
+            </Suspense>
           </ToastProvider>
         </body>
       </html>
@@ -817,9 +829,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <html lang="en" className={isDark ? "dark" : ""}>
         <body>
           <ToastProvider>
-            <OnboardingGuard>
-              <StoreProvider>{children}</StoreProvider>
-            </OnboardingGuard>
+            <Suspense fallback={<OnboardingGuardFallback />}>
+              <OnboardingGuard>
+                <StoreProvider>{children}</StoreProvider>
+              </OnboardingGuard>
+            </Suspense>
           </ToastProvider>
         </body>
       </html>
@@ -830,11 +844,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={isDark ? "dark" : ""}>
       <body>
         <ToastProvider>
-          <OnboardingGuard>
-            <StoreProvider>
-              <AppShell>{children}</AppShell>
-            </StoreProvider>
-          </OnboardingGuard>
+          <Suspense fallback={<OnboardingGuardFallback />}>
+            <OnboardingGuard>
+              <StoreProvider>
+                <AppShell>{children}</AppShell>
+              </StoreProvider>
+            </OnboardingGuard>
+          </Suspense>
         </ToastProvider>
       </body>
     </html>

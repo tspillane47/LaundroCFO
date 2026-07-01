@@ -688,7 +688,7 @@ export default function PortfolioPage() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-[16px] font-semibold" style={{ color: "var(--text-primary)" }}>Your Stores</h2>
-          <Link href="/onboarding" className="btn-outline text-[12px] px-3 py-1.5">+ Add Store</Link>
+          <Link href="/onboarding?add=true" className="btn-outline text-[12px] px-3 py-1.5">+ Add Store</Link>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">

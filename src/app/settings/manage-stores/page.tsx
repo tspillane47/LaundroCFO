@@ -146,7 +146,7 @@ export default function ManageStoresPage() {
             View, archive, or remove stores from your portfolio
           </p>
         </div>
-        <Link href="/onboarding" className="btn-primary text-[13px] flex-shrink-0">
+        <Link href="/onboarding?add=true" className="btn-primary text-[13px] flex-shrink-0">
           + Add Store
         </Link>
       </div>

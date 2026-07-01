@@ -86,7 +86,10 @@ export async function middleware(request: NextRequest) {
   if (user) {
     const onboardingCompleted = await isOnboardingComplete(supabase, user.id)
 
-    if (onboardingCompleted && pathname === '/onboarding') {
+    const isAddingStore =
+      pathname === '/onboarding' && request.nextUrl.searchParams.get('add') === 'true'
+
+    if (onboardingCompleted && pathname === '/onboarding' && !isAddingStore) {
       return NextResponse.redirect(new URL('/portfolio', request.url))
     }
 
