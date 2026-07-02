@@ -34,8 +34,8 @@ function LineItem({
   badge?: string;
 }) {
   return (
-    <div className="py-0.5 text-[11px] border-b border-[var(--border)] last:border-0 min-w-0 space-y-0.5">
-      <span className="block text-adaptive-muted leading-snug break-words" title={label}>
+    <div className="py-0 text-[11px] border-b border-[var(--border)] last:border-0 min-w-0 space-y-0">
+      <span className="block text-adaptive-muted leading-tight break-words" title={label}>
         {label}
       </span>
       <span className="flex items-center justify-end gap-1 flex-wrap min-w-0">
@@ -54,8 +54,8 @@ function LineItem({
 
 function TotalLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="pt-1 mt-0.5 border-t border-[var(--border)] min-w-0 space-y-0.5">
-      <span className="block text-[10px] font-semibold text-adaptive-secondary leading-snug break-words" title={label}>
+    <div className="pt-0.5 mt-0 border-t border-[var(--border)] min-w-0 space-y-0">
+      <span className="block text-[10px] font-semibold text-adaptive-secondary leading-tight break-words" title={label}>
         {label}
       </span>
       <span className="block text-[12px] font-bold text-adaptive-primary tabular-nums text-right leading-none" title={value}>
@@ -67,7 +67,7 @@ function TotalLine({ label, value }: { label: string; value: string }) {
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="text-[10px] font-semibold uppercase tracking-wider text-adaptive-muted mb-1">
+    <div className="text-[10px] font-semibold uppercase tracking-wider text-adaptive-muted mb-0.5">
       {children}
     </div>
   );
@@ -85,8 +85,8 @@ function HeroMetric({
   valueClassName?: string;
 }) {
   return (
-    <div className="py-1 overflow-hidden min-w-0">
-      <div className="text-[9px] font-semibold uppercase tracking-wider text-adaptive-muted mb-0.5 leading-snug break-words">
+    <div className="py-0.5 overflow-hidden min-w-0">
+      <div className="text-[9px] font-semibold uppercase tracking-wider text-adaptive-muted mb-0 leading-tight break-words">
         {label}
       </div>
       <div
@@ -151,7 +151,7 @@ export function CurrentMonthlyAveragesPanel({
 }: CurrentMonthlyAveragesPanelProps) {
   if (loading) {
     return (
-      <div className="card h-full">
+      <div className="card max-h-[600px] overflow-y-auto">
         <div className="text-[13px]" style={{ color: "var(--text-muted)" }}>
           Loading averages…
         </div>
@@ -161,7 +161,7 @@ export function CurrentMonthlyAveragesPanel({
 
   if (!data) {
     return (
-      <div className="card h-full">
+      <div className="card max-h-[600px] overflow-y-auto">
         <div className="section-title">Current Monthly Averages</div>
         <p className="text-[12px] text-adaptive-muted">
           Add financial data to see monthly averages for {storeName || "this store"}.
@@ -176,13 +176,13 @@ export function CurrentMonthlyAveragesPanel({
     data.surplusCashFlow >= 0 ? "text-green-400" : "text-red-400";
 
   return (
-    <div className="card h-full min-w-0 overflow-hidden space-y-2.5">
+    <div className="card min-w-0 max-h-[600px] overflow-y-auto space-y-1">
       <div className="min-w-0">
         <div className="section-title">Current Monthly Averages</div>
         <div className="text-[12px] font-medium text-adaptive-secondary mt-0 truncate" title={storeName}>
           {storeName}
         </div>
-        <div className="text-[10px] text-adaptive-muted mt-0.5 leading-snug">{periodSubtext(data.monthsUsed)}</div>
+        <div className="text-[10px] text-adaptive-muted mt-0 leading-tight">{periodSubtext(data.monthsUsed)}</div>
       </div>
 
       <div>
@@ -192,7 +192,7 @@ export function CurrentMonthlyAveragesPanel({
             <LineItem key={item.category} label={item.category} value={fmtDollar(item.monthlyAverage)} />
           ))}
           {revenueLines.length === 0 && (
-            <p className="text-[12px] text-adaptive-muted py-0.5">No revenue categories recorded.</p>
+            <p className="text-[12px] text-adaptive-muted py-0">No revenue categories recorded.</p>
           )}
           <TotalLine label="Average Monthly Revenue" value={fmtDollar(data.revenue.total)} />
         </div>
@@ -210,13 +210,13 @@ export function CurrentMonthlyAveragesPanel({
             />
           ))}
           {expenseLines.length === 0 && (
-            <p className="text-[12px] text-adaptive-muted py-0.5">No expense categories recorded.</p>
+            <p className="text-[12px] text-adaptive-muted py-0">No expense categories recorded.</p>
           )}
           <TotalLine label="Average Monthly Expenses" value={fmtDollar(data.expenses.total)} />
         </div>
       </div>
 
-      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2.5 py-0.5 min-w-0">
+      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2 py-0 min-w-0">
         <HeroMetric
           label="Average Monthly EBITDA"
           value={fmtDollar(data.ebitda.monthly)}
@@ -246,7 +246,7 @@ export function CurrentMonthlyAveragesPanel({
         )}
       </div>
 
-      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2.5 py-0.5 min-w-0">
+      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2 py-0 min-w-0">
         <HeroMetric
           label="Surplus Cash Flow"
           value={fmtDollar(data.surplusCashFlow)}
@@ -255,7 +255,7 @@ export function CurrentMonthlyAveragesPanel({
         />
       </div>
 
-      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2.5 py-0.5 min-w-0">
+      <div className="rounded-lg bg-[var(--bg-card2)] border border-[var(--border)] px-2 py-0 min-w-0">
         <HeroMetric
           label="Current DSCR"
           sub="Based on active loan terms"
@@ -275,9 +275,9 @@ export function CurrentMonthlyAveragesPanel({
         </div>
       )}
 
-      <div className="flex flex-col gap-1 pt-0.5 border-t border-[var(--border)] min-w-0">
+      <div className="flex flex-col gap-0.5 pt-0 border-t border-[var(--border)] min-w-0">
         <div className="min-w-0">
-          <div className="text-[9px] font-semibold uppercase tracking-wider text-adaptive-muted mb-0.5">
+          <div className="text-[9px] font-semibold uppercase tracking-wider text-adaptive-muted mb-0">
             Water KPI
           </div>
           <div className="text-[14px] font-bold tabular-nums text-adaptive-primary text-right">

@@ -985,10 +985,10 @@ export default function FinancialsPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-[4fr_1fr] gap-4 items-stretch">
-            <div className="card flex flex-col min-h-0 min-w-0 w-full h-full">
+          <div className="grid grid-cols-1 lg:grid-cols-[4fr_1fr] gap-4 items-start">
+            <div className="card flex flex-col min-h-0 min-w-0 w-full max-h-[600px] overflow-y-auto">
               <div className="section-title">P&L — {selectedYear}</div>
-              <div className="table-scroll flex-1 min-w-0 w-full">
+              <div className="table-scroll min-w-0 w-full">
                 <table className="w-full min-w-full table-fixed text-[12px] border-collapse">
                   <colgroup>
                     <col className="w-[11%]" />
@@ -1147,7 +1147,7 @@ export default function FinancialsPage() {
               </div>
             </div>
 
-            <div className="min-h-0 min-w-0 flex flex-col [&>div]:h-full">
+            <div className="min-h-0 min-w-0">
               <CurrentMonthlyAveragesPanel
                 storeName={store?.name ?? selectedStore.name}
                 data={monthlyAverages}
