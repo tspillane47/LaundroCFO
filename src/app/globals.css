@@ -70,115 +70,70 @@
   --toast-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(148, 163, 184, 0.16);
 }
 
-/* ============ REPORT MODE (print / light preview) ============ */
+/* ============ REPORT MODE (light cards on dark page shell) ============ */
 .report-mode {
-  --bg-page: #ffffff;
+  /* Card / preview surface backgrounds — page shell keeps :root dark theme */
   --bg-card: #ffffff;
-  --bg-card2: #f8fafc;
-  --bg-sidebar: #f1f5f9;
-  --bg-sidebar-hover: #e2e8f0;
-  --bg-input: #ffffff;
-  --bg-nav-active: #dbeafe;
-  --nav-active-border: #2563eb;
-  --nav-active-text: #1e40af;
+  --hero-bg: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --card-shadow-hover: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --card-radius: 10px;
+}
 
+/* Light-theme text tokens scoped to report preview surfaces only */
+.report-mode :is(.card, .hero-value-card, .report-metric-card) {
   --text-primary: #0f172a;
   --text-secondary: #374151;
   --text-muted: #475569;
-
-  --sidebar-text: #334155;
-  --sidebar-text-active: #0f172a;
-  --sidebar-text-muted: #64748b;
-  --sidebar-section: #64748b;
-
-  --border: #e2e8f0;
-  --border2: #cbd5e1;
-
-  --accent: #16a34a;
-  --accent-muted: #15803d;
-  --accent-blue: #2563eb;
-  --accent-red: #dc2626;
-  --accent-yellow: #d97706;
-  --accent-purple: #7c3aed;
-
-  --btn-primary-bg: #16a34a;
-  --btn-primary-text: #ffffff;
-  --btn-secondary-bg: #f1f5f9;
-  --btn-secondary-text: #0f172a;
-  --btn-danger-bg: #dc2626;
-  --btn-danger-text: #ffffff;
-  --btn-outline-border: #cbd5e1;
-  --btn-outline-text: #374151;
-
-  --input-focus-border: #2563eb;
-  --input-placeholder: #94a3b8;
-
   --text-info: #1d4ed8;
   --text-success: #16a34a;
   --text-success-muted: #15803d;
   --text-warning: #b45309;
   --text-danger: #dc2626;
   --text-purple: #7c3aed;
-
-  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --card-shadow-hover: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --card-radius: 10px;
-  --hero-bg: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-
+  --border: #e2e8f0;
+  --border2: #cbd5e1;
+  --bg-input: #ffffff;
   --bg-info-tint: #dbeafe;
   --bg-success-tint: #f0fdf4;
   --bg-warning-tint: #fffbeb;
   --bg-danger-tint: #fef2f2;
-
-  --toast-bg: rgba(255, 255, 255, 0.92);
-  --toast-text: #0f172a;
-  --toast-text-muted: #475569;
-  --toast-progress-track: rgba(15, 23, 42, 0.08);
-
-  /* Establish readable default text on light preview surface */
   color: var(--text-primary);
-  background: var(--bg-page);
 }
 
 /* ============ REPORT MODE TEXT (light preview readability) ============ */
-/* Table headers without explicit color inherit body dark-theme light text otherwise */
-.report-mode thead th {
+.report-mode :is(.card, .hero-value-card, .report-metric-card) thead th {
   color: var(--text-secondary);
   font-weight: 500;
 }
 
-/* Dark-theme Tailwind grays reused in preview — map to report-mode tokens */
-.report-mode .text-slate-50,
-.report-mode .text-slate-100,
-.report-mode .text-slate-200,
-.report-mode .text-slate-300,
-.report-mode .text-gray-100,
-.report-mode .text-gray-200 {
+/* Dark-theme Tailwind grays reused on light cards */
+.report-mode :is(.card, .hero-value-card, .report-metric-card) :is(
+  .text-slate-50,
+  .text-slate-100,
+  .text-slate-200,
+  .text-slate-300,
+  .text-gray-100,
+  .text-gray-200
+) {
   color: var(--text-primary);
 }
 
 /* Semantic status colors — dark-mode 400 shades are too light on white cards */
-.report-mode .text-green-400,
-.report-mode .text-green-500 {
+.report-mode :is(.card, .hero-value-card, .report-metric-card) :is(.text-green-400, .text-green-500) {
   color: var(--text-success);
 }
-.report-mode .text-amber-400,
-.report-mode .text-amber-500,
-.report-mode .text-yellow-400 {
+.report-mode :is(.card, .hero-value-card, .report-metric-card) :is(.text-amber-400, .text-amber-500, .text-yellow-400) {
   color: var(--text-warning);
 }
-.report-mode .text-red-400,
-.report-mode .text-red-500 {
+.report-mode :is(.card, .hero-value-card, .report-metric-card) :is(.text-red-400, .text-red-500) {
   color: var(--text-danger);
 }
-.report-mode .text-blue-300,
-.report-mode .text-blue-400,
-.report-mode .text-blue-500 {
+.report-mode :is(.card, .hero-value-card, .report-metric-card) :is(.text-blue-300, .text-blue-400, .text-blue-500) {
   color: var(--text-info);
 }
 
-/* Hero card label (replaces inline light-blue dark-theme color) */
-.report-mode .hero-card-label {
+.report-mode .hero-value-card .hero-card-label {
   font-size: 12px;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -186,8 +141,7 @@
   margin-bottom: 8px;
 }
 
-/* Dark-mode row dividers invisible on light cards */
-.report-mode [class*="divide-white"] > :not([hidden]) ~ :not([hidden]) {
+.report-mode :is(.card, .hero-value-card, .report-metric-card) [class*="divide-white"] > :not([hidden]) ~ :not([hidden]) {
   border-color: var(--border);
 }
 
