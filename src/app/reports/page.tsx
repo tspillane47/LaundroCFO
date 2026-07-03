@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import { pdf } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { getStoreValuation } from "@/lib/getStoreValuation";
@@ -23,10 +22,7 @@ import {
   fmtMultiple,
   fmtPct,
 } from "@/lib/calculations";
-import { ReportDocument, type ReportProps } from "@/components/reports/ReportDocument";
-import {
-  PortfolioReportDocument,
-} from "@/components/reports/PortfolioReportDocument";
+import type { ReportProps } from "@/components/reports/ReportDocument";
 import { generateExecutiveSummary } from "@/components/reports/generateExecutiveSummary";
 import { getPortfolioReport, type PortfolioReportData } from "@/lib/getPortfolioReport";
 import {
@@ -476,8 +472,13 @@ function ReportsPageContent() {
   ]);
 
   const buildPdfBlob = useCallback(async () => {
+    const { pdf } = await import("@react-pdf/renderer");
+
     if (reportMode === "portfolio") {
       if (!portfolioData) throw new Error("Portfolio report data not ready");
+      const { PortfolioReportDocument } = await import(
+        "@/components/reports/PortfolioReportDocument"
+      );
       return pdf(
         <PortfolioReportDocument
           data={portfolioData}
@@ -487,6 +488,7 @@ function ReportsPageContent() {
       ).toBlob();
     }
     if (!reportProps) throw new Error("Report data not ready");
+    const { ReportDocument } = await import("@/components/reports/ReportDocument");
     return pdf(<ReportDocument {...reportProps} />).toBlob();
   }, [reportMode, portfolioData, generatedDate, userEmail, reportProps]);
 
