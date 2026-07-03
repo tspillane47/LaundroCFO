@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { calcDSCR, calcGlobalDSCR, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import { shouldTriggerLowDscrAlert } from "@/lib/dscr";
 import { formatDscrDisplay } from "@/lib/financials";
 import { getStoreValuation, getStoreDebt, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
 import clsx from "clsx";
@@ -281,7 +282,7 @@ export default function PortfolioPage() {
         avgMachineAge,
         storeCash,
         debtService,
-        hasDscrWarning: hasFinancialData && dscr != null && dscr < 1.25,
+        hasDscrWarning: hasFinancialData && shouldTriggerLowDscrAlert(dscr, debtService),
         hasFinancialData,
       };
     });

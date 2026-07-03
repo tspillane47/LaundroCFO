@@ -3,7 +3,7 @@ import {
   formatRentEscalationAlert,
   getNextRentEscalation,
 } from "@/lib/rent-escalation";
-import { calcDSCR } from "@/lib/calculations";
+import { computeStoreDscr, hasScheduledDebtService, shouldTriggerLowDscrAlert } from "@/lib/dscr";
 
 export interface FeedItem {
   id: string;
@@ -77,22 +77,23 @@ export function generateStoreFeed(
   }
 
   const scheduledAnnualDebtService = options?.scheduledAnnualDebtService ?? 0;
-  if (scheduledAnnualDebtService > 0) {
+  if (hasScheduledDebtService(scheduledAnnualDebtService)) {
     const annualEbitda = (store.monthly_revenue - store.monthly_expenses) * 12;
-    const dscr = calcDSCR(annualEbitda, scheduledAnnualDebtService);
+    const dscr = computeStoreDscr(annualEbitda, scheduledAnnualDebtService);
     if (dscr != null) {
+      const isLow = shouldTriggerLowDscrAlert(dscr, scheduledAnnualDebtService);
       items.push({
         id: 'dscr-' + store.id,
         date: formatDate(now),
         category: 'financial',
         icon: '🏦',
         headline: `DSCR: ${dscr.toFixed(2)}x`,
-        description: dscr >= 1.5
-          ? 'Strong debt coverage. Lender-ready position.'
-          : dscr >= 1.25
-          ? 'Meets minimum lender threshold of 1.25x.'
-          : '⚠ Below 1.25x minimum. Review debt service.',
-        severity: dscr >= 1.5 ? 'success' : dscr >= 1.25 ? 'info' : 'danger',
+        description: isLow
+          ? '⚠ Below 1.25x minimum. Review debt service.'
+          : dscr >= 1.5
+            ? 'Strong debt coverage. Lender-ready position.'
+            : 'Meets minimum lender threshold of 1.25x.',
+        severity: isLow ? 'danger' : dscr >= 1.5 ? 'success' : 'info',
         storeName: store.name,
       });
     }

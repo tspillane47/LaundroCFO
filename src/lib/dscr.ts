@@ -13,11 +13,26 @@ import {
 export { DSCR_NO_DEBT_LABEL };
 
 /** Single source of truth: TTM EBITDA ÷ scheduled annual debt service. */
+export const DSCR_LENDER_MINIMUM = 1.25;
+
 export function computeStoreDscr(
   annualEbitda: number,
   scheduledAnnualDebtService: number
 ): number | null {
   return calcDSCR(annualEbitda, scheduledAnnualDebtService);
+}
+
+/** Scheduled annual debt service from active store_loans (same basis as computeStoreDscr). */
+export function hasScheduledDebtService(scheduledAnnualDebtService: number): boolean {
+  return scheduledAnnualDebtService > 0;
+}
+
+/** Warn only when the store has scheduled debt and DSCR is below the lender minimum. */
+export function shouldTriggerLowDscrAlert(
+  dscr: number | null,
+  scheduledAnnualDebtService: number
+): boolean {
+  return hasScheduledDebtService(scheduledAnnualDebtService) && dscr != null && dscr < DSCR_LENDER_MINIMUM;
 }
 
 /** Build TTM metrics with utilities-aware EBITDA and loan-scheduled DSCR. */

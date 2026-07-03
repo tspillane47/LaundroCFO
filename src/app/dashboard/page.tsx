@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { getStoreValuation, getStoreDebt, getStoreScheduledDebtService, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
 import { calcEquipmentScore, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
-import { computeStoreDscr } from "@/lib/dscr";
+import { computeStoreDscr, shouldTriggerLowDscrAlert } from "@/lib/dscr";
 import {
   enrichMonthlyRecords,
   fetchStoreMonthlyFinancials,
@@ -485,13 +485,13 @@ export default function DashboardPage() {
       });
     }
 
-    if (hasFinancialData && dscrNum != null && dscrNum < 1.25) {
+    if (hasFinancialData && shouldTriggerLowDscrAlert(dscrNum, debtService)) {
       items.push({
         id: "dscr",
         severity: "urgent",
         severityLabel: "URGENT",
         title: "DSCR Below Threshold",
-        description: `Current DSCR of ${dscrNum.toFixed(2)}x is below the 1.25x minimum.`,
+        description: `Current DSCR of ${dscrNum!.toFixed(2)}x is below the 1.25x minimum.`,
         href: "/financials",
       });
     }
