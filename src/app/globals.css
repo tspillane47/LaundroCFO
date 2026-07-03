@@ -63,10 +63,11 @@
   --bg-warning-tint: rgba(245, 158, 11, 0.08);
   --bg-danger-tint: rgba(239, 68, 68, 0.08);
 
-  --toast-bg: rgba(15, 23, 42, 0.72);
+  --toast-bg: rgba(26, 36, 54, 0.96);
   --toast-text: #f1f5f9;
   --toast-text-muted: #94a3b8;
-  --toast-progress-track: rgba(255, 255, 255, 0.08);
+  --toast-progress-track: rgba(255, 255, 255, 0.12);
+  --toast-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(148, 163, 184, 0.16);
 }
 
 /* ============ REPORT MODE (print / light preview) ============ */
@@ -924,6 +925,8 @@ html, body {
 }
 
 .toast-visible {
+  opacity: 1;
+  transform: translateX(0) scale(1);
   transform-origin: top right;
 }
 

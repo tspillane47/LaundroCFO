@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type AnimationEvent } from "react";
+import { createPortal } from "react-dom";
 import clsx from "clsx";
 
 export type ToastType = "success" | "error" | "info";
@@ -24,21 +25,21 @@ const TYPE_STYLES: Record<
 > = {
   success: {
     accent: "#22c55e",
-    glow: "rgba(34, 197, 94, 0.35)",
-    shadow: "0 8px 32px rgba(34, 197, 94, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1)",
-    border: "rgba(34, 197, 94, 0.4)",
+    glow: "rgba(34, 197, 94, 0.45)",
+    shadow: "0 8px 32px rgba(34, 197, 94, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12)",
+    border: "rgba(34, 197, 94, 0.55)",
   },
   error: {
     accent: "#ef4444",
-    glow: "rgba(239, 68, 68, 0.35)",
-    shadow: "0 8px 32px rgba(239, 68, 68, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1)",
-    border: "rgba(239, 68, 68, 0.4)",
+    glow: "rgba(239, 68, 68, 0.45)",
+    shadow: "0 8px 32px rgba(239, 68, 68, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12)",
+    border: "rgba(239, 68, 68, 0.55)",
   },
   info: {
     accent: "#3b82f6",
-    glow: "rgba(59, 130, 246, 0.35)",
-    shadow: "0 8px 32px rgba(59, 130, 246, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1)",
-    border: "rgba(59, 130, 246, 0.4)",
+    glow: "rgba(59, 130, 246, 0.45)",
+    shadow: "0 8px 32px rgba(59, 130, 246, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12)",
+    border: "rgba(59, 130, 246, 0.55)",
   },
 };
 
@@ -157,13 +158,20 @@ export function Toast({ item, index, onDismiss }: ToastProps) {
   }, [clearTimer, dismiss]);
 
   useEffect(() => {
-    const enterTimer = setTimeout(() => setPhase("visible"), 20);
     scheduleDismiss();
+    const enterFallback = window.setTimeout(() => {
+      setPhase((current) => (current === "entering" ? "visible" : current));
+    }, 450);
     return () => {
-      clearTimeout(enterTimer);
       clearTimer();
+      window.clearTimeout(enterFallback);
     };
   }, [clearTimer, scheduleDismiss]);
+
+  function handleEnterAnimationEnd(event: AnimationEvent<HTMLDivElement>) {
+    if (event.animationName !== "toast-enter") return;
+    setPhase((current) => (current === "entering" ? "visible" : current));
+  }
 
   function handleMouseEnter() {
     if (phase === "exiting") return;
@@ -191,13 +199,13 @@ export function Toast({ item, index, onDismiss }: ToastProps) {
     >
       <div
         className={clsx(
-          "toast-item",
+          "toast-item toast-visible",
           phase === "entering" && "toast-enter",
-          phase === "visible" && "toast-visible",
           phase === "exiting" && "toast-exit"
         )}
         role="status"
         aria-live="polite"
+        onAnimationEnd={handleEnterAnimationEnd}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
@@ -206,7 +214,7 @@ export function Toast({ item, index, onDismiss }: ToastProps) {
         style={{
           background: "var(--toast-bg)",
           border: `1px solid ${styles.border}`,
-          boxShadow: `${styles.shadow}, 0 0 0 1px ${styles.glow} inset`,
+          boxShadow: `var(--toast-shadow), ${styles.shadow}, 0 0 0 1px ${styles.glow} inset`,
         }}
       >
         <div
@@ -272,11 +280,17 @@ type ToastViewportProps = {
 };
 
 export function ToastViewport({ toasts, onDismiss }: ToastViewportProps) {
-  if (toasts.length === 0) return null;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || toasts.length === 0) return null;
 
   const stackHeight = 80 + Math.max(0, toasts.length - 1) * 12;
 
-  return (
+  return createPortal(
     <div
       className="fixed top-4 right-4 z-[9999] pointer-events-none w-[min(360px,calc(100vw-2rem))]"
       style={{ height: stackHeight }}
@@ -285,6 +299,7 @@ export function ToastViewport({ toasts, onDismiss }: ToastViewportProps) {
       {toasts.map((toast, index) => (
         <Toast key={toast.id} item={toast} index={index} onDismiss={onDismiss} />
       ))}
-    </div>
+    </div>,
+    document.body
   );
 }
