@@ -18,6 +18,7 @@ import {
   preventEnterSubmit,
 } from "./shared";
 import { useToast } from "@/components/ui/ToastProvider";
+import { useAlertEvaluation } from "@/components/alerts/AlertNotificationProvider";
 
 type Lease = {
   id: string;
@@ -240,6 +241,7 @@ type Props = {
 export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: Props) {
   const supabase = createClient();
   const toast = useToast();
+  const { evaluateAlerts } = useAlertEvaluation();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -480,6 +482,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       setMode("view");
       setSaving(false);
       await loadData();
+      void evaluateAlerts({ storeIds: [store.id] });
     } catch (err) {
       console.error("Unexpected lease save error:", err);
       setSaveStatus("error");

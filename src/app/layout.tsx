@@ -21,6 +21,7 @@ import { BetaBanner } from "@/components/ui/BetaBanner";
 import { setTermsReturnPath } from "@/components/ui/TermsBackLink";
 import { BETA_MODE } from "@/lib/config";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import { AlertNotificationProvider } from "@/components/alerts/AlertNotificationProvider";
 import { isOnboardingComplete } from "@/lib/onboarding";
 
 const ADMIN_EMAIL = "tuckerspillane7@gmail.com";
@@ -804,7 +805,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Suspense fallback={<OnboardingGuardFallback />}>
             <OnboardingGuard>
               <StoreProvider>
-                <AppShell>{children}</AppShell>
+                <AlertNotificationProvider>
+                  <AppShell>{children}</AppShell>
+                </AlertNotificationProvider>
               </StoreProvider>
             </OnboardingGuard>
           </Suspense>

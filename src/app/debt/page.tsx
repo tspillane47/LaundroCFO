@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
+import { useAlertEvaluation } from "@/components/alerts/AlertNotificationProvider";
 import { getStoreValuation } from "@/lib/getStoreValuation";
 import type { ValuationResult } from "@/lib/valuation";
 import {
@@ -282,6 +283,7 @@ export default function DebtPage() {
   const supabase = createClient();
   const { selectedStore, isAllStores, stores } = useStores();
   const toast = useToast();
+  const { evaluateAlerts } = useAlertEvaluation();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -530,6 +532,9 @@ export default function DebtPage() {
       closeForm();
       setSaving(false);
       await loadData();
+      if (selectedStore?.id) {
+        void evaluateAlerts({ storeIds: [selectedStore.id] });
+      }
     } catch (err) {
       console.error("Unexpected loan save error:", err);
       setSaveStatus("error");
@@ -552,6 +557,9 @@ export default function DebtPage() {
     } else {
       toast.success("Loan deleted");
       await loadData();
+      if (selectedStore?.id) {
+        void evaluateAlerts({ storeIds: [selectedStore.id] });
+      }
     }
     setDeletingId(null);
   }

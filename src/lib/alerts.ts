@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ToastType } from "@/components/ui/Toast";
 import {
   generateStoreFeed,
+  isPositiveEventAlertKey,
   type FeedItem,
   type StoreFeedOptions,
 } from "@/lib/intelligence";
@@ -36,6 +38,13 @@ export type PersistableAlert = {
   body: string;
 };
 
+export type PositiveEventAlert = {
+  alert_key: string;
+  severity: "success";
+  title: string;
+  body: string;
+};
+
 export type StoreAlertRow = {
   id: string;
   alert_key: string;
@@ -54,6 +63,20 @@ export type StoreAlertSyncResult = {
   inserted: number;
   resolved: number;
   updated: number;
+  positiveInserted: number;
+};
+
+export type StoredStoreAlert = {
+  id: string;
+  store_id: string;
+  alert_key: string;
+  severity: string;
+  title: string;
+  body: string;
+  created_at: string;
+  toast_shown_at: string | null;
+  resolved_at: string | null;
+  storeName?: string;
 };
 
 const CATEGORY_ACTION: Record<string, { action: string; label: string }> = {
@@ -129,13 +152,16 @@ export function planStoreAlertSync(
   current: PersistableAlert[],
   activeRows: StoreAlertRow[]
 ): StoreAlertSyncPlan {
+  const conditionActiveRows = activeRows.filter(
+    (row) => !isPositiveEventAlertKey(row.alert_key)
+  );
   const currentByKey = new Map(current.map((alert) => [alert.alert_key, alert]));
   const currentKeys = new Set(current.map((alert) => alert.alert_key));
-  const activeByKey = new Map(activeRows.map((row) => [row.alert_key, row]));
+  const activeByKey = new Map(conditionActiveRows.map((row) => [row.alert_key, row]));
 
   const toInsert = current.filter((alert) => !activeByKey.has(alert.alert_key));
-  const toResolve = activeRows.filter((row) => !currentKeys.has(row.alert_key));
-  const toUpdate = activeRows
+  const toResolve = conditionActiveRows.filter((row) => !currentKeys.has(row.alert_key));
+  const toUpdate = conditionActiveRows
     .filter((row) => currentKeys.has(row.alert_key))
     .map((row) => ({ row, alert: currentByKey.get(row.alert_key)! }))
     .filter(
@@ -146,6 +172,41 @@ export function planStoreAlertSync(
     );
 
   return { toInsert, toResolve, toUpdate };
+}
+
+export function feedItemsToPositiveEvents(items: FeedItem[]): PositiveEventAlert[] {
+  return items
+    .filter(
+      (item) =>
+        item.severity === "success" &&
+        (item.id.startsWith("revenue-up-") || item.id.startsWith("dscr-improved-"))
+    )
+    .map((item) => ({
+      alert_key: item.id,
+      severity: "success" as const,
+      title: cleanHeadline(item.headline),
+      body: cleanDescription(item.description),
+    }));
+}
+
+export function alertSeverityToToastType(
+  severity: string,
+  alertKey: string
+): ToastType {
+  if (severity === "danger") return "error";
+  if (severity === "warning") return "warning";
+  if (severity === "success") return "success";
+  if (isPositiveEventAlertKey(alertKey)) return "success";
+  return "info";
+}
+
+export function planToastShownUpdates(
+  unshownAlerts: Array<{ id: string }>,
+  alreadyMarkedIds: Set<string>
+): string[] {
+  return unshownAlerts
+    .map((alert) => alert.id)
+    .filter((id) => !alreadyMarkedIds.has(id));
 }
 
 export function feedItemsToActionItems(
@@ -288,7 +349,151 @@ export async function syncStoreAlerts(
     inserted = plan.toInsert.length;
   }
 
-  return { inserted, resolved, updated };
+  const positiveInserted = await syncPositiveEvents(supabase, params);
+
+  return { inserted, resolved, updated, positiveInserted };
+}
+
+export async function syncPositiveEvents(
+  supabase: SupabaseClient,
+  params: {
+    userId: string;
+    storeId: string;
+    feedItems: FeedItem[];
+  }
+): Promise<number> {
+  const events = feedItemsToPositiveEvents(params.feedItems);
+  if (events.length === 0) return 0;
+
+  const { data: existingRows, error: fetchError } = await supabase
+    .from("store_alerts")
+    .select("alert_key")
+    .eq("store_id", params.storeId)
+    .in(
+      "alert_key",
+      events.map((event) => event.alert_key)
+    );
+
+  if (fetchError) throw fetchError;
+
+  const existingKeys = new Set((existingRows ?? []).map((row) => row.alert_key));
+  const toInsert = events.filter((event) => !existingKeys.has(event.alert_key));
+  if (toInsert.length === 0) return 0;
+
+  const nowIso = new Date().toISOString();
+  const { error } = await supabase.from("store_alerts").insert(
+    toInsert.map((event) => ({
+      user_id: params.userId,
+      store_id: params.storeId,
+      alert_key: event.alert_key,
+      severity: event.severity,
+      title: event.title,
+      body: event.body,
+      resolved_at: nowIso,
+    }))
+  );
+
+  if (error) throw error;
+  return toInsert.length;
+}
+
+export async function fetchUnshownStoreAlerts(
+  supabase: SupabaseClient,
+  params: {
+    userId: string;
+    storeIds?: string[];
+  }
+): Promise<StoredStoreAlert[]> {
+  let query = supabase
+    .from("store_alerts")
+    .select("id, store_id, alert_key, severity, title, body, created_at, toast_shown_at, resolved_at")
+    .eq("user_id", params.userId)
+    .is("toast_shown_at", null)
+    .order("created_at", { ascending: true });
+
+  if (params.storeIds?.length) {
+    query = query.in("store_id", params.storeIds);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as StoredStoreAlert[];
+}
+
+export async function markAlertsToastShown(
+  supabase: SupabaseClient,
+  alertIds: string[]
+): Promise<void> {
+  if (alertIds.length === 0) return;
+
+  const nowIso = new Date().toISOString();
+  const { error } = await supabase
+    .from("store_alerts")
+    .update({ toast_shown_at: nowIso })
+    .in("id", alertIds);
+
+  if (error) throw error;
+}
+
+function storedAlertToAlertItem(
+  row: StoredStoreAlert,
+  storeName?: string
+): AlertItem {
+  const categoryTag = row.alert_key.includes("lease")
+    ? "lease"
+    : row.alert_key.includes("ins")
+      ? "insurance"
+      : row.alert_key.includes("equip")
+        ? "equipment"
+        : row.alert_key.includes("val")
+          ? "valuation"
+          : "financial";
+  const actionMeta = CATEGORY_ACTION[categoryTag] ?? null;
+  const isResolved =
+    row.severity === "success" || row.resolved_at != null;
+
+  return {
+    id: row.alert_key,
+    severity: row.severity as AlertItem["severity"],
+    title: row.title,
+    body: row.body,
+    tags: [categoryTag, row.severity],
+    action: actionMeta?.action ?? null,
+    actionLabel: actionMeta?.label ?? null,
+    resolved: isResolved,
+    storeId: row.store_id,
+    storeName,
+  };
+}
+
+export async function fetchPortfolioStoreAlerts(
+  supabase: SupabaseClient,
+  params: {
+    userId: string;
+    storeNamesById?: Record<string, string>;
+  }
+): Promise<AlertItem[]> {
+  const { data, error } = await supabase
+    .from("store_alerts")
+    .select("id, store_id, alert_key, severity, title, body, created_at, toast_shown_at, resolved_at")
+    .eq("user_id", params.userId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  const severityOrder = { danger: 0, warning: 1, info: 2, success: 3 };
+  return (data ?? [])
+    .map((row) =>
+      storedAlertToAlertItem(
+        row as StoredStoreAlert,
+        params.storeNamesById?.[row.store_id]
+      )
+    )
+    .sort(
+      (a, b) =>
+        (severityOrder[a.severity as keyof typeof severityOrder] ?? 9) -
+        (severityOrder[b.severity as keyof typeof severityOrder] ?? 9)
+    );
 }
 
 export async function syncPortfolioAlerts(
@@ -298,7 +503,12 @@ export async function syncPortfolioAlerts(
     stores: Array<{ id: string; feedItems: FeedItem[] }>;
   }
 ): Promise<StoreAlertSyncResult> {
-  const totals: StoreAlertSyncResult = { inserted: 0, resolved: 0, updated: 0 };
+  const totals: StoreAlertSyncResult = {
+    inserted: 0,
+    resolved: 0,
+    updated: 0,
+    positiveInserted: 0,
+  };
 
   for (const store of params.stores) {
     const result = await syncStoreAlerts(supabase, {
@@ -309,6 +519,7 @@ export async function syncPortfolioAlerts(
     totals.inserted += result.inserted;
     totals.resolved += result.resolved;
     totals.updated += result.updated;
+    totals.positiveInserted += result.positiveInserted;
   }
 
   return totals;

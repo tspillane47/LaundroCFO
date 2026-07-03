@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type AnimationEvent } from "r
 import { createPortal } from "react-dom";
 import clsx from "clsx";
 
-export type ToastType = "success" | "error" | "info";
+export type ToastType = "success" | "error" | "info" | "warning";
 
 export type ToastItem = {
   id: string;
@@ -40,6 +40,12 @@ const TYPE_STYLES: Record<
     glow: "rgba(59, 130, 246, 0.45)",
     shadow: "0 8px 32px rgba(59, 130, 246, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12)",
     border: "rgba(59, 130, 246, 0.55)",
+  },
+  warning: {
+    accent: "#f59e0b",
+    glow: "rgba(245, 158, 11, 0.45)",
+    shadow: "0 8px 32px rgba(245, 158, 11, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12)",
+    border: "rgba(245, 158, 11, 0.55)",
   },
 };
 
@@ -80,6 +86,27 @@ function ToastIcon({ type }: { type: ToastType }) {
         />
         <path
           d="M9 9l6 6M15 9l-6 6"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          className="toast-icon-stroke"
+        />
+      </svg>
+    );
+  }
+
+  if (type === "warning") {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M12 3.5L21.5 20H2.5L12 3.5Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+          className="toast-icon-stroke"
+        />
+        <path
+          d="M12 9.5v5.5M12 17.5h.01"
           stroke="currentColor"
           strokeWidth="2"
           strokeLinecap="round"

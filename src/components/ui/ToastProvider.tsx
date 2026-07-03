@@ -14,6 +14,7 @@ type ToastApi = {
   success: (message: string) => void;
   error: (message: string) => void;
   info: (message: string) => void;
+  warning: (message: string) => void;
 };
 
 const ToastContext = createContext<ToastApi | null>(null);
@@ -37,6 +38,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       success: (message) => addToast("success", message),
       error: (message) => addToast("error", message),
       info: (message) => addToast("info", message),
+      warning: (message) => addToast("warning", message),
     }),
     [addToast]
   );

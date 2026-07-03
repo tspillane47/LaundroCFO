@@ -9,6 +9,7 @@ import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { useToast } from "@/components/ui/ToastProvider";
+import { useAlertEvaluation } from "@/components/alerts/AlertNotificationProvider";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { PageError } from "@/components/ui/PageError";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -369,6 +370,7 @@ function TransactionsPageContent() {
   const supabase = useMemo(() => createClient(), []);
   const { selectedStore, loading: storesLoading } = useStores();
   const toast = useToast();
+  const { evaluateAlerts } = useAlertEvaluation();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -1082,6 +1084,7 @@ function TransactionsPageContent() {
     setReclassifyModal(null);
     toast.success("Transactions reclassified");
     await loadData();
+    if (store?.id) void evaluateAlerts({ storeIds: [store.id] });
   }
 
   function openBulkReclassifyModal() {
@@ -1157,6 +1160,7 @@ function TransactionsPageContent() {
       toast.success("Transactions reclassified");
     }
     await loadData();
+    if (store?.id) void evaluateAlerts({ storeIds: [store.id] });
   }
 
   function handleBulkExclude() {
@@ -1295,6 +1299,7 @@ function TransactionsPageContent() {
     setStagedCsv([]);
     toast.success(`CSV imported — ${rows.length} transaction${rows.length === 1 ? "" : "s"} added`);
     await loadData();
+    if (store?.id) void evaluateAlerts({ storeIds: [store.id] });
   }
 
   function openRuleForm(
@@ -1440,6 +1445,7 @@ function TransactionsPageContent() {
       });
       clearRuleApplyFlow();
       await loadData();
+      void evaluateAlerts({ storeIds: [store.id] });
     } finally {
       setRulePostBusy(false);
     }

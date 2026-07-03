@@ -21,6 +21,7 @@ import {
 import { createClient } from "@/lib/supabase";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { useStores } from "@/lib/store-context";
+import { useAlertEvaluation } from "@/components/alerts/AlertNotificationProvider";
 import { fmtDollar, fmtMultiple, fmtPct } from "@/lib/calculations";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DSCRCard } from "@/components/ui/DSCRCard";
@@ -275,6 +276,7 @@ function normalizeTransactionAmount(amount: number, field: PlCategoryField): num
 export default function FinancialsPage() {
   const supabase = createClient();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
+  const { evaluateAlerts } = useAlertEvaluation();
 
   const [activeTab, setActiveTab] = useState<TabId>("pl");
   const [loading, setLoading] = useState(true);
@@ -579,6 +581,7 @@ export default function FinancialsPage() {
       invalidateValuationCache(store.id);
       setSaveStatus("success");
       setSuccess(`${MONTH_NAMES[selectedMonth - 1]} ${selectedYear} saved successfully.`);
+      void evaluateAlerts({ storeIds: [store.id] });
       setTimeout(() => {
         setShowForm(false);
         setSaveStatus("idle");
@@ -687,6 +690,9 @@ export default function FinancialsPage() {
 
     setSuccess(`Posted to ${MONTH_NAMES[month - 1]} ${year} P&L (${CATEGORY_LABELS[category]}).`);
     await loadData();
+    if (store?.id) {
+      void evaluateAlerts({ storeIds: [store.id] });
+    }
   }
 
   async function ignoreTransaction(txn: BankTransaction | StagedTransaction, isStaged: boolean) {

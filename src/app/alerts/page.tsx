@@ -5,9 +5,8 @@ import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
-import { generatePortfolioAlerts, type AlertItem } from "@/lib/alerts";
-import { getStoreValuation } from "@/lib/getStoreValuation";
-import type { StoreFeedOptions } from "@/lib/intelligence";
+import { fetchPortfolioStoreAlerts, type AlertItem } from "@/lib/alerts";
+import { useAlertEvaluation } from "@/components/alerts/AlertNotificationProvider";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
@@ -57,6 +56,7 @@ export default function AlertsPage() {
   const router = useRouter();
   const supabase = createClient();
   const { stores, loading: storesLoading, setSelectedStore, setIsAllStores } = useStores();
+  const { evaluateAlerts } = useAlertEvaluation();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
@@ -72,74 +72,25 @@ export default function AlertsPage() {
     setLoadError(false);
 
     try {
-      const storeIds = stores.map((s) => s.id);
-      const [{ data: leasesData, error: leaseError }, { data: equipmentData, error: equipError }, { data: insuranceData, error: insError }, { data: loansData, error: loansError }] =
-        await Promise.all([
-          supabase.from("leases").select("*").in("store_id", storeIds),
-          supabase.from("equipment_inventory").select("*").in("store_id", storeIds),
-          supabase
-            .from("insurance_policies")
-            .select("*")
-            .in("store_id", storeIds)
-            .eq("is_active", true),
-          supabase
-            .from("store_loans")
-            .select("store_id, monthly_payment")
-            .in("store_id", storeIds)
-            .eq("is_active", true),
-        ]);
+      await evaluateAlerts();
 
-      if (leaseError) throw leaseError;
-      if (equipError) throw equipError;
-      if (insError) throw insError;
-      if (loansError) throw loansError;
-
-      const leasesByStore: Record<string, Record<string, unknown>> = {};
-      for (const l of leasesData ?? []) {
-        if (!leasesByStore[l.store_id]) leasesByStore[l.store_id] = l;
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setAlerts([]);
+        return;
       }
 
-      const equipmentByStore: Record<string, Record<string, unknown>[]> = {};
-      for (const e of equipmentData ?? []) {
-        if (!equipmentByStore[e.store_id]) equipmentByStore[e.store_id] = [];
-        equipmentByStore[e.store_id].push(e);
-      }
-
-      const insuranceByStore: Record<string, Record<string, unknown>[]> = {};
-      for (const p of insuranceData ?? []) {
-        if (!insuranceByStore[p.store_id]) insuranceByStore[p.store_id] = [];
-        insuranceByStore[p.store_id].push(p);
-      }
-
-      const scheduledDebtServiceByStore: Record<string, number> = {};
-      for (const loan of loansData ?? []) {
-        const storeId = String(loan.store_id);
-        scheduledDebtServiceByStore[storeId] =
-          (scheduledDebtServiceByStore[storeId] ?? 0) + (loan.monthly_payment ?? 0) * 12;
-      }
-
-      const valuations = await Promise.all(stores.map((store) => getStoreValuation(store.id)));
-      const feedOptionsByStore: Record<string, StoreFeedOptions> = {};
-      stores.forEach((store, index) => {
-        const storeId = String(store.id);
-        feedOptionsByStore[storeId] = {
-          resolvedFinancials: valuations[index]?.resolvedFinancials,
-          monthlyUtilities: store.monthly_utilities,
-          isOwnerOccupied: store.occupancy_type === "owner_occupied",
-        };
-      });
+      const storeNamesById = Object.fromEntries(
+        stores.map((store) => [String(store.id), String(store.name ?? "Store")])
+      );
 
       setAlerts(
-        generatePortfolioAlerts(
-          stores,
-          leasesByStore,
-          equipmentByStore,
-          insuranceByStore,
-          {
-            scheduledDebtServiceByStore,
-            feedOptionsByStore,
-          }
-        )
+        await fetchPortfolioStoreAlerts(supabase, {
+          userId: user.id,
+          storeNamesById,
+        })
       );
     } catch {
       setLoadError(true);
@@ -147,7 +98,7 @@ export default function AlertsPage() {
     } finally {
       setLoading(false);
     }
-  }, [stores, supabase]);
+  }, [stores, supabase, evaluateAlerts]);
 
   useEffect(() => {
     if (storesLoading) return;
@@ -155,7 +106,12 @@ export default function AlertsPage() {
   }, [storesLoading, loadData]);
 
   const { active, resolved } = useMemo(() => {
-    const activeItems = alerts.filter((a) => !a.resolved && (a.severity === "danger" || a.severity === "warning" || a.severity === "info"));
+    const activeItems = alerts.filter(
+      (a) =>
+        !a.resolved &&
+        a.severity !== "success" &&
+        (a.severity === "danger" || a.severity === "warning" || a.severity === "info")
+    );
     const resolvedItems = alerts.filter((a) => a.resolved || a.severity === "success");
     return { active: activeItems, resolved: resolvedItems };
   }, [alerts]);

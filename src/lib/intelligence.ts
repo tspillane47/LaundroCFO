@@ -24,13 +24,88 @@ export type StoreFeedFinancials = {
   source: 'ttm' | 'none';
 };
 
+export type PositiveEventInput = {
+  revenueUp?: {
+    currentRevenue: number;
+    priorRevenue: number;
+    periodKey: string;
+  };
+  dscrImproved?: {
+    currentDscr: number;
+    previousDscr: number;
+  };
+};
+
 export type StoreFeedOptions = {
   scheduledAnnualDebtService?: number;
   resolvedFinancials?: StoreFeedFinancials | null;
   monthlyUtilities?: number;
   isOwnerOccupied?: boolean;
   valuationMonthlyChange?: number;
+  positiveEvents?: PositiveEventInput;
 };
+
+const POSITIVE_EVENT_PREFIXES = ["revenue-up-", "dscr-improved-", "val-change-"] as const;
+
+export function isPositiveEventAlertKey(alertKey: string): boolean {
+  return POSITIVE_EVENT_PREFIXES.some((prefix) => alertKey.includes(prefix));
+}
+
+export function buildRevenuePeriodKey(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+/** Parse DSCR values from alert title/body text (e.g. "1.10x"). */
+export function parseDscrFromAlertText(text: string): number | null {
+  const match = text.match(/(\d+(?:\.\d+)?)x/i);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
+export function appendPositiveFeedItems(
+  store: { id: string; name?: string },
+  items: FeedItemDraft[],
+  now: Date,
+  positiveEvents?: PositiveEventInput
+): void {
+  if (!positiveEvents) return;
+
+  if (positiveEvents.revenueUp) {
+    const { currentRevenue, priorRevenue, periodKey } = positiveEvents.revenueUp;
+    if (currentRevenue > priorRevenue && priorRevenue > 0) {
+      const change = currentRevenue - priorRevenue;
+      const pct = ((change / priorRevenue) * 100).toFixed(1);
+      items.push({
+        id: `revenue-up-${store.id}-${periodKey}`,
+        date: formatDate(now),
+        category: "financial",
+        icon: "📈",
+        headline: "Revenue Increased",
+        description: `Monthly revenue rose $${Math.round(change).toLocaleString()} (${pct}%) vs. the prior month.`,
+        severity: "success",
+        storeName: store.name,
+      });
+    }
+  }
+
+  if (positiveEvents.dscrImproved) {
+    const { currentDscr, previousDscr } = positiveEvents.dscrImproved;
+    if (currentDscr > previousDscr + 0.005) {
+      const delta = currentDscr - previousDscr;
+      items.push({
+        id: `dscr-improved-${store.id}-${currentDscr.toFixed(2)}`,
+        date: formatDate(now),
+        category: "financial",
+        icon: "🏦",
+        headline: "DSCR Improved",
+        description: `DSCR rose from ${previousDscr.toFixed(2)}x to ${currentDscr.toFixed(2)}x (+${delta.toFixed(2)}x).`,
+        severity: "success",
+        storeName: store.name,
+      });
+    }
+  }
+}
 
 type FeedItemDraft = Omit<FeedItem, "storeId">;
 
@@ -343,6 +418,8 @@ export function generateStoreFeed(
       storeName: store.name,
     });
   }
+
+  appendPositiveFeedItems(store, items, now, options?.positiveEvents);
 
   // Sort by severity: danger first, then warning, then success, then info
   const order = { danger: 0, warning: 1, success: 2, info: 3 };

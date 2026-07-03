@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  alertSeverityToToastType,
   feedItemsToPersistableAlerts,
+  feedItemsToPositiveEvents,
   planStoreAlertSync,
+  planToastShownUpdates,
   type StoreAlertRow,
 } from "@/lib/alerts";
-import { generateStoreFeed } from "@/lib/intelligence";
+import { compareMonthlyRevenue } from "@/lib/alertEvaluation";
+import {
+  buildRevenuePeriodKey,
+  generateStoreFeed,
+  parseDscrFromAlertText,
+} from "@/lib/intelligence";
 
 const STORE_ID = "store-123";
 
@@ -19,6 +27,102 @@ function makeStore(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+describe("positive event detection", () => {
+  it("emits revenue-up when current month beats prior month", () => {
+    const items = generateStoreFeed(makeStore(), undefined, [], [], {
+      positiveEvents: {
+        revenueUp: {
+          currentRevenue: 55000,
+          priorRevenue: 50000,
+          periodKey: "2026-06",
+        },
+      },
+    });
+
+    const event = items.find((item) => item.id === `revenue-up-${STORE_ID}-2026-06`);
+    expect(event?.severity).toBe("success");
+    expect(event?.headline).toBe("Revenue Increased");
+    expect(event?.description).toContain("10.0%");
+  });
+
+  it("emits dscr-improved when current DSCR is higher", () => {
+    const items = generateStoreFeed(makeStore(), undefined, [], [], {
+      positiveEvents: {
+        dscrImproved: {
+          currentDscr: 1.42,
+          previousDscr: 1.1,
+        },
+      },
+    });
+
+    const event = items.find((item) => item.id === `dscr-improved-${STORE_ID}-1.42`);
+    expect(event?.severity).toBe("success");
+    expect(event?.headline).toBe("DSCR Improved");
+    expect(event?.description).toContain("1.10x");
+    expect(event?.description).toContain("1.42x");
+  });
+
+  it("compares monthly revenue using sorted financial records", () => {
+    const comparison = compareMonthlyRevenue([
+      { year: 2026, month: 5, revenue: 50000 } as any,
+      { year: 2026, month: 6, revenue: 55000 } as any,
+    ]);
+
+    expect(comparison).toEqual({
+      currentRevenue: 55000,
+      priorRevenue: 50000,
+      periodKey: buildRevenuePeriodKey(2026, 6),
+    });
+  });
+
+  it("parses DSCR values from alert text", () => {
+    expect(parseDscrFromAlertText("Current DSCR of 1.10x is below the 1.25x minimum.")).toBe(1.1);
+  });
+
+  it("maps positive events for one-time persistence", () => {
+    const items = generateStoreFeed(makeStore(), undefined, [], [], {
+      positiveEvents: {
+        revenueUp: {
+          currentRevenue: 55000,
+          priorRevenue: 50000,
+          periodKey: "2026-06",
+        },
+      },
+    });
+
+    const positive = feedItemsToPositiveEvents(items);
+    expect(positive).toHaveLength(1);
+    expect(positive[0].alert_key).toBe(`revenue-up-${STORE_ID}-2026-06`);
+    expect(positive[0].severity).toBe("success");
+  });
+});
+
+describe("toast mapping and shown tracking", () => {
+  it("maps alert severities to toast colors", () => {
+    expect(alertSeverityToToastType("danger", "dscr-x")).toBe("error");
+    expect(alertSeverityToToastType("warning", "utility-x")).toBe("warning");
+    expect(alertSeverityToToastType("info", "val-change-x")).toBe("success");
+    expect(alertSeverityToToastType("success", "revenue-up-x")).toBe("success");
+    expect(alertSeverityToToastType("info", "ins-premium-x")).toBe("info");
+  });
+
+  it("only marks alerts that have not been toasted yet", () => {
+    const ids = planToastShownUpdates(
+      [{ id: "a" }, { id: "b" }, { id: "c" }],
+      new Set(["b"])
+    );
+    expect(ids).toEqual(["a", "c"]);
+  });
+
+  it("calling toast plan twice after marking shows nothing left to toast", () => {
+    const firstPass = planToastShownUpdates([{ id: "a" }], new Set());
+    expect(firstPass).toEqual(["a"]);
+
+    const secondPass = planToastShownUpdates([{ id: "a" }], new Set(firstPass));
+    expect(secondPass).toEqual([]);
+  });
+});
 
 describe("planStoreAlertSync", () => {
   const current = [
@@ -114,6 +218,22 @@ describe("planStoreAlertSync", () => {
     expect(plan.toResolve).toHaveLength(0);
     expect(plan.toUpdate).toHaveLength(1);
     expect(plan.toUpdate[0].alert.title).toBe("DSCR Below Threshold");
+  });
+
+  it("does not resolve point-in-time positive event rows", () => {
+    const activeRows: StoreAlertRow[] = [
+      {
+        id: "row-positive",
+        alert_key: `revenue-up-${STORE_ID}-2026-06`,
+        title: "Revenue Increased",
+        body: "Monthly revenue rose.",
+        severity: "success",
+      },
+    ];
+
+    const plan = planStoreAlertSync([], activeRows);
+    expect(plan.toResolve).toHaveLength(0);
+    expect(plan.toInsert).toHaveLength(0);
   });
 });
 

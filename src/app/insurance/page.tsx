@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
+import { useAlertEvaluation } from "@/components/alerts/AlertNotificationProvider";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -448,6 +449,7 @@ export default function InsurancePage() {
   const supabase = createClient();
   const { selectedStore } = useStores();
   const toast = useToast();
+  const { evaluateAlerts } = useAlertEvaluation();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -723,6 +725,9 @@ export default function InsurancePage() {
       toast.success(editingPolicyId ? "Policy updated" : "Policy added");
       closePolicyForm();
       await loadData();
+      if (selectedStore?.id) {
+        void evaluateAlerts({ storeIds: [selectedStore.id] });
+      }
     } catch (err) {
       console.error("Unexpected insurance policy save error:", err);
       setSaveStatus("error");
