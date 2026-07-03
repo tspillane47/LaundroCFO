@@ -34,6 +34,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
 import { DesktopOnlyGate } from "@/components/ui/DesktopOnlyGate";
 import { useToast } from "@/components/ui/ToastProvider";
+import { ScenarioIcon } from "@/components/ui/ScenarioIcon";
 
 type SliderConfig = {
   label: string;
@@ -405,7 +406,7 @@ function ScenariosPageContent() {
                 )}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-lg">{opp.emoji}</span>
+                  <ScenarioIcon name={opp.icon} size={16} />
                   <span className="text-[12px] font-bold text-[var(--text-primary)]">
                     #{opp.rank} {opp.title}
                   </span>
@@ -455,8 +456,9 @@ function ScenariosPageContent() {
 
         <div className="card xl:sticky xl:top-0 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
           <div className="flex items-start justify-between gap-2 mb-4">
-            <div className="text-[13px] font-bold text-[var(--text-primary)]">
-              {liveScenario.emoji} {liveScenario.title}
+            <div className="flex items-center gap-2 text-[13px] font-bold text-[var(--text-primary)]">
+              <ScenarioIcon name={liveScenario.icon} size={16} />
+              {liveScenario.title}
             </div>
             <button
               type="button"
@@ -728,10 +730,16 @@ function ComparePanel({
                 Metric
               </th>
               <th className="text-right py-2 text-[var(--text-primary)] font-semibold">
-                {scenarioA.emoji} {scenarioA.title}
+                <span className="inline-flex items-center justify-end gap-1.5">
+                  <ScenarioIcon name={scenarioA.icon} />
+                  {scenarioA.title}
+                </span>
               </th>
               <th className="text-right py-2 text-[var(--text-primary)] font-semibold">
-                {scenarioB.emoji} {scenarioB.title}
+                <span className="inline-flex items-center justify-end gap-1.5">
+                  <ScenarioIcon name={scenarioB.icon} />
+                  {scenarioB.title}
+                </span>
               </th>
             </tr>
           </thead>
@@ -1014,8 +1022,9 @@ function ScenarioCard({
         </span>
       )}
 
-      <div className="text-[13px] font-semibold text-[var(--text-primary)] pr-10">
-        {scenario.emoji} {scenario.title}
+      <div className="flex items-center gap-2 text-[13px] font-semibold text-[var(--text-primary)] pr-10">
+        <ScenarioIcon name={scenario.icon} size={16} />
+        {scenario.title}
       </div>
       <div className="text-[11px] text-[var(--text-muted)] mt-1">
         {scenario.description}

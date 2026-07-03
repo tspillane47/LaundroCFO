@@ -3,9 +3,22 @@ import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import { resolveStoreFinancials, type ResolvedStoreFinancials } from "@/lib/getStoreValuation";
 import { calcValuation, type ValuationInputs, type ValuationResult } from "@/lib/valuation";
 
+export const SCENARIO_ICON_NAMES = [
+  "Wrench",
+  "TrendingUp",
+  "Zap",
+  "Building2",
+  "Shirt",
+  "ArrowUp",
+  "BriefcaseBusiness",
+  "Truck",
+] as const;
+
+export type ScenarioIconName = (typeof SCENARIO_ICON_NAMES)[number];
+
 export type ScenarioResult = {
   id: string;
-  emoji: string;
+  icon: ScenarioIconName;
   title: string;
   description: string;
   currentValue: number;
@@ -160,60 +173,60 @@ function retoolEquipmentScore(age: number): number {
 
 const SCENARIO_META: Record<
   string,
-  Pick<ScenarioResult, "id" | "emoji" | "title" | "description" | "note">
+  Pick<ScenarioResult, "id" | "icon" | "title" | "description" | "note">
 > = {
   retool: {
     id: "retool",
-    emoji: "🔧",
+    icon: "Wrench",
     title: "Retool with New Equipment",
     description: "Replace full washer/dryer fleet",
     note: "New equipment lowers avg age and boosts valuation multiple through equipment quality adjustments.",
   },
   revenue: {
     id: "revenue",
-    emoji: "📈",
+    icon: "TrendingUp",
     title: "Increase Revenue 10%",
     description: "Add WDF, extend hours, marketing",
     note: "Revenue growth lifts annual EBITDA and store value proportionally.",
   },
   utility: {
     id: "utility",
-    emoji: "⚡",
+    icon: "Zap",
     title: "Reduce Utility Ratio 3%",
     description: "Solar, LED, efficient equipment",
     note: "Cutting utility costs flows directly to EBITDA and valuation.",
   },
   lease: {
     id: "lease",
-    emoji: "📋",
+    icon: "Building2",
     title: "Extend Lease 5 Years",
     description: "Negotiate early extension with landlord",
     note: "Extending lease control improves lender confidence and adds to the valuation multiple.",
   },
   wdf: {
     id: "wdf",
-    emoji: "👕",
+    icon: "Shirt",
     title: "Add WDF Service",
     description: "Wash-dry-fold service line",
     note: "WDF adds high-margin recurring revenue with minimal equipment cost.",
   },
   rent: {
     id: "rent",
-    emoji: "⬆️",
+    icon: "ArrowUp",
     title: "Rent Increase",
     description: "Landlord raises rent at renewal",
     note: "A rent increase compresses EBITDA and reduces store value.",
   },
   commercial: {
     id: "commercial",
-    emoji: "🏢",
+    icon: "BriefcaseBusiness",
     title: "Lose Commercial Account",
     description: "Lose hotel/restaurant contract",
     note: "Losing commercial revenue materially reduces EBITDA and value.",
   },
   delivery: {
     id: "delivery",
-    emoji: "🚐",
+    icon: "Truck",
     title: "Add Pickup & Delivery",
     description: "Driver + van + route optimization",
     note: "P&D adds route revenue with incremental operating costs.",
@@ -329,7 +342,7 @@ function makeScenario(
       : 0;
   return {
     id: base.id,
-    emoji: base.emoji,
+    icon: base.icon,
     title: base.title,
     description: base.description,
     currentValue: Math.round(base.baselineValue),
@@ -412,7 +425,7 @@ export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
   return [
     makeScenario({
       id: "retool",
-      emoji: "🔧",
+      icon: "Wrench",
       title: "Retool with New Equipment",
       description: "Replace full washer/dryer fleet",
       baselineValue,
@@ -429,7 +442,7 @@ export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
     }),
     makeScenario({
       id: "revenue",
-      emoji: "📈",
+      icon: "TrendingUp",
       title: "Increase Revenue 10%",
       description: "Add WDF, extend hours, marketing",
       baselineValue,
@@ -448,7 +461,7 @@ export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
     }),
     makeScenario({
       id: "utility",
-      emoji: "⚡",
+      icon: "Zap",
       title: "Reduce Utility Ratio 3%",
       description: "Solar, LED, efficient equipment",
       baselineValue,
@@ -464,7 +477,7 @@ export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
     }),
     makeScenario({
       id: "lease",
-      emoji: "📋",
+      icon: "Building2",
       title: "Extend Lease 5 Years",
       description: "Negotiate early extension with landlord",
       baselineValue,
@@ -480,7 +493,7 @@ export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
     }),
     makeScenario({
       id: "wdf",
-      emoji: "👕",
+      icon: "Shirt",
       title: "Add WDF Service",
       description: "Wash-dry-fold at $1.75/lb",
       baselineValue,
@@ -496,7 +509,7 @@ export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
     }),
     makeScenario({
       id: "rent",
-      emoji: "⬆️",
+      icon: "ArrowUp",
       title: "Rent Increase",
       description: "Landlord raises rent at renewal",
       baselineValue,
@@ -512,7 +525,7 @@ export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
     }),
     makeScenario({
       id: "commercial",
-      emoji: "🏢",
+      icon: "BriefcaseBusiness",
       title: "Lose Commercial Account",
       description: "Lose hotel/restaurant contract",
       baselineValue,
@@ -528,7 +541,7 @@ export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
     }),
     makeScenario({
       id: "delivery",
-      emoji: "🚐",
+      icon: "Truck",
       title: "Add Pickup & Delivery",
       description: "Driver + van + route optimization",
       baselineValue,
@@ -747,7 +760,7 @@ export function computeInteractiveScenario(
 
   const result = makeScenario({
     id: baseMeta.id,
-    emoji: baseMeta.emoji,
+    icon: baseMeta.icon,
     title: baseMeta.title,
     description: baseMeta.description,
     baselineValue,
