@@ -19,12 +19,11 @@ import { Logo } from "@/components/ui/Logo";
 import { FeedbackModal } from "@/components/ui/FeedbackModal";
 import { BetaBanner } from "@/components/ui/BetaBanner";
 import { setTermsReturnPath } from "@/components/ui/TermsBackLink";
-import { BETA_MODE } from "@/lib/config";
+import { useBetaMode } from "@/lib/useBetaMode";
+import { isAdminEmail } from "@/lib/admin";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { AlertNotificationProvider } from "@/components/alerts/AlertNotificationProvider";
 import { isOnboardingComplete } from "@/lib/onboarding";
-
-const ADMIN_EMAIL = "tuckerspillane7@gmail.com";
 
 function getUserInitials(fullName: string | null, email: string | null): string {
   const name = fullName?.trim();
@@ -99,6 +98,7 @@ const pageTitles: Record<string, string> = {
   "/settings": "Settings",
   "/settings/manage-stores": "Manage Stores",
   "/settings/edit-store": "Edit Store",
+  "/admin": "Admin",
   "/admin/feedback": "Feedback Admin",
 };
 
@@ -192,6 +192,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+  const { betaMode } = useBetaMode();
   const { stores, selectedStore, setSelectedStore, isAllStores, setIsAllStores, loading: storesLoading } = useStores();
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
   const [storeSearch, setStoreSearch] = useState("");
@@ -222,7 +223,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       } = await supabase.auth.getUser();
       if (cancelled || !user) return;
 
-      setIsAdminUser(user.email === ADMIN_EMAIL);
+      setIsAdminUser(isAdminEmail(user.email));
       setUserEmail(user.email ?? null);
 
       const { data: profile } = await supabase
@@ -329,7 +330,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         ...section,
         items: [
           ...section.items,
-          { href: "/admin/feedback", label: "Admin", icon: "admin" },
+          { href: "/admin", label: "Admin", icon: "admin" },
         ],
       };
     });
@@ -421,7 +422,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
           style={{ borderColor: "var(--border)" }}
         >
           <Logo variant="sidebar" />
-          {BETA_MODE && (
+          {betaMode && (
             <span className="sidebar-brand-badge badge badge-blue text-[9px] px-1.5 py-0.5 font-semibold uppercase tracking-wide">
               Beta
             </span>

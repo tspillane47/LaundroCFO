@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BETA_MODE } from "@/lib/config";
+import { useBetaMode } from "@/lib/useBetaMode";
 
 const DISMISS_KEY = "laundrocfo_beta_banner_dismissed";
 
@@ -10,13 +10,14 @@ type BetaBannerProps = {
 };
 
 export function BetaBanner({ onFeedbackClick }: BetaBannerProps) {
+  const { betaMode } = useBetaMode();
   const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
     setDismissed(localStorage.getItem(DISMISS_KEY) === "1");
   }, []);
 
-  if (!BETA_MODE || dismissed) return null;
+  if (!betaMode || dismissed) return null;
 
   function handleDismiss() {
     localStorage.setItem(DISMISS_KEY, "1");

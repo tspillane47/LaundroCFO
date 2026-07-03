@@ -4,11 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
+import { isAdminEmail } from "@/lib/admin";
 import { FEEDBACK_TYPES } from "@/components/ui/FeedbackModal";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
-
-const ADMIN_EMAIL = "tuckerspillane7@gmail.com";
 
 const STATUS_OPTIONS = [
   { value: "new", label: "New" },
@@ -99,7 +98,7 @@ export default function AdminFeedbackPage() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (!user || user.email !== ADMIN_EMAIL) {
+      if (!user || !isAdminEmail(user.email)) {
         router.replace("/dashboard");
         return;
       }

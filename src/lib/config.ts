@@ -1,4 +1,4 @@
-export const BETA_MODE = true;
+export const BETA_MODE = true; // Fallback default when app_settings.beta_mode cannot be read
 
 export const PLANS = {
   starter: { name: "Starter", price: 29, maxStores: 1 },

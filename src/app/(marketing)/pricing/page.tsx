@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { BETA_MODE, PLANS } from "@/lib/config";
+import { PLANS } from "@/lib/config";
+import { useBetaMode } from "@/lib/useBetaMode";
 
 const tiers = [
   {
@@ -43,12 +44,13 @@ const tiers = [
 ];
 
 export default function PricingPage() {
-  const ctaLabel = BETA_MODE ? "Join Beta — Free" : "Get Started";
+  const { betaMode } = useBetaMode();
+  const ctaLabel = betaMode ? "Join Beta — Free" : "Get Started";
 
   return (
     <div className="pt-32 pb-24 bg-[var(--bg-page)]">
       <div className="max-w-5xl mx-auto px-6 space-y-8">
-        {BETA_MODE && (
+        {betaMode && (
           <div className="rounded-lg px-4 py-3 text-center text-[13px] font-medium border border-blue-200 bg-blue-50 text-blue-700">
             LaundroCFO is free during beta — all features unlocked
           </div>
@@ -57,7 +59,7 @@ export default function PricingPage() {
         <div className="text-center">
           <h1 className="text-[32px] font-bold tracking-tight text-slate-900">Pricing</h1>
           <p className="text-[15px] mt-2 text-slate-500">
-            {BETA_MODE
+            {betaMode
               ? "All plans are free during beta. Paid tiers launch when beta ends."
               : "Simple plans that scale with your portfolio."}
           </p>
