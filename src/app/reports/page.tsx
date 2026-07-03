@@ -102,7 +102,7 @@ function ReportMetricTile({ label, value }: { label: string; value: string }) {
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-3 pb-2.5border-b border-[var(--border)]">
+    <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-3 pb-2.5 border-b border-[var(--border)]">
       {children}
     </div>
   );
@@ -628,7 +628,7 @@ function ReportsPageContent() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[15px] font-semibold text-slate-100">
+          <h1 className="text-[15px] font-semibold text-[var(--text-primary)]">
             {reportMode === "portfolio" ? "Portfolio Underwriting Report" : "Underwriting Report"}
           </h1>
           <p className="text-[var(--text-muted)] text-[12px] mt-0.5">
@@ -704,7 +704,7 @@ function ReportsPageContent() {
       {reportMode === "portfolio" && portfolioReady && totals && cashFlow && (
         <>
           <div className="hero-value-card">
-            <div style={{ fontSize: "12px", color: "#93c5fd", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
+            <div className="hero-card-label">
               Portfolio Net Worth
             </div>
             <AnimatedNumber value={totals.portfolioNetWorth} prefix="$" className="hero-value-text" duration={1200} />
@@ -739,7 +739,7 @@ function ReportsPageContent() {
             <div className="table-scroll">
               <table className="w-full text-[12px] min-w-[900px]">
                 <thead>
-                  <tr className="text-left text-[var(--text-secondary)]border-b border-[var(--border)]">
+                  <tr className="text-left text-[var(--text-secondary)] border-b border-[var(--border)]">
                     <th className="pb-3 pr-3 font-medium">Store Name</th>
                     <th className="pb-3 pr-3 font-medium">Address</th>
                     <th className="pb-3 pr-3 font-medium text-right">Revenue</th>
@@ -840,7 +840,7 @@ function ReportsPageContent() {
             <div className="table-scroll">
               <table className="w-full text-[12px] min-w-[640px]">
                 <thead>
-                  <tr className="text-left text-[var(--text-secondary)]border-b border-[var(--border)]">
+                  <tr className="text-left text-[var(--text-secondary)] border-b border-[var(--border)]">
                     <th className="pb-3 pr-3 font-medium">Store</th>
                     <th className="pb-3 pr-3 font-medium">Lease Expiration</th>
                     <th className="pb-3 pr-3 font-medium text-right">Years Remaining</th>
@@ -874,7 +874,7 @@ function ReportsPageContent() {
             <div className="table-scroll">
               <table className="w-full text-[12px] min-w-[720px]">
                 <thead>
-                  <tr className="text-left text-[var(--text-secondary)]border-b border-[var(--border)]">
+                  <tr className="text-left text-[var(--text-secondary)] border-b border-[var(--border)]">
                     <th className="pb-3 pr-3 font-medium">Store</th>
                     <th className="pb-3 pr-3 font-medium text-right">Equipment Grade</th>
                     <th className="pb-3 pr-3 font-medium text-right">Avg Age</th>
@@ -1165,7 +1165,7 @@ function ReportsPageContent() {
       {shareModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
           <div className="card max-w-lg w-full">
-            <div className="text-[15px] font-semibold text-slate-100 mb-1">Share with Lender</div>
+            <div className="text-[15px] font-semibold text-[var(--text-primary)] mb-1">Share with Lender</div>
             <p className="text-[12px] text-[var(--text-secondary)] mb-4">
               This secure link expires on {shareExpires} (7 days).
             </p>
