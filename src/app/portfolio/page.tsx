@@ -8,7 +8,7 @@ import { useStores } from "@/lib/store-context";
 import { calcDSCR, calcGlobalDSCR, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { shouldTriggerLowDscrAlert } from "@/lib/dscr";
 import { formatDscrDisplay } from "@/lib/financials";
-import { getStoreValuation, getStoreDebt, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
+import { getStoreValuation, getStoreBusinessDebt, getStoreBuildingMortgage, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
 import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
@@ -94,6 +94,7 @@ export default function PortfolioPage() {
   const [loadError, setLoadError] = useState(false);
   const [leases, setLeases] = useState<Lease[]>([]);
   const [realEstateTotal, setRealEstateTotal] = useState(0);
+  const [buildingMortgageTotal, setBuildingMortgageTotal] = useState(0);
   const [equipmentByStore, setEquipmentByStore] = useState<Record<string, any[]>>({});
   const [insuranceByStore, setInsuranceByStore] = useState<Record<string, any[]>>({});
   const [showWelcome, setShowWelcome] = useState(false);
@@ -189,10 +190,12 @@ export default function PortfolioPage() {
       );
       setStoreValuations(valuations);
 
-      const debtTotal = await Promise.all(
-        (stores as Store[]).map((store) => getStoreDebt(store.id))
-      );
+      const [debtTotal, buildingMortgageTotal] = await Promise.all([
+        Promise.all((stores as Store[]).map((store) => getStoreBusinessDebt(store.id))),
+        Promise.all((stores as Store[]).map((store) => getStoreBuildingMortgage(store.id))),
+      ]);
       setTotalDebt(debtTotal.reduce((s, d) => s + d, 0));
+      setBuildingMortgageTotal(buildingMortgageTotal.reduce((s, d) => s + d, 0));
 
       const annualDebtServiceFromLoans = (loansData ?? []).reduce(
         (s, loan) => s + (loan.monthly_payment ?? 0) * 12,
@@ -298,7 +301,8 @@ export default function PortfolioPage() {
     const totalAnnualDebtService = totalAnnualDebtServiceFromLoans;
     const hasDebtData = totalAnnualDebtServiceFromLoans > 0 && withFinancials.length > 0;
     const globalDSCR = hasDebtData ? calcGlobalDSCR(totalAnnualEbitda, totalAnnualDebtService) : null;
-    const portfolioNetWorth = totalPortfolioValue - totalDebt + totalCash;
+    const portfolioNetWorth =
+      totalPortfolioValue + realEstateTotal - totalDebt - buildingMortgageTotal + totalCash;
     const ebitdaMargin = totalAnnualRevenue > 0 ? (totalAnnualEbitda / totalAnnualRevenue) * 100 : 0;
     const availableMonthlyCashFlow = Math.max(0, (totalAnnualEbitda - totalAnnualDebtService) / 12);
     const acquisitionCapacity = (availableMonthlyCashFlow * 12) / 0.12;
@@ -311,6 +315,7 @@ export default function PortfolioPage() {
       totalAnnualEbitda,
       totalMonthlyEbitda,
       totalDebt,
+      buildingMortgageTotal,
       totalCash,
       totalAnnualDebtService,
       globalDSCR,
@@ -322,7 +327,7 @@ export default function PortfolioPage() {
       portfolioEquity,
       hasAnyFinancialData,
     };
-  }, [storeMetrics, totalDebt, totalAnnualDebtServiceFromLoans]);
+  }, [storeMetrics, totalDebt, buildingMortgageTotal, realEstateTotal, totalAnnualDebtServiceFromLoans]);
 
   const allFeedItems = useMemo(() => {
     const items = (stores as Store[]).flatMap((store) => {
@@ -623,7 +628,7 @@ export default function PortfolioPage() {
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.2s" }}
-          label="Total Debt"
+          label="Business Debt"
           value={<AnimatedNumber value={aggregates.totalDebt} prefix="$" duration={1000} />}
         />
 
@@ -638,7 +643,7 @@ export default function PortfolioPage() {
               "—"
             )
           }
-          sub="Value + cash − debt"
+          sub="Value + cash − business debt"
           valueColor={
             aggregates.hasAnyFinancialData
               ? aggregates.portfolioEquity > 0
@@ -936,16 +941,18 @@ export default function PortfolioPage() {
             </span>
           </div>
           <div className="flex justify-between">
-            <span style={{ color: "var(--text-secondary)" }}>− Total Debt:</span>
+            <span style={{ color: "var(--text-secondary)" }}>− Business Debt:</span>
             <span className="font-medium text-red-400">−{fmtDollar(aggregates.totalDebt)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span style={{ color: "var(--text-secondary)" }}>− Building Mortgage:</span>
+            <span className="font-medium text-red-400">−{fmtDollar(aggregates.buildingMortgageTotal)}</span>
           </div>
           <div className="border-t pt-3 mt-3 flex justify-between" style={{ borderColor: "var(--border)" }}>
             <span className="font-semibold" style={{ color: "var(--text-primary)" }}>= Portfolio Net Worth:</span>
             <span className="text-[24px] font-bold text-green-400">
               {aggregates.hasAnyFinancialData
-                ? fmtDollar(
-                    aggregates.totalPortfolioValue + realEstateTotal - aggregates.totalDebt + aggregates.totalCash
-                  )
+                ? fmtDollar(aggregates.portfolioNetWorth)
                 : "—"}
             </span>
           </div>

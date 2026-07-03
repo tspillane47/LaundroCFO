@@ -317,6 +317,67 @@ export async function getStoreScheduledDebtService(storeId: string): Promise<num
   return loans.reduce((sum, loan) => sum + (loan.monthly_payment ?? 0) * 12, 0);
 }
 
+const REAL_ESTATE_LOAN_TYPE = "Real Estate";
+
+async function sumActiveLoanBalances(
+  loans: {
+    loan_type: string | null;
+    current_balance: number | null;
+    interest_rate: number | null;
+    monthly_payment: number | null;
+    updated_at: string | null;
+  }[],
+  options: { excludeLoanTypes?: string[]; includeLoanTypes?: string[] } = {}
+): Promise<number> {
+  const { excludeLoanTypes = [], includeLoanTypes } = options;
+  const excluded = new Set(excludeLoanTypes);
+  let eligible = loans;
+  if (includeLoanTypes?.length) {
+    const included = new Set(includeLoanTypes);
+    eligible = eligible.filter((loan) => included.has(loan.loan_type ?? ""));
+  } else if (excluded.size > 0) {
+    eligible = eligible.filter((loan) => !excluded.has(loan.loan_type ?? ""));
+  }
+  if (eligible.length === 0) return 0;
+
+  const { calcEstimatedBalance } = await import("@/lib/amortization");
+  return eligible.reduce((sum, loan) => {
+    const estimated = calcEstimatedBalance({
+      currentBalance: loan.current_balance ?? 0,
+      interestRate: loan.interest_rate ?? 0,
+      monthlyPayment: loan.monthly_payment ?? 0,
+      lastUpdated: loan.updated_at ?? undefined,
+    });
+    return sum + estimated;
+  }, 0);
+}
+
+/** Prefer real_estate balance; fall back to Debt-module "Real Estate" store_loans when unset. */
+export function resolveStoreBuildingMortgage(
+  realEstateLoanBalance: number | null | undefined,
+  realEstateLoansBalance: number
+): number {
+  const fromRealEstate = realEstateLoanBalance ?? 0;
+  if (fromRealEstate > 0) return fromRealEstate;
+  return realEstateLoansBalance;
+}
+
+export async function getStoreBuildingMortgage(storeId: string): Promise<number> {
+  const supabase = createClient();
+  const [{ data: realEstate }, { data: loans }] = await Promise.all([
+    supabase.from("real_estate").select("current_loan_balance").eq("store_id", storeId).maybeSingle(),
+    supabase
+      .from("store_loans")
+      .select("*")
+      .eq("store_id", storeId)
+      .eq("is_active", true)
+      .eq("loan_type", REAL_ESTATE_LOAN_TYPE),
+  ]);
+
+  const fromLoans = await sumActiveLoanBalances(loans ?? [], { includeLoanTypes: [REAL_ESTATE_LOAN_TYPE] });
+  return resolveStoreBuildingMortgage(realEstate?.current_loan_balance, fromLoans);
+}
+
 export async function getStoreDebt(storeId: string): Promise<number> {
   const supabase = createClient();
   const { data: loans } = await supabase
@@ -326,14 +387,18 @@ export async function getStoreDebt(storeId: string): Promise<number> {
     .eq("is_active", true);
   if (!loans) return 0;
 
-  const { calcEstimatedBalance } = await import("@/lib/amortization");
-  return loans.reduce((sum, loan) => {
-    const estimated = calcEstimatedBalance({
-      currentBalance: loan.current_balance,
-      interestRate: loan.interest_rate,
-      monthlyPayment: loan.monthly_payment,
-      lastUpdated: loan.updated_at,
-    });
-    return sum + estimated;
-  }, 0);
+  return sumActiveLoanBalances(loans);
+}
+
+/** Active store_loans excluding building mortgages (tracked separately on real_estate). */
+export async function getStoreBusinessDebt(storeId: string): Promise<number> {
+  const supabase = createClient();
+  const { data: loans } = await supabase
+    .from("store_loans")
+    .select("*")
+    .eq("store_id", storeId)
+    .eq("is_active", true);
+  if (!loans) return 0;
+
+  return sumActiveLoanBalances(loans, { excludeLoanTypes: [REAL_ESTATE_LOAN_TYPE] });
 }
