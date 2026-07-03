@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { getStoreValuation, getStoreDebt, getStoreScheduledDebtService, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
-import { calcDSCR, DSCR_NO_DEBT_LABEL } from "@/lib/calculations";
+import { calcEquipmentScore, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import { computeStoreDscr } from "@/lib/dscr";
 import {
   enrichMonthlyRecords,
   fetchStoreMonthlyFinancials,
@@ -20,7 +21,6 @@ import {
   calcOccupancyCostRatioFromRent,
   calcRealEstateLTV,
 } from "@/lib/real-estate-calculations";
-import { calcEquipmentScore, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import type { EquipmentRecord } from "@/lib/equipment";
 import {
   AreaChart,
@@ -40,6 +40,7 @@ import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { KpiCard } from "@/components/ui/KpiCard";
+import { DSCRCard } from "@/components/ui/DSCRCard";
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { CashCard } from "@/components/ui/CashCard";
 import { PageError } from "@/components/ui/PageError";
@@ -353,7 +354,7 @@ export default function DashboardPage() {
   const debtService = scheduledDebtService;
   const annualCashFlow = hasFinancialData ? annualEbitda - debtService : 0;
   const monthlyCashFlow = hasFinancialData ? annualCashFlow / 12 : 0;
-  const dscrNum = hasFinancialData ? calcDSCR(annualEbitda, debtService) : null;
+  const dscrNum = hasFinancialData ? computeStoreDscr(annualEbitda, debtService) : null;
   const ebitdaMargin = hasFinancialData && revenue > 0 ? (ebitda / revenue) * 100 : 0;
   const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
   const utilities = hasFinancialData ? (store?.monthly_utilities ?? 0) : 0;
@@ -730,41 +731,12 @@ export default function DashboardPage() {
 
       {/* Section 2: KPI Cards */}
       <div className="metric-grid">
-        <KpiCard
+        <DSCRCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0s" }}
-          label={<DisclaimerLabel>DSCR</DisclaimerLabel>}
-          value={
-            hasFinancialData && debtService > 0 && dscrNum != null ? (
-              <AnimatedNumber value={dscrNum} decimals={2} suffix="x" duration={1000} />
-            ) : hasFinancialData ? (
-              <span className="text-green-400">{DSCR_NO_DEBT_LABEL}</span>
-            ) : (
-              "—"
-            )
-          }
-          sub={
-            !hasFinancialData
-              ? "Add monthly financials"
-              : debtService <= 0
-                ? "No debt — strong position"
-                : dscrNum != null && dscrNum >= 1.5
-                  ? "Strong coverage"
-                  : dscrNum != null && dscrNum >= 1.25
-                    ? "Adequate"
-                    : "Below threshold"
-          }
-          valueColor={
-            !hasFinancialData
-              ? "var(--text-muted)"
-              : debtService <= 0
-                ? "var(--text-success)"
-                : dscrNum != null && dscrNum >= 1.5
-                  ? "var(--text-success)"
-                  : dscrNum != null && dscrNum >= 1.25
-                    ? "var(--text-warning)"
-                    : "var(--text-danger)"
-          }
+          dscr={dscrNum}
+          scheduledAnnualDebtService={debtService}
+          hasFinancialData={hasFinancialData}
         />
 
         <KpiCard

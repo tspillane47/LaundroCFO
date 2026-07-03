@@ -1,0 +1,59 @@
+import { calcDSCR, DSCR_NO_DEBT_LABEL } from "@/lib/calculations";
+import {
+  applyLoanDebtServiceToTtm,
+  buildUtilitiesLookup,
+  calcTtmMetrics,
+  enrichMonthlyRecords,
+  sortRecordsDesc,
+  type MonthlyFinancialRecord,
+  type MonthlyUtilityRecord,
+  type TtmMetrics,
+} from "@/lib/financials";
+
+export { DSCR_NO_DEBT_LABEL };
+
+/** Single source of truth: TTM EBITDA ÷ scheduled annual debt service. */
+export function computeStoreDscr(
+  annualEbitda: number,
+  scheduledAnnualDebtService: number
+): number | null {
+  return calcDSCR(annualEbitda, scheduledAnnualDebtService);
+}
+
+/** Build TTM metrics with utilities-aware EBITDA and loan-scheduled DSCR. */
+export function buildStoreTtmWithDscr(
+  financialRecords: MonthlyFinancialRecord[],
+  scheduledAnnualDebtService: number,
+  utilityRecords: MonthlyUtilityRecord[] = []
+): TtmMetrics {
+  const utilitiesLookup = buildUtilitiesLookup(utilityRecords);
+  const records = enrichMonthlyRecords(sortRecordsDesc(financialRecords), utilitiesLookup);
+  return applyLoanDebtServiceToTtm(calcTtmMetrics(records), scheduledAnnualDebtService);
+}
+
+export type DscrDisplayOptions = {
+  hasFinancialData: boolean;
+  scheduledAnnualDebtService: number;
+};
+
+export function getDscrSubtext(
+  dscr: number | null,
+  { hasFinancialData, scheduledAnnualDebtService }: DscrDisplayOptions
+): string {
+  if (!hasFinancialData) return "Add monthly financials";
+  if (scheduledAnnualDebtService <= 0) return "No debt — strong position";
+  if (dscr != null && dscr >= 1.5) return "Strong coverage";
+  if (dscr != null && dscr >= 1.25) return "Adequate";
+  return "Below threshold";
+}
+
+export function getDscrValueColor(
+  dscr: number | null,
+  { hasFinancialData, scheduledAnnualDebtService }: DscrDisplayOptions
+): string {
+  if (!hasFinancialData) return "var(--text-muted)";
+  if (scheduledAnnualDebtService <= 0) return "var(--text-success)";
+  if (dscr != null && dscr >= 1.5) return "var(--text-success)";
+  if (dscr != null && dscr >= 1.25) return "var(--text-warning)";
+  return "var(--text-danger)";
+}

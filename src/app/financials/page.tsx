@@ -23,6 +23,7 @@ import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple, fmtPct } from "@/lib/calculations";
 import { MetricCard } from "@/components/ui/MetricCard";
+import { DSCRCard } from "@/components/ui/DSCRCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { CurrentMonthlyAveragesPanel } from "@/components/financials/CurrentMonthlyAveragesPanel";
 import {
@@ -38,6 +39,7 @@ import {
   type BankTransaction,
   type CalculatedMonthly,
   type MonthlyFinancialRecord,
+  type MonthlyUtilityRecord,
   type PlCategoryField,
   type RatioBenchmark,
   type StoreFinancialProfile,
@@ -54,9 +56,7 @@ import {
   calcTtmMetrics,
   calcYoYMetrics,
   DSCR_NO_DEBT_LABEL,
-  dscrSubColor,
-  dscrTextColor,
-  formatDscrDisplay,
+  buildUtilitiesLookup,
   emptyMonthlyForm,
   enrichMonthlyRecords,
   getChartRecords,
@@ -328,6 +328,7 @@ export default function FinancialsPage() {
       { data: financialsData, error: financialsError },
       { data: bankData, error: bankError },
       { data: mappingData, error: mappingError },
+      { data: utilitiesData, error: utilitiesError },
       annualDebtByStore,
     ] = await Promise.all([
       supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
@@ -344,17 +345,25 @@ export default function FinancialsPage() {
         .eq("is_reviewed", false)
         .order("transaction_date", { ascending: false }),
       supabase.from("quickbooks_mapping").select("*").eq("store_id", selectedStore.id),
+      supabase
+        .from("monthly_utilities")
+        .select("year, month, water, gas, electric, sewer, trash, internet")
+        .eq("store_id", selectedStore.id),
       fetchAnnualDebtServiceByStore(supabase, [selectedStore.id]),
     ]);
 
-    const errors = [storeError, financialsError, bankError, mappingError]
+    const errors = [storeError, financialsError, bankError, mappingError, utilitiesError]
       .filter(Boolean)
       .map((e) => e!.message);
     if (errors.length > 0) setError(errors.join(" · "));
 
     setStore(storeData as StoreFinancialProfile);
     setScheduledAnnualDebtService(annualDebtByStore[selectedStore.id] ?? 0);
-    const sorted = enrichMonthlyRecords(sortRecordsDesc((financialsData ?? []) as MonthlyFinancialRecord[]));
+    const utilitiesLookup = buildUtilitiesLookup((utilitiesData ?? []) as MonthlyUtilityRecord[]);
+    const sorted = enrichMonthlyRecords(
+      sortRecordsDesc((financialsData ?? []) as MonthlyFinancialRecord[]),
+      utilitiesLookup
+    );
     setRecords(sorted);
     setBankTransactions((bankData ?? []) as BankTransaction[]);
 
@@ -771,9 +780,6 @@ export default function FinancialsPage() {
 
   const occupancyPct = ratios && ttm.ttmRevenue > 0 ? (ratios.annualRent / ttm.ttmRevenue) * 100 : 0;
   const reviewCount = bankTransactions.length + stagedTransactions.length;
-  const displayDscr = ttm.dscr;
-  const hasScheduledDebt = scheduledAnnualDebtService > 0;
-
   return (
     <div className="space-y-5">
       <div>
@@ -835,33 +841,11 @@ export default function FinancialsPage() {
               </div>
             </div>
             <MetricCard label="EBITDA Margin" value={fmtPct(ttm.ttmEbitdaMargin || 0)} sub="TTM" subColor="muted" />
-            <div className="card">
-              <div className="metric-label">
-                <DisclaimerLabel>DSCR</DisclaimerLabel>
-              </div>
-              <div className={clsx("metric-value", !hasScheduledDebt && "text-green-400")}>
-                {formatDscrDisplay(displayDscr, scheduledAnnualDebtService)}
-              </div>
-              <div className="text-[12px] mt-1 text-[var(--text-muted)]">Net cash flow ÷ annual debt service</div>
-              {hasScheduledDebt && displayDscr != null ? (
-                <div
-                  className={clsx(
-                    "text-[12px] mt-1",
-                    displayDscr >= 1.5
-                      ? "text-green-400"
-                      : displayDscr >= 1.25
-                        ? "text-amber-400"
-                        : "text-red-400"
-                  )}
-                >
-                  {displayDscr >= 1.5
-                    ? "Strong"
-                    : displayDscr >= 1.25
-                      ? "Adequate"
-                      : "Below threshold"}
-                </div>
-              ) : null}
-            </div>
+            <DSCRCard
+              dscr={ttm.dscr}
+              scheduledAnnualDebtService={scheduledAnnualDebtService}
+              compact
+            />
             <div className="card">
               <div className="metric-label">
                 <MetricTooltip
