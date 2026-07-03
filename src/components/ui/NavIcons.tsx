@@ -42,6 +42,15 @@ export function NavIcon({ name }: { name: string }) {
           <path d="m7 16 4-4 4 4 4-4" />
         </svg>
       );
+    case "transactions":
+      return (
+        <svg {...props}>
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <line x1="6" y1="9" x2="18" y2="9" />
+          <line x1="6" y1="13" x2="14" y2="13" />
+          <line x1="6" y1="17" x2="11" y2="17" />
+        </svg>
+      );
     case "occupancy":
       return (
         <svg {...props}>
