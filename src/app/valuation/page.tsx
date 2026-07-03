@@ -1111,10 +1111,10 @@ export default function ValuationPage() {
               {valuation.improvements.map((item) => (
                 <li
                   key={item.action}
-                  className="flex items-start justify-between gap-3 text-[12px]border-b border-[var(--border)] pb-3 last:border-0 last:pb-0"
+                  className="flex items-start justify-between gap-3 text-[12px] border-b border-[var(--border)] pb-3 last:border-0 last:pb-0"
                 >
                   <div>
-                    <div className="text-slate-900 font-medium">{item.action}</div>
+                    <div className="text-[var(--text-primary)] font-medium">{item.action}</div>
                     <div className="text-green-400 font-semibold mt-0.5">
                       +{fmtDollar(item.estimatedGain)} potential
                     </div>
