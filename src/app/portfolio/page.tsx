@@ -334,13 +334,17 @@ export default function PortfolioPage() {
       const storeLease = leases.find((l) => l.store_id === store.id);
       const equipment = equipmentByStore[store.id] ?? [];
       const insurance = insuranceByStore[store.id] ?? [];
+      const valuation = valuationByStoreId.get(store.id);
       return generateStoreFeed(store, storeLease, equipment, insurance, {
         scheduledAnnualDebtService: scheduledDebtServiceByStore[store.id] ?? 0,
+        resolvedFinancials: valuation?.resolvedFinancials,
+        monthlyUtilities: (store as Record<string, unknown>).monthly_utilities as number | undefined,
+        isOwnerOccupied: store.occupancy_type === "owner_occupied",
       });
     });
     const order = { danger: 0, warning: 1, success: 2, info: 3 };
     return items.sort((a, b) => order[a.severity] - order[b.severity]);
-  }, [stores, leases, equipmentByStore, insuranceByStore, scheduledDebtServiceByStore]);
+  }, [stores, leases, equipmentByStore, insuranceByStore, scheduledDebtServiceByStore, valuationByStoreId]);
 
   const acquisitionMessage =
     !aggregates.hasDebtData

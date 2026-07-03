@@ -6,6 +6,8 @@ import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { generatePortfolioAlerts, type AlertItem } from "@/lib/alerts";
+import { getStoreValuation } from "@/lib/getStoreValuation";
+import type { StoreFeedOptions } from "@/lib/intelligence";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
@@ -116,13 +118,27 @@ export default function AlertsPage() {
           (scheduledDebtServiceByStore[storeId] ?? 0) + (loan.monthly_payment ?? 0) * 12;
       }
 
+      const valuations = await Promise.all(stores.map((store) => getStoreValuation(store.id)));
+      const feedOptionsByStore: Record<string, StoreFeedOptions> = {};
+      stores.forEach((store, index) => {
+        const storeId = String(store.id);
+        feedOptionsByStore[storeId] = {
+          resolvedFinancials: valuations[index]?.resolvedFinancials,
+          monthlyUtilities: store.monthly_utilities,
+          isOwnerOccupied: store.occupancy_type === "owner_occupied",
+        };
+      });
+
       setAlerts(
         generatePortfolioAlerts(
           stores,
           leasesByStore,
           equipmentByStore,
           insuranceByStore,
-          scheduledDebtServiceByStore
+          {
+            scheduledDebtServiceByStore,
+            feedOptionsByStore,
+          }
         )
       );
     } catch {

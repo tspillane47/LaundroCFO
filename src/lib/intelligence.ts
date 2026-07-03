@@ -17,27 +17,62 @@ export interface FeedItem {
   storeName?: string;
 }
 
+export type StoreFeedFinancials = {
+  monthlyRevenue: number;
+  monthlyExpenses: number;
+  annualEbitda: number;
+  source: 'ttm' | 'none';
+};
+
+export type StoreFeedOptions = {
+  scheduledAnnualDebtService?: number;
+  resolvedFinancials?: StoreFeedFinancials | null;
+  monthlyUtilities?: number;
+  isOwnerOccupied?: boolean;
+  valuationMonthlyChange?: number;
+};
+
 type FeedItemDraft = Omit<FeedItem, "storeId">;
+
+function calcYearsRemaining(endDate: string, now: Date): number {
+  const end = new Date(endDate);
+  return Math.max(0, (end.getTime() - now.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+}
+
+function hasTtmFinancials(financials?: StoreFeedFinancials | null): financials is StoreFeedFinancials {
+  return financials?.source === 'ttm';
+}
 
 export function generateStoreFeed(
   store: any,
   lease?: any,
   equipment?: any[],
   insurance?: any[],
-  options?: { scheduledAnnualDebtService?: number }
+  options?: StoreFeedOptions
 ): FeedItem[] {
   const items: FeedItemDraft[] = [];
   const now = new Date();
+  const financials = options?.resolvedFinancials;
+  const hasFinancialData = hasTtmFinancials(financials);
+  const monthlyRevenue = hasFinancialData
+    ? financials.monthlyRevenue
+    : Number(store.monthly_revenue) || 0;
+  const monthlyExpenses = hasFinancialData
+    ? financials.monthlyExpenses
+    : Number(store.monthly_expenses) || 0;
+  const annualEbitda = hasFinancialData
+    ? financials.annualEbitda
+    : (monthlyRevenue - monthlyExpenses) * 12;
 
   // Financial items
-  if (store.monthly_revenue > 0) {
+  if (monthlyRevenue > 0) {
     items.push({
       id: 'rev-' + store.id,
       date: formatDate(now),
       category: 'financial',
       icon: '💰',
-      headline: `Monthly revenue: $${store.monthly_revenue.toLocaleString()}`,
-      description: store.monthly_revenue > 60000
+      headline: `Monthly revenue: $${monthlyRevenue.toLocaleString()}`,
+      description: monthlyRevenue > 60000
         ? 'Above $60k threshold — strong revenue month.'
         : 'Tracking within normal range.',
       severity: 'success',
@@ -46,8 +81,8 @@ export function generateStoreFeed(
   }
 
   if (store.monthly_rent > 0) {
-    const rentRatio = store.monthly_revenue > 0
-      ? ((store.monthly_rent / store.monthly_revenue) * 100).toFixed(1)
+    const rentRatio = monthlyRevenue > 0
+      ? ((store.monthly_rent / monthlyRevenue) * 100).toFixed(1)
       : 0;
     items.push({
       id: 'rent-' + store.id,
@@ -61,9 +96,9 @@ export function generateStoreFeed(
     });
   }
 
-  if (store.monthly_expenses > 0) {
-    const ebitda = store.monthly_revenue - store.monthly_expenses;
-    const margin = store.monthly_revenue > 0 ? ((ebitda / store.monthly_revenue) * 100).toFixed(1) : 0;
+  if (monthlyExpenses > 0 || monthlyRevenue > 0) {
+    const ebitda = monthlyRevenue - monthlyExpenses;
+    const margin = monthlyRevenue > 0 ? ((ebitda / monthlyRevenue) * 100).toFixed(1) : 0;
     items.push({
       id: 'ebitda-' + store.id,
       date: formatDate(now),
@@ -76,9 +111,25 @@ export function generateStoreFeed(
     });
   }
 
+  if (hasFinancialData && monthlyRevenue > 0) {
+    const utilities = options?.monthlyUtilities ?? store.monthly_utilities ?? 0;
+    const utilityRatio = (utilities / monthlyRevenue) * 100;
+    if (utilityRatio > 20) {
+      items.push({
+        id: 'utility-' + store.id,
+        date: formatDate(now),
+        category: 'financial',
+        icon: '⚡',
+        headline: 'High Utility Costs',
+        description: `Utilities are ${utilityRatio.toFixed(1)}% of revenue — above the 20% threshold.`,
+        severity: 'warning',
+        storeName: store.name,
+      });
+    }
+  }
+
   const scheduledAnnualDebtService = options?.scheduledAnnualDebtService ?? 0;
   if (hasScheduledDebtService(scheduledAnnualDebtService)) {
-    const annualEbitda = (store.monthly_revenue - store.monthly_expenses) * 12;
     const dscr = computeStoreDscr(annualEbitda, scheduledAnnualDebtService);
     if (dscr != null) {
       const isLow = shouldTriggerLowDscrAlert(dscr, scheduledAnnualDebtService);
@@ -87,9 +138,9 @@ export function generateStoreFeed(
         date: formatDate(now),
         category: 'financial',
         icon: '🏦',
-        headline: `DSCR: ${dscr.toFixed(2)}x`,
+        headline: isLow ? 'DSCR Below Threshold' : `DSCR: ${dscr.toFixed(2)}x`,
         description: isLow
-          ? '⚠ Below 1.25x minimum. Review debt service.'
+          ? `Current DSCR of ${dscr.toFixed(2)}x is below the 1.25x minimum.`
           : dscr >= 1.5
             ? 'Strong debt coverage. Lender-ready position.'
             : 'Meets minimum lender threshold of 1.25x.',
@@ -100,7 +151,6 @@ export function generateStoreFeed(
   }
 
   // Valuation items
-  const annualEbitda = (store.monthly_revenue - store.monthly_expenses) * 12;
   const estimatedValue = annualEbitda * 3.47;
   if (estimatedValue > 0) {
     items.push({
@@ -115,6 +165,19 @@ export function generateStoreFeed(
     });
   }
 
+  if (options?.valuationMonthlyChange != null && options.valuationMonthlyChange > 0) {
+    items.push({
+      id: 'val-change-' + store.id,
+      date: formatDate(now),
+      category: 'valuation',
+      icon: '📈',
+      headline: 'Valuation Increased',
+      description: `Store value rose $${Math.round(options.valuationMonthlyChange).toLocaleString()} this month.`,
+      severity: 'info',
+      storeName: store.name,
+    });
+  }
+
   // Equipment items
   if (store.avg_machine_age > 0) {
     const age = store.avg_machine_age;
@@ -123,13 +186,13 @@ export function generateStoreFeed(
       date: formatDate(now),
       category: 'equipment',
       icon: '⚙️',
-      headline: `Equipment avg age: ${age.toFixed(1)} years`,
-      description: age < 8
+      headline: age > 12 ? 'Equipment Aging' : `Equipment avg age: ${age.toFixed(1)} years`,
+      description: age <= 8
         ? 'Equipment in good shape. Positive valuation impact.'
-        : age < 12
+        : age <= 12
         ? 'Equipment approaching mid-life. Plan for future replacements.'
-        : '⚠ Equipment aging. Consider retool to protect valuation.',
-      severity: age < 8 ? 'success' : age < 12 ? 'info' : 'warning',
+        : `Average machine age is ${age.toFixed(1)} years — consider replacement planning.`,
+      severity: age <= 8 ? 'success' : age <= 12 ? 'info' : 'warning',
       storeName: store.name,
     });
   }
@@ -157,18 +220,18 @@ export function generateStoreFeed(
 
   // Lease items
   if (lease?.lease_end_date) {
+    const yearsRemaining = calcYearsRemaining(lease.lease_end_date, now);
     const endDate = new Date(lease.lease_end_date);
-    const yearsRemaining = (endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 365);
     items.push({
       id: 'lease-' + store.id,
       date: formatDate(now),
       category: 'lease',
       icon: '📋',
       headline: yearsRemaining < 3
-        ? `⚠ Lease expires in ${Math.round(yearsRemaining * 12)} months`
+        ? 'Lease Expiring'
         : `Lease expires ${endDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
       description: yearsRemaining < 3
-        ? 'Critical: Short lease term is a significant lender risk. Begin renewal negotiations immediately.'
+        ? `Only ${yearsRemaining.toFixed(1)} years remaining on your lease.`
         : yearsRemaining < 5
         ? 'Lease renewal should be prioritized within 12 months to maintain lender confidence.'
         : `${yearsRemaining.toFixed(1)} years remaining on base lease. Good lender position.`,
@@ -176,8 +239,8 @@ export function generateStoreFeed(
       storeName: store.name,
     });
 
-    if (lease.monthly_rent && store.monthly_revenue) {
-      const rentRatio = ((lease.monthly_rent / store.monthly_revenue) * 100).toFixed(1);
+    if (lease.monthly_rent && monthlyRevenue) {
+      const rentRatio = ((lease.monthly_rent / monthlyRevenue) * 100).toFixed(1);
       items.push({
         id: 'lease-rent-' + store.id,
         date: formatDate(now),
@@ -263,7 +326,7 @@ export function generateStoreFeed(
         category: 'insurance',
         icon: '🛡️',
         headline: `Total annual insurance premium: $${totalPremium.toLocaleString()}`,
-        description: `${insurance.length} active ${insurance.length === 1 ? 'policy' : 'policies'}. Premium is ${store.monthly_revenue > 0 ? ((totalPremium / (store.monthly_revenue * 12)) * 100).toFixed(1) + '% of annual revenue.' : 'recorded.'}`,
+        description: `${insurance.length} active ${insurance.length === 1 ? 'policy' : 'policies'}. Premium is ${monthlyRevenue > 0 ? ((totalPremium / (monthlyRevenue * 12)) * 100).toFixed(1) + '% of annual revenue.' : 'recorded.'}`,
         severity: 'info',
         storeName: store.name,
       });
@@ -274,8 +337,8 @@ export function generateStoreFeed(
       date: formatDate(now),
       category: 'insurance',
       icon: '🛡️',
-      headline: 'No insurance policies on file',
-      description: 'Add your insurance policies to track renewals, coverage gaps, and premium costs.',
+      headline: 'Add Insurance Policies',
+      description: 'No active insurance policies on file for this store.',
       severity: 'warning',
       storeName: store.name,
     });

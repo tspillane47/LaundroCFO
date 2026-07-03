@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { getStoreValuation, getStoreDebt, getStoreScheduledDebtService, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
 import { calcEquipmentScore, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
-import { computeStoreDscr, shouldTriggerLowDscrAlert } from "@/lib/dscr";
+import { computeStoreDscr } from "@/lib/dscr";
+import { feedItemsToActionItems } from "@/lib/alerts";
 import {
   enrichMonthlyRecords,
   fetchStoreMonthlyFinancials,
@@ -118,15 +119,6 @@ function formatAxisValue(value: number): string {
   if (value >= 1_000) return `$${Math.round(value / 1_000)}k`;
   return `$${value}`;
 }
-
-type ActionItem = {
-  id: string;
-  severity: "urgent" | "warning" | "info";
-  severityLabel: string;
-  title: string;
-  description: string;
-  href: string;
-};
 
 const REVENUE_BAR_FILL = "rgba(34, 197, 94, 0.35)";
 const REVENUE_BAR_STROKE = "rgba(34, 197, 94, 0.8)";
@@ -471,87 +463,6 @@ export default function DashboardPage() {
 
   const laundrocfoScore = laundroCfoScoreResult?.total ?? 0;
 
-  const actions = useMemo(() => {
-    const items: ActionItem[] = [];
-
-    if (!isOwnerOccupied && leaseMetrics && leaseMetrics.yearsRemaining < 3) {
-      items.push({
-        id: "lease",
-        severity: "urgent",
-        severityLabel: "URGENT",
-        title: "Lease Expiring",
-        description: `Only ${leaseMetrics.yearsRemaining.toFixed(1)} years remaining on your lease.`,
-        href: "/lease",
-      });
-    }
-
-    if (hasFinancialData && shouldTriggerLowDscrAlert(dscrNum, debtService)) {
-      items.push({
-        id: "dscr",
-        severity: "urgent",
-        severityLabel: "URGENT",
-        title: "DSCR Below Threshold",
-        description: `Current DSCR of ${dscrNum!.toFixed(2)}x is below the 1.25x minimum.`,
-        href: "/financials",
-      });
-    }
-
-    if (hasFinancialData && utilityRatio > 20) {
-      items.push({
-        id: "utility",
-        severity: "warning",
-        severityLabel: "WARN",
-        title: "High Utility Costs",
-        description: `Utilities are ${utilityRatio.toFixed(1)}% of revenue — above the 20% threshold.`,
-        href: "/financials",
-      });
-    }
-
-    if (avgEquipmentAge > 12) {
-      items.push({
-        id: "equipment",
-        severity: "warning",
-        severityLabel: "WARN",
-        title: "Equipment Aging",
-        description: `Average machine age is ${avgEquipmentAge.toFixed(1)} years — consider replacement planning.`,
-        href: "/equipment",
-      });
-    }
-
-    if (insuranceCount === 0) {
-      items.push({
-        id: "insurance",
-        severity: "warning",
-        severityLabel: "WARN",
-        title: "Add Insurance Policies",
-        description: "No active insurance policies on file for this store.",
-        href: "/insurance",
-      });
-    }
-
-    if (hasFinancialData && monthlyChange > 0) {
-      items.push({
-        id: "valuation",
-        severity: "info",
-        severityLabel: "INFO",
-        title: "Valuation Increased",
-        description: `Store value rose ${fmtDollar(monthlyChange)} this month.`,
-        href: "/valuation",
-      });
-    }
-
-    return items;
-  }, [
-    isOwnerOccupied,
-    hasFinancialData,
-    leaseMetrics,
-    dscrNum,
-    utilityRatio,
-    avgEquipmentAge,
-    insuranceCount,
-    monthlyChange,
-  ]);
-
   const severityBorder = {
     urgent: "border-l-red-500",
     warning: "border-l-amber-500",
@@ -563,9 +474,27 @@ export default function DashboardPage() {
       store
         ? generateStoreFeed(store, lease, equipment, insurancePolicies, {
             scheduledAnnualDebtService: scheduledDebtService,
+            resolvedFinancials,
+            monthlyUtilities: store.monthly_utilities,
+            isOwnerOccupied,
+            valuationMonthlyChange: monthlyChange,
           })
         : [],
-    [store, lease, equipment, insurancePolicies, scheduledDebtService]
+    [
+      store,
+      lease,
+      equipment,
+      insurancePolicies,
+      scheduledDebtService,
+      resolvedFinancials,
+      isOwnerOccupied,
+      monthlyChange,
+    ]
+  );
+
+  const actions = useMemo(
+    () => feedItemsToActionItems(feedItems, { isOwnerOccupied }),
+    [feedItems, isOwnerOccupied]
   );
 
   if (loadError) {
