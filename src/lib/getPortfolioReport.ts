@@ -1,11 +1,18 @@
 import { createClient } from "@/lib/supabase";
-import { getStoreValuation, getStoreDebt } from "@/lib/getStoreValuation";
+import { getStoreValuation, getStoreBusinessDebt } from "@/lib/getStoreValuation";
+import {
+  computePortfolioEquity,
+  computePortfolioFinancialTotals,
+  computePortfolioStoreDscr,
+  sumPortfolioCash,
+} from "@/lib/portfolioMetrics";
 import {
   buildPortfolioTtmCashFlow,
-  buildPortfolioTtmSummary,
   fetchAnnualDebtServiceByStore,
   fetchMonthlyFinancialsForStores,
+  fetchMonthlyUtilitiesForStores,
   type MonthlyFinancialRecord,
+  type MonthlyUtilityRecordWithStore,
   type PortfolioTtmCashFlow,
 } from "@/lib/financials";
 
@@ -52,6 +59,7 @@ export async function getPortfolioReport(
   userId: string,
   options?: {
     financialsData?: MonthlyFinancialRecord[];
+    utilitiesData?: MonthlyUtilityRecordWithStore[];
     annualDebtByStore?: Record<string, number>;
   }
 ): Promise<PortfolioReportData> {
@@ -100,17 +108,30 @@ export async function getPortfolioReport(
   const financialsData =
     options?.financialsData ??
     (await fetchMonthlyFinancialsForStores(supabase, storeIds));
+  const utilitiesData =
+    options?.utilitiesData ??
+    (await fetchMonthlyUtilitiesForStores(supabase, storeIds));
   const annualDebtByStore =
     options?.annualDebtByStore ??
     (await fetchAnnualDebtServiceByStore(supabase, storeIds));
 
-  const portfolioTtm = buildPortfolioTtmSummary(financialsData, storeIds, annualDebtByStore);
-  const cashFlow = buildPortfolioTtmCashFlow(financialsData, storeIds, annualDebtByStore);
+  const portfolioFinancials = computePortfolioFinancialTotals(
+    financialsData,
+    storeIds,
+    annualDebtByStore,
+    utilitiesData
+  );
+  const cashFlow = buildPortfolioTtmCashFlow(
+    financialsData,
+    storeIds,
+    annualDebtByStore,
+    utilitiesData
+  );
 
   const storeDetails = await Promise.all(
     stores.map(async (store) => {
       const valuation = await getStoreValuation(store.id);
-      const debt = await getStoreDebt(store.id);
+      const debt = await getStoreBusinessDebt(store.id);
       const cash =
         (store.operating_account_balance ?? 0) +
         (store.reserve_account_balance ?? 0) +
@@ -135,14 +156,12 @@ export async function getPortfolioReport(
         .eq("store_id", store.id)
         .eq("is_active", true);
 
-      const ttm = portfolioTtm.byStoreId[store.id];
+      const ttm = portfolioFinancials.summary.byStoreId[store.id];
       const hasTtm = (ttm?.monthsUsed ?? 0) > 0;
-      const annualRevenue = hasTtm ? ttm.ttmRevenue : (store.monthly_revenue ?? 0) * 12;
-      const annualEbitda = hasTtm
-        ? ttm.ttmEbitda
-        : ((store.monthly_revenue ?? 0) - (store.monthly_expenses ?? 0)) * 12;
-      const annualDebtService = ttm?.ttmDebtService ?? 0;
-      const dscr = annualDebtService > 0 ? (ttm?.dscr ?? null) : null;
+      const annualRevenue = hasTtm ? ttm.ttmRevenue : 0;
+      const annualEbitda = hasTtm ? ttm.ttmEbitda : 0;
+      const annualDebtService = annualDebtByStore[store.id] ?? 0;
+      const dscr = computePortfolioStoreDscr(ttm, annualDebtService);
 
       const equity = valuation.businessValue - debt + cash;
 
@@ -206,13 +225,13 @@ export async function getPortfolioReport(
 
   const portfolioValue = storeDetails.reduce((s, d) => s + d.valuation.businessValue, 0);
   const portfolioDebt = storeDetails.reduce((s, d) => s + d.debt, 0);
-  const portfolioCash = storeDetails.reduce((s, d) => s + d.cash, 0);
-  const portfolioEquity = portfolioValue - portfolioDebt + portfolioCash;
-  const portfolioNetWorth = portfolioValue + portfolioCash - portfolioDebt;
+  const portfolioCash = sumPortfolioCash(stores);
+  const portfolioEquity = computePortfolioEquity(portfolioValue, portfolioDebt, portfolioCash);
+  const portfolioNetWorth = portfolioEquity;
   const annualRevenue = storeDetails.reduce((s, d) => s + d.annualRevenue, 0);
-  const annualEbitda = portfolioTtm.ttmEbitda;
-  const annualDebtService = portfolioTtm.ttmDebtService;
-  const globalDSCR = portfolioTtm.globalDscr;
+  const annualEbitda = portfolioFinancials.annualEbitda;
+  const annualDebtService = portfolioFinancials.annualDebtService;
+  const globalDSCR = portfolioFinancials.globalDSCR;
   const globalLTV = portfolioValue > 0 ? (portfolioDebt / portfolioValue) * 100 : 0;
   const debtYield = portfolioDebt > 0 ? (annualEbitda / portfolioDebt) * 100 : 0;
   const debtToEbitda = annualEbitda > 0 ? portfolioDebt / annualEbitda : 0;

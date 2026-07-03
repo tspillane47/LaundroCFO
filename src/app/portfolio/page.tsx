@@ -5,10 +5,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
-import { calcDSCR, calcGlobalDSCR, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import { DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { shouldTriggerLowDscrAlert } from "@/lib/dscr";
+import {
+  fetchMonthlyFinancialsForStores,
+  fetchMonthlyUtilitiesForStores,
+  type PortfolioTtmSummary,
+} from "@/lib/financials";
+import {
+  computePortfolioEquity,
+  computePortfolioFinancialTotals,
+  computePortfolioStoreDscr,
+  sumPortfolioCash,
+} from "@/lib/portfolioMetrics";
 import { formatDscrDisplay } from "@/lib/financials";
-import { getStoreValuation, getStoreBusinessDebt, getStoreBuildingMortgage, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
+import { getStoreValuation, getStoreBusinessDebt, getStoreBuildingMortgage, type StoreValuationResult } from "@/lib/getStoreValuation";
 import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
@@ -108,6 +119,7 @@ export default function PortfolioPage() {
   const [totalDebt, setTotalDebt] = useState(0);
   const [totalAnnualDebtServiceFromLoans, setTotalAnnualDebtServiceFromLoans] = useState(0);
   const [scheduledDebtServiceByStore, setScheduledDebtServiceByStore] = useState<Record<string, number>>({});
+  const [portfolioTtmSummary, setPortfolioTtmSummary] = useState<PortfolioTtmSummary | null>(null);
 
   useEffect(() => {
     if (localStorage.getItem("laundrocfo_show_welcome") === "true") {
@@ -154,12 +166,16 @@ export default function PortfolioPage() {
         { data: equipmentData, error: equipmentError },
         { data: insuranceData, error: insuranceError },
         { data: loansData, error: loansError },
+        financialsData,
+        utilitiesData,
       ] = await Promise.all([
         supabase.from("leases").select("id, store_id, lease_end_date, monthly_rent").in("store_id", storeIds),
         supabase.from("real_estate").select("store_id, estimated_value").in("store_id", storeIds),
         supabase.from("equipment_inventory").select("*").in("store_id", storeIds),
         supabase.from("insurance_policies").select("*").in("store_id", storeIds).eq("is_active", true),
         supabase.from("store_loans").select("store_id, monthly_payment").in("store_id", storeIds).eq("is_active", true),
+        fetchMonthlyFinancialsForStores(supabase, storeIds),
+        fetchMonthlyUtilitiesForStores(supabase, storeIds),
       ]);
 
       const errors = [leasesError, reError, equipmentError, insuranceError, loansError].filter(Boolean);
@@ -211,6 +227,14 @@ export default function PortfolioPage() {
       }
       setScheduledDebtServiceByStore(debtServiceByStore);
 
+      const portfolioFinancials = computePortfolioFinancialTotals(
+        financialsData,
+        storeIds,
+        debtServiceByStore,
+        utilitiesData
+      );
+      setPortfolioTtmSummary(portfolioFinancials.summary);
+
       const totalPortfolioValue = valuations.reduce((s, sv) => s + sv.valuation.businessValue, 0);
       if (stores.length === 1 && valuations.length === 1) {
         const singleStoreValue = valuations[0].valuation.businessValue;
@@ -243,15 +267,18 @@ export default function PortfolioPage() {
   const storeMetrics = useMemo(() => {
     return (stores as Store[]).map((store) => {
       const storeValuation = valuationByStoreId.get(store.id);
-      const resolved = storeValuation?.resolvedFinancials;
-      const hasFinancialData = hasMonthlyFinancialRecords(resolved);
-      const monthlyRevenue = hasFinancialData ? (resolved?.monthlyRevenue ?? 0) : 0;
-      const monthlyExpenses = hasFinancialData ? (resolved?.monthlyExpenses ?? 0) : 0;
+      const storeTtm = portfolioTtmSummary?.byStoreId[store.id];
+      const hasFinancialData = (storeTtm?.monthsUsed ?? 0) > 0;
+      const monthlyRevenue =
+        hasFinancialData && storeTtm ? storeTtm.ttmRevenue / storeTtm.monthsUsed : 0;
+      const monthlyExpenses =
+        hasFinancialData && storeTtm
+          ? (storeTtm.ttmRevenue - storeTtm.ttmEbitda) / storeTtm.monthsUsed
+          : 0;
       const monthlyEbitda = hasFinancialData ? monthlyRevenue - monthlyExpenses : 0;
-      const annualEbitda = hasFinancialData ? (resolved?.annualEbitda ?? 0) : 0;
+      const annualEbitda = hasFinancialData ? (storeTtm?.ttmEbitda ?? 0) : 0;
       const debtService = hasFinancialData ? (scheduledDebtServiceByStore[store.id] ?? 0) : 0;
-      const annualCashFlow = hasFinancialData ? annualEbitda - debtService : 0;
-      const dscr = hasFinancialData ? calcDSCR(annualEbitda, debtService) : null;
+      const dscr = computePortfolioStoreDscr(storeTtm, debtService);
       const estimatedValue = hasFinancialData ? (storeValuation?.businessValue ?? 0) : 0;
       const loanBalance = store.loan_balance ?? 0;
       const storeCash = hasFinancialData
@@ -289,24 +316,24 @@ export default function PortfolioPage() {
         hasFinancialData,
       };
     });
-  }, [stores, leases, valuationByStoreId, scheduledDebtServiceByStore]);
+  }, [stores, leases, valuationByStoreId, scheduledDebtServiceByStore, portfolioTtmSummary]);
 
   const aggregates = useMemo(() => {
     const withFinancials = storeMetrics.filter((m) => m.hasFinancialData);
     const totalPortfolioValue = withFinancials.reduce((s, m) => s + m.estimatedValue, 0);
     const totalAnnualRevenue = withFinancials.reduce((s, m) => s + m.monthlyRevenue * 12, 0);
-    const totalAnnualEbitda = withFinancials.reduce((s, m) => s + m.annualEbitda, 0);
+    const totalAnnualEbitda = portfolioTtmSummary?.ttmEbitda ?? 0;
     const totalMonthlyEbitda = withFinancials.length > 0 ? totalAnnualEbitda / 12 : 0;
-    const totalCash = withFinancials.reduce((s, m) => s + m.storeCash, 0);
+    const totalCash = sumPortfolioCash(stores as Store[]);
     const totalAnnualDebtService = totalAnnualDebtServiceFromLoans;
     const hasDebtData = totalAnnualDebtServiceFromLoans > 0 && withFinancials.length > 0;
-    const globalDSCR = hasDebtData ? calcGlobalDSCR(totalAnnualEbitda, totalAnnualDebtService) : null;
+    const globalDSCR = hasDebtData ? (portfolioTtmSummary?.globalDscr ?? null) : null;
     const portfolioNetWorth =
       totalPortfolioValue + realEstateTotal - totalDebt - buildingMortgageTotal + totalCash;
     const ebitdaMargin = totalAnnualRevenue > 0 ? (totalAnnualEbitda / totalAnnualRevenue) * 100 : 0;
     const availableMonthlyCashFlow = Math.max(0, (totalAnnualEbitda - totalAnnualDebtService) / 12);
     const acquisitionCapacity = (availableMonthlyCashFlow * 12) / 0.12;
-    const portfolioEquity = totalPortfolioValue + totalCash - totalDebt;
+    const portfolioEquity = computePortfolioEquity(totalPortfolioValue, totalDebt, totalCash);
     const hasAnyFinancialData = withFinancials.length > 0;
 
     return {
@@ -327,7 +354,7 @@ export default function PortfolioPage() {
       portfolioEquity,
       hasAnyFinancialData,
     };
-  }, [storeMetrics, totalDebt, buildingMortgageTotal, realEstateTotal, totalAnnualDebtServiceFromLoans]);
+  }, [storeMetrics, stores, totalDebt, buildingMortgageTotal, realEstateTotal, totalAnnualDebtServiceFromLoans, portfolioTtmSummary]);
 
   const allFeedItems = useMemo(() => {
     const items = (stores as Store[]).flatMap((store) => {

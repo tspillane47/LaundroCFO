@@ -37,6 +37,10 @@ export type MonthlyUtilityRecord = {
   internet: number;
 };
 
+export type MonthlyUtilityRecordWithStore = MonthlyUtilityRecord & {
+  store_id: string;
+};
+
 export type CalculatedMonthly = MonthlyFinancialRecord & {
   totalExpenses: number;
   grossProfit: number;
@@ -352,9 +356,25 @@ export function groupFinancialsByStoreId(
   return map;
 }
 
-export function calcStoreTtmFromFinancials(records: MonthlyFinancialRecord[]): TtmMetrics {
+export function groupUtilitiesByStoreId(
+  rows: MonthlyUtilityRecordWithStore[]
+): Map<string, MonthlyUtilityRecord[]> {
+  const map = new Map<string, MonthlyUtilityRecord[]>();
+  for (const row of rows) {
+    const list = map.get(row.store_id) ?? [];
+    const { store_id: _storeId, ...utility } = row;
+    list.push(utility);
+    map.set(row.store_id, list);
+  }
+  return map;
+}
+
+export function calcStoreTtmFromFinancials(
+  records: MonthlyFinancialRecord[],
+  utilitiesLookup?: Map<string, MonthlyUtilityRecord>
+): TtmMetrics {
   if (records.length === 0) return EMPTY_TTM_METRICS;
-  return calcTtmMetrics(enrichMonthlyRecords(sortRecordsDesc(records)));
+  return calcTtmMetrics(enrichMonthlyRecords(sortRecordsDesc(records), utilitiesLookup));
 }
 
 export type PortfolioTtmSummary = {
@@ -381,15 +401,19 @@ export function applyLoanDebtServiceToTtm(
 export function buildPortfolioTtmSummary(
   rows: MonthlyFinancialRecord[],
   storeIds: string[],
-  annualDebtServiceByStore?: Record<string, number>
+  annualDebtServiceByStore?: Record<string, number>,
+  utilityRows: MonthlyUtilityRecordWithStore[] = []
 ): PortfolioTtmSummary {
   const grouped = groupFinancialsByStoreId(rows);
+  const utilitiesGrouped = groupUtilitiesByStoreId(utilityRows);
   const byStoreId: Record<string, TtmMetrics> = {};
   let ttmEbitda = 0;
   let ttmDebtService = 0;
 
   for (const id of storeIds) {
-    const baseTtm = calcStoreTtmFromFinancials(grouped.get(id) ?? []);
+    const utilitiesLookup = buildUtilitiesLookup(utilitiesGrouped.get(id) ?? []);
+    const records = enrichMonthlyRecords(sortRecordsDesc(grouped.get(id) ?? []), utilitiesLookup);
+    const baseTtm = calcTtmMetrics(records);
     const ttm = applyLoanDebtServiceToTtm(baseTtm, annualDebtServiceByStore?.[id] ?? 0);
     byStoreId[id] = ttm;
     ttmEbitda += ttm.ttmEbitda;
@@ -439,11 +463,13 @@ function sumTtmRecords(
 export function buildPortfolioTtmCashFlow(
   rows: MonthlyFinancialRecord[],
   storeIds: string[],
-  annualDebtServiceByStore?: Record<string, number>
+  annualDebtServiceByStore?: Record<string, number>,
+  utilityRows: MonthlyUtilityRecordWithStore[] = []
 ): PortfolioTtmCashFlow {
   if (storeIds.length === 0) return EMPTY_PORTFOLIO_TTM_CASH_FLOW;
 
   const grouped = groupFinancialsByStoreId(rows);
+  const utilitiesGrouped = groupUtilitiesByStoreId(utilityRows);
   let revenue = 0;
   let utilities = 0;
   let rent = 0;
@@ -454,7 +480,8 @@ export function buildPortfolioTtmCashFlow(
   let debtService = 0;
 
   for (const id of storeIds) {
-    const records = enrichMonthlyRecords(sortRecordsDesc(grouped.get(id) ?? []));
+    const utilitiesLookup = buildUtilitiesLookup(utilitiesGrouped.get(id) ?? []);
+    const records = enrichMonthlyRecords(sortRecordsDesc(grouped.get(id) ?? []), utilitiesLookup);
     revenue += sumTtmRecords(records, (r) => r.revenue);
     utilities += sumTtmRecords(records, (r) => r.utilities);
     rent += sumTtmRecords(records, (r) => r.rent);
@@ -543,6 +570,22 @@ export async function fetchMonthlyFinancialsForStores(
     storeIds.map((storeId) => fetchStoreMonthlyFinancials(supabase, storeId))
   );
   return results.flat();
+}
+
+/** monthly_utilities for portfolio TTM — same basis as getStoreValuation / Financials page. */
+export async function fetchMonthlyUtilitiesForStores(
+  supabase: FinancialsSupabaseClient,
+  storeIds: string[]
+): Promise<MonthlyUtilityRecordWithStore[]> {
+  if (storeIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("monthly_utilities")
+    .select("store_id, year, month, water, gas, electric, sewer, trash, internet")
+    .in("store_id", storeIds);
+
+  if (error) throw error;
+  return (data ?? []) as MonthlyUtilityRecordWithStore[];
 }
 
 /** Annual debt service from active store_loans (monthly_payment × 12), keyed by store_id. */

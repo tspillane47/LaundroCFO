@@ -32,6 +32,7 @@ import {
   EMPTY_TTM_METRICS,
   fetchAnnualDebtServiceByStore,
   fetchMonthlyFinancialsForStores,
+  fetchMonthlyUtilitiesForStores,
   formatDscrDisplay,
   type PortfolioTtmCashFlow,
   type PortfolioTtmSummary,
@@ -222,7 +223,7 @@ function ReportsPageContent() {
 
       const storeIds = stores.length > 0 ? stores.map((s) => s.id) : [storeData.id];
 
-      const [{ data: equipmentData }, { data: policiesData }, financialsData, annualDebtByStore] =
+      const [{ data: equipmentData }, { data: policiesData }, financialsData, utilitiesData, annualDebtByStore] =
         await Promise.all([
           supabase.from("equipment_inventory").select("*").eq("store_id", storeData.id),
           supabase
@@ -231,16 +232,24 @@ function ReportsPageContent() {
             .eq("store_id", storeData.id)
             .eq("is_active", true),
           fetchMonthlyFinancialsForStores(supabase, storeIds),
+          fetchMonthlyUtilitiesForStores(supabase, storeIds),
           fetchAnnualDebtServiceByStore(supabase, storeIds),
         ]);
 
       setEquipment((equipmentData ?? []) as EquipmentRecord[]);
       setInsurance(policiesData ?? []);
 
-      const portfolioSummary = buildPortfolioTtmSummary(financialsData, storeIds, annualDebtByStore);
+      const portfolioSummary = buildPortfolioTtmSummary(
+        financialsData,
+        storeIds,
+        annualDebtByStore,
+        utilitiesData
+      );
       setStoreTtm(portfolioSummary.byStoreId[storeData.id] ?? EMPTY_TTM_METRICS);
       setPortfolioTtm(portfolioSummary);
-      setPortfolioCashFlow(buildPortfolioTtmCashFlow(financialsData, storeIds, annualDebtByStore));
+      setPortfolioCashFlow(
+        buildPortfolioTtmCashFlow(financialsData, storeIds, annualDebtByStore, utilitiesData)
+      );
 
       const ownerOccupied = storeData.occupancy_type === "owner_occupied";
 
@@ -304,13 +313,23 @@ function ReportsPageContent() {
           .eq("archived", false);
 
         const storeIds = (userStores ?? []).map((s) => s.id);
-        const [financialsData, annualDebtByStore] = await Promise.all([
+        const [financialsData, utilitiesData, annualDebtByStore] = await Promise.all([
           fetchMonthlyFinancialsForStores(supabase, storeIds),
+          fetchMonthlyUtilitiesForStores(supabase, storeIds),
           fetchAnnualDebtServiceByStore(supabase, storeIds),
         ]);
-        const cashFlow = buildPortfolioTtmCashFlow(financialsData, storeIds, annualDebtByStore);
+        const cashFlow = buildPortfolioTtmCashFlow(
+          financialsData,
+          storeIds,
+          annualDebtByStore,
+          utilitiesData
+        );
         setPortfolioCashFlow(cashFlow);
-        const data = await getPortfolioReport(userId, { financialsData, annualDebtByStore });
+        const data = await getPortfolioReport(userId, {
+          financialsData,
+          utilitiesData,
+          annualDebtByStore,
+        });
         setPortfolioData({ ...data, cashFlow });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load portfolio report");
