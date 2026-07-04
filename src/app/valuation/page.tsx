@@ -20,7 +20,7 @@ import {
   gradeColor,
   type EquipmentRecord,
 } from "@/lib/equipment";
-import { fmtDollar, fmtMultiple } from "@/lib/calculations";
+import { calcLeaseScore, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 import {
   AreaChart,
@@ -170,31 +170,6 @@ function sumCategoryAdj(result: ValuationResult, category: string): number {
   return result.adjustments
     .filter((a) => a.category === category)
     .reduce((s, a) => s + a.value, 0);
-}
-
-function calcLeaseScore(params: {
-  yearsRemaining: number;
-  availableOptions: number;
-  exclusivityClause: boolean;
-  personalGuaranty: boolean;
-  assignmentRights: string | null;
-  monthlyRent: number | null;
-  monthlyRevenue: number | null;
-}): number {
-  let score = 50;
-  if (params.yearsRemaining >= 10) score += 25;
-  else if (params.yearsRemaining >= 7) score += 15;
-  else if (params.yearsRemaining >= 5) score += 8;
-  if (params.availableOptions >= 2) score += 10;
-  else if (params.availableOptions === 1) score += 5;
-  if (params.exclusivityClause) score += 5;
-  if (params.personalGuaranty) score -= 10;
-  if (params.assignmentRights === "Not Allowed") score -= 5;
-  if (params.monthlyRent != null && params.monthlyRevenue != null && params.monthlyRevenue > 0) {
-    const rentToRevenue = (params.monthlyRent / params.monthlyRevenue) * 100;
-    if (rentToRevenue > 20) score -= 15;
-  }
-  return Math.min(100, Math.max(0, score));
 }
 
 function calcDataCompleteness(

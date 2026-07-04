@@ -6,6 +6,7 @@ import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { SmallMetric } from "@/components/ui/MetricCard";
 import clsx from "clsx";
+import { calcLeaseScore } from "@/lib/calculations";
 import { getNextRentEscalation } from "@/lib/rent-escalation";
 import {
   INPUT_CLASS,
@@ -168,36 +169,6 @@ function calcMonthsRemaining(endDate: string | null): number {
   if (!end) return 0;
   const now = new Date();
   return Math.max(0, diffInMonths(now, end));
-}
-
-function calcLeaseScore(params: {
-  yearsRemaining: number;
-  availableOptions: number;
-  exclusivityClause: boolean;
-  personalGuaranty: boolean;
-  assignmentRights: string | null;
-  monthlyRent: number | null;
-  monthlyRevenue: number | null;
-}): number {
-  let score = 50;
-
-  if (params.yearsRemaining >= 10) score += 25;
-  else if (params.yearsRemaining >= 7) score += 15;
-  else if (params.yearsRemaining >= 5) score += 8;
-
-  if (params.availableOptions >= 2) score += 10;
-  else if (params.availableOptions === 1) score += 5;
-
-  if (params.exclusivityClause) score += 5;
-  if (params.personalGuaranty) score -= 10;
-  if (params.assignmentRights === "Not Allowed") score -= 5;
-
-  if (params.monthlyRent != null && params.monthlyRevenue != null && params.monthlyRevenue > 0) {
-    const rentToRevenue = (params.monthlyRent / params.monthlyRevenue) * 100;
-    if (rentToRevenue > 20) score -= 15;
-  }
-
-  return Math.min(100, Math.max(0, score));
 }
 
 function riskFromScore(score: number): { label: string; color: string; ringColor: string } {

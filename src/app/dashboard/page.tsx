@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { getStoreValuation, getStoreDebt, getStoreScheduledDebtService, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
-import { calcEquipmentScore, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import { calcEquipmentScore, calcLeaseScore, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { computeStoreDscr } from "@/lib/dscr";
 import { feedItemsToActionItems } from "@/lib/alerts";
 import {
@@ -65,31 +65,6 @@ function calcYearsRemaining(endDate: string | null): number {
   const now = new Date();
   const ms = end.getTime() - now.getTime();
   return Math.max(0, ms / (365.25 * 24 * 60 * 60 * 1000));
-}
-
-function calcLeaseScore(params: {
-  yearsRemaining: number;
-  availableOptions: number;
-  exclusivityClause: boolean;
-  personalGuaranty: boolean;
-  assignmentRights: string | null;
-  monthlyRent: number | null;
-  monthlyRevenue: number | null;
-}): number {
-  let score = 50;
-  if (params.yearsRemaining >= 10) score += 25;
-  else if (params.yearsRemaining >= 7) score += 15;
-  else if (params.yearsRemaining >= 5) score += 8;
-  if (params.availableOptions >= 2) score += 10;
-  else if (params.availableOptions === 1) score += 5;
-  if (params.exclusivityClause) score += 5;
-  if (params.personalGuaranty) score -= 10;
-  if (params.assignmentRights === "Not Allowed") score -= 5;
-  if (params.monthlyRent != null && params.monthlyRevenue != null && params.monthlyRevenue > 0) {
-    const rentToRevenue = (params.monthlyRent / params.monthlyRevenue) * 100;
-    if (rentToRevenue > 20) score -= 15;
-  }
-  return Math.min(100, Math.max(0, score));
 }
 
 function generateValuationTrend(estimatedValue: number) {

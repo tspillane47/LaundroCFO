@@ -316,10 +316,12 @@ function computeReportMetrics(props: ReportProps) {
   const leaseScore = lease
     ? calcLeaseScore({
         yearsRemaining,
-        renewalOptions: availableOptions.length,
-        relocationClause: false,
-        assignmentWithConsent: lease.assignment_rights === "With Consent",
-        exclusiveUse: lease.exclusivity_clause ?? false,
+        availableOptions: availableOptions.length,
+        exclusivityClause: lease.exclusivity_clause ?? false,
+        personalGuaranty: lease.personal_guaranty ?? false,
+        assignmentRights: lease.assignment_rights ?? null,
+        monthlyRent: lease.monthly_rent ?? null,
+        monthlyRevenue: monthlyRevenue > 0 ? monthlyRevenue : null,
       })
     : isOwnerOccupied
       ? 95
