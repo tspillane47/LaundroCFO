@@ -367,6 +367,12 @@ export default function PortfolioPage() {
         resolvedFinancials: valuation?.resolvedFinancials,
         monthlyUtilities: (store as Record<string, unknown>).monthly_utilities as number | undefined,
         isOwnerOccupied: store.occupancy_type === "owner_occupied",
+        valuation: valuation
+          ? {
+              businessValue: valuation.businessValue,
+              finalMultiple: valuation.finalMultiple,
+            }
+          : null,
       });
     });
     const order = { danger: 0, warning: 1, success: 2, info: 3 };

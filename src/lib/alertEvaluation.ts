@@ -251,6 +251,12 @@ export async function buildPortfolioFeedItems(
       resolvedFinancials: valuation?.resolvedFinancials,
       monthlyUtilities: store.monthly_utilities as number | undefined,
       isOwnerOccupied: store.occupancy_type === "owner_occupied",
+      valuation: valuation
+        ? {
+            businessValue: valuation.businessValue,
+            finalMultiple: valuation.finalMultiple,
+          }
+        : null,
       positiveEvents: await buildPositiveEventsForStore(supabase, store, {
         scheduledAnnualDebtService: scheduledDebtServiceByStore[storeId] ?? 0,
         resolvedFinancials: valuation?.resolvedFinancials,

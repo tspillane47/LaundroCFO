@@ -4,6 +4,10 @@ import {
   getNextRentEscalation,
 } from "@/lib/rent-escalation";
 import { computeStoreDscr, hasScheduledDebtService, shouldTriggerLowDscrAlert } from "@/lib/dscr";
+import {
+  computeStoreValuation,
+  type StoreValuationContext,
+} from "@/lib/getStoreValuation";
 
 export interface FeedItem {
   id: string;
@@ -36,11 +40,18 @@ export type PositiveEventInput = {
   };
 };
 
+export type StoreFeedValuation = {
+  businessValue: number;
+  finalMultiple: number;
+};
+
 export type StoreFeedOptions = {
   scheduledAnnualDebtService?: number;
   resolvedFinancials?: StoreFeedFinancials | null;
   monthlyUtilities?: number;
   isOwnerOccupied?: boolean;
+  /** Canonical valuation from getStoreValuation(); falls back to computeStoreValuation when omitted. */
+  valuation?: StoreFeedValuation | null;
   valuationMonthlyChange?: number;
   positiveEvents?: PositiveEventInput;
 };
@@ -116,6 +127,35 @@ function calcYearsRemaining(endDate: string, now: Date): number {
 
 function hasTtmFinancials(financials?: StoreFeedFinancials | null): financials is StoreFeedFinancials {
   return financials?.source === 'ttm';
+}
+
+function resolveFeedValuation(
+  store: any,
+  lease: any,
+  equipment: any[] | undefined,
+  financials: StoreFeedFinancials | null | undefined,
+  provided?: StoreFeedValuation | null
+): StoreFeedValuation | null {
+  if (provided && provided.businessValue > 0) {
+    return provided;
+  }
+
+  const ctx: StoreValuationContext = {
+    store,
+    equipment: equipment ?? [],
+    lease: lease ?? null,
+    leaseOptions: [],
+    realEstate: null,
+    resolvedFinancials: hasTtmFinancials(financials) ? financials : undefined,
+  };
+
+  const result = computeStoreValuation(ctx);
+  if (result.businessValue <= 0) return null;
+
+  return {
+    businessValue: result.businessValue,
+    finalMultiple: result.finalMultiple,
+  };
 }
 
 export function generateStoreFeed(
@@ -225,16 +265,22 @@ export function generateStoreFeed(
     }
   }
 
-  // Valuation items
-  const estimatedValue = annualEbitda * 3.47;
-  if (estimatedValue > 0) {
+  // Valuation items — same calcValuation path as Valuation page (getStoreValuation)
+  const feedValuation = resolveFeedValuation(
+    store,
+    lease,
+    equipment,
+    financials,
+    options?.valuation
+  );
+  if (feedValuation) {
     items.push({
       id: 'val-' + store.id,
       date: formatDate(now),
       category: 'valuation',
       icon: '💎',
-      headline: `Store valuation: $${Math.round(estimatedValue).toLocaleString()}`,
-      description: `Based on ${annualEbitda > 0 ? '3.47x' : 'N/A'} EBITDA multiple. Update equipment and lease data to refine this estimate.`,
+      headline: `Store valuation: $${Math.round(feedValuation.businessValue).toLocaleString()}`,
+      description: `Based on ${feedValuation.finalMultiple.toFixed(2)}x EBITDA multiple. Update equipment and lease data to refine this estimate.`,
       severity: 'info',
       storeName: store.name,
     });

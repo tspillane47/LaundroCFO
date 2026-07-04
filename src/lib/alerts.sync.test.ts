@@ -13,6 +13,7 @@ import {
   generateStoreFeed,
   parseDscrFromAlertText,
 } from "@/lib/intelligence";
+import { computeStoreValuation } from "@/lib/getStoreValuation";
 
 const STORE_ID = "store-123";
 
@@ -281,5 +282,54 @@ describe("generateStoreFeed unified evaluator", () => {
     expect(keys).toContain(`utility-${STORE_ID}`);
     expect(keys).toContain(`equip-${STORE_ID}`);
     expect(keys).not.toContain(`rev-${STORE_ID}`);
+  });
+
+  it("uses canonical valuation when passed from getStoreValuation", () => {
+    const canonical = {
+      businessValue: 365732,
+      finalMultiple: 4.6,
+    };
+    const items = generateStoreFeed(makeStore(), undefined, [], [], {
+      resolvedFinancials: {
+        monthlyRevenue: 50000,
+        monthlyExpenses: 39000,
+        annualEbitda: 132000,
+        source: "ttm",
+      },
+      valuation: canonical,
+    });
+
+    const valItem = items.find((item) => item.id === `val-${STORE_ID}`);
+    expect(valItem?.headline).toBe("Store valuation: $365,732");
+    expect(valItem?.description).toContain("4.60x EBITDA multiple");
+  });
+
+  it("matches computeStoreValuation when valuation option is omitted", () => {
+    const store = makeStore({ square_footage: 2500, occupancy_type: "leased" });
+    const financials = {
+      monthlyRevenue: 50000,
+      monthlyExpenses: 39000,
+      annualEbitda: 132000,
+      source: "ttm" as const,
+    };
+
+    const canonical = computeStoreValuation({
+      store,
+      equipment: [],
+      lease: null,
+      leaseOptions: [],
+      realEstate: null,
+      resolvedFinancials: financials,
+    });
+
+    const items = generateStoreFeed(store, undefined, [], [], {
+      resolvedFinancials: financials,
+    });
+
+    const valItem = items.find((item) => item.id === `val-${STORE_ID}`);
+    expect(valItem?.headline).toBe(
+      `Store valuation: $${Math.round(canonical.businessValue).toLocaleString()}`
+    );
+    expect(valItem?.description).toContain(`${canonical.finalMultiple.toFixed(2)}x EBITDA multiple`);
   });
 });

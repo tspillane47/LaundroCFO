@@ -477,6 +477,12 @@ export default function DashboardPage() {
             resolvedFinancials,
             monthlyUtilities: store.monthly_utilities,
             isOwnerOccupied,
+            valuation: valuation
+              ? {
+                  businessValue: valuation.businessValue,
+                  finalMultiple: valuation.finalMultiple,
+                }
+              : null,
             valuationMonthlyChange: monthlyChange,
           })
         : [],
@@ -488,6 +494,7 @@ export default function DashboardPage() {
       scheduledDebtService,
       resolvedFinancials,
       isOwnerOccupied,
+      valuation,
       monthlyChange,
     ]
   );
