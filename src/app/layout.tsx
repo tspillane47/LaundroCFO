@@ -1,5 +1,6 @@
 "use client";
 import "./globals.css";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, Suspense } from "react";
@@ -777,6 +778,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     return (
       <html lang="en">
         <body>
+          <GoogleAnalytics gaId="G-ZCTEFSVP13" />
           <ToastProvider>
             <Suspense fallback={<OnboardingGuardFallback />}>
               <OnboardingGuard>{children}</OnboardingGuard>
@@ -791,6 +793,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     return (
       <html lang="en">
         <body>
+          <GoogleAnalytics gaId="G-ZCTEFSVP13" />
           <ToastProvider>
             <Suspense fallback={<OnboardingGuardFallback />}>
               <OnboardingGuard>
@@ -806,6 +809,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        <GoogleAnalytics gaId="G-ZCTEFSVP13" />
         <ToastProvider>
           <Suspense fallback={<OnboardingGuardFallback />}>
             <OnboardingGuard>
