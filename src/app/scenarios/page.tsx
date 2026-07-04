@@ -147,6 +147,7 @@ function ScenariosPageContent() {
       const ownerOccupied = storeData.occupancy_type === "owner_occupied";
       let totalLeaseControl = ownerOccupied ? 15 : 0;
       let leaseYearsRemaining = ownerOccupied ? 15 : 0;
+      let availableOptionYears = 0;
       let realEstateValue = 0;
 
       if (ownerOccupied) {
@@ -179,6 +180,7 @@ function ScenariosPageContent() {
             .reduce((s, o) => s + (o.option_years ?? 0), 0);
           leaseYearsRemaining = remaining;
           totalLeaseControl = remaining + optionYears;
+          availableOptionYears = optionYears;
         }
       }
 
@@ -187,6 +189,7 @@ function ScenariosPageContent() {
         equipment: (equipmentData ?? []) as EquipmentRecord[],
         totalLeaseControl,
         leaseYearsRemaining,
+        availableOptionYears,
         isOwnerOccupied: ownerOccupied,
         realEstateValue,
         resolvedFinancials,

@@ -6,6 +6,8 @@ export interface ValuationInputs {
   pct200G: number;
   equipmentScore: number;
   totalLeaseControl: number;
+  /** Available renewal option years (sum of lease_options); avoids float drift from totalLeaseControl − leaseYearsRemaining. */
+  availableOptionYears?: number;
   /** Base lease years remaining; when set, term and option years adjust the multiple separately. */
   leaseYearsRemaining?: number;
   occupancyType: string;
@@ -147,7 +149,10 @@ export function calcValuation(inputs: ValuationInputs): ValuationResult {
   if (!isOwned) {
     if (inputs.leaseYearsRemaining != null) {
       const yearsRemaining = inputs.leaseYearsRemaining;
-      const optionYears = Math.max(0, inputs.totalLeaseControl - yearsRemaining);
+      const optionYears =
+        inputs.availableOptionYears != null
+          ? inputs.availableOptionYears
+          : Math.round(Math.max(0, inputs.totalLeaseControl - yearsRemaining));
       const termAdj = calcLeaseTermAdjustment(yearsRemaining);
       const optionAdj = calcLeaseOptionAdjustment(optionYears);
       pushAdj(

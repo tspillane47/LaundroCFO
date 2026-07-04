@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase";
 import { calcEstimatedBalance } from "@/lib/amortization";
-import { calcDSCR } from "@/lib/calculations";
+import { computeStoreDscr } from "@/lib/dscr";
 import { getStoreValuation } from "@/lib/getStoreValuation";
 import {
   BANK_IMPORT_CATEGORY_LABELS,
@@ -334,7 +334,7 @@ function buildCurrentMonthlyAveragesFromContext(
       totalOutstandingBalance,
     },
     surplusCashFlow: ebitdaMonthly - totalMonthlyDebtService,
-    dscr: calcDSCR(ebitdaMonthly * 12, totalMonthlyDebtService * 12),
+    dscr: computeStoreDscr(ttm.ttmEbitda, totalMonthlyDebtService * 12),
     equity,
     waterKPI,
     monthsUsed,

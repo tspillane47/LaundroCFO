@@ -23,6 +23,7 @@ import {
   generatePayoffSchedule,
 } from "@/lib/amortization";
 import { calcDSCR, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import { computeStoreDscr } from "@/lib/dscr";
 import {
   calcStoreTtmFromFinancials,
   type MonthlyFinancialRecord,
@@ -374,7 +375,7 @@ export default function DebtPage() {
     const monthlyVariancePct =
       monthlyVariance != null ? variancePct(monthlyVariance, scheduledMonthly) : null;
 
-    const scheduledDscr = calcDSCR(ttm.ttmEbitda, scheduledAnnual);
+    const scheduledDscr = computeStoreDscr(ttm.ttmEbitda, scheduledAnnual);
     const actualDscr = calcDSCR(ttm.ttmEbitda, actualAnnualTotal ?? 0);
 
     return {

@@ -1,5 +1,16 @@
 import { createClient } from "@/lib/supabase";
-import { getStoreValuation, getStoreBusinessDebt } from "@/lib/getStoreValuation";
+import {
+  calcAverageEquipmentAge,
+  calcDebtYield,
+  calcEquipmentScore,
+  calcLeaseScore,
+} from "@/lib/calculations";
+import { getEquipmentGrade } from "@/lib/equipment";
+import {
+  calcYearsRemaining,
+  getStoreValuation,
+  getStoreBusinessDebt,
+} from "@/lib/getStoreValuation";
 import {
   computePortfolioEquity,
   computePortfolioFinancialTotals,
@@ -163,43 +174,33 @@ export async function getPortfolioReport(
       const annualDebtService = annualDebtByStore[store.id] ?? 0;
       const dscr = computePortfolioStoreDscr(ttm, annualDebtService);
 
-      const equity = valuation.businessValue - debt + cash;
+      const equity = computePortfolioEquity(valuation.businessValue, debt, cash);
 
-      let leaseScore = 50;
-      let yearsRemaining = 0;
-      if (lease?.lease_end_date) {
-        yearsRemaining =
-          (new Date(lease.lease_end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 365);
-        if (yearsRemaining >= 10) leaseScore += 30;
-        else if (yearsRemaining >= 5) leaseScore += 20;
-        else if (yearsRemaining >= 3) leaseScore += 10;
-        const availableOptions = (leaseOptions ?? []).filter((o) => o.status === "Available").length;
-        if (availableOptions >= 2) leaseScore += 10;
-        else if (availableOptions === 1) leaseScore += 5;
-        if (lease.exclusivity_clause) leaseScore += 5;
-        if (lease.assignment_rights === "Not Allowed") leaseScore -= 5;
-      }
-      leaseScore = Math.min(100, Math.max(0, leaseScore));
-
-      const currentYear = new Date().getFullYear();
-      const totalMachines = (equipment ?? []).reduce((s, e) => s + e.quantity, 0);
-      const avgEquipmentAge =
-        totalMachines > 0
-          ? (equipment ?? []).reduce(
-              (s, e) => s + e.quantity * (currentYear - e.installation_year),
-              0
-            ) / totalMachines
-          : (store.avg_machine_age ?? 0);
-
-      let equipScore = 60;
-      if (avgEquipmentAge < 5) equipScore += 30;
-      else if (avgEquipmentAge < 8) equipScore += 20;
-      else if (avgEquipmentAge < 12) equipScore += 10;
-      else if (avgEquipmentAge >= 15) equipScore -= 10;
-      const equipmentGrade =
-        equipScore >= 90 ? "A" : equipScore >= 75 ? "B" : equipScore >= 60 ? "C" : "D";
-
+      const yearsRemaining = lease ? calcYearsRemaining(lease.lease_end_date) : 0;
       const availableLeaseOptions = (leaseOptions ?? []).filter((o) => o.status === "Available").length;
+      const monthlyRevenue =
+        hasTtm && ttm.monthsUsed > 0 ? ttm.ttmRevenue / ttm.monthsUsed : null;
+      const leaseScore = lease
+        ? calcLeaseScore({
+            yearsRemaining,
+            availableOptions: availableLeaseOptions,
+            exclusivityClause: lease.exclusivity_clause ?? false,
+            personalGuaranty: lease.personal_guaranty ?? false,
+            assignmentRights: lease.assignment_rights ?? null,
+            monthlyRent: lease.monthly_rent ?? null,
+            monthlyRevenue: monthlyRevenue != null && monthlyRevenue > 0 ? monthlyRevenue : null,
+          })
+        : store.occupancy_type === "owner_occupied"
+          ? 95
+          : 50;
+
+      const avgEquipmentAge =
+        (equipment ?? []).length > 0
+          ? calcAverageEquipmentAge(
+              (equipment ?? []).map((e) => ({ qty: e.quantity, installed: e.installation_year }))
+            )
+          : (store.avg_machine_age ?? 0);
+      const equipmentGrade = getEquipmentGrade(calcEquipmentScore(avgEquipmentAge));
 
       return {
         store,
@@ -233,7 +234,8 @@ export async function getPortfolioReport(
   const annualDebtService = portfolioFinancials.annualDebtService;
   const globalDSCR = portfolioFinancials.globalDSCR;
   const globalLTV = portfolioValue > 0 ? (portfolioDebt / portfolioValue) * 100 : 0;
-  const debtYield = portfolioDebt > 0 ? (annualEbitda / portfolioDebt) * 100 : 0;
+  const annualNoi = portfolioFinancials.summary.ttmEbitda - portfolioFinancials.annualDebtService;
+  const debtYield = calcDebtYield(annualNoi, portfolioDebt);
   const debtToEbitda = annualEbitda > 0 ? portfolioDebt / annualEbitda : 0;
 
   return {

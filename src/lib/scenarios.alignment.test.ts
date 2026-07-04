@@ -37,8 +37,20 @@ describe("scenarios alignment with valuation and dashboard", () => {
     const valuationCtx = {
       store,
       equipment: [
-        { machine_type: "Washer", quantity: 20, avg_age: 6, high_speed_extract: true },
-        { machine_type: "Dryer", quantity: 20, avg_age: 6, high_speed_extract: false },
+        {
+          machine_type: "Washer",
+          quantity: 20,
+          installation_year: 2020,
+          high_speed_extract: true,
+          condition: "Good",
+        },
+        {
+          machine_type: "Dryer",
+          quantity: 20,
+          installation_year: 2020,
+          high_speed_extract: false,
+          condition: "Good",
+        },
       ],
       lease: { lease_end_date: leaseEndDate, monthly_rent: 8500 },
       leaseOptions: [{ option_years: optionYears, status: "Available" }],
@@ -51,6 +63,7 @@ describe("scenarios alignment with valuation and dashboard", () => {
       equipment: valuationCtx.equipment,
       totalLeaseControl,
       leaseYearsRemaining,
+      availableOptionYears: optionYears,
       isOwnerOccupied: false,
       realEstateValue: 0,
       resolvedFinancials,

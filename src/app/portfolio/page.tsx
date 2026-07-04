@@ -275,7 +275,10 @@ export default function PortfolioPage() {
         hasFinancialData && storeTtm
           ? (storeTtm.ttmRevenue - storeTtm.ttmEbitda) / storeTtm.monthsUsed
           : 0;
-      const monthlyEbitda = hasFinancialData ? monthlyRevenue - monthlyExpenses : 0;
+      const monthlyEbitda =
+        hasFinancialData && storeTtm && storeTtm.monthsUsed > 0
+          ? storeTtm.ttmEbitda / storeTtm.monthsUsed
+          : 0;
       const annualEbitda = hasFinancialData ? (storeTtm?.ttmEbitda ?? 0) : 0;
       const debtService = hasFinancialData ? (scheduledDebtServiceByStore[store.id] ?? 0) : 0;
       const dscr = computePortfolioStoreDscr(storeTtm, debtService);

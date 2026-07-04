@@ -1,12 +1,15 @@
 import { computeStoreDscr } from "@/lib/dscr";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import {
+  calcYearsRemaining,
   computeStoreValuation,
   resolveStoreFinancials,
   type ResolvedStoreFinancials,
   type StoreValuationContext,
 } from "@/lib/getStoreValuation";
 import { type ValuationInputs, type ValuationResult } from "@/lib/valuation";
+
+export { calcYearsRemaining };
 
 export const SCENARIO_ICON_NAMES = [
   "Wrench",
@@ -41,6 +44,8 @@ export type StoreScenarioContext = {
   equipment: EquipmentRecord[];
   totalLeaseControl: number;
   leaseYearsRemaining: number;
+  /** Sum of available lease option years; keeps valuation aligned with the lease-aware path. */
+  availableOptionYears?: number;
   isOwnerOccupied: boolean;
   realEstateValue: number;
   resolvedFinancials?: ResolvedStoreFinancials;
@@ -238,16 +243,9 @@ const SCENARIO_META: Record<
   },
 };
 
-function parseDate(value: string | null | undefined): Date | null {
-  if (!value) return null;
-  const d = new Date(String(value).split("T")[0] + "T12:00:00");
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-export function calcYearsRemaining(endDate: string | null | undefined): number {
-  const end = parseDate(endDate);
-  if (!end) return 0;
-  return Math.max(0, (end.getTime() - Date.now()) / (365.25 * 24 * 60 * 60 * 1000));
+function resolveAvailableOptionYears(ctx: StoreScenarioContext): number {
+  if (ctx.availableOptionYears != null) return ctx.availableOptionYears;
+  return Math.round(Math.max(0, ctx.totalLeaseControl - ctx.leaseYearsRemaining));
 }
 
 function toValuationContext(ctx: StoreScenarioContext): StoreValuationContext {
@@ -265,6 +263,7 @@ function scenarioLeaseOverrides(ctx: StoreScenarioContext): Partial<ValuationInp
   return {
     totalLeaseControl: ctx.totalLeaseControl,
     leaseYearsRemaining: ctx.leaseYearsRemaining,
+    availableOptionYears: resolveAvailableOptionYears(ctx),
     ...(ctx.isOwnerOccupied ? { realEstateValue: ctx.realEstateValue } : {}),
   };
 }
@@ -352,6 +351,7 @@ export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
   const leaseExt = runValuation(ctx, {
     leaseYearsRemaining: ctx.leaseYearsRemaining + 5,
     totalLeaseControl: ctx.totalLeaseControl + 5,
+    availableOptionYears: resolveAvailableOptionYears(ctx),
   });
 
   const wdfMonthlyRevenue = monthlyRevenue + 6000;
@@ -622,6 +622,7 @@ export function computeInteractiveScenario(
       scenarioValuation = runValuation(ctx, {
         leaseYearsRemaining: ctx.leaseYearsRemaining + yearsToExtend,
         totalLeaseControl: ctx.totalLeaseControl + yearsToExtend,
+        availableOptionYears: resolveAvailableOptionYears(ctx),
       });
       newEbitda = annualEbitda;
       detail = {

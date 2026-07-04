@@ -45,6 +45,8 @@ function calcYearsRemaining(endDate: string | null | undefined): number {
   return Math.max(0, (end.getTime() - Date.now()) / (365.25 * 24 * 60 * 60 * 1000));
 }
 
+export { calcYearsRemaining };
+
 function normalizeMarketDensity(raw: string | null | undefined): string {
   if (!raw) return "";
   const v = raw.toLowerCase();
@@ -141,12 +143,14 @@ export function buildStoreValuationInputs(
 
   let totalLeaseControl = 0;
   let leaseYearsRemaining = 0;
+  let availableOptionYears = 0;
   if (!isOwnerOccupied && lease?.lease_end_date) {
     const yearsRemaining = calcYearsRemaining(lease.lease_end_date as string);
     const optionYears = leaseOptions
       .filter((o) => o.status === "Available")
       .reduce((s, o) => s + (Number(o.option_years) || 0), 0);
     leaseYearsRemaining = yearsRemaining;
+    availableOptionYears = optionYears;
     totalLeaseControl = yearsRemaining + optionYears;
   }
 
@@ -160,6 +164,7 @@ export function buildStoreValuationInputs(
       pct200G: 0,
       equipmentScore: 0,
       totalLeaseControl: 0,
+      availableOptionYears: 0,
       leaseYearsRemaining: 0,
       occupancyType: isOwnerOccupied ? "owned" : "leased",
       marketDensity: "",
@@ -203,6 +208,7 @@ export function buildStoreValuationInputs(
     pct200G: equipMetrics.pct200GWashers,
     equipmentScore: equipMetrics.totalMachines > 0 ? equipMetrics.qualityScore : 0,
     totalLeaseControl,
+    availableOptionYears,
     leaseYearsRemaining,
     occupancyType: isOwnerOccupied ? "owned" : "leased",
     marketDensity: normalizeMarketDensity(
