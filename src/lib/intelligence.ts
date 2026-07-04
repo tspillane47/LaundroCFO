@@ -1,4 +1,4 @@
-import { calcUtilityRatio } from "@/lib/calculations";
+import { calcRentToRevenue, calcUtilityRatio } from "@/lib/calculations";
 import {
   escalationSeverity,
   formatRentEscalationAlert,
@@ -7,6 +7,7 @@ import {
 import { computeStoreDscr, hasScheduledDebtService, shouldTriggerLowDscrAlert } from "@/lib/dscr";
 import {
   computeStoreValuation,
+  resolveStoreFinancials,
   type StoreValuationContext,
 } from "@/lib/getStoreValuation";
 
@@ -172,16 +173,13 @@ export function generateStoreFeed(
   const items: FeedItemDraft[] = [];
   const now = new Date();
   const financials = options?.resolvedFinancials;
-  const hasFinancialData = hasTtmFinancials(financials);
-  const monthlyRevenue = hasFinancialData
-    ? financials.monthlyRevenue
-    : Number(store.monthly_revenue) || 0;
-  const monthlyExpenses = hasFinancialData
-    ? financials.monthlyExpenses
-    : Number(store.monthly_expenses) || 0;
-  const annualEbitda = hasFinancialData
-    ? financials.annualEbitda
-    : (monthlyRevenue - monthlyExpenses) * 12;
+  const resolved = hasTtmFinancials(financials)
+    ? financials
+    : resolveStoreFinancials(store);
+  const hasFinancialData = resolved.source === "ttm";
+  const monthlyRevenue = resolved.monthlyRevenue;
+  const monthlyExpenses = resolved.monthlyExpenses;
+  const annualEbitda = resolved.annualEbitda;
 
   // Financial items
   if (monthlyRevenue > 0) {
@@ -200,9 +198,7 @@ export function generateStoreFeed(
   }
 
   if (store.monthly_rent > 0) {
-    const rentRatio = monthlyRevenue > 0
-      ? ((store.monthly_rent / monthlyRevenue) * 100).toFixed(1)
-      : 0;
+    const rentRatio = calcRentToRevenue(Number(store.monthly_rent) * 12, monthlyRevenue * 12).toFixed(1);
     items.push({
       id: 'rent-' + store.id,
       date: formatDate(now),
@@ -368,7 +364,7 @@ export function generateStoreFeed(
     });
 
     if (lease.monthly_rent && monthlyRevenue) {
-      const rentRatio = ((lease.monthly_rent / monthlyRevenue) * 100).toFixed(1);
+      const rentRatio = calcRentToRevenue(Number(lease.monthly_rent) * 12, monthlyRevenue * 12).toFixed(1);
       items.push({
         id: 'lease-rent-' + store.id,
         date: formatDate(now),

@@ -1,7 +1,12 @@
-import { calcDSCR } from "@/lib/calculations";
+import { computeStoreDscr } from "@/lib/dscr";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
-import { resolveStoreFinancials, type ResolvedStoreFinancials } from "@/lib/getStoreValuation";
-import { calcValuation, type ValuationInputs, type ValuationResult } from "@/lib/valuation";
+import {
+  computeStoreValuation,
+  resolveStoreFinancials,
+  type ResolvedStoreFinancials,
+  type StoreValuationContext,
+} from "@/lib/getStoreValuation";
+import { type ValuationInputs, type ValuationResult } from "@/lib/valuation";
 
 export const SCENARIO_ICON_NAMES = [
   "Wrench",
@@ -245,86 +250,46 @@ export function calcYearsRemaining(endDate: string | null | undefined): number {
   return Math.max(0, (end.getTime() - Date.now()) / (365.25 * 24 * 60 * 60 * 1000));
 }
 
-function normalizeMarketDensity(raw: string | null | undefined): string {
-  const v = (raw ?? "average").toLowerCase();
-  if (v === "urban" || v === "dense_urban") return "urban";
-  if (v === "suburban") return "suburban";
-  if (v === "rural") return "rural";
-  return "average";
-}
-
-function normalizeStoreCondition(raw: string | null | undefined): string {
-  const v = (raw ?? "fair").toLowerCase();
-  if (v === "excellent" || v === "remodeled") return "excellent";
-  if (v === "good") return "good";
-  if (v === "poor" || v === "needs_renovation") return "poor";
-  return "fair";
-}
-
-export function buildValuationInputs(
-  ctx: StoreScenarioContext,
-  overrides: {
-    monthlyRevenue?: number;
-    monthlyExpenses?: number;
-    avgEquipmentAge?: number;
-    equipmentScore?: number;
-    pct200G?: number;
-    totalLeaseControl?: number;
-    leaseYearsRemaining?: number;
-    wdfPct?: number;
-    commercialPct?: number;
-    pickupDeliveryPct?: number;
-    selfServicePct?: number;
-    lastRetoolYear?: number;
-    retoolInvestment?: number;
-    revenueTrend?: string;
-  } = {}
-): ValuationInputs {
-  const store = ctx.store;
-  const resolved = ctx.resolvedFinancials ?? resolveStoreFinancials(store);
-  const monthlyRevenue = overrides.monthlyRevenue ?? resolved.monthlyRevenue;
-  const monthlyExpenses = overrides.monthlyExpenses ?? resolved.monthlyExpenses;
-  const equipMetrics = computeEquipmentMetrics(ctx.equipment);
-  const wdfPct = overrides.wdfPct ?? (store.wdf_pct != null ? Number(store.wdf_pct) : 18);
-  const commercialPct = overrides.commercialPct ?? (store.commercial_pct != null ? Number(store.commercial_pct) : 12);
-  const pickupDeliveryPct = overrides.pickupDeliveryPct ?? (Number(store.pickup_delivery_pct) || 0);
-  const selfServicePct =
-    overrides.selfServicePct ??
-    Math.max(0, 100 - wdfPct - commercialPct - pickupDeliveryPct);
-
+function toValuationContext(ctx: StoreScenarioContext): StoreValuationContext {
   return {
-    ebitda: (monthlyRevenue - monthlyExpenses) * 12,
-    monthlyRevenue,
-    squareFootage: Number(store.square_footage) || 3500,
-    avgEquipmentAge:
-      overrides.avgEquipmentAge ??
-      (equipMetrics.totalMachines > 0 ? equipMetrics.weightedAvgAge : Number(store.avg_machine_age) || 6),
-    pct200G: overrides.pct200G ?? equipMetrics.pct200GWashers,
-    equipmentScore:
-      overrides.equipmentScore ??
-      (equipMetrics.totalMachines > 0 ? equipMetrics.qualityScore : 85),
-    totalLeaseControl: overrides.totalLeaseControl ?? ctx.totalLeaseControl,
-    leaseYearsRemaining: overrides.leaseYearsRemaining ?? ctx.leaseYearsRemaining,
-    occupancyType: ctx.isOwnerOccupied ? "owned" : "leased",
-    marketDensity: normalizeMarketDensity(
-      (store.market_density as string) ?? (store.location_type as string)
-    ),
-    storeCondition: normalizeStoreCondition(store.store_condition as string),
-    lastRetoolYear: overrides.lastRetoolYear ?? (Number(store.last_retool_year) || undefined),
-    retoolInvestment: overrides.retoolInvestment ?? (Number(store.retool_investment) || undefined),
-    retoolType: (store.retool_type as string) || undefined,
-    revenueTrend: overrides.revenueTrend ?? ((store.revenue_trend as string) || "stable"),
-    competitionLevel: (store.competition_level as string) || "normal",
-    selfServicePct,
-    wdfPct,
-    commercialPct,
-    pickupDeliveryPct,
-    realEstateValue: ctx.isOwnerOccupied ? ctx.realEstateValue : undefined,
+    store: ctx.store,
+    equipment: ctx.equipment,
+    lease: null,
+    leaseOptions: [],
+    realEstate: ctx.isOwnerOccupied ? { estimated_value: ctx.realEstateValue } : null,
+    resolvedFinancials: ctx.resolvedFinancials,
   };
 }
 
-function runValuation(ctx: StoreScenarioContext, overrides: Parameters<typeof buildValuationInputs>[1] = {}): ValuationResult {
-  return calcValuation(buildValuationInputs(ctx, overrides));
+function scenarioLeaseOverrides(ctx: StoreScenarioContext): Partial<ValuationInputs> {
+  return {
+    totalLeaseControl: ctx.totalLeaseControl,
+    leaseYearsRemaining: ctx.leaseYearsRemaining,
+    ...(ctx.isOwnerOccupied ? { realEstateValue: ctx.realEstateValue } : {}),
+  };
+}
+
+type ScenarioValuationOverrides = Partial<ValuationInputs> & {
+  monthlyExpenses?: number;
+};
+
+function runValuation(
+  ctx: StoreScenarioContext,
+  overrides: ScenarioValuationOverrides = {}
+): ValuationResult {
+  const resolved = ctx.resolvedFinancials ?? resolveStoreFinancials(ctx.store);
+  const monthlyRevenue = overrides.monthlyRevenue ?? resolved.monthlyRevenue;
+  const monthlyExpenses = overrides.monthlyExpenses ?? resolved.monthlyExpenses;
+  const { monthlyExpenses: _monthlyExpenses, ...valuationOverrides } = overrides;
+  const syncedOverrides: Partial<ValuationInputs> = { ...valuationOverrides };
+  if (overrides.monthlyRevenue !== undefined || overrides.monthlyExpenses !== undefined) {
+    syncedOverrides.ebitda = (monthlyRevenue - monthlyExpenses) * 12;
+  }
+
+  return computeStoreValuation(toValuationContext(ctx), {
+    ...scenarioLeaseOverrides(ctx),
+    ...syncedOverrides,
+  });
 }
 
 function makeScenario(
@@ -361,7 +326,7 @@ export function computeScenarios(ctx: StoreScenarioContext): ScenarioResult[] {
   const resolved = ctx.resolvedFinancials ?? resolveStoreFinancials(store);
   const monthlyRevenue = resolved.monthlyRevenue;
   const monthlyExpenses = resolved.monthlyExpenses;
-  const annualEbitda = (monthlyRevenue - monthlyExpenses) * 12;
+  const annualEbitda = resolved.annualEbitda;
   const commercialPct = store.commercial_pct != null ? Number(store.commercial_pct) : 12;
   const wdfPct = store.wdf_pct != null ? Number(store.wdf_pct) : 18;
   const currentYear = new Date().getFullYear();
@@ -591,7 +556,7 @@ export function computeInteractiveScenario(
   const resolved = ctx.resolvedFinancials ?? resolveStoreFinancials(store);
   const monthlyRevenue = resolved.monthlyRevenue;
   const monthlyExpenses = resolved.monthlyExpenses;
-  const annualEbitda = (monthlyRevenue - monthlyExpenses) * 12;
+  const annualEbitda = resolved.annualEbitda;
   const commercialPct = store.commercial_pct != null ? Number(store.commercial_pct) : 12;
   const wdfPct = store.wdf_pct != null ? Number(store.wdf_pct) : 18;
   const pickupPct = Number(store.pickup_delivery_pct) || 0;
@@ -599,8 +564,7 @@ export function computeInteractiveScenario(
   const currentYear = new Date().getFullYear();
   const baseline = runValuation(ctx);
   const baselineValue = baseline.businessValue;
-  const baselineDscr =
-    annualDebtService > 0 ? calcDSCR(annualEbitda, annualDebtService) : null;
+  const baselineDscr = computeStoreDscr(annualEbitda, annualDebtService);
 
   const baseMeta = SCENARIO_META[scenarioId];
   if (!baseMeta) return null;
@@ -703,7 +667,7 @@ export function computeInteractiveScenario(
       const newExpenses = monthlyExpenses + rentIncrease;
       scenarioValuation = runValuation(ctx, { monthlyExpenses: newExpenses });
       newEbitda = (monthlyRevenue - newExpenses) * 12;
-      newDscr = annualDebtService > 0 ? calcDSCR(newEbitda, annualDebtService) : null;
+      newDscr = computeStoreDscr(newEbitda, annualDebtService);
       detail = {
         rentIncrease: `${increasePct}%`,
         monthlyRentIncrease: Math.round(rentIncrease),
