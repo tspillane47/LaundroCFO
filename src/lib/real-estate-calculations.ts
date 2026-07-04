@@ -49,11 +49,11 @@ export function calcMarketRentDifference(
 }
 
 export function calcCombinedValueEstimate(
-  annualEbitda: number,
+  businessValue: number,
   estimatedValue: number | null
 ): number | null {
   if (estimatedValue == null) return null;
-  return annualEbitda * 3.47 + estimatedValue;
+  return businessValue + estimatedValue;
 }
 
 export type UnderwritingFlag = {

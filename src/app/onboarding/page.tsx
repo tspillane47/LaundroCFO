@@ -16,11 +16,10 @@ import {
   parseBankCsv,
   type TransactionType,
 } from "@/lib/financials";
-import { invalidateValuationCache } from "@/lib/getStoreValuation";
+import { getStoreValuation, invalidateValuationCache } from "@/lib/getStoreValuation";
 import { isOnboardingComplete } from "@/lib/onboarding";
 
 const TOTAL_STEPS = 5;
-const VALUATION_MULTIPLE = 3.47;
 
 const STEP_LABELS = ["Welcome", "Your Store", "Occupancy", "Equipment", "Financials"];
 
@@ -575,11 +574,12 @@ function OnboardingContent() {
 
       if (form.financialMode === "manual") {
         const revenue = toNullableNum(form.monthlyRevenue) ?? 0;
-        const expenses = toNullableNum(form.monthlyExpenses) ?? 0;
         if (revenue > 0) {
-          const annualEbitda = (revenue - expenses) * 12;
-          nextEstimate = annualEbitda * VALUATION_MULTIPLE;
-          nextHasEstimate = annualEbitda > 0;
+          const valuation = await getStoreValuation(storeId);
+          if (valuation.businessValue > 0) {
+            nextEstimate = valuation.businessValue;
+            nextHasEstimate = true;
+          }
         }
       }
     }
@@ -708,7 +708,7 @@ function OnboardingContent() {
                   </h1>
                   <p className="text-[15px] text-[var(--text-secondary)] mb-8 max-w-md mx-auto">
                     {hasValuationEstimate
-                      ? `Based on what you've shared, your estimated store value is ${fmtDollar(estimatedValue)}.`
+                      ? `Based on what you've shared so far, your preliminary business value estimate is ${fmtDollar(estimatedValue)}. Add equipment, lease, and store details on the Valuation page to refine this.`
                       : isAddingStore
                         ? "Your new store is in your portfolio — add more data anytime to unlock its full valuation."
                         : "Your dashboard is ready — add more data to unlock your full valuation."}

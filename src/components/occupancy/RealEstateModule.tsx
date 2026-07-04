@@ -25,6 +25,7 @@ import {
   flagStyle,
   getUnderwritingFlags,
 } from "@/lib/real-estate-calculations";
+import { getStoreValuation } from "@/lib/getStoreValuation";
 
 type RealEstate = {
   id: string;
@@ -225,6 +226,7 @@ export function RealEstateModule({ store }: Props) {
   const [mode, setMode] = useState<"view" | "edit">("view");
 
   const [record, setRecord] = useState<RealEstate | null>(null);
+  const [businessValue, setBusinessValue] = useState<number | null>(null);
   const [form, setForm] = useState<RealEstateForm>(emptyForm(store.address));
 
   function setField<K extends keyof RealEstateForm>(field: K, value: RealEstateForm[K]) {
@@ -235,12 +237,10 @@ export function RealEstateModule({ store }: Props) {
     setLoading(true);
     setError("");
 
-    const { data, error: fetchError } = await supabase
-      .from("real_estate")
-      .select("*")
-      .eq("store_id", store.id)
-      .limit(1)
-      .maybeSingle();
+    const [{ data, error: fetchError }, valuation] = await Promise.all([
+      supabase.from("real_estate").select("*").eq("store_id", store.id).limit(1).maybeSingle(),
+      getStoreValuation(store.id),
+    ]);
 
     if (fetchError) {
       setError(fetchError.message);
@@ -256,6 +256,7 @@ export function RealEstateModule({ store }: Props) {
       setForm(emptyForm(store.address));
     }
 
+    setBusinessValue(valuation.businessValue);
     setLoading(false);
   }
 
@@ -279,12 +280,10 @@ export function RealEstateModule({ store }: Props) {
     );
     const marketRentDiff = calcMarketRentDifference(monthlyRentCharged, marketRentEstimate);
 
-    const monthlyRevenue = store.monthly_revenue ?? 0;
-    const monthlyExpenses = store.monthly_expenses ?? 0;
-    const annualEbitda = (monthlyRevenue - monthlyExpenses) * 12;
-    const combinedValue = calcCombinedValueEstimate(annualEbitda, estimatedValue);
+    const combinedValue = calcCombinedValueEstimate(businessValue ?? 0, estimatedValue);
 
     const yearsOwned = calcYearsOwned(record?.date_purchased ?? null);
+    const monthlyRevenue = store.monthly_revenue ?? 0;
     const annualRevenue = monthlyRevenue * 12;
     const debtService = record?.annual_debt_service ?? null;
     const debtServiceToRevenue =
@@ -329,7 +328,7 @@ export function RealEstateModule({ store }: Props) {
       risk,
       flags,
     };
-  }, [record, store]);
+  }, [record, store, businessValue]);
 
   function enterEditMode() {
     if (record) {
