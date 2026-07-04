@@ -1,11 +1,11 @@
 import { createClient } from "@/lib/supabase";
+import { calcDebtYield, calcLeaseScore } from "@/lib/calculations";
 import {
-  calcAverageEquipmentAge,
-  calcDebtYield,
-  calcEquipmentScore,
-  calcLeaseScore,
-} from "@/lib/calculations";
-import { getEquipmentGrade } from "@/lib/equipment";
+  computeEquipmentMetrics,
+  getEquipmentGrade,
+  getEquipmentQualityScore,
+  type EquipmentRecord,
+} from "@/lib/equipment";
 import {
   calcYearsRemaining,
   getStoreValuation,
@@ -194,13 +194,16 @@ export async function getPortfolioReport(
           ? 95
           : 50;
 
+      const equipRecords = (equipment ?? []) as EquipmentRecord[];
+      const equipMetrics = computeEquipmentMetrics(equipRecords);
       const avgEquipmentAge =
-        (equipment ?? []).length > 0
-          ? calcAverageEquipmentAge(
-              (equipment ?? []).map((e) => ({ qty: e.quantity, installed: e.installation_year }))
-            )
+        equipRecords.length > 0
+          ? equipMetrics.weightedAvgAge
           : (store.avg_machine_age ?? 0);
-      const equipmentGrade = getEquipmentGrade(calcEquipmentScore(avgEquipmentAge));
+      const equipmentGrade =
+        equipRecords.length > 0
+          ? equipMetrics.grade
+          : getEquipmentGrade(getEquipmentQualityScore(avgEquipmentAge, 0, 0, []));
 
       return {
         store,
