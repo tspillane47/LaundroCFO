@@ -10,10 +10,13 @@ import { calcEquipmentScore, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "
 import { computeStoreDscr } from "@/lib/dscr";
 import { feedItemsToActionItems } from "@/lib/alerts";
 import {
+  applyLoanDebtServiceToTtm,
+  buildUtilitiesLookup,
+  calcTtmMetrics,
   enrichMonthlyRecords,
   fetchStoreMonthlyFinancials,
   sortRecordsDesc,
-  type MonthlyFinancialRecord,
+  type CalculatedMonthly,
   type MonthlyUtilityRecord,
 } from "@/lib/financials";
 import { computeLaundroCfoScoreFromRaw, type LaundroCfoScoreResult } from "@/lib/laundroCfoScore";
@@ -224,7 +227,7 @@ export default function DashboardPage() {
   const [valuation, setValuation] = useState<StoreValuationResult | null>(null);
   const [totalDebt, setTotalDebt] = useState(0);
   const [scheduledDebtService, setScheduledDebtService] = useState(0);
-  const [monthlyFinancials, setMonthlyFinancials] = useState<MonthlyFinancialRecord[]>([]);
+  const [monthlyFinancials, setMonthlyFinancials] = useState<CalculatedMonthly[]>([]);
   const [monthlyUtilities, setMonthlyUtilities] = useState<MonthlyUtilityRecord[]>([]);
   const supabase = createClient();
 
@@ -260,9 +263,10 @@ export default function DashboardPage() {
       ]);
       setTotalDebt(debt);
       setScheduledDebtService(scheduledAnnual);
-      setMonthlyFinancials(enrichMonthlyRecords(sortRecordsDesc(financialsData)));
       if (utilitiesError) throw utilitiesError;
+      const utilitiesLookup = buildUtilitiesLookup((utilitiesData ?? []) as MonthlyUtilityRecord[]);
       setMonthlyUtilities((utilitiesData ?? []) as MonthlyUtilityRecord[]);
+      setMonthlyFinancials(enrichMonthlyRecords(sortRecordsDesc(financialsData), utilitiesLookup));
 
       const [{ data: policiesData, error: policiesError }, { data: equipmentData, error: equipmentError }] =
         await Promise.all([
@@ -344,6 +348,11 @@ export default function DashboardPage() {
   const ebitda = hasFinancialData ? revenue - expenses : 0;
   const annualEbitda = hasFinancialData ? (resolvedFinancials?.annualEbitda ?? 0) : 0;
   const debtService = scheduledDebtService;
+  const ttm = useMemo(
+    () => applyLoanDebtServiceToTtm(calcTtmMetrics(monthlyFinancials), scheduledDebtService),
+    [monthlyFinancials, scheduledDebtService]
+  );
+  const ttmNoi = hasFinancialData ? ttm.ttmNoi : 0;
   const annualCashFlow = hasFinancialData ? annualEbitda - debtService : 0;
   const monthlyCashFlow = hasFinancialData ? annualCashFlow / 12 : 0;
   const dscrNum = hasFinancialData ? computeStoreDscr(annualEbitda, debtService) : null;
@@ -1180,9 +1189,7 @@ export default function DashboardPage() {
             { label: "Annual Revenue", value: hasFinancialData ? fmtDollar(revenue * 12) : "—" },
             {
               label: "NOI",
-              value: hasFinancialData
-                ? fmtDollar(annualEbitda - (store?.monthly_rent ?? 0) * 12)
-                : "—",
+              value: hasFinancialData ? fmtDollar(ttmNoi) : "—",
             },
             {
               label: "DSCR",

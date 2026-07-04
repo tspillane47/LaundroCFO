@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
-import { invalidateValuationCache } from "@/lib/getStoreValuation";
+import {
+  getStoreValuation,
+  hasMonthlyFinancialRecords,
+  invalidateValuationCache,
+} from "@/lib/getStoreValuation";
 import { useStores } from "@/lib/store-context";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
@@ -32,8 +36,6 @@ import { PageError } from "@/components/ui/PageError";
 type Store = {
   id: string;
   name: string | null;
-  monthly_revenue: number | null;
-  monthly_expenses: number | null;
 };
 
 type EquipmentForm = {
@@ -97,6 +99,7 @@ export default function EquipmentPage() {
   const [store, setStore] = useState<Store | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
+  const [annualEbitda, setAnnualEbitda] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EquipmentForm>(EMPTY_FORM);
@@ -119,17 +122,26 @@ export default function EquipmentPage() {
         toast.error("Select a store from the dropdown above.");
         setStore(null);
         setEquipment([]);
+        setAnnualEbitda(0);
         return;
       }
 
-      const { data: storeData, error: storeError } = await supabase
-        .from("stores")
-        .select("id, name, monthly_revenue, monthly_expenses")
-        .eq("id", selectedStore.id)
-        .single();
+      const [{ data: storeData, error: storeError }, valuation] = await Promise.all([
+        supabase
+          .from("stores")
+          .select("id, name")
+          .eq("id", selectedStore.id)
+          .single(),
+        getStoreValuation(selectedStore.id),
+      ]);
       if (storeError) throw storeError;
       if (!storeData) throw new Error("No store found");
       setStore(storeData);
+      setAnnualEbitda(
+        hasMonthlyFinancialRecords(valuation.resolvedFinancials)
+          ? valuation.resolvedFinancials.annualEbitda
+          : 0
+      );
 
       const { data: equipmentData, error: equipmentError } = await supabase
         .from("equipment_inventory")
@@ -146,6 +158,7 @@ export default function EquipmentPage() {
       setLoadError(true);
       setStore(null);
       setEquipment([]);
+      setAnnualEbitda(0);
     } finally {
       setLoading(false);
     }
@@ -159,13 +172,6 @@ export default function EquipmentPage() {
     () => computeEquipmentMetrics(equipment, currentYear),
     [equipment, currentYear]
   );
-
-  const annualEbitda = useMemo(() => {
-    if (!store) return 0;
-    const revenue = store.monthly_revenue ?? 0;
-    const expenses = store.monthly_expenses ?? 0;
-    return (revenue - expenses) * 12;
-  }, [store]);
 
   const valuationImpactDollars = metrics.totalEquipmentAdjustment * annualEbitda;
 

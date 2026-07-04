@@ -8,9 +8,11 @@ import { useStores } from "@/lib/store-context";
 import {
   computeStoreValuation,
   getStoreValuation,
+  getStoreScheduledDebtService,
   invalidateValuationCache,
   type StoreValuationContext,
 } from "@/lib/getStoreValuation";
+import { computeStoreDscr } from "@/lib/dscr";
 import type { ValuationResult } from "@/lib/valuation";
 import {
   computeEquipmentMetrics,
@@ -353,6 +355,7 @@ export default function ValuationPage() {
   const [retoolType, setRetoolType] = useState("");
 
   const [annualEbitda, setAnnualEbitda] = useState(0);
+  const [scheduledDebtService, setScheduledDebtService] = useState(0);
   const [monthlyRevenue, setMonthlyRevenue] = useState(0);
   const [squareFootage, setSquareFootage] = useState(3500);
   const [isOwnerOccupied, setIsOwnerOccupied] = useState(false);
@@ -375,7 +378,11 @@ export default function ValuationPage() {
     setLoadError(false);
 
     try {
-      const valuationResult = await getStoreValuation(selectedStore.id);
+      const [valuationResult, scheduledAnnualDebtService] = await Promise.all([
+        getStoreValuation(selectedStore.id),
+        getStoreScheduledDebtService(selectedStore.id),
+      ]);
+      setScheduledDebtService(scheduledAnnualDebtService);
       const store = valuationResult.store as StoreRow;
       if (!store?.id) throw new Error("Store not found");
       setStore(store);
@@ -555,8 +562,8 @@ export default function ValuationPage() {
   }, [annualEbitda, monthlyRevenue]);
 
   const equipmentGrade = equipMetrics.grade;
-  const annualDebtService = store?.annual_debt_service ?? 0;
-  const dscr = annualDebtService > 0 ? annualEbitda / annualDebtService : 0;
+  const dscrNum = computeStoreDscr(annualEbitda, scheduledDebtService);
+  const dscr = dscrNum ?? 0;
   const totalCash =
     (store?.operating_account_balance ?? 0) +
     (store?.reserve_account_balance ?? 0) +
