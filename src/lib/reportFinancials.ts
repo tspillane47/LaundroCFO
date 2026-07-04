@@ -115,7 +115,7 @@ export type ReportFinancialContext = {
   surplusCashFlow: number;
   waterKPI: ReturnType<typeof computeWaterKpi>;
   benchmarkRows: BenchmarkMetricRow[];
-  monthlyFinancialsForScore: { revenue?: number | null; utilities?: number | null }[];
+  monthlyFinancialsForScore: { revenue?: number | null; utilities?: number | null; ebitda?: number | null }[];
   monthlyUtilities: MonthlyUtilityRecord[];
   availableMonths: { year: number; month: number }[];
   utilityReport: UtilityReportData;
@@ -475,11 +475,6 @@ export async function fetchReportFinancialContext(
   const totalOutstandingDebt = loans.reduce((s, l) => s + l.estimatedBalance, 0);
   const annualDebtService = totalMonthlyDebtService * 12;
 
-  const monthlyFinancialsForScore = (financialsData ?? []).slice(0, 12).map((r) => ({
-    revenue: r.revenue,
-    utilities: r.utilities,
-  }));
-
   if (!financialsData || financialsData.length === 0) {
     const store = options?.store ?? {};
     const monthlyRevenue = num(store.monthly_revenue as number);
@@ -521,6 +516,7 @@ export async function fetchReportFinancialContext(
       ttmRevenue: monthlyRevenue * 12,
       ttmEbitda: monthlyEbitda * 12,
       ttmEbitdaMargin: monthlyRevenue > 0 ? (monthlyEbitda / monthlyRevenue) * 100 : 0,
+      ttmUtilities: monthlyUtilitiesCost * 12,
       ttmDebtService: debtService * 12,
       ttmActualDebtService: 0,
       ttmNoi: monthlyEbitda * 12 - debtService * 12,
@@ -677,6 +673,12 @@ export async function fetchReportFinancialContext(
     selfServiceTtmTotal > 0 && (options?.equipment ?? []).length > 0
       ? computeTurnsPerDay(options!.equipment!, selfServiceTtmTotal, dryerRevenuePct)
       : null;
+
+  const monthlyFinancialsForScore = ttmRecords.map((r) => ({
+    revenue: r.revenue,
+    utilities: r.utilities,
+    ebitda: r.ebitda,
+  }));
 
   return {
     hasMonthlyFinancials: true,

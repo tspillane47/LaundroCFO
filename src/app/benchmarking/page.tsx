@@ -468,7 +468,7 @@ function BenchmarkingPageContent() {
         equipment: equip,
         lease: leaseData as Record<string, unknown> | null,
         realEstate: reData as Record<string, unknown> | null,
-        monthlyFinancials: sorted.map((r) => ({ revenue: r.revenue, utilities: r.utilities })),
+        monthlyFinancials: sorted.map((r) => ({ revenue: r.revenue, utilities: r.utilities, ebitda: r.ebitda })),
         monthlyUtilities: (utilitiesData ?? []) as MonthlyUtilityRecord[],
         ttmMonthsUsed: ttm.monthsUsed,
       });

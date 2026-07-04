@@ -8,7 +8,14 @@ import {
   type StoredStoreAlert,
 } from "@/lib/alerts";
 import { computeStoreDscr } from "@/lib/dscr";
-import { enrichMonthlyRecords, sortRecordsDesc, type MonthlyFinancialRecord } from "@/lib/financials";
+import {
+  buildPortfolioTtmSummary,
+  enrichMonthlyRecords,
+  fetchMonthlyFinancialsForStores,
+  fetchMonthlyUtilitiesForStores,
+  sortRecordsDesc,
+  type MonthlyFinancialRecord,
+} from "@/lib/financials";
 import { getStoreValuation } from "@/lib/getStoreValuation";
 import {
   buildRevenuePeriodKey,
@@ -235,6 +242,17 @@ export async function buildPortfolioFeedItems(
       (scheduledDebtServiceByStore[id] ?? 0) + (loan.monthly_payment ?? 0) * 12;
   }
 
+  const [financialsData, utilitiesData] = await Promise.all([
+    fetchMonthlyFinancialsForStores(supabase, storeIds),
+    fetchMonthlyUtilitiesForStores(supabase, storeIds),
+  ]);
+  const portfolioTtmSummary = buildPortfolioTtmSummary(
+    financialsData,
+    storeIds,
+    scheduledDebtServiceByStore,
+    utilitiesData
+  );
+
   const valuations = await Promise.all(
     targetStores.map((store) => getStoreValuation(String(store.id)))
   );
@@ -245,11 +263,13 @@ export async function buildPortfolioFeedItems(
     const store = targetStores[index];
     const storeId = String(store.id);
     const valuation = valuations[index];
+    const storeTtm = portfolioTtmSummary.byStoreId[storeId];
 
     const feedOptions: StoreFeedOptions = {
       scheduledAnnualDebtService: scheduledDebtServiceByStore[storeId] ?? 0,
       resolvedFinancials: valuation?.resolvedFinancials,
-      monthlyUtilities: store.monthly_utilities as number | undefined,
+      ttmRevenue: storeTtm?.ttmRevenue,
+      ttmUtilities: storeTtm?.ttmUtilities,
       isOwnerOccupied: store.occupancy_type === "owner_occupied",
       valuation: valuation
         ? {

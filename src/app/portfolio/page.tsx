@@ -362,10 +362,12 @@ export default function PortfolioPage() {
       const equipment = equipmentByStore[store.id] ?? [];
       const insurance = insuranceByStore[store.id] ?? [];
       const valuation = valuationByStoreId.get(store.id);
+      const storeTtm = portfolioTtmSummary?.byStoreId[store.id];
       return generateStoreFeed(store, storeLease, equipment, insurance, {
         scheduledAnnualDebtService: scheduledDebtServiceByStore[store.id] ?? 0,
         resolvedFinancials: valuation?.resolvedFinancials,
-        monthlyUtilities: (store as Record<string, unknown>).monthly_utilities as number | undefined,
+        ttmRevenue: storeTtm?.ttmRevenue,
+        ttmUtilities: storeTtm?.ttmUtilities,
         isOwnerOccupied: store.occupancy_type === "owner_occupied",
         valuation: valuation
           ? {
@@ -377,7 +379,7 @@ export default function PortfolioPage() {
     });
     const order = { danger: 0, warning: 1, success: 2, info: 3 };
     return items.sort((a, b) => order[a.severity] - order[b.severity]);
-  }, [stores, leases, equipmentByStore, insuranceByStore, scheduledDebtServiceByStore, valuationByStoreId]);
+  }, [stores, leases, equipmentByStore, insuranceByStore, scheduledDebtServiceByStore, valuationByStoreId, portfolioTtmSummary]);
 
   const acquisitionMessage =
     !aggregates.hasDebtData

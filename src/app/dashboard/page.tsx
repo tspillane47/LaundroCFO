@@ -465,6 +465,7 @@ export default function DashboardPage() {
       monthlyFinancials: monthlyFinancials.map((r) => ({
         revenue: r.revenue,
         utilities: r.utilities,
+        ebitda: r.ebitda,
       })),
       monthlyUtilities,
     });
@@ -484,7 +485,8 @@ export default function DashboardPage() {
         ? generateStoreFeed(store, lease, equipment, insurancePolicies, {
             scheduledAnnualDebtService: scheduledDebtService,
             resolvedFinancials,
-            monthlyUtilities: store.monthly_utilities,
+            ttmRevenue: ttm.ttmRevenue,
+            ttmUtilities: ttm.ttmUtilities,
             isOwnerOccupied,
             valuation: valuation
               ? {
@@ -505,6 +507,7 @@ export default function DashboardPage() {
       isOwnerOccupied,
       valuation,
       monthlyChange,
+      ttm,
     ]
   );
 

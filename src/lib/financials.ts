@@ -54,6 +54,7 @@ export type TtmMetrics = {
   ttmRevenue: number;
   ttmEbitda: number;
   ttmEbitdaMargin: number;
+  ttmUtilities: number;
   /** Scheduled annual debt service from store_loans (via applyLoanDebtServiceToTtm). */
   ttmDebtService: number;
   /** Actual TTM debt service from monthly_financials P&L entries. */
@@ -319,12 +320,14 @@ export function calcTtmMetrics(records: CalculatedMonthly[]): TtmMetrics {
   const ttmEbitda = ttm.reduce((sum, r) => sum + r.ebitda, 0);
   const ttmActualDebtService = ttm.reduce((sum, r) => sum + r.debt_service, 0);
   const ttmNoi = ttm.reduce((sum, r) => sum + r.noi, 0);
+  const ttmUtilities = ttm.reduce((sum, r) => sum + r.utilities, 0);
   const ttmEbitdaMargin = ttmRevenue > 0 ? (ttmEbitda / ttmRevenue) * 100 : 0;
 
   return {
     ttmRevenue,
     ttmEbitda,
     ttmEbitdaMargin,
+    ttmUtilities,
     ttmDebtService: ttmActualDebtService,
     ttmActualDebtService,
     ttmNoi,
@@ -337,6 +340,7 @@ export const EMPTY_TTM_METRICS: TtmMetrics = {
   ttmRevenue: 0,
   ttmEbitda: 0,
   ttmEbitdaMargin: 0,
+  ttmUtilities: 0,
   ttmDebtService: 0,
   ttmActualDebtService: 0,
   ttmNoi: 0,

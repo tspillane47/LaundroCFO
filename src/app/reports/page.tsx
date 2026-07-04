@@ -382,10 +382,13 @@ function ReportsPageContent() {
     const annualEbitda =
       storeTtm && storeTtm.monthsUsed > 0 ? storeTtm.ttmEbitda : monthlyEbitda * 12;
     const ttmDebtService = storeTtm?.ttmDebtService ?? 0;
-    const monthlyUtilities = store.monthly_utilities ?? 0;
     const loanBalance = store.loan_balance ?? 0;
     const sqft = store.square_footage ?? 3500;
     const isOwnerOccupied = store.occupancy_type === "owner_occupied";
+    const annualNoi =
+      storeTtm && storeTtm.monthsUsed > 0
+        ? storeTtm.ttmNoi
+        : monthlyEbitda * 12 - ttmDebtService;
 
     const dscr = ttmDebtService > 0 ? (storeTtm?.dscr ?? null) : null;
     const portfolioTtmEbitda = portfolioTtm?.ttmEbitda ?? 0;
@@ -402,11 +405,14 @@ function ReportsPageContent() {
           ? storeTtm.ttmEbitdaMargin
           : calcEbitdaMargin(annualEbitda, annualRevenue)
         : 0;
-    const utilityRatio = calcUtilityRatio(monthlyUtilities * 12, annualRevenue);
+    const utilityRatio = calcUtilityRatio(
+      hasTtm ? storeTtm.ttmUtilities : 0,
+      annualRevenue
+    );
     const rentToRevenue = calcRentToRevenue((lease?.monthly_rent ?? 0) * 12, annualRevenue);
     const revenuePerSF = calcRevenuePerSF(annualRevenue, sqft);
     const ebitdaPerSF = calcEbitdaPerSF(annualEbitda, sqft);
-    const debtYield = loanBalance > 0 ? calcDebtYield(annualEbitda, loanBalance) : 0;
+    const debtYield = loanBalance > 0 ? calcDebtYield(annualNoi, loanBalance) : 0;
 
     const yearsRemaining = lease ? calcYearsRemaining(lease.lease_end_date) : 0;
     const availableOptions = leaseOptions.filter((o) => o.status === "Available");

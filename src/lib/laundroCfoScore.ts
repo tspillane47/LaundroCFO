@@ -1,5 +1,8 @@
+import { calcEbitdaMargin, calcRevenuePerSF, calcUtilityRatio } from "@/lib/calculations";
 import { benchmarks } from "@/lib/data";
+import { computeStoreDscr } from "@/lib/dscr";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
+import { resolveStoreFinancials } from "@/lib/getStoreValuation";
 import { utilityRecordTotal, type MonthlyUtilityRecord } from "@/lib/financials";
 
 const NETWORK_BENCHMARK_THRESHOLD = 15;
@@ -40,6 +43,7 @@ export type LaundroCfoFinancialsInput = {
   ttmMonthsUsed: number;
   ttmRevenue: number;
   ttmUtilities: number;
+  ttmEbitda: number;
 };
 
 export type LaundroCfoLeaseInput = {
@@ -88,10 +92,10 @@ export function resolveScoreUtilityRatio(
   monthlyUtilities: number | null
 ): number | null {
   if (financials.ttmRevenue > 0 && financials.ttmMonthsUsed > 0 && financials.ttmUtilities > 0) {
-    return (financials.ttmUtilities / financials.ttmRevenue) * 100;
+    return calcUtilityRatio(financials.ttmUtilities, financials.ttmRevenue);
   }
   if (monthlyRevenue != null && monthlyRevenue > 0 && monthlyUtilities != null && monthlyUtilities > 0) {
-    return (monthlyUtilities / monthlyRevenue) * 100;
+    return calcUtilityRatio(monthlyUtilities * 12, monthlyRevenue * 12);
   }
   return null;
 }
@@ -107,18 +111,19 @@ export function resolveOccupancyRent(
 }
 
 export function buildLaundroCfoFinancialsInput(
-  monthlyFinancials: { revenue?: number | null; utilities?: number | null }[],
+  monthlyFinancials: { revenue?: number | null; utilities?: number | null; ebitda?: number | null }[],
   ttmMonthsUsedOverride?: number
 ): LaundroCfoFinancialsInput {
   const records = monthlyFinancials.slice(0, 12);
   const ttmRevenue = records.reduce((s, r) => s + (Number(r.revenue) || 0), 0);
   const ttmUtilities = records.reduce((s, r) => s + (Number(r.utilities) || 0), 0);
+  const ttmEbitda = records.reduce((s, r) => s + (Number(r.ebitda) || 0), 0);
   const ttmMonthsUsed =
     ttmMonthsUsedOverride != null && ttmMonthsUsedOverride > 0
       ? ttmMonthsUsedOverride
       : records.length;
 
-  return { ttmMonthsUsed, ttmRevenue, ttmUtilities };
+  return { ttmMonthsUsed, ttmRevenue, ttmUtilities, ttmEbitda };
 }
 
 export function buildLaundroCfoStoreInput(store: Record<string, unknown>): LaundroCfoStoreInput {
@@ -380,13 +385,23 @@ export function computeLaundroCfoScore(
   utilities: LaundroCfoUtilitiesInput,
   _options?: { realEstateMonthlyRent?: number | null }
 ): LaundroCfoScoreResult {
-  const monthlyRevenue = store.monthly_revenue;
-  const monthlyExpenses = store.monthly_expenses;
-  const hasFinancials = monthlyRevenue != null && monthlyRevenue > 0;
+  const ttm =
+    financials.ttmMonthsUsed > 0 && financials.ttmRevenue > 0
+      ? {
+          ttmRevenue: financials.ttmRevenue,
+          ttmEbitda: financials.ttmEbitda,
+          monthsUsed: financials.ttmMonthsUsed,
+        }
+      : null;
+  const resolved = resolveStoreFinancials(store as Record<string, unknown>, ttm);
+  const hasFinancials = resolved.source === "ttm";
+  const monthlyRevenue = hasFinancials ? resolved.monthlyRevenue : store.monthly_revenue;
+  const annualRevenue = hasFinancials ? financials.ttmRevenue : null;
+  const annualEbitda = hasFinancials ? resolved.annualEbitda : null;
 
   const ebitdaMargin =
-    hasFinancials && monthlyExpenses != null
-      ? ((monthlyRevenue - monthlyExpenses) / monthlyRevenue) * 100
+    hasFinancials && annualRevenue != null && annualRevenue > 0 && annualEbitda != null
+      ? calcEbitdaMargin(annualEbitda, annualRevenue)
       : null;
 
   const utilityRatio = resolveScoreUtilityRatio(
@@ -395,20 +410,17 @@ export function computeLaundroCfoScore(
     store.monthly_utilities
   );
 
-  const annualRevenue = hasFinancials ? monthlyRevenue * 12 : null;
   const squareFootage =
     store.square_footage != null && store.square_footage > 0 ? store.square_footage : null;
   const revenuePerSF =
-    annualRevenue != null && squareFootage != null ? annualRevenue / squareFootage : null;
-
-  const annualEbitda =
-    hasFinancials && monthlyExpenses != null
-      ? (monthlyRevenue - monthlyExpenses) * 12
+    annualRevenue != null && squareFootage != null
+      ? calcRevenuePerSF(annualRevenue, squareFootage)
       : null;
+
   const debtService = store.annual_debt_service;
   const dscr =
-    debtService != null && debtService > 0 && annualEbitda != null && annualEbitda > 0
-      ? annualEbitda / debtService
+    hasFinancials && debtService != null && debtService > 0 && annualEbitda != null
+      ? computeStoreDscr(annualEbitda, debtService)
       : null;
 
   const equipMetrics = computeEquipmentMetrics(equipment);

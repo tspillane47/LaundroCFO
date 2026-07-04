@@ -248,7 +248,8 @@ describe("generateStoreFeed unified evaluator", () => {
         annualEbitda: 132000,
         source: "ttm",
       },
-      monthlyUtilities: 12000,
+      ttmRevenue: 600000,
+      ttmUtilities: 144000,
     });
 
     const dscr = items.find((item) => item.id === `dscr-${STORE_ID}`);
@@ -272,7 +273,8 @@ describe("generateStoreFeed unified evaluator", () => {
         annualEbitda: 132000,
         source: "ttm",
       },
-      monthlyUtilities: 12000,
+      ttmRevenue: 600000,
+      ttmUtilities: 144000,
     });
 
     const persistable = feedItemsToPersistableAlerts(items);

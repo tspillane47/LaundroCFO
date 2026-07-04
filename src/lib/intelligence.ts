@@ -1,3 +1,4 @@
+import { calcUtilityRatio } from "@/lib/calculations";
 import {
   escalationSeverity,
   formatRentEscalationAlert,
@@ -48,7 +49,10 @@ export type StoreFeedValuation = {
 export type StoreFeedOptions = {
   scheduledAnnualDebtService?: number;
   resolvedFinancials?: StoreFeedFinancials | null;
+  /** @deprecated Use ttmUtilities — stale profile fallback only. */
   monthlyUtilities?: number;
+  ttmRevenue?: number;
+  ttmUtilities?: number;
   isOwnerOccupied?: boolean;
   /** Canonical valuation from getStoreValuation(); falls back to computeStoreValuation when omitted. */
   valuation?: StoreFeedValuation | null;
@@ -226,20 +230,23 @@ export function generateStoreFeed(
     });
   }
 
-  if (hasFinancialData && monthlyRevenue > 0) {
-    const utilities = options?.monthlyUtilities ?? store.monthly_utilities ?? 0;
-    const utilityRatio = (utilities / monthlyRevenue) * 100;
-    if (utilityRatio > 20) {
-      items.push({
-        id: 'utility-' + store.id,
-        date: formatDate(now),
-        category: 'financial',
-        icon: '⚡',
-        headline: 'High Utility Costs',
-        description: `Utilities are ${utilityRatio.toFixed(1)}% of revenue — above the 20% threshold.`,
-        severity: 'warning',
-        storeName: store.name,
-      });
+  if (hasFinancialData) {
+    const ttmRevenue = options?.ttmRevenue ?? 0;
+    const ttmUtilities = options?.ttmUtilities ?? 0;
+    if (ttmRevenue > 0 && ttmUtilities > 0) {
+      const utilityRatio = calcUtilityRatio(ttmUtilities, ttmRevenue);
+      if (utilityRatio > 20) {
+        items.push({
+          id: 'utility-' + store.id,
+          date: formatDate(now),
+          category: 'financial',
+          icon: '⚡',
+          headline: 'High Utility Costs',
+          description: `Utilities are ${utilityRatio.toFixed(1)}% of revenue — above the 20% threshold.`,
+          severity: 'warning',
+          storeName: store.name,
+        });
+      }
     }
   }
 

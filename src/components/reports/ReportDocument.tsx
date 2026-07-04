@@ -275,9 +275,11 @@ function computeReportMetrics(props: ReportProps) {
   const annualEbitda = hasTtm ? storeTtm!.ttmEbitda : monthlyEbitda * 12;
   const annualOperatingExpenses = hasTtm ? annualRevenue - annualEbitda : monthlyExpenses * 12;
   const ttmDebtService = storeTtm?.ttmDebtService ?? 0;
-  const monthlyUtilities = store?.monthly_utilities ?? 0;
   const loanBalance = store?.loan_balance ?? 0;
   const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
+  const annualNoi = hasTtm
+    ? storeTtm!.ttmNoi
+    : monthlyEbitda * 12 - ttmDebtService;
 
   const dscr = ttmDebtService > 0 ? (storeTtm?.dscr ?? null) : null;
   const portfolioEbitda = portfolioTtm.ttmEbitda;
@@ -293,8 +295,9 @@ function computeReportMetrics(props: ReportProps) {
       : 0;
   const revenuePerSF = calcRevenuePerSF(annualRevenue, sqft);
   const ebitdaPerSF = calcEbitdaPerSF(annualEbitda, sqft);
-  const utilityRatio = calcUtilityRatio(monthlyUtilities * 12, annualRevenue);
-  const debtYield = loanBalance > 0 ? calcDebtYield(annualEbitda, loanBalance) : 0;
+  const ttmUtilities = hasTtm ? storeTtm!.ttmUtilities : 0;
+  const utilityRatio = calcUtilityRatio(ttmUtilities, annualRevenue);
+  const debtYield = loanBalance > 0 ? calcDebtYield(annualNoi, loanBalance) : 0;
 
   const equipRecords = (equipment ?? []) as EquipmentRecord[];
   const equipMetrics = computeEquipmentMetrics(equipRecords);
