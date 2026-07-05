@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { PLANS } from "@/lib/config";
+import type { PlanKey } from "@/lib/beta";
+import { createClient } from "@/lib/supabase";
 import { useBetaMode } from "@/lib/useBetaMode";
 
 const tiers = [
@@ -45,7 +48,60 @@ const tiers = [
 
 export default function PricingPage() {
   const { betaMode } = useBetaMode();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [checkoutPlan, setCheckoutPlan] = useState<PlanKey | null>(null);
+  const [checkoutError, setCheckoutError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAuth() {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!cancelled) {
+        setIsLoggedIn(Boolean(user));
+        setCheckingAuth(false);
+      }
+    }
+
+    void loadAuth();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const startCheckout = useCallback(async (plan: PlanKey) => {
+    setCheckoutError("");
+    setCheckoutPlan(plan);
+
+    try {
+      const response = await fetch("/api/stripe/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+
+      const data = (await response.json()) as { url?: string; error?: string };
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error ?? "Could not start checkout");
+      }
+
+      window.location.href = data.url;
+    } catch (error) {
+      setCheckoutError(
+        error instanceof Error ? error.message : "Could not start checkout"
+      );
+      setCheckoutPlan(null);
+    }
+  }, []);
+
   const ctaLabel = betaMode ? "Join Beta — Free" : "Get Started";
+  const useCheckout = !betaMode && isLoggedIn;
 
   return (
     <div className="pt-32 pb-24 bg-[var(--bg-page)]">
@@ -65,9 +121,20 @@ export default function PricingPage() {
           </p>
         </div>
 
+        {checkoutError && (
+          <div className="rounded-lg px-4 py-3 text-center text-[13px] font-medium border border-red-200 bg-red-50 text-red-700">
+            {checkoutError}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {tiers.map((tier) => {
             const plan = PLANS[tier.key];
+            const isLoading = checkoutPlan === tier.key;
+            const buttonClassName = tier.highlighted
+              ? "w-full text-center py-2.5 text-[13px] font-semibold rounded-lg bg-[#2563eb] text-white hover:bg-[#1d4ed8] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              : "w-full text-center py-2.5 text-[13px] font-semibold rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
+
             return (
               <div
                 key={tier.key}
@@ -99,16 +166,20 @@ export default function PricingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  href="/signup"
-                  className={
-                    tier.highlighted
-                      ? "w-full text-center py-2.5 text-[13px] font-semibold rounded-lg bg-[#2563eb] text-white hover:bg-[#1d4ed8] transition-colors"
-                      : "w-full text-center py-2.5 text-[13px] font-semibold rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors block"
-                  }
-                >
-                  {ctaLabel}
-                </Link>
+                {useCheckout ? (
+                  <button
+                    type="button"
+                    onClick={() => startCheckout(tier.key)}
+                    disabled={checkingAuth || isLoading}
+                    className={buttonClassName}
+                  >
+                    {isLoading ? "Redirecting…" : "Subscribe"}
+                  </button>
+                ) : (
+                  <Link href="/signup" className={buttonClassName}>
+                    {checkingAuth && !betaMode ? "Loading…" : ctaLabel}
+                  </Link>
+                )}
               </div>
             );
           })}
