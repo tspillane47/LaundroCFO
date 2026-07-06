@@ -8,6 +8,14 @@ import { INPUT_CLASS, formatDate } from "@/components/occupancy/shared";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { useToast } from "@/components/ui/ToastProvider";
+import {
+  formatAccessStatusLabel,
+  formatStoreLimit,
+  planDisplayName,
+  readOnlyActionCopy,
+} from "@/lib/access";
+import { useAccessStatus } from "@/lib/useAccessStatus";
+import { useBetaMode } from "@/lib/useBetaMode";
 
 const ROLE_OPTIONS = ["Owner", "Manager", "Accountant", "Investor"] as const;
 
@@ -81,6 +89,16 @@ export default function AccountPage() {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
+  const { betaMode, loading: betaLoading } = useBetaMode();
+  const {
+    isReadOnly,
+    plan,
+    maxStores,
+    reason,
+    trialEndsAt,
+    currentPeriodEnd,
+    loading: accessLoading,
+  } = useAccessStatus();
 
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -251,6 +269,8 @@ export default function AccountPage() {
     return <LoadingSkeleton variant="page" />;
   }
 
+  const readOnlyCopy = !betaMode && isReadOnly ? readOnlyActionCopy(reason) : null;
+
   return (
     <div className="space-y-5 max-w-3xl mx-auto w-full">
       <div>
@@ -372,42 +392,124 @@ export default function AccountPage() {
       <div className="card space-y-4">
         <div className="section-title mb-0">Billing</div>
 
-        <div
-          className="rounded-lg p-4"
-          style={{
-            background: "var(--bg-card2)",
-            border: "1px solid var(--border)",
-          }}
-        >
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
-              Beta — All Features Free
+        {betaLoading || accessLoading ? (
+          <LoadingSkeleton rows={3} />
+        ) : betaMode ? (
+          <>
+            <div
+              className="rounded-lg p-4"
+              style={{
+                background: "var(--bg-card2)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                  Beta — All Features Free
+                </div>
+                <span className="badge badge-blue">Current Plan</span>
+              </div>
+              <ul className="space-y-1.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                <li>Unlimited stores</li>
+                <li>All features</li>
+                <li>Priority feedback</li>
+              </ul>
             </div>
-            <span className="badge badge-blue">Current Plan</span>
-          </div>
-          <ul className="space-y-1.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-            <li>Unlimited stores</li>
-            <li>All features</li>
-            <li>Priority feedback</li>
-          </ul>
-        </div>
 
-        <Link href="/pricing" className="btn-outline inline-flex">
-          View Pricing
-        </Link>
+            <Link href="/pricing" className="btn-outline inline-flex">
+              View Pricing
+            </Link>
 
-        <div className="divide-y" style={{ borderColor: "var(--border)" }}>
-          <div className="flex justify-between py-2.5 text-[13px] gap-4">
-            <span style={{ color: "var(--text-secondary)" }}>Payment method</span>
-            <span className="text-right" style={{ color: "var(--text-muted)" }}>
-              Not configured — will be set up when billing launches
-            </span>
-          </div>
-          <div className="flex justify-between py-2.5 text-[13px]">
-            <span style={{ color: "var(--text-secondary)" }}>Billing history</span>
-            <span style={{ color: "var(--text-muted)" }}>No billing history yet</span>
-          </div>
-        </div>
+            <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+              <div className="flex justify-between py-2.5 text-[13px] gap-4">
+                <span style={{ color: "var(--text-secondary)" }}>Payment method</span>
+                <span className="text-right" style={{ color: "var(--text-muted)" }}>
+                  Not configured — will be set up when billing launches
+                </span>
+              </div>
+              <div className="flex justify-between py-2.5 text-[13px]">
+                <span style={{ color: "var(--text-secondary)" }}>Billing history</span>
+                <span style={{ color: "var(--text-muted)" }}>No billing history yet</span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {readOnlyCopy && (
+              <div
+                className="rounded-lg px-4 py-3 flex items-center justify-between gap-4"
+                style={{
+                  background: "var(--bg-warning-tint, var(--bg-info-tint))",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-warning, var(--text-info))",
+                }}
+              >
+                <p className="text-[12px] leading-snug">{readOnlyCopy.message}</p>
+                <Link
+                  href="/pricing"
+                  className="flex-shrink-0 text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
+                >
+                  {readOnlyCopy.action}
+                </Link>
+              </div>
+            )}
+
+            <div
+              className="rounded-lg p-4"
+              style={{
+                background: "var(--bg-card2)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {planDisplayName(plan)}
+                </div>
+                <span
+                  className={`badge ${isReadOnly ? "badge-amber" : "badge-green"}`}
+                >
+                  {formatAccessStatusLabel(reason, trialEndsAt)}
+                </span>
+              </div>
+              <ul className="space-y-1.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                <li>{formatStoreLimit(maxStores)}</li>
+                {currentPeriodEnd && (
+                  <li>Billing period ends {formatDate(currentPeriodEnd.toISOString())}</li>
+                )}
+              </ul>
+            </div>
+
+            <Link href="/pricing" className="btn-outline inline-flex">
+              {readOnlyCopy ? readOnlyCopy.action : "Manage Plan"}
+            </Link>
+
+            <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+              <div className="flex justify-between py-2.5 text-[13px] gap-4">
+                <span style={{ color: "var(--text-secondary)" }}>Status</span>
+                <span
+                  className="text-right font-medium"
+                  style={{ color: isReadOnly ? "var(--text-warning)" : "var(--text-primary)" }}
+                >
+                  {formatAccessStatusLabel(reason, trialEndsAt)}
+                </span>
+              </div>
+              {currentPeriodEnd && (
+                <div className="flex justify-between py-2.5 text-[13px] gap-4">
+                  <span style={{ color: "var(--text-secondary)" }}>Billing period ends</span>
+                  <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+                    {formatDate(currentPeriodEnd.toISOString())}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between py-2.5 text-[13px]">
+                <span style={{ color: "var(--text-secondary)" }}>Billing history</span>
+                <span style={{ color: "var(--text-muted)" }}>
+                  {isReadOnly ? "Subscribe to start billing" : "No billing history yet"}
+                </span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Section 4 — Notifications */}

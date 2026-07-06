@@ -8,6 +8,9 @@ import { useStores } from "@/lib/store-context";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 import { useToast } from "@/components/ui/ToastProvider";
+import { formatAccessStatusLabel, planDisplayName } from "@/lib/access";
+import { useAccessStatus } from "@/lib/useAccessStatus";
+import { useBetaMode } from "@/lib/useBetaMode";
 
 const inputClass = INPUT_CLASS;
 
@@ -79,6 +82,8 @@ export default function SettingsPage() {
   const supabase = createClient();
   const { stores, selectedStore, refreshStores } = useStores();
   const toast = useToast();
+  const { betaMode, loading: betaLoading } = useBetaMode();
+  const { plan, reason, trialEndsAt, loading: accessLoading } = useAccessStatus();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -300,6 +305,13 @@ export default function SettingsPage() {
 
   const totalMachines =
     (Number(form.washers) || 0) + (Number(form.dryers) || 0);
+
+  const planLabel =
+    betaLoading || accessLoading
+      ? "…"
+      : betaMode
+        ? "Beta"
+        : `${planDisplayName(plan)} — ${formatAccessStatusLabel(reason, trialEndsAt)}`;
 
   return (
     <div className="space-y-5">
@@ -653,7 +665,7 @@ export default function SettingsPage() {
               {[
                 ["Name", userName],
                 ["Email", userEmail],
-                ["Plan", "Beta"],
+                ["Plan", planLabel],
                 ["Stores", String(stores.length)],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between py-2.5 text-[13px]">

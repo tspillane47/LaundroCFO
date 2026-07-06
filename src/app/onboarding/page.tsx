@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
@@ -17,6 +18,8 @@ import {
   type TransactionType,
 } from "@/lib/financials";
 import { getStoreValuation, invalidateValuationCache } from "@/lib/getStoreValuation";
+import { canAddStore, storeLimitUpgradeMessage } from "@/lib/access";
+import { useAccessStatus, invalidateAccessStatusCache } from "@/lib/useAccessStatus";
 import { isOnboardingComplete } from "@/lib/onboarding";
 
 const TOTAL_STEPS = 5;
@@ -171,6 +174,20 @@ function OnboardingContent() {
   const searchParams = useSearchParams();
   const isAddingStore = searchParams.get("add") === "true";
   const supabase = createClient();
+  const {
+    plan: accessPlan,
+    maxStores,
+    storeCount,
+    loading: accessLoading,
+  } = useAccessStatus();
+  const accessStatus = {
+    plan: accessPlan,
+    isReadOnly: false,
+    reason: "active" as const,
+    trialEndsAt: null,
+    currentPeriodEnd: null,
+    maxStores,
+  };
 
   const [step, setStep] = useState(isAddingStore ? 2 : 1);
   const [showCompletion, setShowCompletion] = useState(false);
@@ -232,6 +249,16 @@ function OnboardingContent() {
         return;
       }
 
+      if (accessLoading) {
+        return;
+      }
+
+      if (!canAddStore(accessStatus, storeCount)) {
+        setErrorMessage(storeLimitUpgradeMessage(accessPlan));
+        setReady(true);
+        return;
+      }
+
       setReady(true);
     }
 
@@ -239,7 +266,7 @@ function OnboardingContent() {
     return () => {
       cancelled = true;
     };
-  }, [router, supabase, isAddingStore]);
+  }, [router, supabase, isAddingStore, accessLoading, accessPlan, maxStores, storeCount]);
 
   async function createStore(): Promise<string | null> {
     const {
@@ -247,6 +274,11 @@ function OnboardingContent() {
     } = await supabase.auth.getUser();
     if (!user) {
       router.replace("/login");
+      return null;
+    }
+
+    if (!canAddStore(accessStatus, storeCount)) {
+      setErrorMessage(storeLimitUpgradeMessage(accessStatus.plan));
       return null;
     }
 
@@ -265,26 +297,37 @@ function OnboardingContent() {
       if (recent) return recent.id;
     }
 
-    const { data: newStore, error } = await supabase
-      .from("stores")
-      .insert({
-        user_id: user.id,
+    const response = await fetch("/api/stores", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         name,
         address,
         square_footage: toNullableNum(form.squareFootage),
         store_type: form.storeType,
         year_opened: toNullableNum(form.yearOpened),
-      })
-      .select("id")
-      .single();
+      }),
+    });
 
-    if (error || !newStore) {
-      console.error("Store creation error:", error);
-      setErrorMessage("We couldn't create your store. Please try again.");
+    const payload = await response.json().catch(() => null);
+
+    if (response.status === 403 && payload?.error === "store_limit_reached") {
+      setErrorMessage(payload.message ?? storeLimitUpgradeMessage(accessStatus.plan));
       return null;
     }
 
-    return newStore.id;
+    if (!response.ok || !payload?.id) {
+      console.error("Store creation error:", payload);
+      setErrorMessage(
+        typeof payload?.error === "string"
+          ? payload.error
+          : "We couldn't create your store. Please try again."
+      );
+      return null;
+    }
+
+    invalidateAccessStatusCache();
+    return payload.id as string;
   }
 
   async function saveOccupancy(id: string): Promise<boolean> {
@@ -693,6 +736,13 @@ function OnboardingContent() {
             {showCompletion && <Confetti />}
 
             <FormBanner message={errorMessage ? { type: "error", text: errorMessage } : null} />
+            {errorMessage && !canAddStore(accessStatus, storeCount) && (
+              <p className="text-center text-[12px] mb-4" style={{ color: "var(--text-muted)" }}>
+                <Link href="/pricing" className="font-semibold underline underline-offset-2">
+                  View plans
+                </Link>
+              </p>
+            )}
 
             <div
               key={showCompletion ? "complete" : `${step}-${slideKey}`}

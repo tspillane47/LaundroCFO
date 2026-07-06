@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { FormBanner } from "@/components/ui/FormBanner";
+import { AddStoreLink } from "@/components/ui/AddStoreLink";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 
 type StoreRow = {
@@ -146,9 +147,7 @@ export default function ManageStoresPage() {
             View, archive, or remove stores from your portfolio
           </p>
         </div>
-        <Link href="/onboarding?add=true" className="btn-primary text-[13px] flex-shrink-0">
-          + Add Store
-        </Link>
+        <AddStoreLink className="btn-primary text-[13px] flex-shrink-0" />
       </div>
 
       <FormBanner message={message} />
@@ -158,9 +157,9 @@ export default function ManageStoresPage() {
           <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
             No stores yet.
           </p>
-          <Link href="/onboarding" className="btn-primary inline-flex mt-4 text-[13px]">
+          <AddStoreLink firstStore className="btn-primary inline-flex mt-4 text-[13px]">
             Add Your First Store →
-          </Link>
+          </AddStoreLink>
         </div>
       ) : (
         <div className="space-y-3">

@@ -19,6 +19,7 @@ import {
 import { Logo } from "@/components/ui/Logo";
 import { FeedbackModal } from "@/components/ui/FeedbackModal";
 import { BetaBanner } from "@/components/ui/BetaBanner";
+import { ReadOnlyBanner } from "@/components/ui/ReadOnlyBanner";
 import { setTermsReturnPath } from "@/components/ui/TermsBackLink";
 import { useBetaMode } from "@/lib/useBetaMode";
 import { isAdminEmail } from "@/lib/admin";
@@ -729,6 +730,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <BetaBanner onFeedbackClick={() => setFeedbackOpen(true)} />
+        <ReadOnlyBanner />
 
         {/* Page content */}
         <main className="app-page-content flex-1 overflow-y-auto p-4 md:p-6 transition-colors duration-300">
