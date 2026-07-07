@@ -15,6 +15,8 @@ import { PageError } from "@/components/ui/PageError";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { DesktopOnlyGate } from "@/components/ui/DesktopOnlyGate";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 import { RuleApplyPrompt } from "@/components/financials/RuleApplyPrompt";
 import {
   BANK_IMPORT_CATEGORY_LABELS,
@@ -206,6 +208,7 @@ function RuleFormPanel({
   onCancel,
   saving,
   message,
+  writeDisabled = false,
 }: {
   type: TransactionType;
   vendorPattern: string;
@@ -222,6 +225,7 @@ function RuleFormPanel({
   onCancel: () => void;
   saving: boolean;
   message: { type: "error" | "success"; text: string } | null;
+  writeDisabled?: boolean;
 }) {
   return (
     <div className="space-y-3 text-[12px]">
@@ -316,9 +320,11 @@ function RuleFormPanel({
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="btn-primary text-[11px]" onClick={onSave} disabled={saving}>
-          {saving ? "Saving…" : "Save Rule"}
-        </button>
+        <ReadOnlyGuard>
+          <button type="button" className="btn-primary text-[11px]" onClick={onSave} disabled={saving || writeDisabled}>
+            {saving ? "Saving…" : "Save Rule"}
+          </button>
+        </ReadOnlyGuard>
         <button type="button" className="btn-outline text-[11px]" onClick={onCancel} disabled={saving}>
           Cancel
         </button>
@@ -371,6 +377,15 @@ function TransactionsPageContent() {
   const { selectedStore, loading: storesLoading } = useStores();
   const toast = useToast();
   const { evaluateAlerts } = useAlertEvaluation();
+  const { canWrite, blockedReason } = useWriteGuard();
+
+  function requireWrite(): boolean {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return false;
+    }
+    return true;
+  }
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -788,6 +803,8 @@ function TransactionsPageContent() {
     previousCategory: string | null,
     persist = true
   ) {
+    if (persist && !requireWrite()) return;
+
     setCategoryOverrides((prev) => new Map(prev).set(id, category));
 
     if (!persist) return;
@@ -818,6 +835,7 @@ function TransactionsPageContent() {
   }
 
   async function saveNotes(id: string) {
+    if (!requireWrite()) return;
     const notes = notesDraft.get(id) ?? "";
     const previous = transactions.find((t) => t.id === id)?.notes ?? "";
     if (notes === previous) return;
@@ -878,6 +896,7 @@ function TransactionsPageContent() {
   }
 
   async function handlePostRows(rows: ReviewRow[]) {
+    if (!requireWrite()) return;
     if (!store?.id || !userId || rows.length === 0 || postingRef.current) return;
 
     const postableRows = rows.filter((row) => row.status !== "posted" && !row.excluded);
@@ -951,6 +970,7 @@ function TransactionsPageContent() {
   }
 
   async function confirmExclude() {
+    if (!requireWrite()) return;
     if (!excludeModal || !userId) return;
     const reason = excludeModal.reason.trim();
     if (!reason) {
@@ -979,6 +999,7 @@ function TransactionsPageContent() {
   }
 
   function openManualModal() {
+    if (!requireWrite()) return;
     const type: TransactionType = "expense";
     setManualDraft({
       date: formatLocalDate(new Date()),
@@ -1004,6 +1025,7 @@ function TransactionsPageContent() {
   }, [manualDraft]);
 
   async function confirmManualTransaction() {
+    if (!requireWrite()) return;
     if (!manualFormValid || !store?.id || !userId) return;
 
     setManualSaving(true);
@@ -1060,6 +1082,7 @@ function TransactionsPageContent() {
   }
 
   async function confirmReclassify() {
+    if (!requireWrite()) return;
     if (!reclassifyModal || !userId) return;
 
     setSaving(true);
@@ -1088,6 +1111,7 @@ function TransactionsPageContent() {
   }
 
   function openBulkReclassifyModal() {
+    if (!requireWrite()) return;
     const ids = selectedActionRows.map((row) => row.id);
     if (ids.length === 0) {
       setMessage({ type: "error", text: "Select at least one non-excluded transaction to reclassify." });
@@ -1105,6 +1129,7 @@ function TransactionsPageContent() {
   }
 
   async function confirmBulkReclassify() {
+    if (!requireWrite()) return;
     if (!bulkReclassifyModal || !userId) return;
 
     const category = bulkReclassifyModal.category;
@@ -1164,6 +1189,7 @@ function TransactionsPageContent() {
   }
 
   function handleBulkExclude() {
+    if (!requireWrite()) return;
     const ids = selectedActionRows.map((row) => row.id);
     if (ids.length === 0) {
       setMessage({ type: "error", text: "Select at least one non-excluded transaction to exclude." });
@@ -1173,6 +1199,7 @@ function TransactionsPageContent() {
   }
 
   function handleCSVUpload(file: File) {
+    if (!requireWrite()) return;
     const reader = new FileReader();
     reader.onload = async (e) => {
       const text = e.target?.result as string;
@@ -1271,6 +1298,7 @@ function TransactionsPageContent() {
   }
 
   async function saveStagedToQueue() {
+    if (!requireWrite()) return;
     if (!store?.id || !userId || stagedCsv.length === 0) return;
     setSaving(true);
 
@@ -1309,6 +1337,7 @@ function TransactionsPageContent() {
     vendorPattern: string,
     amount: number
   ) {
+    if (!requireWrite()) return;
     setRuleFormKey(key);
     setRuleFormCategory(category);
     setRuleFormTxnType(type);
@@ -1346,6 +1375,7 @@ function TransactionsPageContent() {
   }
 
   async function confirmApplyRuleToExisting() {
+    if (!requireWrite()) return;
     if (!ruleApplyPrompt || !store?.id || !userId) return;
 
     setRuleApplyBusy(true);
@@ -1409,6 +1439,7 @@ function TransactionsPageContent() {
   }
 
   async function confirmPostAppliedRuleTransactions() {
+    if (!requireWrite()) return;
     if (!rulePostPrompt || !store?.id || !userId || rulePostBusy) return;
 
     setRulePostBusy(true);
@@ -1457,6 +1488,7 @@ function TransactionsPageContent() {
   }
 
   async function saveCategorizationRule() {
+    if (!requireWrite()) return;
     setRuleFormMessage(null);
     let activeUserId = userId;
     if (!activeUserId) {
@@ -1545,6 +1577,7 @@ function TransactionsPageContent() {
   }
 
   async function deleteCategorizationRule(ruleId: string) {
+    if (!requireWrite()) return;
     const { error } = await supabase.from("categorization_rules").delete().eq("id", ruleId);
     if (error) {
       setMessage({ type: "error", text: error.message });
@@ -1555,6 +1588,7 @@ function TransactionsPageContent() {
   }
 
   function updateGroupCategory(groupKey: string, category: BankImportCategory) {
+    if (!requireWrite()) return;
     const group = transactionGroups.find((g) => g.groupKey === groupKey);
     if (!group) return;
     for (const row of group.items) {
@@ -1614,6 +1648,7 @@ function TransactionsPageContent() {
           <select
             value={item.category}
             onChange={(e) => void updateCategory(item.id, e.target.value as BankImportCategory, storedCategory, true)}
+            disabled={!canWrite}
             className={clsx(
               "select-tan",
               "w-40 text-[11px]",
@@ -1631,26 +1666,35 @@ function TransactionsPageContent() {
         <td className="py-2 text-right whitespace-nowrap">
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             <StatusBadge status={item.status} excluded={item.excluded} />
-            <button
-              type="button"
-              className="btn-primary text-[11px]"
-              onClick={() => void handlePostRows([item])}
-              disabled={!isCategoryReadyToPost(item.category) || posting || item.status === "posted"}
-            >
-              {posting ? "Posting…" : "Post"}
-            </button>
-            <button
-              type="button"
-              className="btn-outline text-[11px] text-red-400 border-red-500/30"
-              onClick={() => setExcludeModal({ ids: [item.id], reason: "" })}
-              disabled={posting}
-            >
-              Exclude
-            </button>
+            <ReadOnlyGuard>
+              <button
+                type="button"
+                className="btn-primary text-[11px]"
+                onClick={() => void handlePostRows([item])}
+                disabled={!isCategoryReadyToPost(item.category) || posting || item.status === "posted"}
+              >
+                {posting ? "Posting…" : "Post"}
+              </button>
+            </ReadOnlyGuard>
+            <ReadOnlyGuard>
+              <button
+                type="button"
+                className="btn-outline text-[11px] text-red-400 border-red-500/30"
+                onClick={() => openExcludeModal([item.id])}
+                disabled={posting}
+              >
+                Exclude
+              </button>
+            </ReadOnlyGuard>
           </div>
         </td>
       </tr>
     );
+  }
+
+  function openExcludeModal(ids: string[]) {
+    if (!requireWrite()) return;
+    setExcludeModal({ ids, reason: "" });
   }
 
   function renderNotesInput(row: ReviewRow, readOnly = false) {
@@ -1665,7 +1709,8 @@ function TransactionsPageContent() {
             e.currentTarget.blur();
           }
         }}
-        disabled={readOnly}
+        disabled={readOnly || !canWrite}
+        readOnly={!canWrite}
         placeholder="Add note…"
         className={clsx(INPUT_CLASS, "w-full min-w-[120px] py-1 text-[11px]")}
       />
@@ -1748,26 +1793,33 @@ function TransactionsPageContent() {
           </div>
         </div>
         <div className="flex gap-2">
-          <label className="btn-outline cursor-pointer">
-            Upload CSV
-            <input
-              type="file"
-              accept=".csv"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleCSVUpload(file);
-                e.target.value = "";
-              }}
-            />
-          </label>
-          <button type="button" className="btn-outline" onClick={openManualModal}>
-            Add Manual Transaction
-          </button>
-          {stagedCsv.length > 0 && (
-            <button type="button" className="btn-primary" onClick={() => void saveStagedToQueue()} disabled={saving}>
-              Save {stagedCsv.length} to Queue
+          <ReadOnlyGuard>
+            <label className={clsx("btn-outline", canWrite ? "cursor-pointer" : "cursor-not-allowed opacity-60")}>
+              Upload CSV
+              <input
+                type="file"
+                accept=".csv"
+                className="hidden"
+                disabled={!canWrite}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleCSVUpload(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </ReadOnlyGuard>
+          <ReadOnlyGuard>
+            <button type="button" className="btn-outline" onClick={openManualModal}>
+              Add Manual Transaction
             </button>
+          </ReadOnlyGuard>
+          {stagedCsv.length > 0 && (
+            <ReadOnlyGuard>
+              <button type="button" className="btn-primary" onClick={() => void saveStagedToQueue()} disabled={saving}>
+                Save {stagedCsv.length} to Queue
+              </button>
+            </ReadOnlyGuard>
           )}
         </div>
       </div>
@@ -1915,13 +1967,15 @@ function TransactionsPageContent() {
                         <span className="text-adaptive-muted mx-2">→</span>
                         <CategoryBadge category={rule.category as BankImportCategory} />
                       </div>
-                      <button
-                        type="button"
-                        className="text-[11px] text-red-400 hover:text-red-300"
-                        onClick={() => void deleteCategorizationRule(rule.id)}
-                      >
-                        Delete
-                      </button>
+                      <ReadOnlyGuard>
+                        <button
+                          type="button"
+                          className="text-[11px] text-red-400 hover:text-red-300"
+                          onClick={() => void deleteCategorizationRule(rule.id)}
+                        >
+                          Delete
+                        </button>
+                      </ReadOnlyGuard>
                     </div>
                   );
                 })}
@@ -1940,27 +1994,32 @@ function TransactionsPageContent() {
           onSkipApply={skipApplyRuleToExisting}
           onPostAll={() => void confirmPostAppliedRuleTransactions()}
           onReviewFirst={dismissRulePostPrompt}
+          writeBlocked={!canWrite}
         />
 
         {someSelected && (
           <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
             <span className="text-[12px] text-adaptive-info font-medium">{selectedIds.size} selected</span>
-            <button
-              type="button"
-              className="btn-outline text-[11px]"
-              onClick={openBulkReclassifyModal}
-              disabled={selectedActionRows.length === 0 || saving}
-            >
-              Reclassify
-            </button>
-            <button
-              type="button"
-              className="btn-outline text-[11px] text-red-400 border-red-500/30"
-              onClick={handleBulkExclude}
-              disabled={selectedActionRows.length === 0 || saving}
-            >
-              Exclude
-            </button>
+            <ReadOnlyGuard>
+              <button
+                type="button"
+                className="btn-outline text-[11px]"
+                onClick={openBulkReclassifyModal}
+                disabled={selectedActionRows.length === 0 || saving}
+              >
+                Reclassify
+              </button>
+            </ReadOnlyGuard>
+            <ReadOnlyGuard>
+              <button
+                type="button"
+                className="btn-outline text-[11px] text-red-400 border-red-500/30"
+                onClick={handleBulkExclude}
+                disabled={selectedActionRows.length === 0 || saving}
+              >
+                Exclude
+              </button>
+            </ReadOnlyGuard>
           </div>
         )}
 
@@ -2110,6 +2169,7 @@ function TransactionsPageContent() {
                           onChange={(e) =>
                             updateGroupCategory(group.groupKey, e.target.value as BankImportCategory)
                           }
+                          disabled={!canWrite}
                           className={clsx("select-tan", "w-40 text-[12px]")}
                         >
                           {getImportCategoriesForType(group.type).map((f) => (
@@ -2121,39 +2181,45 @@ function TransactionsPageContent() {
                       </td>
                       <td className="py-3 pr-3 text-[var(--text-secondary)] text-[11px]">—</td>
                       <td className="py-3 text-right whitespace-nowrap">
-                        <button
-                          type="button"
-                          className="btn-primary text-[11px] mr-1.5"
-                          onClick={() => void handlePostRows(group.items)}
-                          disabled={!isCategoryReadyToPost(group.category) || posting}
-                        >
-                          {posting ? "Posting…" : "Post All"}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-outline text-[11px] mr-1.5 text-red-400 border-red-500/30"
-                          onClick={() =>
-                            setExcludeModal({ ids: group.items.map((i) => i.id), reason: "" })
-                          }
-                          disabled={posting}
-                        >
-                          Exclude All
-                        </button>
-                        <button
-                          type="button"
-                          className="text-[11px] text-adaptive-info"
-                          onClick={() =>
-                            openRuleForm(
-                              group.groupKey,
-                              group.category,
-                              group.type,
-                              group.vendorPattern,
-                              group.items[0]?.amount ?? group.totalAmount
-                            )
-                          }
-                        >
-                          Set as Rule
-                        </button>
+                        <ReadOnlyGuard>
+                          <button
+                            type="button"
+                            className="btn-primary text-[11px] mr-1.5"
+                            onClick={() => void handlePostRows(group.items)}
+                            disabled={!isCategoryReadyToPost(group.category) || posting}
+                          >
+                            {posting ? "Posting…" : "Post All"}
+                          </button>
+                        </ReadOnlyGuard>
+                        <ReadOnlyGuard>
+                          <button
+                            type="button"
+                            className="btn-outline text-[11px] mr-1.5 text-red-400 border-red-500/30"
+                            onClick={() =>
+                              openExcludeModal(group.items.map((i) => i.id))
+                            }
+                            disabled={posting}
+                          >
+                            Exclude All
+                          </button>
+                        </ReadOnlyGuard>
+                        <ReadOnlyGuard>
+                          <button
+                            type="button"
+                            className="text-[11px] text-adaptive-info"
+                            onClick={() =>
+                              openRuleForm(
+                                group.groupKey,
+                                group.category,
+                                group.type,
+                                group.vendorPattern,
+                                group.items[0]?.amount ?? group.totalAmount
+                              )
+                            }
+                          >
+                            Set as Rule
+                          </button>
+                        </ReadOnlyGuard>
                       </td>
                     </tr>
                     {isExpanded &&
@@ -2179,6 +2245,7 @@ function TransactionsPageContent() {
                             onCancel={() => setRuleFormKey(null)}
                             saving={ruleFormSaving}
                             message={ruleFormMessage}
+                            writeDisabled={!canWrite}
                           />
                         </td>
                       </tr>
@@ -2276,6 +2343,7 @@ function TransactionsPageContent() {
                                   }
                                   void updateCategory(row.id, newCategory, storedCategory, true);
                                 }}
+                                disabled={!canWrite}
                                 className={clsx(
                                   "select-tan",
                                   "w-40 text-[12px]",
@@ -2301,68 +2369,79 @@ function TransactionsPageContent() {
                         <td className="py-3 text-right whitespace-nowrap">
                           {(activeTab === "needs_review" || (activeTab === "all" && needsReview)) && (
                             <>
-                              <button
-                                type="button"
-                                className="btn-primary text-[11px] mr-1.5"
-                                onClick={() => void handlePostRows([row])}
-                                disabled={
-                                  !isCategoryReadyToPost(row.category) || posting || row.status === "posted"
-                                }
-                              >
-                                {posting ? "Posting…" : "Post"}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-outline text-[11px] mr-1.5 text-red-400 border-red-500/30"
-                                onClick={() => setExcludeModal({ ids: [row.id], reason: "" })}
-                              >
-                                Exclude
-                              </button>
-                              <button
-                                type="button"
-                                className="text-[11px] text-adaptive-info"
-                                onClick={() =>
-                                  openRuleForm(
-                                    row.id,
-                                    row.category,
-                                    row.type,
-                                    normalizeVendorPattern(row.description),
-                                    row.amount
-                                  )
-                                }
-                              >
-                                Rule
-                              </button>
+                              <ReadOnlyGuard>
+                                <button
+                                  type="button"
+                                  className="btn-primary text-[11px] mr-1.5"
+                                  onClick={() => void handlePostRows([row])}
+                                  disabled={
+                                    !isCategoryReadyToPost(row.category) || posting || row.status === "posted"
+                                  }
+                                >
+                                  {posting ? "Posting…" : "Post"}
+                                </button>
+                              </ReadOnlyGuard>
+                              <ReadOnlyGuard>
+                                <button
+                                  type="button"
+                                  className="btn-outline text-[11px] mr-1.5 text-red-400 border-red-500/30"
+                                  onClick={() => openExcludeModal([row.id])}
+                                >
+                                  Exclude
+                                </button>
+                              </ReadOnlyGuard>
+                              <ReadOnlyGuard>
+                                <button
+                                  type="button"
+                                  className="text-[11px] text-adaptive-info"
+                                  onClick={() =>
+                                    openRuleForm(
+                                      row.id,
+                                      row.category,
+                                      row.type,
+                                      normalizeVendorPattern(row.description),
+                                      row.amount
+                                    )
+                                  }
+                                >
+                                  Rule
+                                </button>
+                              </ReadOnlyGuard>
                             </>
                           )}
                           {(activeTab === "posted" || (activeTab === "all" && posted)) && (
                             <>
-                              <button
-                                type="button"
-                                className="btn-primary text-[11px] mr-1.5"
-                                onClick={() => {
-                                  const stored = (storedCategory ?? "") as BankImportCategory;
-                                  if (row.category === stored) {
-                                    setMessage({ type: "error", text: "Choose a different category to reclassify." });
-                                    return;
-                                  }
-                                  if (!isCategoryReadyToPost(row.category)) {
-                                    setMessage({ type: "error", text: "Choose a postable category to reclassify." });
-                                    return;
-                                  }
-                                  setReclassifyModal({ row, newCategory: row.category });
-                                }}
-                                disabled={saving}
-                              >
-                                Reclassify
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-outline text-[11px] text-red-400 border-red-500/30"
-                                onClick={() => setExcludeModal({ ids: [row.id], reason: "" })}
-                              >
-                                Exclude
-                              </button>
+                              <ReadOnlyGuard>
+                                <button
+                                  type="button"
+                                  className="btn-primary text-[11px] mr-1.5"
+                                  onClick={() => {
+                                    if (!requireWrite()) return;
+                                    const stored = (storedCategory ?? "") as BankImportCategory;
+                                    if (row.category === stored) {
+                                      setMessage({ type: "error", text: "Choose a different category to reclassify." });
+                                      return;
+                                    }
+                                    if (!isCategoryReadyToPost(row.category)) {
+                                      setMessage({ type: "error", text: "Choose a postable category to reclassify." });
+                                      return;
+                                    }
+                                    setReclassifyModal({ row, newCategory: row.category });
+                                  }}
+                                  disabled={saving}
+                                >
+                                  Reclassify
+                                </button>
+                              </ReadOnlyGuard>
+                              <ReadOnlyGuard>
+                                <button
+                                  type="button"
+                                  className="btn-outline text-[11px] text-red-400 border-red-500/30"
+                                  onClick={() => openExcludeModal([row.id])}
+                                >
+                                  Exclude
+                                </button>
+                              </ReadOnlyGuard>
                             </>
                           )}
                         </td>
@@ -2387,6 +2466,7 @@ function TransactionsPageContent() {
                               onCancel={() => setRuleFormKey(null)}
                               saving={ruleFormSaving}
                               message={ruleFormMessage}
+                              writeDisabled={!canWrite}
                             />
                           </td>
                         </tr>
@@ -2428,9 +2508,11 @@ function TransactionsPageContent() {
               <button type="button" className="btn-outline" onClick={() => setExcludeModal(null)} disabled={saving}>
                 Cancel
               </button>
-              <button type="button" className="btn-primary" onClick={() => void confirmExclude()} disabled={saving}>
-                {saving ? "Excluding…" : "Exclude"}
-              </button>
+              <ReadOnlyGuard>
+                <button type="button" className="btn-primary" onClick={() => void confirmExclude()} disabled={saving}>
+                  {saving ? "Excluding…" : "Exclude"}
+                </button>
+              </ReadOnlyGuard>
             </div>
           </div>
         </div>
@@ -2473,14 +2555,16 @@ function TransactionsPageContent() {
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => void confirmBulkReclassify()}
-                disabled={saving || bulkReclassifyCategories.length === 0}
-              >
-                {saving ? "Reclassifying…" : "Reclassify"}
-              </button>
+              <ReadOnlyGuard>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => void confirmBulkReclassify()}
+                  disabled={saving || bulkReclassifyCategories.length === 0}
+                >
+                  {saving ? "Reclassifying…" : "Reclassify"}
+                </button>
+              </ReadOnlyGuard>
             </div>
           </div>
         </div>
@@ -2508,9 +2592,11 @@ function TransactionsPageContent() {
               <button type="button" className="btn-outline" onClick={() => setReclassifyModal(null)} disabled={saving}>
                 Cancel
               </button>
-              <button type="button" className="btn-primary" onClick={() => void confirmReclassify()} disabled={saving}>
-                {saving ? "Reclassifying…" : "Reclassify"}
-              </button>
+              <ReadOnlyGuard>
+                <button type="button" className="btn-primary" onClick={() => void confirmReclassify()} disabled={saving}>
+                  {saving ? "Reclassifying…" : "Reclassify"}
+                </button>
+              </ReadOnlyGuard>
             </div>
           </div>
         </div>
@@ -2637,14 +2723,16 @@ function TransactionsPageContent() {
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => void confirmManualTransaction()}
-                disabled={!manualFormValid || manualSaving}
-              >
-                {manualSaving ? "Adding…" : "Add Transaction"}
-              </button>
+              <ReadOnlyGuard>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => void confirmManualTransaction()}
+                  disabled={!manualFormValid || manualSaving}
+                >
+                  {manualSaving ? "Adding…" : "Add Transaction"}
+                </button>
+              </ReadOnlyGuard>
             </div>
           </div>
         </div>

@@ -26,6 +26,9 @@ import {
   getUnderwritingFlags,
 } from "@/lib/real-estate-calculations";
 import { getStoreValuation } from "@/lib/getStoreValuation";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
+import { useWriteGuard } from "@/lib/useWriteGuard";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type RealEstate = {
   id: string;
@@ -218,6 +221,8 @@ type Props = {
 
 export function RealEstateModule({ store }: Props) {
   const supabase = createClient();
+  const toast = useToast();
+  const { canWrite, blockedReason } = useWriteGuard();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -331,6 +336,10 @@ export function RealEstateModule({ store }: Props) {
   }, [record, store, businessValue]);
 
   function enterEditMode() {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     if (record) {
       setForm(recordToForm(record));
     } else {
@@ -351,6 +360,10 @@ export function RealEstateModule({ store }: Props) {
   }
 
   async function handleSave() {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     setSaving(true);
     setError("");
     setSuccess("");
@@ -440,17 +453,21 @@ export function RealEstateModule({ store }: Props) {
           <p className="text-[var(--text-muted)] text-[13px] mt-0.5">Owner-occupied or related-party real estate</p>
         </div>
         {mode === "view" ? (
-          <button type="button" onClick={enterEditMode} className="btn-primary">
-            {record ? "Edit Profile" : "Add Profile"}
-          </button>
+          <ReadOnlyGuard>
+            <button type="button" onClick={enterEditMode} className="btn-primary">
+              {record ? "Edit Profile" : "Add Profile"}
+            </button>
+          </ReadOnlyGuard>
         ) : (
           <div className="flex gap-2">
             <button type="button" onClick={cancelEdit} className="btn-outline" disabled={saving}>
               Cancel
             </button>
-            <button type="button" onClick={handleSave} className="btn-primary" disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
+            <ReadOnlyGuard>
+              <button type="button" onClick={handleSave} className="btn-primary" disabled={saving}>
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
+            </ReadOnlyGuard>
           </div>
         )}
       </div>
@@ -472,9 +489,11 @@ export function RealEstateModule({ store }: Props) {
           <p className="text-[var(--text-muted)] text-[13px] mt-2 mb-4">
             Add building ownership and mortgage details to track equity and debt position.
           </p>
-          <button type="button" onClick={enterEditMode} className="btn-primary">
-            Add Profile
-          </button>
+          <ReadOnlyGuard align="stretch">
+            <button type="button" onClick={enterEditMode} className="btn-primary">
+              Add Profile
+            </button>
+          </ReadOnlyGuard>
         </div>
       ) : mode === "view" && record ? (
         <>

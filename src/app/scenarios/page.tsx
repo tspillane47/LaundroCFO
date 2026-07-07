@@ -34,6 +34,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
 import { DesktopOnlyGate } from "@/components/ui/DesktopOnlyGate";
 import { useToast } from "@/components/ui/ToastProvider";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 import { ScenarioIcon } from "@/components/ui/ScenarioIcon";
 
 type SliderConfig = {
@@ -66,6 +68,7 @@ function ScenariosPageContent() {
   const supabase = createClient();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
   const toast = useToast();
+  const { canWrite, blockedReason } = useWriteGuard();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [ctx, setCtx] = useState<StoreScenarioContext | null>(null);
@@ -253,6 +256,10 @@ function ScenariosPageContent() {
   );
 
   const handleSaveScenario = useCallback(async () => {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     if (!ctx || !inputParams || !liveScenario || !selectedStore?.id || !userId) return;
     setSaving(true);
     try {
@@ -298,15 +305,21 @@ function ScenariosPageContent() {
     supabase,
     loadSavedScenarios,
     toast,
+    canWrite,
+    blockedReason,
   ]);
 
   const handleDeleteSaved = useCallback(
     async (id: string) => {
+      if (!canWrite) {
+        toast.error(blockedReason ?? "Subscribe to make changes.");
+        return;
+      }
       if (!selectedStore?.id || !userId) return;
       await supabase.from("saved_scenarios").delete().eq("id", id);
       await loadSavedScenarios(selectedStore.id, userId);
     },
-    [selectedStore?.id, userId, supabase, loadSavedScenarios]
+    [selectedStore?.id, userId, supabase, loadSavedScenarios, canWrite, blockedReason, toast]
   );
 
   if (storesLoading || loading) {
@@ -463,14 +476,16 @@ function ScenariosPageContent() {
               <ScenarioIcon name={liveScenario.icon} size={16} />
               {liveScenario.title}
             </div>
-            <button
-              type="button"
-              onClick={handleSaveScenario}
-              disabled={saving}
-              className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-[var(--border)] text-[var(--text-secondary)] hover:border-blue-500/40 hover:text-blue-400 transition-colors shrink-0 disabled:opacity-50"
-            >
-              {saving ? "Saving…" : "Save Scenario"}
-            </button>
+            <ReadOnlyGuard>
+              <button
+                type="button"
+                onClick={handleSaveScenario}
+                disabled={saving}
+                className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-[var(--border)] text-[var(--text-secondary)] hover:border-blue-500/40 hover:text-blue-400 transition-colors shrink-0 disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "Save Scenario"}
+              </button>
+            </ReadOnlyGuard>
           </div>
 
           {/* Sliders */}
@@ -802,13 +817,15 @@ function SavedScenarioItem({
           {neg ? "−" : "+"}
           {fmtDollar(Math.abs(impact))}
         </span>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="text-[10px] text-[var(--text-secondary)] hover:text-red-400"
-        >
-          Delete
-        </button>
+        <ReadOnlyGuard>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="text-[10px] text-[var(--text-secondary)] hover:text-red-400"
+          >
+            Delete
+          </button>
+        </ReadOnlyGuard>
       </div>
     </div>
   );

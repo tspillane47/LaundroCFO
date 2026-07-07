@@ -8,6 +8,7 @@ export type OccupancyType = "leased" | "owner_occupied";
 type Props = {
   saving: boolean;
   onSelect: (type: OccupancyType) => Promise<void>;
+  writeBlocked?: boolean;
 };
 
 const OPTIONS: {
@@ -30,7 +31,7 @@ const OPTIONS: {
   },
 ];
 
-export function OccupancySelector({ saving, onSelect }: Props) {
+export function OccupancySelector({ saving, onSelect, writeBlocked = false }: Props) {
   const [hovered, setHovered] = useState<OccupancyType | null>(null);
 
   return (
@@ -47,7 +48,7 @@ export function OccupancySelector({ saving, onSelect }: Props) {
           <button
             key={opt.type}
             type="button"
-            disabled={saving}
+            disabled={saving || writeBlocked}
             onClick={() => onSelect(opt.type)}
             onMouseEnter={() => setHovered(opt.type)}
             onMouseLeave={() => setHovered(null)}

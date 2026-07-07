@@ -13,6 +13,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { useToast } from "@/components/ui/ToastProvider";
 import { PageError } from "@/components/ui/PageError";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 import {
   INPUT_CLASS,
   formatCurrency,
@@ -450,6 +452,7 @@ export default function InsurancePage() {
   const { selectedStore } = useStores();
   const toast = useToast();
   const { evaluateAlerts } = useAlertEvaluation();
+  const { canWrite, blockedReason } = useWriteGuard();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -631,6 +634,10 @@ export default function InsurancePage() {
   }, [claims]);
 
   function openAddPolicy() {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     setEditingPolicyId(null);
     setPolicyForm(emptyPolicyForm());
     setSaveStatus("idle");
@@ -638,6 +645,10 @@ export default function InsurancePage() {
   }
 
   function openEditPolicy(policy: InsurancePolicy) {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     setEditingPolicyId(policy.id);
     setPolicyForm(policyToForm(policy));
     setSaveStatus("idle");
@@ -651,6 +662,10 @@ export default function InsurancePage() {
   }
 
   async function handleSavePolicy() {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     if (!store || !userId || saving || saveStatus === "success") return;
     setSaving(true);
     setSaveStatus("idle");
@@ -738,6 +753,10 @@ export default function InsurancePage() {
   }
 
   function openAddClaim(policyId?: string) {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     setClaimForm({
       policy_id: policyId ?? policies[0]?.id ?? "",
       claim_date: new Date().toISOString().split("T")[0],
@@ -750,6 +769,10 @@ export default function InsurancePage() {
   }
 
   async function handleSaveClaim() {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     if (!claimForm.policy_id) {
       setMessage({ type: "error", text: "Select a policy for this claim." });
       return;
@@ -813,9 +836,11 @@ export default function InsurancePage() {
               {store?.name ?? "Store"} · {store?.address ?? "Address not set"}
             </p>
           </div>
-          <button type="button" onClick={openAddPolicy} className="btn-primary">
-            + Add Policy
-          </button>
+          <ReadOnlyGuard>
+            <button type="button" onClick={openAddPolicy} className="btn-primary">
+              + Add Policy
+            </button>
+          </ReadOnlyGuard>
         </div>
         <EmptyState
           icon="Shield"
@@ -838,9 +863,11 @@ export default function InsurancePage() {
             {store?.name ?? "Store"} · {store?.address ?? "Address not set"}
           </p>
         </div>
-        <button type="button" onClick={openAddPolicy} className="btn-primary">
-          + Add Policy
-        </button>
+        <ReadOnlyGuard>
+          <button type="button" onClick={openAddPolicy} className="btn-primary">
+            + Add Policy
+          </button>
+        </ReadOnlyGuard>
       </div>
 
       <FormBanner message={message} />
@@ -1228,20 +1255,22 @@ export default function InsurancePage() {
               <button type="button" onClick={closePolicyForm} className="btn-outline">
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={handleSavePolicy}
-                disabled={saving || saveStatus === "success"}
-                className="btn-primary"
-              >
-                {saveStatus === "success"
-                  ? "Saved"
-                  : saving
-                    ? "Saving..."
-                    : editingPolicyId
-                      ? "Update Policy"
-                      : "Save Policy"}
-              </button>
+              <ReadOnlyGuard>
+                <button
+                  type="button"
+                  onClick={handleSavePolicy}
+                  disabled={saving || saveStatus === "success"}
+                  className="btn-primary"
+                >
+                  {saveStatus === "success"
+                    ? "Saved"
+                    : saving
+                      ? "Saving..."
+                      : editingPolicyId
+                        ? "Update Policy"
+                        : "Save Policy"}
+                </button>
+              </ReadOnlyGuard>
             </div>
           </div>
         </div>
@@ -1319,13 +1348,15 @@ export default function InsurancePage() {
                   </div>
 
                   <div className="flex gap-2 mt-4">
-                    <button
-                      type="button"
-                      onClick={() => openEditPolicy(policy)}
-                      className="btn-outline flex-1"
-                    >
-                      Edit
-                    </button>
+                    <ReadOnlyGuard align="stretch">
+                      <button
+                        type="button"
+                        onClick={() => openEditPolicy(policy)}
+                        className="btn-outline flex-1"
+                      >
+                        Edit
+                      </button>
+                    </ReadOnlyGuard>
                     <button
                       type="button"
                       onClick={() =>
@@ -1364,9 +1395,11 @@ export default function InsurancePage() {
         <div className="flex items-center justify-between mb-4">
           <div className="section-title mb-0">Claims History</div>
           {policies.length > 0 && (
-            <button type="button" onClick={() => openAddClaim()} className="btn-primary">
-              + Add Claim
-            </button>
+            <ReadOnlyGuard>
+              <button type="button" onClick={() => openAddClaim()} className="btn-primary">
+                + Add Claim
+              </button>
+            </ReadOnlyGuard>
           )}
         </div>
 
@@ -1445,14 +1478,16 @@ export default function InsurancePage() {
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={handleSaveClaim}
-                disabled={saving}
-                className="btn-primary"
-              >
-                {saving ? "Saving..." : "Save Claim"}
-              </button>
+              <ReadOnlyGuard>
+                <button
+                  type="button"
+                  onClick={handleSaveClaim}
+                  disabled={saving}
+                  className="btn-primary"
+                >
+                  {saving ? "Saving..." : "Save Claim"}
+                </button>
+              </ReadOnlyGuard>
             </div>
           </div>
         )}

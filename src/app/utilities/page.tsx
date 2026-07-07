@@ -50,6 +50,8 @@ import { FormBanner } from "@/components/ui/FormBanner";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { PageError } from "@/components/ui/PageError";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 
 type StoreProfile = {
@@ -157,6 +159,7 @@ function ChartTooltip({
 export default function UtilitiesPage() {
   const supabase = createClient();
   const { selectedStore, loading: storesLoading } = useStores();
+  const { canWrite, blockedReason } = useWriteGuard();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -435,6 +438,7 @@ export default function UtilitiesPage() {
   }, [latest, equipMetrics.avgEquipmentAge, latestRevenue]);
 
   function openMonthForm(month: number) {
+    if (!canWrite) return;
     setSelectedMonth(month);
     const existing = records.find((r) => r.year === selectedYear && r.month === month);
     if (existing) {
@@ -463,6 +467,10 @@ export default function UtilitiesPage() {
   }
 
   async function saveUtilityRecord() {
+    if (!canWrite) {
+      setMessage({ type: "error", text: blockedReason ?? "Subscribe to make changes." });
+      return;
+    }
     if (!store?.id || !userId || saving || saveStatus === "success") return;
     setSaving(true);
     setSaveStatus("idle");
@@ -545,9 +553,11 @@ export default function UtilitiesPage() {
           <p className="text-[15px] mb-6 max-w-lg mx-auto" style={{ color: "var(--text-muted)" }}>
             Track your utility costs to unlock water analysis, benchmarks, and equipment efficiency insights.
           </p>
-          <button type="button" className="btn-primary" onClick={() => openMonthForm(new Date().getMonth() + 1)}>
-            + Add This Month&apos;s Utilities
-          </button>
+          <ReadOnlyGuard align="stretch">
+            <button type="button" className="btn-primary" onClick={() => openMonthForm(new Date().getMonth() + 1)}>
+              + Add This Month&apos;s Utilities
+            </button>
+          </ReadOnlyGuard>
         </div>
       </div>
     );
@@ -682,9 +692,11 @@ export default function UtilitiesPage() {
               </div>
             </div>
           </div>
-          <button type="button" className="btn-primary" onClick={() => openMonthForm(selectedMonth)}>
-            {selectedRecord ? "Edit Month" : "Add Month"}
-          </button>
+          <ReadOnlyGuard>
+            <button type="button" className="btn-primary" onClick={() => openMonthForm(selectedMonth)}>
+              {selectedRecord ? "Edit Month" : "Add Month"}
+            </button>
+          </ReadOnlyGuard>
         </div>
       </div>
 
@@ -737,14 +749,16 @@ export default function UtilitiesPage() {
             <button type="button" className="btn-outline" onClick={() => setShowForm(false)}>
               Cancel
             </button>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={saveUtilityRecord}
-              disabled={saving || saveStatus === "success"}
-            >
-              {saveStatus === "success" ? "Saved" : saving ? "Saving…" : "Save Utilities"}
-            </button>
+            <ReadOnlyGuard>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={saveUtilityRecord}
+                disabled={saving || saveStatus === "success"}
+              >
+                {saveStatus === "success" ? "Saved" : saving ? "Saving…" : "Save Utilities"}
+              </button>
+            </ReadOnlyGuard>
           </div>
         </div>
       )}
@@ -972,8 +986,11 @@ export default function UtilitiesPage() {
                 return (
                   <tr
                     key={`${r.year}-${r.month}`}
-                    className="border-b border-[var(--border)] hover:bg-[var(--bg-card2)] cursor-pointer"
-                    onClick={() => openMonthForm(r.month)}
+                    className={clsx(
+                      "border-b border-[var(--border)] hover:bg-[var(--bg-card2)]",
+                      canWrite ? "cursor-pointer" : "cursor-default"
+                    )}
+                    onClick={() => canWrite && openMonthForm(r.month)}
                   >
                     <td className="py-2.5 pr-3 text-adaptive-secondary">
                       {MONTH_NAMES[r.month - 1]} {r.year}

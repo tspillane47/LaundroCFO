@@ -21,6 +21,7 @@ type RuleApplyPromptProps = {
   onSkipApply: () => void;
   onPostAll: () => void;
   onReviewFirst: () => void;
+  writeBlocked?: boolean;
 };
 
 export function RuleApplyPrompt({
@@ -33,6 +34,7 @@ export function RuleApplyPrompt({
   onSkipApply,
   onPostAll,
   onReviewFirst,
+  writeBlocked = false,
 }: RuleApplyPromptProps) {
   if (!applyPrompt && !applyResult && !postPrompt) return null;
 
@@ -51,7 +53,7 @@ export function RuleApplyPrompt({
             <button
               type="button"
               className="btn-primary text-[11px]"
-              disabled={applying}
+              disabled={applying || writeBlocked}
               onClick={onApplyAll}
             >
               {applying ? "Applying…" : "Apply to All"}
@@ -93,7 +95,7 @@ export function RuleApplyPrompt({
             <button
               type="button"
               className="btn-primary text-[11px]"
-              disabled={posting}
+              disabled={posting || writeBlocked}
               onClick={onPostAll}
             >
               {posting ? "Posting…" : "Post All Now"}

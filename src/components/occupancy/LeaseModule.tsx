@@ -20,6 +20,8 @@ import {
 } from "./shared";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useAlertEvaluation } from "@/components/alerts/AlertNotificationProvider";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 
 type Lease = {
   id: string;
@@ -213,6 +215,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
   const supabase = createClient();
   const toast = useToast();
   const { evaluateAlerts } = useAlertEvaluation();
+  const { canWrite, blockedReason } = useWriteGuard();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -322,6 +325,10 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
   }, [lease, options, store]);
 
   function enterEditMode() {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     if (lease) {
       setLeaseForm(leaseToForm(lease));
       setOptionForms(options.length > 0 ? options.map(optionToForm) : [emptyOptionForm(0)]);
@@ -353,6 +360,10 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
   }
 
   async function handleSave() {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     if (saving || saveStatus === "success") return;
     setSaving(true);
     setSaveStatus("idle");
@@ -489,17 +500,21 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             <p className="text-[var(--text-muted)] text-[13px] mt-0.5">Third-party leased location</p>
           </div>
           {mode === "view" ? (
-            <button type="button" onClick={enterEditMode} className="btn-primary">
-              {lease ? "Edit Lease" : "Add Lease"}
-            </button>
+            <ReadOnlyGuard>
+              <button type="button" onClick={enterEditMode} className="btn-primary">
+                {lease ? "Edit Lease" : "Add Lease"}
+              </button>
+            </ReadOnlyGuard>
           ) : (
             <div className="flex gap-2">
               <button type="button" onClick={cancelEdit} className="btn-outline" disabled={saving}>
                 Cancel
               </button>
-              <button type="button" onClick={handleSave} className="btn-primary" disabled={saving || saveStatus === "success"}>
-                {saveStatus === "success" ? "Saved ✓" : saving ? "Saving..." : "Save Changes"}
-              </button>
+              <ReadOnlyGuard>
+                <button type="button" onClick={handleSave} className="btn-primary" disabled={saving || saveStatus === "success"}>
+                  {saveStatus === "success" ? "Saved ✓" : saving ? "Saving..." : "Save Changes"}
+                </button>
+              </ReadOnlyGuard>
             </div>
           )}
         </div>
@@ -509,9 +524,11 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
           <button type="button" onClick={cancelEdit} className="btn-outline" disabled={saving}>
             Cancel
           </button>
-          <button type="button" onClick={handleSave} className="btn-primary" disabled={saving || saveStatus === "success"}>
-            {saveStatus === "success" ? "Saved ✓" : saving ? "Saving..." : "Save Changes"}
-          </button>
+          <ReadOnlyGuard>
+            <button type="button" onClick={handleSave} className="btn-primary" disabled={saving || saveStatus === "success"}>
+              {saveStatus === "success" ? "Saved ✓" : saving ? "Saving..." : "Save Changes"}
+            </button>
+          </ReadOnlyGuard>
         </div>
       )}
 
@@ -530,9 +547,11 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
           <p className="text-[var(--text-muted)] text-[13px] mt-2 mb-4">
             Add your lease terms to calculate risk score and track renewal options.
           </p>
-          <button type="button" onClick={enterEditMode} className="btn-primary">
-            Add Lease
-          </button>
+          <ReadOnlyGuard align="stretch">
+            <button type="button" onClick={enterEditMode} className="btn-primary">
+              Add Lease
+            </button>
+          </ReadOnlyGuard>
         </div>
       ) : mode === "view" && lease ? (
         <>

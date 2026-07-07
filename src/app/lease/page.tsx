@@ -12,6 +12,8 @@ import { FormBanner } from "@/components/ui/FormBanner";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 
 type Store = {
   id: string;
@@ -30,6 +32,7 @@ export default function OccupancyPage() {
   const router = useRouter();
   const supabase = createClient();
   const { selectedStore } = useStores();
+  const { canWrite, blockedReason } = useWriteGuard();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -85,6 +88,10 @@ export default function OccupancyPage() {
 
   async function handleSelectOccupancy(type: OccupancyType) {
     if (!store || savingType) return;
+    if (!canWrite) {
+      setMessage({ type: "error", text: blockedReason ?? "Subscribe to make changes." });
+      return;
+    }
     setSavingType(true);
     setMessage(null);
 
@@ -112,6 +119,7 @@ export default function OccupancyPage() {
   }
 
   function triggerLeaseEdit() {
+    if (!canWrite) return;
     setEditTrigger((t) => t + 1);
   }
 
@@ -157,9 +165,11 @@ export default function OccupancyPage() {
               {store.address ?? "Store address not set"}
             </p>
           </div>
-          <button type="button" onClick={triggerLeaseEdit} className="btn-primary w-full sm:w-auto">
-            Set Up Your Lease →
-          </button>
+          <ReadOnlyGuard align="stretch">
+            <button type="button" onClick={triggerLeaseEdit} className="btn-primary w-full sm:w-auto">
+              Set Up Your Lease →
+            </button>
+          </ReadOnlyGuard>
         </div>
         <FormBanner message={message} />
         <EmptyState
@@ -195,14 +205,18 @@ export default function OccupancyPage() {
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           {isLeased && (
-            <button type="button" onClick={triggerLeaseEdit} className="btn-primary w-full sm:w-auto">
-              {hasLease ? "Edit Lease" : "Set Up Your Lease →"}
-            </button>
+            <ReadOnlyGuard align="stretch">
+              <button type="button" onClick={triggerLeaseEdit} className="btn-primary w-full sm:w-auto">
+                {hasLease ? "Edit Lease" : "Set Up Your Lease →"}
+              </button>
+            </ReadOnlyGuard>
           )}
           {store.occupancy_type && !showSelector && (
-            <button type="button" onClick={handleChangeOccupancyType} className="btn-outline w-full sm:w-auto">
-              Change Occupancy Type
-            </button>
+            <ReadOnlyGuard align="stretch">
+              <button type="button" onClick={handleChangeOccupancyType} className="btn-outline w-full sm:w-auto">
+                Change Occupancy Type
+              </button>
+            </ReadOnlyGuard>
           )}
         </div>
       </div>
@@ -210,7 +224,7 @@ export default function OccupancyPage() {
       <FormBanner message={message} />
 
       {showSelector ? (
-        <OccupancySelector saving={savingType} onSelect={handleSelectOccupancy} />
+        <OccupancySelector saving={savingType} onSelect={handleSelectOccupancy} writeBlocked={!canWrite} />
       ) : store.occupancy_type === "leased" ? (
         <LeaseModule
           store={store}
