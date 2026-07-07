@@ -36,6 +36,8 @@ import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import { PageError } from "@/components/ui/PageError";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 import {
   type BankTransaction,
   type CalculatedMonthly,
@@ -277,6 +279,7 @@ export default function FinancialsPage() {
   const supabase = createClient();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
   const { evaluateAlerts } = useAlertEvaluation();
+  const { canWrite, blockedReason } = useWriteGuard();
 
   const [activeTab, setActiveTab] = useState<TabId>("pl");
   const [loading, setLoading] = useState(true);
@@ -513,6 +516,10 @@ export default function FinancialsPage() {
   );
 
   function openMonthForm(month: number) {
+    if (!canWrite) {
+      setError(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     setSelectedMonth(month);
     const existing = records.find((r) => r.year === selectedYear && r.month === month);
     setForm(existing ? recordToForm(existing) : { ...emptyMonthlyForm(store), year: selectedYear, month });
@@ -529,6 +536,10 @@ export default function FinancialsPage() {
   }
 
   async function saveMonthlyRecord() {
+    if (!canWrite) {
+      setError(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     if (!store?.id || !userId || saving || saveStatus === "success") return;
     setSaving(true);
     setSaveStatus("idle");
@@ -913,9 +924,11 @@ export default function FinancialsPage() {
                   </div>
                 </div>
               </div>
-              <button type="button" className="btn-primary" onClick={() => openMonthForm(selectedMonth)}>
-                {selectedRecord ? "Edit Month" : "Add Month"}
-              </button>
+              <ReadOnlyGuard>
+                <button type="button" className="btn-primary" onClick={() => openMonthForm(selectedMonth)}>
+                  {selectedRecord ? "Edit Month" : "Add Month"}
+                </button>
+              </ReadOnlyGuard>
             </div>
           </div>
 
@@ -938,6 +951,8 @@ export default function FinancialsPage() {
                       onKeyDown={preventEnterSubmit}
                       className={INPUT_CLASS}
                       placeholder="0"
+                      readOnly={!canWrite}
+                      disabled={!canWrite}
                     />
                   </div>
                 ))}
@@ -968,9 +983,16 @@ export default function FinancialsPage() {
                 <button type="button" className="btn-outline" onClick={() => setShowForm(false)}>
                   Cancel
                 </button>
-                <button type="button" className="btn-primary" onClick={saveMonthlyRecord} disabled={saving || saveStatus === "success"}>
-                  {saveStatus === "success" ? "Saved" : saving ? "Saving…" : "Save to monthly_financials"}
-                </button>
+                <ReadOnlyGuard>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={saveMonthlyRecord}
+                    disabled={saving || saveStatus === "success"}
+                  >
+                    {saveStatus === "success" ? "Saved" : saving ? "Saving…" : "Save to monthly_financials"}
+                  </button>
+                </ReadOnlyGuard>
               </div>
             </div>
           )}

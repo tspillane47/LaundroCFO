@@ -32,6 +32,8 @@ import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { useToast } from "@/components/ui/ToastProvider";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 
 type Store = {
   id: string;
@@ -90,6 +92,7 @@ export default function EquipmentPage() {
   const supabase = createClient();
   const { selectedStore } = useStores();
   const toast = useToast();
+  const { canWrite, blockedReason } = useWriteGuard();
   const currentYear = new Date().getFullYear();
 
   const [loading, setLoading] = useState(true);
@@ -188,6 +191,10 @@ export default function EquipmentPage() {
   }
 
   function openAddForm() {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     setEditingId(null);
     setForm(EMPTY_FORM);
     setSaveStatus("idle");
@@ -195,6 +202,10 @@ export default function EquipmentPage() {
   }
 
   function openEditForm(item: EquipmentRecord) {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     setEditingId(item.id);
     setForm({
       machine_type: item.machine_type,
@@ -217,6 +228,10 @@ export default function EquipmentPage() {
   }
 
   async function handleSave() {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     if (!store || !userId || saving || saveStatus === "success") return;
 
     const quantity = parseInt(form.quantity, 10);
@@ -278,6 +293,10 @@ export default function EquipmentPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     if (!confirm("Delete this machine group? This cannot be undone.")) return;
 
     const { error: deleteError } = await supabase.from("equipment_inventory").delete().eq("id", id);
@@ -328,9 +347,11 @@ export default function EquipmentPage() {
               Fleet tracking, age analysis, and valuation impact for {store?.name ?? "your store"}
             </p>
           </div>
-          <button type="button" onClick={openAddForm} className="btn-primary text-[13px] py-2 px-4 flex-shrink-0">
-            + Add Machine Group
-          </button>
+          <ReadOnlyGuard>
+            <button type="button" onClick={openAddForm} className="btn-primary text-[13px] py-2 px-4 flex-shrink-0">
+              + Add Machine Group
+            </button>
+          </ReadOnlyGuard>
         </div>
         <EmptyState
           icon="WashingMachine"
@@ -352,9 +373,11 @@ export default function EquipmentPage() {
             Fleet tracking, age analysis, and valuation impact for {store?.name ?? "your store"}
           </p>
         </div>
-        <button type="button" onClick={openAddForm} className="btn-primary text-[13px] py-2 px-4 flex-shrink-0">
-          + Add Machine Group
-        </button>
+        <ReadOnlyGuard>
+          <button type="button" onClick={openAddForm} className="btn-primary text-[13px] py-2 px-4 flex-shrink-0">
+            + Add Machine Group
+          </button>
+        </ReadOnlyGuard>
       </div>
 
       {/* Section 1 — Summary cards */}
@@ -445,9 +468,11 @@ export default function EquipmentPage() {
           <div className="card">
             <div className="flex items-center justify-between mb-4">
               <div className="section-title mb-0">Equipment Inventory</div>
-              <button type="button" onClick={openAddForm} className="btn-primary text-[12px] py-1.5 px-3">
-                Add Machine Group
-              </button>
+              <ReadOnlyGuard align="stretch">
+                <button type="button" onClick={openAddForm} className="btn-primary text-[12px] py-1.5 px-3">
+                  Add Machine Group
+                </button>
+              </ReadOnlyGuard>
             </div>
 
             {equipment.length === 0 && !showForm ? null : (
@@ -487,20 +512,24 @@ export default function EquipmentPage() {
                           <td className="py-2.5 text-[var(--text-secondary)]">{item.condition}</td>
                           <td className="py-2.5 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openEditForm(item)}
-                                className="btn-outline text-[11px] py-1 px-2"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDelete(item.id)}
-                                className="btn-outline text-[11px] py-1 px-2 text-red-400 border-red-500/20 hover:bg-red-500/10"
-                              >
-                                Delete
-                              </button>
+                              <ReadOnlyGuard>
+                                <button
+                                  type="button"
+                                  onClick={() => openEditForm(item)}
+                                  className="btn-outline text-[11px] py-1 px-2"
+                                >
+                                  Edit
+                                </button>
+                              </ReadOnlyGuard>
+                              <ReadOnlyGuard>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(item.id)}
+                                  className="btn-outline text-[11px] py-1 px-2 text-red-400 border-red-500/20 hover:bg-red-500/10"
+                                >
+                                  Delete
+                                </button>
+                              </ReadOnlyGuard>
                             </div>
                           </td>
                         </tr>
@@ -610,20 +639,22 @@ export default function EquipmentPage() {
                 </div>
 
                 <div className="flex items-center gap-3 mt-4">
-                  <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={saving || saveStatus === "success"}
-                    className="btn-primary py-2 px-5 text-[13px]"
-                  >
-                    {saveStatus === "success"
-                      ? "Saved"
-                      : saving
-                        ? "Saving..."
-                        : editingId
-                          ? "Update Machine Group"
-                          : "Save Machine Group"}
-                  </button>
+                  <ReadOnlyGuard>
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      disabled={saving || saveStatus === "success"}
+                      className="btn-primary py-2 px-5 text-[13px]"
+                    >
+                      {saveStatus === "success"
+                        ? "Saved"
+                        : saving
+                          ? "Saving..."
+                          : editingId
+                            ? "Update Machine Group"
+                            : "Save Machine Group"}
+                    </button>
+                  </ReadOnlyGuard>
                   <button type="button" onClick={closeForm} className="btn-outline py-2 px-5 text-[13px]">
                     Cancel
                   </button>

@@ -35,6 +35,8 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 import {
   INPUT_CLASS,
   formatDate,
@@ -285,6 +287,7 @@ export default function DebtPage() {
   const { selectedStore, isAllStores, stores } = useStores();
   const toast = useToast();
   const { evaluateAlerts } = useAlertEvaluation();
+  const { canWrite, blockedReason } = useWriteGuard();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -449,6 +452,10 @@ export default function DebtPage() {
   }, [largestLoan]);
 
   function openAddLoan() {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     setEditingId(null);
     setForm(emptyLoanForm());
     setSaveStatus("idle");
@@ -456,6 +463,10 @@ export default function DebtPage() {
   }
 
   function openEditLoan(loan: StoreLoan) {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     setEditingId(loan.id);
     setForm(loanToForm(loan));
     setSaveStatus("idle");
@@ -470,6 +481,10 @@ export default function DebtPage() {
   }
 
   async function handleSave() {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     if (!selectedStore || !userId || saving || saveStatus === "success") return;
 
     if (!form.lender_name.trim()) {
@@ -545,6 +560,10 @@ export default function DebtPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     if (deletingId) return;
     setDeletingId(id);
 
@@ -620,9 +639,11 @@ export default function DebtPage() {
               Track loans, monitor payoff progress, and calculate store equity
             </p>
           </div>
-          <button type="button" onClick={openAddLoan} className="btn-primary text-[13px]">
-            + Add Loan
-          </button>
+          <ReadOnlyGuard>
+            <button type="button" onClick={openAddLoan} className="btn-primary text-[13px]">
+              + Add Loan
+            </button>
+          </ReadOnlyGuard>
         </div>
         <EmptyState
           icon="Landmark"
@@ -758,9 +779,11 @@ export default function DebtPage() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="section-title mb-0">Active Loans</h2>
-          <button type="button" onClick={openAddLoan} className="btn-primary text-[12px] px-3 py-1.5">
-            + Add Loan
-          </button>
+          <ReadOnlyGuard>
+            <button type="button" onClick={openAddLoan} className="btn-primary text-[12px] px-3 py-1.5">
+              + Add Loan
+            </button>
+          </ReadOnlyGuard>
         </div>
 
         {enrichedLoans.length === 0 ? (
@@ -768,9 +791,11 @@ export default function DebtPage() {
             <p className="text-[14px] mb-4" style={{ color: "var(--text-muted)" }}>
               No loans added yet
             </p>
-            <button type="button" onClick={openAddLoan} className="btn-primary text-[13px]">
-              + Add Loan
-            </button>
+            <ReadOnlyGuard align="stretch">
+              <button type="button" onClick={openAddLoan} className="btn-primary text-[13px]">
+                + Add Loan
+              </button>
+            </ReadOnlyGuard>
           </div>
         ) : (
           <div className="space-y-4">
@@ -790,21 +815,25 @@ export default function DebtPage() {
                     </div>
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => openEditLoan(loan)}
-                      className="btn-outline text-[11px] px-2.5 py-1"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(loan.id)}
-                      disabled={deletingId === loan.id}
-                      className="btn-outline text-[11px] px-2.5 py-1 text-red-400 border-red-500/20 disabled:opacity-40"
-                    >
-                      {deletingId === loan.id ? "Deleting..." : "Delete"}
-                    </button>
+                    <ReadOnlyGuard>
+                      <button
+                        type="button"
+                        onClick={() => openEditLoan(loan)}
+                        className="btn-outline text-[11px] px-2.5 py-1"
+                      >
+                        Edit
+                      </button>
+                    </ReadOnlyGuard>
+                    <ReadOnlyGuard>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(loan.id)}
+                        disabled={deletingId === loan.id}
+                        className="btn-outline text-[11px] px-2.5 py-1 text-red-400 border-red-500/20 disabled:opacity-40"
+                      >
+                        {deletingId === loan.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </ReadOnlyGuard>
                   </div>
                 </div>
 
@@ -1192,14 +1221,16 @@ export default function DebtPage() {
           </FormField>
 
           <div className="flex gap-3 mt-6">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || saveStatus === "success"}
-              className="btn-primary disabled:opacity-40"
-            >
-              {saving ? "Saving..." : saveStatus === "success" ? "Saved!" : "Save Loan"}
-            </button>
+            <ReadOnlyGuard>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving || saveStatus === "success"}
+                className="btn-primary disabled:opacity-40"
+              >
+                {saving ? "Saving..." : saveStatus === "success" ? "Saved!" : "Save Loan"}
+              </button>
+            </ReadOnlyGuard>
             <button type="button" onClick={closeForm} className="btn-outline">
               Cancel
             </button>
