@@ -129,6 +129,10 @@ export default function AccountPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
 
+  const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [portalError, setPortalError] = useState("");
+
   const loadAccount = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -174,6 +178,14 @@ export default function AccountPage() {
       monthly_report: boolOrDefault(row?.monthly_report ?? null, true),
       rent_escalation_alerts: boolOrDefault(row?.rent_escalation_alerts ?? null, true),
     });
+
+    const { data: subscription } = await supabase
+      .from("subscriptions")
+      .select("stripe_customer_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    setStripeCustomerId(subscription?.stripe_customer_id ?? null);
 
     setLoading(false);
   }, [router, supabase]);
@@ -254,6 +266,30 @@ export default function AccountPage() {
 
   function handleExportData() {
     toast.info("Data export requested — you will receive an email within 24 hours");
+  }
+
+  async function handleManageBilling() {
+    setPortalError("");
+    setPortalLoading(true);
+
+    try {
+      const response = await fetch("/api/stripe/create-portal-session", {
+        method: "POST",
+      });
+
+      const data = (await response.json()) as { url?: string; error?: string };
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error ?? "Could not open billing portal");
+      }
+
+      window.location.href = data.url;
+    } catch (error) {
+      setPortalError(
+        error instanceof Error ? error.message : "Could not open billing portal"
+      );
+      setPortalLoading(false);
+    }
   }
 
   async function handleDeleteAccountConfirm() {
@@ -479,9 +515,37 @@ export default function AccountPage() {
               </ul>
             </div>
 
-            <Link href="/pricing" className="btn-outline inline-flex">
-              {readOnlyCopy ? readOnlyCopy.action : "Manage Plan"}
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link href="/pricing" className="btn-outline inline-flex">
+                {readOnlyCopy ? readOnlyCopy.action : "Manage Plan"}
+              </Link>
+              {stripeCustomerId ? (
+                <button
+                  type="button"
+                  onClick={() => void handleManageBilling()}
+                  disabled={portalLoading}
+                  className="btn-primary inline-flex disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {portalLoading ? "Redirecting…" : "Manage Billing"}
+                </button>
+              ) : (
+                <p className="text-[12px] self-center" style={{ color: "var(--text-muted)" }}>
+                  <Link
+                    href="/pricing"
+                    className="underline underline-offset-2 hover:opacity-80"
+                  >
+                    Subscribe first
+                  </Link>{" "}
+                  to manage billing
+                </p>
+              )}
+            </div>
+
+            {portalError && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[12px] text-red-400">
+                {portalError}
+              </div>
+            )}
 
             <div className="divide-y" style={{ borderColor: "var(--border)" }}>
               <div className="flex justify-between py-2.5 text-[13px] gap-4">
