@@ -4,13 +4,16 @@ import { createClient } from "@/lib/supabase";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormBanner } from "@/components/ui/FormBanner";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { preventEnterSubmit, INPUT_CLASS } from "@/components/occupancy/shared";
 import { toNullableNum } from "@/lib/formHelpers";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 
 function EditStoreForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const { canWrite, blockedReason } = useWriteGuard();
   const [storeId, setStoreId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
@@ -86,6 +89,10 @@ function EditStoreForm() {
 
   async function handleSubmit() {
     if (!storeId || saving || saveStatus === "success") return;
+    if (!canWrite) {
+      setMessage({ type: "error", text: blockedReason ?? "Subscribe to make changes." });
+      return;
+    }
     setSaving(true);
     setSaveStatus("idle");
     setMessage(null);
@@ -285,14 +292,16 @@ function EditStoreForm() {
             />
           </div>
         </div>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={saving || saveStatus === "success"}
-          className="btn-primary w-full py-2.5 text-[13px] disabled:opacity-40"
-        >
-          {saveStatus === "success" ? "Saved" : saving ? "Saving..." : "Save Changes"}
-        </button>
+        <ReadOnlyGuard align="stretch">
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={saving || saveStatus === "success"}
+            className="btn-primary w-full py-2.5 text-[13px] disabled:opacity-40"
+          >
+            {saveStatus === "success" ? "Saved" : saving ? "Saving..." : "Save Changes"}
+          </button>
+        </ReadOnlyGuard>
       </div>
     </div>
   );

@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import clsx from "clsx";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { storeLimitUpgradeMessage } from "@/lib/access";
 import { useAccessStatus } from "@/lib/useAccessStatus";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 
 type AddStoreLinkProps = {
   className?: string;
@@ -18,9 +20,22 @@ export function AddStoreLink({
   firstStore = false,
 }: AddStoreLinkProps) {
   const { plan, maxStores, storeCount, loading } = useAccessStatus();
+  const { canWrite } = useWriteGuard();
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
 
+  const href = firstStore ? "/onboarding" : "/onboarding?add=true";
   const atLimit = !loading && maxStores !== null && storeCount >= maxStores;
+
+  // Read-only first: expired trial / canceled subs can't save regardless of store count.
+  if (!canWrite) {
+    return (
+      <ReadOnlyGuard align="end">
+        <Link href={href} className={className}>
+          {children}
+        </Link>
+      </ReadOnlyGuard>
+    );
+  }
 
   if (atLimit) {
     return (
@@ -45,7 +60,7 @@ export function AddStoreLink({
   }
 
   return (
-    <Link href={firstStore ? "/onboarding" : "/onboarding?add=true"} className={className}>
+    <Link href={href} className={className}>
       {children}
     </Link>
   );

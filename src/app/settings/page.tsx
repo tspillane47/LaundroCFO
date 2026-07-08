@@ -8,9 +8,11 @@ import { useStores } from "@/lib/store-context";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 import { useToast } from "@/components/ui/ToastProvider";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { formatAccessStatusLabel, planDisplayName } from "@/lib/access";
 import { useAccessStatus } from "@/lib/useAccessStatus";
 import { useBetaMode } from "@/lib/useBetaMode";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 
 const inputClass = INPUT_CLASS;
 
@@ -84,6 +86,7 @@ export default function SettingsPage() {
   const toast = useToast();
   const { betaMode, loading: betaLoading } = useBetaMode();
   const { plan, reason, trialEndsAt, loading: accessLoading } = useAccessStatus();
+  const { canWrite, blockedReason } = useWriteGuard();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -203,6 +206,10 @@ export default function SettingsPage() {
 
   async function handleSaveStore() {
     if (!selectedStore?.id) return;
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     setSaving(true);
     setError("");
 
@@ -239,6 +246,10 @@ export default function SettingsPage() {
 
   async function handleSaveCash() {
     if (!selectedStore?.id) return;
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     setSavingCash(true);
     setError("");
 
@@ -400,9 +411,11 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={handleSaveStore} disabled={saving} className="btn-primary flex-1">
-                    {saving ? "Saving..." : "Save Changes"}
-                  </button>
+                  <ReadOnlyGuard align="stretch">
+                    <button type="button" onClick={handleSaveStore} disabled={saving} className="btn-primary flex-1">
+                      {saving ? "Saving..." : "Save Changes"}
+                    </button>
+                  </ReadOnlyGuard>
                   <button type="button" onClick={() => setEditingStore(false)} className="btn-outline flex-1">Cancel</button>
                 </div>
               </div>
@@ -432,9 +445,11 @@ export default function SettingsPage() {
                     </div>
                   ))}
                 </div>
-                <button type="button" onClick={() => setEditingStore(true)} className="btn-outline w-full mt-4">
-                  Edit Store Profile
-                </button>
+                <ReadOnlyGuard align="stretch">
+                  <button type="button" onClick={() => setEditingStore(true)} className="btn-outline w-full mt-4">
+                    Edit Store Profile
+                  </button>
+                </ReadOnlyGuard>
                 <Link
                   href="/settings/manage-stores"
                   className="btn-primary w-full mt-3 text-center block text-[13px] py-2.5"
@@ -488,9 +503,11 @@ export default function SettingsPage() {
                   Connect QuickBooks or Plaid to sync automatically (coming soon)
                 </p>
                 <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={handleSaveCash} disabled={savingCash} className="btn-primary flex-1">
-                    {savingCash ? "Saving..." : "Save Cash Balances"}
-                  </button>
+                  <ReadOnlyGuard align="stretch">
+                    <button type="button" onClick={handleSaveCash} disabled={savingCash} className="btn-primary flex-1">
+                      {savingCash ? "Saving..." : "Save Cash Balances"}
+                    </button>
+                  </ReadOnlyGuard>
                   <button type="button" onClick={() => setEditingCash(false)} className="btn-outline flex-1">
                     Cancel
                   </button>
@@ -536,9 +553,11 @@ export default function SettingsPage() {
                 <p className="text-[11px] mt-3" style={{ color: "var(--text-muted)" }}>
                   Connect QuickBooks or Plaid to sync automatically (coming soon)
                 </p>
-                <button type="button" onClick={() => setEditingCash(true)} className="btn-outline w-full mt-4">
-                  Update Cash Balances
-                </button>
+                <ReadOnlyGuard align="stretch">
+                  <button type="button" onClick={() => setEditingCash(true)} className="btn-outline w-full mt-4">
+                    Update Cash Balances
+                  </button>
+                </ReadOnlyGuard>
               </>
             )}
           </div>
@@ -675,13 +694,15 @@ export default function SettingsPage() {
               ))}
             </div>
             <div className="flex gap-2 mt-4">
-              <button
-                type="button"
-                onClick={() => setEditingStore(true)}
-                className="btn-outline flex-1"
-              >
-                Edit Store Profile
-              </button>
+              <ReadOnlyGuard align="stretch">
+                <button
+                  type="button"
+                  onClick={() => setEditingStore(true)}
+                  className="btn-outline flex-1"
+                >
+                  Edit Store Profile
+                </button>
+              </ReadOnlyGuard>
               <button type="button" onClick={handleSignOut} className="btn-outline flex-1 text-red-400 border-red-500/20">
                 Sign Out
               </button>

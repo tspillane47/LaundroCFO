@@ -8,6 +8,8 @@ import { useStores } from "@/lib/store-context";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { AddStoreLink } from "@/components/ui/AddStoreLink";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 
 type StoreRow = {
   id: string;
@@ -37,6 +39,7 @@ export default function ManageStoresPage() {
   const router = useRouter();
   const supabase = createClient();
   const { selectedStore, setSelectedStore, setIsAllStores, refreshStores } = useStores();
+  const { canWrite, blockedReason } = useWriteGuard();
 
   const [stores, setStores] = useState<StoreRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +83,10 @@ export default function ManageStoresPage() {
   }, [message]);
 
   async function handleToggleArchive(store: StoreRow) {
+    if (!canWrite) {
+      setMessage({ type: "error", text: blockedReason ?? "Subscribe to make changes." });
+      return;
+    }
     setTogglingId(store.id);
     setMessage(null);
 
@@ -103,6 +110,10 @@ export default function ManageStoresPage() {
 
   async function handleDeleteConfirm() {
     if (!deleteTarget || deleting) return;
+    if (!canWrite) {
+      setMessage({ type: "error", text: blockedReason ?? "Subscribe to make changes." });
+      return;
+    }
     setDeleting(true);
     setMessage(null);
 
@@ -214,25 +225,29 @@ export default function ManageStoresPage() {
                     >
                       Edit
                     </Link>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleArchive(store)}
-                      disabled={togglingId === store.id}
-                      className="btn-outline text-[12px] px-3 py-1.5 disabled:opacity-40"
-                    >
-                      {togglingId === store.id
-                        ? "Updating..."
-                        : isArchived
-                          ? "Unarchive"
-                          : "Archive"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(store)}
-                      className="btn-outline text-[12px] px-3 py-1.5 text-red-400 border-red-500/20"
-                    >
-                      Delete
-                    </button>
+                    <ReadOnlyGuard>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleArchive(store)}
+                        disabled={togglingId === store.id}
+                        className="btn-outline text-[12px] px-3 py-1.5 disabled:opacity-40"
+                      >
+                        {togglingId === store.id
+                          ? "Updating..."
+                          : isArchived
+                            ? "Unarchive"
+                            : "Archive"}
+                      </button>
+                    </ReadOnlyGuard>
+                    <ReadOnlyGuard>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget(store)}
+                        className="btn-outline text-[12px] px-3 py-1.5 text-red-400 border-red-500/20"
+                      >
+                        Delete
+                      </button>
+                    </ReadOnlyGuard>
                   </div>
                 </div>
               </div>
@@ -267,15 +282,17 @@ export default function ManageStoresPage() {
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={handleDeleteConfirm}
-                disabled={deleting}
-                className="flex-1 rounded-lg px-4 py-2.5 text-[13px] font-medium text-white disabled:opacity-40"
-                style={{ background: "var(--text-danger)" }}
-              >
-                {deleting ? "Deleting..." : "Delete Store"}
-              </button>
+              <ReadOnlyGuard align="stretch">
+                <button
+                  type="button"
+                  onClick={handleDeleteConfirm}
+                  disabled={deleting}
+                  className="flex-1 rounded-lg px-4 py-2.5 text-[13px] font-medium text-white disabled:opacity-40"
+                  style={{ background: "var(--text-danger)" }}
+                >
+                  {deleting ? "Deleting..." : "Delete Store"}
+                </button>
+              </ReadOnlyGuard>
             </div>
           </div>
         </div>

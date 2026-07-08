@@ -30,8 +30,10 @@ import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { AddStoreLink } from "@/components/ui/AddStoreLink";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 
 type Store = {
   id: string;
@@ -102,6 +104,7 @@ export default function PortfolioPage() {
     setIsAllStores,
     refreshStores,
   } = useStores();
+  const { canWrite, blockedReason } = useWriteGuard();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [leases, setLeases] = useState<Lease[]>([]);
@@ -402,6 +405,10 @@ export default function PortfolioPage() {
 
   async function handleArchive(store: Store) {
     if (archivingId) return;
+    if (!canWrite) {
+      setMessage({ type: "error", text: blockedReason ?? "Subscribe to make changes." });
+      return;
+    }
     setArchivingId(store.id);
     setMessage(null);
 
@@ -425,6 +432,10 @@ export default function PortfolioPage() {
 
   async function handleDeleteConfirm() {
     if (!deleteTarget || deleting) return;
+    if (!canWrite) {
+      setMessage({ type: "error", text: blockedReason ?? "Subscribe to make changes." });
+      return;
+    }
     setDeleting(true);
     setMessage(null);
 
@@ -818,22 +829,26 @@ export default function PortfolioPage() {
                 >
                   Edit
                 </Link>
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(m.store)}
-                  className="btn-outline text-[12px] px-3 py-1.5 text-red-400 border-red-500/20"
-                >
-                  Delete
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleArchive(m.store)}
-                  disabled={archivingId === m.store.id}
-                  className="text-[12px] px-1 py-1 disabled:opacity-40"
-                  style={{ color: "var(--text-muted)", background: "none", border: "none" }}
-                >
-                  {archivingId === m.store.id ? "Archiving..." : "Archive"}
-                </button>
+                <ReadOnlyGuard>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(m.store)}
+                    className="btn-outline text-[12px] px-3 py-1.5 text-red-400 border-red-500/20"
+                  >
+                    Delete
+                  </button>
+                </ReadOnlyGuard>
+                <ReadOnlyGuard>
+                  <button
+                    type="button"
+                    onClick={() => handleArchive(m.store)}
+                    disabled={archivingId === m.store.id}
+                    className="text-[12px] px-1 py-1 disabled:opacity-40"
+                    style={{ color: "var(--text-muted)", background: "none", border: "none" }}
+                  >
+                    {archivingId === m.store.id ? "Archiving..." : "Archive"}
+                  </button>
+                </ReadOnlyGuard>
               </div>
             </div>
           ))}
@@ -869,15 +884,17 @@ export default function PortfolioPage() {
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={handleDeleteConfirm}
-                disabled={deleting}
-                className="flex-1 min-w-[120px] rounded-lg px-4 py-2.5 text-[13px] font-medium text-white disabled:opacity-40"
-                style={{ background: "var(--text-danger)" }}
-              >
-                {deleting ? "Deleting..." : "Delete Store"}
-              </button>
+              <ReadOnlyGuard align="stretch">
+                <button
+                  type="button"
+                  onClick={handleDeleteConfirm}
+                  disabled={deleting}
+                  className="flex-1 min-w-[120px] rounded-lg px-4 py-2.5 text-[13px] font-medium text-white disabled:opacity-40"
+                  style={{ background: "var(--text-danger)" }}
+                >
+                  {deleting ? "Deleting..." : "Delete Store"}
+                </button>
+              </ReadOnlyGuard>
             </div>
           </div>
         </div>

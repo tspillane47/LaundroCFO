@@ -29,7 +29,9 @@ import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
 import { DesktopOnlyGate } from "@/components/ui/DesktopOnlyGate";
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
+import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { useToast } from "@/components/ui/ToastProvider";
+import { useWriteGuard } from "@/lib/useWriteGuard";
 import {
   DashboardDial,
   zoneLetterGrade,
@@ -324,17 +326,19 @@ function NetworkBenchmarkingSection({
                 You are opted in — we will notify you when network benchmarking launches
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={onOptIn}
-                disabled={saving}
-                className={clsx(
-                  "inline-flex items-center justify-center px-4 py-2 rounded-lg text-[13px] font-semibold transition-colors btn-primary",
-                  saving && "opacity-60 cursor-not-allowed"
-                )}
-              >
-                {saving ? "Saving..." : "Opt In Early"}
-              </button>
+              <ReadOnlyGuard>
+                <button
+                  type="button"
+                  onClick={onOptIn}
+                  disabled={saving}
+                  className={clsx(
+                    "inline-flex items-center justify-center px-4 py-2 rounded-lg text-[13px] font-semibold transition-colors btn-primary",
+                    saving && "opacity-60 cursor-not-allowed"
+                  )}
+                >
+                  {saving ? "Saving..." : "Opt In Early"}
+                </button>
+              </ReadOnlyGuard>
             )}
           </div>
         )}
@@ -357,6 +361,7 @@ function BenchmarkingPageContent() {
   const supabase = createClient();
   const toast = useToast();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
+  const { canWrite, blockedReason } = useWriteGuard();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [store, setStore] = useState<StoreFinancialProfile | null>(null);
@@ -488,6 +493,10 @@ function BenchmarkingPageContent() {
 
   const handleNetworkOptIn = useCallback(async () => {
     if (!selectedStore?.id || networkOptedIn || networkOptInSaving) return;
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
 
     setNetworkOptInSaving(true);
     const optedInAt = new Date().toISOString();
@@ -512,7 +521,7 @@ function BenchmarkingPageContent() {
     }
 
     setNetworkOptInSaving(false);
-  }, [networkOptedIn, networkOptInSaving, selectedStore?.id, supabase, toast]);
+  }, [canWrite, blockedReason, networkOptedIn, networkOptInSaving, selectedStore?.id, supabase, toast]);
 
   useEffect(() => {
     if (storesLoading) return;
