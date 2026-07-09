@@ -1,5 +1,6 @@
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { TermsBackLink } from "@/components/ui/TermsBackLink";
+import Link from "next/link";
 
 const sections = [
   {
@@ -119,9 +120,12 @@ const sections = [
     title: "Privacy Policy",
     content: (
       <p>
-        Your use of LaundroCFO is also governed by our Privacy Policy, which describes how we collect,
-        use, and protect personal and business information. Contact us for privacy-related requests or
-        questions about data handling practices.
+        Your use of LaundroCFO is also governed by our{" "}
+        <Link href="/privacy" className="text-blue-400 hover:text-blue-300">
+          Privacy Policy
+        </Link>
+        , which describes how we collect, use, and protect personal and business information. Contact us
+        at support@laundrocfo.com for privacy-related requests or questions about data handling practices.
       </p>
     ),
   },

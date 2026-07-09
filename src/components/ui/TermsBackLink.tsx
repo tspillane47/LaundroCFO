@@ -15,7 +15,7 @@ export function TermsBackLink() {
   function handleBack() {
     const returnTo = sessionStorage.getItem(TERMS_RETURN_KEY);
     sessionStorage.removeItem(TERMS_RETURN_KEY);
-    if (returnTo && returnTo !== "/terms" && returnTo !== "/login") {
+    if (returnTo && returnTo !== "/terms" && returnTo !== "/privacy" && returnTo !== "/login") {
       router.push(returnTo);
       return;
     }

@@ -105,7 +105,7 @@ const pageTitles: Record<string, string> = {
 };
 
 const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password", "/auth/callback"];
-const publicPages = ["/terms"];
+const publicPages = ["/terms", "/privacy"];
 const marketingPages = ["/", "/about", "/pricing"];
 const onboardingExemptPaths = [
   ...publicPages,
@@ -741,14 +741,27 @@ function AppShell({ children }: { children: React.ReactNode }) {
           className="flex-shrink-0 px-6 py-2 border-t text-center"
           style={{ borderColor: "var(--border)", background: "var(--bg-card)" }}
         >
-          <Link
-            href="/terms"
-            onClick={() => setTermsReturnPath(pathname)}
-            className="text-[11px] hover:underline underline-offset-2"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Disclaimer
-          </Link>
+          <div className="flex items-center justify-center gap-3">
+            <Link
+              href="/terms"
+              onClick={() => setTermsReturnPath(pathname)}
+              className="text-[11px] hover:underline underline-offset-2"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Terms
+            </Link>
+            <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+              ·
+            </span>
+            <Link
+              href="/privacy"
+              onClick={() => setTermsReturnPath(pathname)}
+              className="text-[11px] hover:underline underline-offset-2"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Privacy
+            </Link>
+          </div>
         </footer>
       </div>
 

@@ -13,6 +13,7 @@ const PUBLIC_ROUTES = [
   '/reset-password',
   '/auth/callback',
   '/terms',
+  '/privacy',
 ]
 
 const PROTECTED_PREFIXES = [

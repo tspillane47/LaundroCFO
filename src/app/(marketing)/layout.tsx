@@ -17,6 +17,8 @@ const footerLinks = [
   { href: "/about", label: "About" },
   { href: "/login", label: "Login" },
   { href: "/signup", label: "Sign Up" },
+  { href: "/terms", label: "Terms" },
+  { href: "/privacy", label: "Privacy" },
 ];
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
