@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import {
   Area,
@@ -88,6 +89,22 @@ type QBMappingRow = {
   id?: string;
   qb_account_name: string;
   laundrocfo_field: PlCategoryField;
+};
+
+type QBConnection = {
+  id: string;
+  realm_id: string;
+  connected_at: string;
+};
+
+const QB_ERROR_MESSAGES: Record<string, string> = {
+  missing_params: "QuickBooks did not return the expected authorization data.",
+  invalid_state: "QuickBooks authorization state was invalid. Please try again.",
+  csrf_mismatch: "QuickBooks authorization expired or was invalid. Please try again.",
+  unauthorized: "You must be signed in to connect QuickBooks.",
+  forbidden: "You do not have access to connect QuickBooks for this store.",
+  token_exchange_failed: "QuickBooks authorization succeeded but token exchange failed.",
+  access_denied: "QuickBooks connection was cancelled.",
 };
 
 const TABS: { id: TabId; label: string }[] = [
@@ -277,6 +294,8 @@ function normalizeTransactionAmount(amount: number, field: PlCategoryField): num
 
 export default function FinancialsPage() {
   const supabase = createClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
   const { evaluateAlerts } = useAlertEvaluation();
   const { canWrite, blockedReason } = useWriteGuard();
@@ -295,6 +314,8 @@ export default function FinancialsPage() {
   const [bankTransactions, setBankTransactions] = useState<BankTransaction[]>([]);
   const [stagedTransactions, setStagedTransactions] = useState<StagedTransaction[]>([]);
   const [qbMappings, setQbMappings] = useState<QBMappingRow[]>(DEFAULT_QB_MAPPINGS);
+  const [qbConnection, setQbConnection] = useState<QBConnection | null>(null);
+  const [disconnectingQb, setDisconnectingQb] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [showForm, setShowForm] = useState(false);
@@ -333,6 +354,7 @@ export default function FinancialsPage() {
       { data: financialsData, error: financialsError },
       { data: bankData, error: bankError },
       { data: mappingData, error: mappingError },
+      { data: connectionData, error: connectionError },
       { data: utilitiesData, error: utilitiesError },
       annualDebtByStore,
     ] = await Promise.all([
@@ -351,13 +373,18 @@ export default function FinancialsPage() {
         .order("transaction_date", { ascending: false }),
       supabase.from("quickbooks_mapping").select("*").eq("store_id", selectedStore.id),
       supabase
+        .from("quickbooks_connections")
+        .select("id, realm_id, connected_at")
+        .eq("store_id", selectedStore.id)
+        .maybeSingle(),
+      supabase
         .from("monthly_utilities")
         .select("year, month, water, gas, electric, sewer, trash, internet")
         .eq("store_id", selectedStore.id),
       fetchAnnualDebtServiceByStore(supabase, [selectedStore.id]),
     ]);
 
-    const errors = [storeError, financialsError, bankError, mappingError, utilitiesError]
+    const errors = [storeError, financialsError, bankError, mappingError, connectionError, utilitiesError]
       .filter(Boolean)
       .map((e) => e!.message);
     if (errors.length > 0) setError(errors.join(" · "));
@@ -384,6 +411,8 @@ export default function FinancialsPage() {
       setQbMappings(DEFAULT_QB_MAPPINGS);
     }
 
+    setQbConnection((connectionData as QBConnection | null) ?? null);
+
     if (sorted.length > 0) {
       setSelectedYear(sorted[0].year);
       setSelectedMonth(sorted[0].month);
@@ -400,6 +429,30 @@ export default function FinancialsPage() {
     if (storesLoading) return;
     loadData();
   }, [storesLoading, loadData]);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    const qbStatus = searchParams.get("qb");
+    const reason = searchParams.get("reason");
+
+    if (tab === "quickbooks") {
+      setActiveTab("quickbooks");
+    }
+
+    if (qbStatus === "connected") {
+      setActiveTab("quickbooks");
+      setSuccess("QuickBooks connected successfully.");
+      setError("");
+    } else if (qbStatus === "error") {
+      setActiveTab("quickbooks");
+      setError(QB_ERROR_MESSAGES[reason ?? ""] ?? "QuickBooks connection failed. Please try again.");
+      setSuccess("");
+    }
+
+    if (tab || qbStatus) {
+      router.replace("/financials");
+    }
+  }, [searchParams, router]);
 
   useEffect(() => {
     if (!selectedStore?.id || loading) return;
@@ -739,6 +792,35 @@ export default function FinancialsPage() {
     setSuccess("QuickBooks account mappings saved.");
     setSaving(false);
     await loadData();
+  }
+
+  async function disconnectQuickBooks() {
+    if (!store?.id) return;
+    setDisconnectingQb(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch("/api/quickbooks/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId: store.id }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error ?? "Failed to disconnect QuickBooks");
+      }
+
+      setQbConnection(null);
+      setSuccess("QuickBooks disconnected.");
+    } catch (disconnectError) {
+      setError(
+        disconnectError instanceof Error ? disconnectError.message : "Failed to disconnect QuickBooks"
+      );
+    } finally {
+      setDisconnectingQb(false);
+    }
   }
 
   if (loadError) {
@@ -1576,15 +1658,39 @@ export default function FinancialsPage() {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-0.5">
                 <div className="text-[14px] font-semibold text-slate-100">QuickBooks Online</div>
-                <span className="badge badge-amber text-[10px]">Not Connected</span>
+                {qbConnection ? (
+                  <span className="badge badge-green text-[10px]">Connected</span>
+                ) : (
+                  <span className="badge badge-amber text-[10px]">Not Connected</span>
+                )}
               </div>
               <div className="text-[12px] text-[var(--text-secondary)]">
-                Connect QuickBooks to automatically sync monthly revenue, expenses, and debt service.
+                {qbConnection
+                  ? `Connected to QuickBooks company ${qbConnection.realm_id}.`
+                  : "Connect QuickBooks to automatically sync monthly revenue, expenses, and debt service."}
               </div>
             </div>
-            <button type="button" className="btn-primary flex-shrink-0" disabled>
-              Connect QuickBooks
-            </button>
+            {qbConnection ? (
+              <button
+                type="button"
+                className="btn-outline flex-shrink-0"
+                onClick={disconnectQuickBooks}
+                disabled={disconnectingQb}
+              >
+                {disconnectingQb ? "Disconnecting…" : "Disconnect"}
+              </button>
+            ) : (
+              <a
+                href={store?.id ? `/api/quickbooks/authorize?storeId=${store.id}` : undefined}
+                className={clsx(
+                  "btn-primary flex-shrink-0",
+                  !store?.id && "pointer-events-none opacity-50"
+                )}
+                aria-disabled={!store?.id}
+              >
+                Connect QuickBooks
+              </a>
+            )}
           </div>
 
           <div className="card">
