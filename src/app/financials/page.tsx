@@ -166,7 +166,7 @@ const ROADMAP = [
   { feature: "Manual P&L entry", status: "live" as const },
   { feature: "Bank CSV import", status: "live" as const },
   { feature: "Auto-categorization", status: "live" as const },
-  { feature: "QuickBooks Online sync", status: "soon" as const },
+  { feature: "QuickBooks Online sync", status: "live" as const },
   { feature: "Plaid bank feed", status: "soon" as const },
   { feature: "Utility bill OCR", status: "soon" as const },
 ];
@@ -316,6 +316,11 @@ export default function FinancialsPage() {
   const [qbMappings, setQbMappings] = useState<QBMappingRow[]>(DEFAULT_QB_MAPPINGS);
   const [qbConnection, setQbConnection] = useState<QBConnection | null>(null);
   const [disconnectingQb, setDisconnectingQb] = useState(false);
+  const [syncingQb, setSyncingQb] = useState(false);
+  const [qbSyncResult, setQbSyncResult] = useState<{
+    monthsSynced: number;
+    unmappedAccounts: string[];
+  } | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [showForm, setShowForm] = useState(false);
@@ -799,6 +804,7 @@ export default function FinancialsPage() {
     setDisconnectingQb(true);
     setError("");
     setSuccess("");
+    setQbSyncResult(null);
 
     try {
       const response = await fetch("/api/quickbooks/disconnect", {
@@ -821,6 +827,51 @@ export default function FinancialsPage() {
     } finally {
       setDisconnectingQb(false);
     }
+  }
+
+  async function syncQuickBooks() {
+    if (!store?.id) return;
+    setSyncingQb(true);
+    setError("");
+    setSuccess("");
+    setQbSyncResult(null);
+
+    try {
+      const response = await fetch("/api/quickbooks/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId: store.id }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { monthsSynced?: number; unmappedAccounts?: string[]; error?: string; reconnectRequired?: boolean }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Failed to sync QuickBooks");
+      }
+
+      const monthsSynced = payload?.monthsSynced ?? 0;
+      const unmappedAccounts = payload?.unmappedAccounts ?? [];
+      setQbSyncResult({ monthsSynced, unmappedAccounts });
+      setSuccess(
+        monthsSynced === 1
+          ? "Synced 1 month from QuickBooks."
+          : `Synced ${monthsSynced} months from QuickBooks.`
+      );
+
+      invalidateValuationCache(store.id);
+      void evaluateAlerts({ storeIds: [store.id] });
+      await loadData();
+    } catch (syncError) {
+      setError(syncError instanceof Error ? syncError.message : "Failed to sync QuickBooks");
+    } finally {
+      setSyncingQb(false);
+    }
+  }
+
+  function scrollToQbAccountMapping() {
+    document.getElementById("qb-account-mapping")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   if (loadError) {
@@ -1671,14 +1722,24 @@ export default function FinancialsPage() {
               </div>
             </div>
             {qbConnection ? (
-              <button
-                type="button"
-                className="btn-outline flex-shrink-0"
-                onClick={disconnectQuickBooks}
-                disabled={disconnectingQb}
-              >
-                {disconnectingQb ? "Disconnecting…" : "Disconnect"}
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={syncQuickBooks}
+                  disabled={syncingQb || disconnectingQb}
+                >
+                  {syncingQb ? "Syncing…" : "Sync Now"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={disconnectQuickBooks}
+                  disabled={disconnectingQb || syncingQb}
+                >
+                  {disconnectingQb ? "Disconnecting…" : "Disconnect"}
+                </button>
+              </div>
             ) : (
               <a
                 href={store?.id ? `/api/quickbooks/authorize?storeId=${store.id}` : undefined}
@@ -1693,7 +1754,44 @@ export default function FinancialsPage() {
             )}
           </div>
 
-          <div className="card">
+          {qbSyncResult && (
+            <div
+              className={clsx(
+                "card border",
+                qbSyncResult.unmappedAccounts.length > 0
+                  ? "border-amber-500/40 bg-amber-500/5"
+                  : "border-green-500/40 bg-green-500/5"
+              )}
+            >
+              <div className="text-[13px] font-semibold text-slate-100 mb-1">Sync complete</div>
+              <p className="text-[12px] text-[var(--text-secondary)]">
+                {qbSyncResult.monthsSynced === 1
+                  ? "1 month of P&L data was imported from QuickBooks."
+                  : `${qbSyncResult.monthsSynced} months of P&L data were imported from QuickBooks.`}
+              </p>
+              {qbSyncResult.unmappedAccounts.length > 0 && (
+                <div className="mt-3 text-[12px] text-amber-200">
+                  <p className="font-medium">
+                    {qbSyncResult.unmappedAccounts.length} QuickBooks{" "}
+                    {qbSyncResult.unmappedAccounts.length === 1 ? "account" : "accounts"} couldn&apos;t be
+                    matched.
+                  </p>
+                  <p className="mt-1 text-[var(--text-secondary)]">
+                    Add mapping rules for: {qbSyncResult.unmappedAccounts.join(", ")}.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-outline mt-3 text-[12px]"
+                    onClick={scrollToQbAccountMapping}
+                  >
+                    Go to Account Mapping
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="card" id="qb-account-mapping">
             <div className="section-title">Account Mapping</div>
             <p className="text-[12px] text-[var(--text-muted)] mb-4">
               Map QuickBooks accounts to LaundroCFO fields. Saved to{" "}
