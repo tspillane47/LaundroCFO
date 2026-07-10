@@ -406,11 +406,13 @@ export default function FinancialsPage() {
 
     if ((mappingData ?? []).length > 0) {
       setQbMappings(
-        (mappingData as { id: string; qb_account_name: string; laundrocfo_field: PlCategoryField }[]).map((m) => ({
-          id: m.id,
-          qb_account_name: m.qb_account_name,
-          laundrocfo_field: m.laundrocfo_field,
-        }))
+        (mappingData as { id: string; qb_account_name: string; laundrocfo_category: PlCategoryField }[]).map(
+          (m) => ({
+            id: m.id,
+            qb_account_name: m.qb_account_name,
+            laundrocfo_field: m.laundrocfo_category,
+          })
+        )
       );
     } else {
       setQbMappings(DEFAULT_QB_MAPPINGS);
@@ -784,7 +786,7 @@ export default function FinancialsPage() {
       store_id: store.id,
       user_id: userId,
       qb_account_name: m.qb_account_name,
-      laundrocfo_field: m.laundrocfo_field,
+      laundrocfo_category: m.laundrocfo_field,
     }));
 
     const { error: insertError } = await supabase.from("quickbooks_mapping").insert(rows);

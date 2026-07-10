@@ -632,7 +632,7 @@ async function loadQuickBooksMappings(
   const admin = createAdminSupabaseClient();
   const { data, error } = await admin
     .from("quickbooks_mapping")
-    .select("qb_account_name, laundrocfo_field")
+    .select("qb_account_name, laundrocfo_category")
     .eq("store_id", storeId);
 
   if (error) {
@@ -643,7 +643,10 @@ async function loadQuickBooksMappings(
     return DEFAULT_QB_MAPPINGS;
   }
 
-  return data as { qb_account_name: string; laundrocfo_field: PlCategoryField }[];
+  return data.map((row) => ({
+    qb_account_name: row.qb_account_name,
+    laundrocfo_field: row.laundrocfo_category as PlCategoryField,
+  }));
 }
 
 async function storeHasMonthlyFinancials(storeId: string): Promise<boolean> {

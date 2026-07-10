@@ -6,7 +6,9 @@ CREATE TABLE IF NOT EXISTS quickbooks_mapping (
   store_id uuid NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   qb_account_name text NOT NULL,
-  laundrocfo_field text NOT NULL
+  qb_account_type text,
+  laundrocfo_category text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS quickbooks_mapping_store_id_idx
