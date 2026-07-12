@@ -1,9 +1,19 @@
+export type FinancialDataSource = "manual" | "quickbooks" | "bank_import";
+
+export const FINANCIAL_DATA_SOURCE_LABELS: Record<FinancialDataSource, string> = {
+  manual: "Manual",
+  quickbooks: "QuickBooks",
+  bank_import: "Bank Import",
+};
+
 export type MonthlyFinancialRecord = {
   id: string;
   store_id: string;
   user_id?: string;
   year: number;
   month: number;
+  data_source?: FinancialDataSource;
+  manually_overridden_at?: string | null;
   revenue: number;
   self_service_revenue: number;
   wdf_revenue: number;
@@ -141,6 +151,7 @@ export type StoreFinancialProfile = {
   monthly_expenses?: number | null;
   monthly_rent?: number | null;
   annual_debt_service?: number | null;
+  financial_data_source?: FinancialDataSource | null;
 };
 
 export const MONTH_NAMES = [

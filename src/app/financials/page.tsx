@@ -42,6 +42,8 @@ import { useWriteGuard } from "@/lib/useWriteGuard";
 import {
   type BankTransaction,
   type CalculatedMonthly,
+  type FinancialDataSource,
+  FINANCIAL_DATA_SOURCE_LABELS,
   type MonthlyFinancialRecord,
   type MonthlyUtilityRecord,
   type PlCategoryField,
@@ -71,9 +73,13 @@ import {
   sortRecordsDesc,
   suggestTransactionCategory,
 } from "@/lib/financials";
+import {
+  formatSkippedMonthLabel,
+  type QuickBooksSyncSkippedMonth,
+} from "@/lib/quickbooks-shared";
 
 type TabId = "pl" | "trends" | "ratios" | "bank" | "quickbooks";
-type MonthlyForm = Omit<MonthlyFinancialRecord, "id" | "store_id">;
+type MonthlyForm = Omit<MonthlyFinancialRecord, "id" | "store_id" | "data_source" | "manually_overridden_at">;
 type NumericFormField = Exclude<keyof MonthlyForm, "notes">;
 
 type StagedTransaction = {
@@ -317,9 +323,13 @@ export default function FinancialsPage() {
   const [qbConnection, setQbConnection] = useState<QBConnection | null>(null);
   const [disconnectingQb, setDisconnectingQb] = useState(false);
   const [syncingQb, setSyncingQb] = useState(false);
+  const [showQbSourceWarning, setShowQbSourceWarning] = useState(false);
+  const [connectingQb, setConnectingQb] = useState(false);
+  const [forceResyncingMonths, setForceResyncingMonths] = useState<Set<string>>(new Set());
   const [qbSyncResult, setQbSyncResult] = useState<{
     monthsSynced: number;
     unmappedAccounts: string[];
+    skippedMonths: QuickBooksSyncSkippedMonth[];
   } | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -624,6 +634,8 @@ export default function FinancialsPage() {
         other_expenses: form.other_expenses,
         debt_service: form.debt_service,
         notes: form.notes,
+        data_source: "manual" as const,
+        manually_overridden_at: new Date().toISOString(),
       };
 
       if (selectedRecord?.id) {
@@ -831,22 +843,33 @@ export default function FinancialsPage() {
     }
   }
 
-  async function syncQuickBooks() {
+  async function syncQuickBooks(forceOverrideMonths?: QuickBooksSyncSkippedMonth[]) {
     if (!store?.id) return;
     setSyncingQb(true);
     setError("");
     setSuccess("");
-    setQbSyncResult(null);
+    if (!forceOverrideMonths?.length) {
+      setQbSyncResult(null);
+    }
 
     try {
       const response = await fetch("/api/quickbooks/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storeId: store.id }),
+        body: JSON.stringify({
+          storeId: store.id,
+          ...(forceOverrideMonths?.length ? { forceOverrideMonths } : {}),
+        }),
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { monthsSynced?: number; unmappedAccounts?: string[]; error?: string; reconnectRequired?: boolean }
+        | {
+            monthsSynced?: number;
+            unmappedAccounts?: string[];
+            skippedMonths?: QuickBooksSyncSkippedMonth[];
+            error?: string;
+            reconnectRequired?: boolean;
+          }
         | null;
 
       if (!response.ok) {
@@ -855,12 +878,29 @@ export default function FinancialsPage() {
 
       const monthsSynced = payload?.monthsSynced ?? 0;
       const unmappedAccounts = payload?.unmappedAccounts ?? [];
-      setQbSyncResult({ monthsSynced, unmappedAccounts });
-      setSuccess(
-        monthsSynced === 1
-          ? "Synced 1 month from QuickBooks."
-          : `Synced ${monthsSynced} months from QuickBooks.`
-      );
+      const skippedMonths = payload?.skippedMonths ?? [];
+      setQbSyncResult({ monthsSynced, unmappedAccounts, skippedMonths });
+
+      const skippedCount = skippedMonths.length;
+      if (forceOverrideMonths?.length) {
+        setSuccess(
+          monthsSynced === 1
+            ? "Force-resynced 1 month from QuickBooks."
+            : `Force-resynced ${monthsSynced} months from QuickBooks.`
+        );
+      } else if (skippedCount > 0) {
+        setSuccess(
+          monthsSynced === 0
+            ? `Sync complete. ${skippedCount} manually edited month${skippedCount === 1 ? "" : "s"} were skipped.`
+            : `Synced ${monthsSynced} month${monthsSynced === 1 ? "" : "s"} from QuickBooks. ${skippedCount} manually edited month${skippedCount === 1 ? "" : "s"} were skipped.`
+        );
+      } else {
+        setSuccess(
+          monthsSynced === 1
+            ? "Synced 1 month from QuickBooks."
+            : `Synced ${monthsSynced} months from QuickBooks.`
+        );
+      }
 
       invalidateValuationCache(store.id);
       void evaluateAlerts({ storeIds: [store.id] });
@@ -869,7 +909,43 @@ export default function FinancialsPage() {
       setError(syncError instanceof Error ? syncError.message : "Failed to sync QuickBooks");
     } finally {
       setSyncingQb(false);
+      setForceResyncingMonths(new Set());
     }
+  }
+
+  function initiateQuickBooksConnect() {
+    if (!store?.id) return;
+    const source = store.financial_data_source ?? "manual";
+    if (source === "bank_import") {
+      setShowQbSourceWarning(true);
+      return;
+    }
+    window.location.href = `/api/quickbooks/authorize?storeId=${store.id}`;
+  }
+
+  async function confirmQuickBooksConnect() {
+    if (!store?.id) return;
+    setConnectingQb(true);
+    setError("");
+
+    const { error: updateError } = await supabase
+      .from("stores")
+      .update({ financial_data_source: "quickbooks" as const })
+      .eq("id", store.id);
+
+    if (updateError) {
+      setError(updateError.message);
+      setConnectingQb(false);
+      return;
+    }
+
+    window.location.href = `/api/quickbooks/authorize?storeId=${store.id}`;
+  }
+
+  async function forceResyncQuickBooks(months: QuickBooksSyncSkippedMonth[]) {
+    if (!store?.id || months.length === 0) return;
+    setForceResyncingMonths(new Set(months.map((month) => monthKey(month.year, month.month))));
+    await syncQuickBooks(months);
   }
 
   function scrollToQbAccountMapping() {
@@ -976,6 +1052,13 @@ export default function FinancialsPage() {
       {/* ─── TAB 1: P&L ─── */}
       {activeTab === "pl" && (
         <div className="space-y-5">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-[var(--text-muted)]">Data source:</span>
+            <span className="badge badge-blue text-[10px]">
+              {FINANCIAL_DATA_SOURCE_LABELS[(store?.financial_data_source ?? "manual") as FinancialDataSource]}
+            </span>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 grid-4">
             <MetricCard
               label="TTM Revenue"
@@ -1728,7 +1811,7 @@ export default function FinancialsPage() {
                 <button
                   type="button"
                   className="btn-primary"
-                  onClick={syncQuickBooks}
+                  onClick={() => syncQuickBooks()}
                   disabled={syncingQb || disconnectingQb}
                 >
                   {syncingQb ? "Syncing…" : "Sync Now"}
@@ -1743,24 +1826,51 @@ export default function FinancialsPage() {
                 </button>
               </div>
             ) : (
-              <a
-                href={store?.id ? `/api/quickbooks/authorize?storeId=${store.id}` : undefined}
-                className={clsx(
-                  "btn-primary flex-shrink-0",
-                  !store?.id && "pointer-events-none opacity-50"
-                )}
-                aria-disabled={!store?.id}
+              <button
+                type="button"
+                className={clsx("btn-primary flex-shrink-0", !store?.id && "pointer-events-none opacity-50")}
+                onClick={initiateQuickBooksConnect}
+                disabled={!store?.id || connectingQb}
               >
-                Connect QuickBooks
-              </a>
+                {connectingQb ? "Connecting…" : "Connect QuickBooks"}
+              </button>
             )}
           </div>
+
+          {showQbSourceWarning && (
+            <div className="card border border-amber-500/40 bg-amber-500/5">
+              <div className="text-[13px] font-semibold text-slate-100 mb-1">Switch data source to QuickBooks?</div>
+              <p className="text-[12px] text-[var(--text-secondary)]">
+                This store currently uses Bank Import for financial data. Connecting QuickBooks will make QuickBooks
+                the primary source going forward — bank-imported months won&apos;t be affected unless you manually edit
+                them, but new data will come from QuickBooks.
+              </p>
+              <div className="flex gap-2 mt-4">
+                <button
+                  type="button"
+                  className="btn-outline text-[12px]"
+                  onClick={() => setShowQbSourceWarning(false)}
+                  disabled={connectingQb}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary text-[12px]"
+                  onClick={confirmQuickBooksConnect}
+                  disabled={connectingQb}
+                >
+                  {connectingQb ? "Continuing…" : "Continue with QuickBooks"}
+                </button>
+              </div>
+            </div>
+          )}
 
           {qbSyncResult && (
             <div
               className={clsx(
                 "card border",
-                qbSyncResult.unmappedAccounts.length > 0
+                qbSyncResult.unmappedAccounts.length > 0 || qbSyncResult.skippedMonths.length > 0
                   ? "border-amber-500/40 bg-amber-500/5"
                   : "border-green-500/40 bg-green-500/5"
               )}
@@ -1771,6 +1881,48 @@ export default function FinancialsPage() {
                   ? "1 month of P&L data was imported from QuickBooks."
                   : `${qbSyncResult.monthsSynced} months of P&L data were imported from QuickBooks.`}
               </p>
+              {qbSyncResult.skippedMonths.length > 0 && (
+                <div className="mt-3 text-[12px] text-amber-200">
+                  <p className="font-medium">
+                    {qbSyncResult.skippedMonths.length} month{qbSyncResult.skippedMonths.length === 1 ? "" : "s"}{" "}
+                    skipped because {qbSyncResult.skippedMonths.length === 1 ? "it was" : "they were"} manually edited:{" "}
+                    {qbSyncResult.skippedMonths.map((month) => formatSkippedMonthLabel(month.year, month.month)).join(", ")}.
+                  </p>
+                  <p className="mt-1 text-[var(--text-secondary)]">
+                    Force resync will replace your manual edits with QuickBooks data for the selected month
+                    {qbSyncResult.skippedMonths.length === 1 ? "" : "s"}.
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {qbSyncResult.skippedMonths.map((month) => {
+                      const key = monthKey(month.year, month.month);
+                      const isResyncing = forceResyncingMonths.has(key);
+                      return (
+                        <div key={key} className="flex items-center justify-between gap-3">
+                          <span>{formatSkippedMonthLabel(month.year, month.month)}</span>
+                          <button
+                            type="button"
+                            className="btn-outline text-[11px]"
+                            onClick={() => forceResyncQuickBooks([month])}
+                            disabled={syncingQb || isResyncing}
+                          >
+                            {isResyncing ? "Resyncing…" : "Force resync"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {qbSyncResult.skippedMonths.length > 1 && (
+                    <button
+                      type="button"
+                      className="btn-outline mt-3 text-[12px]"
+                      onClick={() => forceResyncQuickBooks(qbSyncResult.skippedMonths)}
+                      disabled={syncingQb}
+                    >
+                      {syncingQb ? "Resyncing…" : "Force resync all skipped months"}
+                    </button>
+                  )}
+                </div>
+              )}
               {qbSyncResult.unmappedAccounts.length > 0 && (
                 <div className="mt-3 text-[12px] text-amber-200">
                   <p className="font-medium">

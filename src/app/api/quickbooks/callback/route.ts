@@ -5,6 +5,7 @@ import {
   decodeOAuthState,
   exchangeAuthorizationCode,
   financialsRedirectUrl,
+  updateStoreFinancialDataSourceOnQuickBooksConnect,
   upsertQuickBooksConnection,
   verifyUserOwnsStore,
 } from "@/lib/quickbooks";
@@ -70,6 +71,7 @@ export async function GET(request: Request) {
       realmId,
       tokens,
     });
+    await updateStoreFinancialDataSourceOnQuickBooksConnect(state.storeId);
 
     const response = NextResponse.redirect(financialsRedirectUrl(origin, "connected"));
     response.cookies.set(QB_OAUTH_CSRF_COOKIE, "", {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatSkippedMonthLabel,
+  shouldSkipMonthForQuickBooksSync,
+} from "@/lib/quickbooks-shared";
+import {
   extractProfitAndLossAccountRows,
   getQuickBooksSyncDateRange,
   mapProfitAndLossToMonthlyAmounts,
@@ -171,5 +175,56 @@ describe("getQuickBooksSyncDateRange", () => {
     const { startDate, endDate } = getQuickBooksSyncDateRange(false);
     expect(startDate).toMatch(/^\d{4}-\d{2}-01$/);
     expect(endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe("shouldSkipMonthForQuickBooksSync", () => {
+  it("does not skip months without a manual override", () => {
+    expect(
+      shouldSkipMonthForQuickBooksSync({
+        manuallyOverriddenAt: null,
+        year: 2026,
+        month: 3,
+      })
+    ).toBe(false);
+  });
+
+  it("skips manually overridden months during a normal sync", () => {
+    expect(
+      shouldSkipMonthForQuickBooksSync({
+        manuallyOverriddenAt: "2026-03-15T12:00:00.000Z",
+        year: 2026,
+        month: 3,
+      })
+    ).toBe(true);
+  });
+
+  it("allows force override for a specific skipped month", () => {
+    expect(
+      shouldSkipMonthForQuickBooksSync({
+        manuallyOverriddenAt: "2026-03-15T12:00:00.000Z",
+        year: 2026,
+        month: 3,
+        forceOverrideMonths: [{ year: 2026, month: 3 }],
+      })
+    ).toBe(false);
+  });
+
+  it("still skips other manually overridden months when only one is force-overridden", () => {
+    expect(
+      shouldSkipMonthForQuickBooksSync({
+        manuallyOverriddenAt: "2026-04-15T12:00:00.000Z",
+        year: 2026,
+        month: 4,
+        forceOverrideMonths: [{ year: 2026, month: 3 }],
+      })
+    ).toBe(true);
+  });
+});
+
+describe("formatSkippedMonthLabel", () => {
+  it("formats year and month for sync summaries", () => {
+    expect(formatSkippedMonthLabel(2026, 3)).toBe("March 2026");
+    expect(formatSkippedMonthLabel(2026, 4)).toBe("April 2026");
   });
 });

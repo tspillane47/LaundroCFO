@@ -1,12 +1,21 @@
+import "server-only";
+
 import { endOfMonth, format, parse, startOfMonth, subMonths } from "date-fns";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   emptyMonthlyForm,
   PL_CATEGORY_FIELDS,
+  type FinancialDataSource,
   type MonthlyFinancialRecord,
   type PlCategoryField,
 } from "@/lib/financials";
 import { createAdminSupabaseClient } from "@/lib/supabase-admin";
+import {
+  shouldSkipMonthForQuickBooksSync,
+  type QuickBooksSyncSkippedMonth,
+} from "@/lib/quickbooks-shared";
+
+export type { QuickBooksSyncSkippedMonth };
 
 const INTUIT_AUTHORIZE_URL = "https://appcenter.intuit.com/connect/oauth2";
 const INTUIT_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
@@ -205,6 +214,19 @@ export async function upsertQuickBooksConnection(params: {
   }
 }
 
+export async function updateStoreFinancialDataSourceOnQuickBooksConnect(storeId: string): Promise<void> {
+  const admin = createAdminSupabaseClient();
+  const { error } = await admin
+    .from("stores")
+    .update({ financial_data_source: "quickbooks" satisfies FinancialDataSource })
+    .eq("id", storeId)
+    .eq("financial_data_source", "manual");
+
+  if (error) {
+    throw new Error(`Failed to update store financial data source: ${error.message}`);
+  }
+}
+
 export async function deleteQuickBooksConnection(storeId: string): Promise<QuickBooksConnectionRow | null> {
   const admin = createAdminSupabaseClient();
   const { data: existing, error: fetchError } = await admin
@@ -287,9 +309,14 @@ export type QuickBooksProfitAndLossReport = {
   Rows?: { Row?: QuickBooksReportRow[] };
 };
 
+export type QuickBooksSyncOptions = {
+  forceOverrideMonths?: QuickBooksSyncSkippedMonth[];
+};
+
 export type QuickBooksSyncResult = {
   monthsSynced: number;
   unmappedAccounts: string[];
+  skippedMonths: QuickBooksSyncSkippedMonth[];
 };
 
 export type ParsedMonthColumn = {
@@ -745,6 +772,8 @@ function buildMonthlyFinancialPayload(params: {
     store_id: params.storeId,
     user_id: params.userId,
     ...base,
+    data_source: "quickbooks" satisfies FinancialDataSource,
+    manually_overridden_at: null,
   };
 }
 
@@ -752,9 +781,11 @@ async function upsertSyncedMonthlyFinancials(params: {
   storeId: string;
   userId: string;
   monthlyAmounts: Map<string, Record<PlCategoryField, number>>;
-}): Promise<number> {
+  forceOverrideMonths?: QuickBooksSyncSkippedMonth[];
+}): Promise<{ monthsSynced: number; skippedMonths: QuickBooksSyncSkippedMonth[] }> {
   const admin = createAdminSupabaseClient();
   let monthsSynced = 0;
+  const skippedMonths: QuickBooksSyncSkippedMonth[] = [];
 
   for (const [key, syncedFields] of Array.from(params.monthlyAmounts.entries())) {
     const [yearPart, monthPart] = key.split("-");
@@ -773,13 +804,26 @@ async function upsertSyncedMonthlyFinancials(params: {
       throw new Error(`Failed to load monthly financials for ${year}-${month}: ${fetchError.message}`);
     }
 
+    const existingRecord = (existing as MonthlyFinancialRecord | null) ?? null;
+    if (
+      shouldSkipMonthForQuickBooksSync({
+        manuallyOverriddenAt: existingRecord?.manually_overridden_at,
+        year,
+        month,
+        forceOverrideMonths: params.forceOverrideMonths,
+      })
+    ) {
+      skippedMonths.push({ year, month });
+      continue;
+    }
+
     const payload = buildMonthlyFinancialPayload({
       storeId: params.storeId,
       userId: params.userId,
       year,
       month,
       syncedFields,
-      existing: (existing as MonthlyFinancialRecord | null) ?? null,
+      existing: existingRecord,
     });
 
     if (existing?.id) {
@@ -801,10 +845,13 @@ async function upsertSyncedMonthlyFinancials(params: {
     monthsSynced += 1;
   }
 
-  return monthsSynced;
+  return { monthsSynced, skippedMonths };
 }
 
-export async function syncQuickBooksFinancials(storeId: string): Promise<QuickBooksSyncResult> {
+export async function syncQuickBooksFinancials(
+  storeId: string,
+  options: QuickBooksSyncOptions = {}
+): Promise<QuickBooksSyncResult> {
   const { accessToken, realmId, userId } = await getValidAccessToken(storeId);
   const mappings = await loadQuickBooksMappings(storeId);
   const isFirstSync = !(await storeHasMonthlyFinancials(storeId));
@@ -822,14 +869,16 @@ export async function syncQuickBooksFinancials(storeId: string): Promise<QuickBo
     mappings,
   });
 
-  const monthsSynced = await upsertSyncedMonthlyFinancials({
+  const { monthsSynced, skippedMonths } = await upsertSyncedMonthlyFinancials({
     storeId,
     userId,
     monthlyAmounts,
+    forceOverrideMonths: options.forceOverrideMonths,
   });
 
   return {
     monthsSynced,
     unmappedAccounts,
+    skippedMonths,
   };
 }
