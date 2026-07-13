@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
@@ -334,6 +334,8 @@ export default function FinancialsPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [showForm, setShowForm] = useState(false);
+  const showFormRef = useRef(showForm);
+  showFormRef.current = showForm;
   const [form, setForm] = useState<MonthlyForm>(() => emptyMonthlyForm());
   const [monthlyAverages, setMonthlyAverages] = useState<CurrentMonthlyAverages | null>(null);
   const [monthlyAveragesLoading, setMonthlyAveragesLoading] = useState(false);
@@ -430,7 +432,7 @@ export default function FinancialsPage() {
 
     setQbConnection((connectionData as QBConnection | null) ?? null);
 
-    if (sorted.length > 0) {
+    if (sorted.length > 0 && !showFormRef.current) {
       setSelectedYear(sorted[0].year);
       setSelectedMonth(sorted[0].month);
     }
@@ -585,6 +587,11 @@ export default function FinancialsPage() {
     [records, selectedYear]
   );
 
+  function selectMonth(month: number) {
+    setSelectedMonth(month);
+    setShowForm(false);
+  }
+
   function openMonthForm(month: number) {
     if (!canWrite) {
       setError(blockedReason ?? "Subscribe to make changes.");
@@ -606,11 +613,34 @@ export default function FinancialsPage() {
   }
 
   async function saveMonthlyRecord() {
+    console.log("[saveMonthlyRecord] invoked", {
+      canWrite,
+      blockedReason,
+      storeId: store?.id ?? null,
+      userId,
+      saving,
+      saveStatus,
+      selectedYear,
+      selectedMonth,
+      selectedRecordId: selectedRecord?.id ?? null,
+      selectedRecordYear: selectedRecord?.year ?? null,
+      selectedRecordMonth: selectedRecord?.month ?? null,
+    });
+
     if (!canWrite) {
+      console.warn("[saveMonthlyRecord] blocked: read-only (canWrite=false)", { blockedReason });
       setError(blockedReason ?? "Subscribe to make changes.");
       return;
     }
-    if (!store?.id || !userId || saving || saveStatus === "success") return;
+    if (!store?.id || !userId || saving || saveStatus === "success") {
+      console.warn("[saveMonthlyRecord] early return (silent)", {
+        hasStoreId: Boolean(store?.id),
+        hasUserId: Boolean(userId),
+        saving,
+        saveStatus,
+      });
+      return;
+    }
     setSaving(true);
     setSaveStatus("idle");
     setError("");
@@ -639,10 +669,20 @@ export default function FinancialsPage() {
       };
 
       if (selectedRecord?.id) {
-        const { error: updateError } = await supabase
+        console.log("[saveMonthlyRecord] UPDATE path", {
+          recordId: selectedRecord.id,
+          payload,
+        });
+        const { data: updatedRows, error: updateError } = await supabase
           .from("monthly_financials")
           .update(payload)
-          .eq("id", selectedRecord.id);
+          .eq("id", selectedRecord.id)
+          .select("id, year, month, data_source, manually_overridden_at, revenue, updated_at");
+        console.log("[saveMonthlyRecord] UPDATE result", {
+          error: updateError,
+          rowsReturned: updatedRows?.length ?? 0,
+          updatedRows,
+        });
         if (updateError) {
           console.error("Monthly financials save error:", updateError);
           setSaveStatus("error");
@@ -651,7 +691,16 @@ export default function FinancialsPage() {
           return;
         }
       } else {
-        const { error: insertError } = await supabase.from("monthly_financials").insert(payload);
+        console.log("[saveMonthlyRecord] INSERT path (no selectedRecord.id)", { payload });
+        const { data: insertedRows, error: insertError } = await supabase
+          .from("monthly_financials")
+          .insert(payload)
+          .select("id, year, month, data_source, manually_overridden_at, revenue, updated_at");
+        console.log("[saveMonthlyRecord] INSERT result", {
+          error: insertError,
+          rowsReturned: insertedRows?.length ?? 0,
+          insertedRows,
+        });
         if (insertError) {
           console.error("Monthly financials save error:", insertError);
           setSaveStatus("error");
@@ -1100,7 +1149,10 @@ export default function FinancialsPage() {
                   <div className="metric-label mb-1.5">Year</div>
                   <select
                     value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                    onChange={(e) => {
+                      setSelectedYear(Number(e.target.value));
+                      setShowForm(false);
+                    }}
                     className={clsx(INPUT_CLASS, "w-32")}
                   >
                     {yearOptions.map((y) => (
@@ -1121,10 +1173,7 @@ export default function FinancialsPage() {
                         <button
                           key={label}
                           type="button"
-                          onClick={() => {
-                            setSelectedMonth(month);
-                            setShowForm(false);
-                          }}
+                          onClick={() => selectMonth(month)}
                           className={clsx(
                             "px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors",
                             isSelected
@@ -1271,7 +1320,7 @@ export default function FinancialsPage() {
                               !isSelected &&
                               "bg-blue-500/[0.06] ring-1 ring-inset ring-blue-400/15"
                           )}
-                          onClick={() => setSelectedMonth(month)}
+                          onClick={() => selectMonth(month)}
                         >
                           <td className="py-1.5 px-4 text-left font-medium text-[var(--text-primary)]">
                             {MONTH_NAMES[i]}
