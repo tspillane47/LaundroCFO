@@ -439,7 +439,17 @@ export async function getValidAccessToken(storeId: string): Promise<{
     throw new QuickBooksReconnectRequiredError();
   }
 
-  if (isAccessTokenValid(connection.access_token_expires_at)) {
+  const nowIso = new Date().toISOString();
+  const accessTokenValid = isAccessTokenValid(connection.access_token_expires_at);
+  console.log("[quickbooks-token] checking access token validity", {
+    storeId,
+    access_token_expires_at: connection.access_token_expires_at,
+    now: nowIso,
+    isAccessTokenValid: accessTokenValid,
+  });
+
+  if (accessTokenValid) {
+    console.log("[quickbooks-token] using cached access token (no refresh needed)", { storeId });
     return {
       accessToken: connection.access_token,
       realmId: connection.realm_id,
@@ -447,8 +457,15 @@ export async function getValidAccessToken(storeId: string): Promise<{
     };
   }
 
+  console.log("[quickbooks-token] access token expired or near expiry — starting refresh", { storeId });
   const tokens = await refreshQuickBooksAccessToken(connection.refresh_token);
+  const newAccessTokenExpiresAt = tokenExpiryFromNow(tokens.expires_in);
   await updateQuickBooksTokens(storeId, tokens);
+  console.log("[quickbooks-token] refresh complete", {
+    storeId,
+    access_token_expires_at: newAccessTokenExpiresAt,
+    expires_in: tokens.expires_in,
+  });
 
   return {
     accessToken: tokens.access_token,
