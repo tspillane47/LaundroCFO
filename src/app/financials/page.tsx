@@ -324,6 +324,7 @@ export default function FinancialsPage() {
   const [disconnectingQb, setDisconnectingQb] = useState(false);
   const [syncingQb, setSyncingQb] = useState(false);
   const [showQbSourceWarning, setShowQbSourceWarning] = useState(false);
+  const [showQbDisconnectConfirm, setShowQbDisconnectConfirm] = useState(false);
   const [connectingQb, setConnectingQb] = useState(false);
   const [forceResyncingMonths, setForceResyncingMonths] = useState<Set<string>>(new Set());
   const [qbSyncResult, setQbSyncResult] = useState<{
@@ -882,6 +883,8 @@ export default function FinancialsPage() {
       }
 
       setQbConnection(null);
+      setStore((prev) => (prev ? { ...prev, financial_data_source: "manual" } : prev));
+      setShowQbDisconnectConfirm(false);
       setSuccess("QuickBooks disconnected.");
     } catch (disconnectError) {
       setError(
@@ -1868,10 +1871,10 @@ export default function FinancialsPage() {
                 <button
                   type="button"
                   className="btn-outline"
-                  onClick={disconnectQuickBooks}
+                  onClick={() => setShowQbDisconnectConfirm(true)}
                   disabled={disconnectingQb || syncingQb}
                 >
-                  {disconnectingQb ? "Disconnecting…" : "Disconnect"}
+                  Disconnect
                 </button>
               </div>
             ) : (
@@ -1885,6 +1888,33 @@ export default function FinancialsPage() {
               </button>
             )}
           </div>
+
+          {showQbDisconnectConfirm && (
+            <div className="card border border-red-500/40 bg-red-500/5">
+              <div className="text-[13px] font-semibold text-slate-100 mb-1">Disconnect QuickBooks?</div>
+              <p className="text-[12px] text-[var(--text-secondary)]">
+                This will stop automatic syncing. Previously synced data will remain in your P&L.
+              </p>
+              <div className="flex gap-2 mt-4">
+                <button
+                  type="button"
+                  className="btn-outline text-[12px]"
+                  onClick={() => setShowQbDisconnectConfirm(false)}
+                  disabled={disconnectingQb}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="text-[12px] px-4 py-2 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700"
+                  onClick={() => void disconnectQuickBooks()}
+                  disabled={disconnectingQb}
+                >
+                  {disconnectingQb ? "Disconnecting…" : "Disconnect QuickBooks"}
+                </button>
+              </div>
+            </div>
+          )}
 
           {showQbSourceWarning && (
             <div className="card border border-amber-500/40 bg-amber-500/5">

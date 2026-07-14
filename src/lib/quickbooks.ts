@@ -227,6 +227,19 @@ export async function updateStoreFinancialDataSourceOnQuickBooksConnect(storeId:
   }
 }
 
+export async function resetStoreFinancialDataSourceOnQuickBooksDisconnect(storeId: string): Promise<void> {
+  const admin = createAdminSupabaseClient();
+  const { error } = await admin
+    .from("stores")
+    .update({ financial_data_source: "manual" satisfies FinancialDataSource })
+    .eq("id", storeId)
+    .eq("financial_data_source", "quickbooks");
+
+  if (error) {
+    throw new Error(`Failed to reset store financial data source: ${error.message}`);
+  }
+}
+
 export async function deleteQuickBooksConnection(storeId: string): Promise<QuickBooksConnectionRow | null> {
   const admin = createAdminSupabaseClient();
   const { data: existing, error: fetchError } = await admin

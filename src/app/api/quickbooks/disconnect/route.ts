@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   deleteQuickBooksConnection,
+  resetStoreFinancialDataSourceOnQuickBooksDisconnect,
   revokeQuickBooksToken,
   verifyUserOwnsStore,
 } from "@/lib/quickbooks";
@@ -43,6 +44,8 @@ export async function POST(request: Request) {
         console.error("[quickbooks/disconnect] token revoke failed", revokeError);
       }
     }
+
+    await resetStoreFinancialDataSourceOnQuickBooksDisconnect(storeId);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
