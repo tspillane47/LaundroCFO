@@ -70,6 +70,10 @@ export type QuickBooksConnectionRow = {
   refresh_token_expires_at: string;
   connected_at: string;
   updated_at: string;
+  last_synced_at: string | null;
+  last_sync_months_synced: number | null;
+  last_sync_skipped_count: number | null;
+  last_sync_unmapped_count: number | null;
 };
 
 export function getQuickBooksConfig(): QuickBooksConfig {
@@ -878,6 +882,29 @@ async function upsertSyncedMonthlyFinancials(params: {
   return { monthsSynced, skippedMonths };
 }
 
+async function recordQuickBooksSyncHistory(params: {
+  storeId: string;
+  monthsSynced: number;
+  skippedCount: number;
+  unmappedCount: number;
+}): Promise<void> {
+  const admin = createAdminSupabaseClient();
+  const { error } = await admin
+    .from("quickbooks_connections")
+    .update({
+      last_synced_at: new Date().toISOString(),
+      last_sync_months_synced: params.monthsSynced,
+      last_sync_skipped_count: params.skippedCount,
+      last_sync_unmapped_count: params.unmappedCount,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("store_id", params.storeId);
+
+  if (error) {
+    throw new Error(`Failed to record QuickBooks sync history: ${error.message}`);
+  }
+}
+
 export async function syncQuickBooksFinancials(
   storeId: string,
   options: QuickBooksSyncOptions = {}
@@ -904,6 +931,13 @@ export async function syncQuickBooksFinancials(
     userId,
     monthlyAmounts,
     forceOverrideMonths: options.forceOverrideMonths,
+  });
+
+  await recordQuickBooksSyncHistory({
+    storeId,
+    monthsSynced,
+    skippedCount: skippedMonths.length,
+    unmappedCount: unmappedAccounts.length,
   });
 
   return {

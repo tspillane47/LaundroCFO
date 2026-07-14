@@ -74,6 +74,7 @@ import {
   suggestTransactionCategory,
 } from "@/lib/financials";
 import {
+  formatQuickBooksSyncStatus,
   formatSkippedMonthLabel,
   type QuickBooksSyncSkippedMonth,
 } from "@/lib/quickbooks-shared";
@@ -101,6 +102,10 @@ type QBConnection = {
   id: string;
   realm_id: string;
   connected_at: string;
+  last_synced_at: string | null;
+  last_sync_months_synced: number | null;
+  last_sync_skipped_count: number | null;
+  last_sync_unmapped_count: number | null;
 };
 
 const QB_ERROR_MESSAGES: Record<string, string> = {
@@ -392,7 +397,9 @@ export default function FinancialsPage() {
       supabase.from("quickbooks_mapping").select("*").eq("store_id", selectedStore.id),
       supabase
         .from("quickbooks_connections")
-        .select("id, realm_id, connected_at")
+        .select(
+          "id, realm_id, connected_at, last_synced_at, last_sync_months_synced, last_sync_skipped_count, last_sync_unmapped_count"
+        )
         .eq("store_id", selectedStore.id)
         .maybeSingle(),
       supabase
@@ -1857,6 +1864,11 @@ export default function FinancialsPage() {
                   ? `Connected to QuickBooks company ${qbConnection.realm_id}.`
                   : "Connect QuickBooks to automatically sync monthly revenue, expenses, and debt service."}
               </div>
+              {qbConnection && (
+                <div className="text-[11px] text-[var(--text-muted)] mt-1">
+                  {formatQuickBooksSyncStatus(qbConnection)}
+                </div>
+              )}
             </div>
             {qbConnection ? (
               <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
