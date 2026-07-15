@@ -116,6 +116,7 @@ export type BankTransaction = {
   transaction_type?: TransactionType | null;
   split_parent_id?: string | null;
   modified_at?: string;
+  plaid_transaction_id?: string | null;
 };
 
 export type TransactionPlLink = {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
+import { usePlaidLink } from "react-plaid-link";
 import {
   Area,
   AreaChart,
@@ -78,6 +79,11 @@ import {
   formatSkippedMonthLabel,
   type QuickBooksSyncSkippedMonth,
 } from "@/lib/quickbooks-shared";
+import {
+  formatPlaidConnectionLabel,
+  isQuickBooksDataSource,
+  PLAID_QUICKBOOKS_BLOCK_MESSAGE,
+} from "@/lib/plaid-shared";
 
 type TabId = "pl" | "trends" | "ratios" | "bank" | "quickbooks";
 type MonthlyForm = Omit<MonthlyFinancialRecord, "id" | "store_id" | "data_source" | "manually_overridden_at">;
@@ -106,6 +112,13 @@ type QBConnection = {
   last_sync_months_synced: number | null;
   last_sync_skipped_count: number | null;
   last_sync_unmapped_count: number | null;
+};
+
+type PlaidConnection = {
+  id: string;
+  plaid_item_id: string;
+  institution_name: string | null;
+  connected_at: string;
 };
 
 const QB_ERROR_MESSAGES: Record<string, string> = {
@@ -326,6 +339,12 @@ export default function FinancialsPage() {
   const [stagedTransactions, setStagedTransactions] = useState<StagedTransaction[]>([]);
   const [qbMappings, setQbMappings] = useState<QBMappingRow[]>(DEFAULT_QB_MAPPINGS);
   const [qbConnection, setQbConnection] = useState<QBConnection | null>(null);
+  const [plaidConnection, setPlaidConnection] = useState<PlaidConnection | null>(null);
+  const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
+  const [shouldOpenPlaidLink, setShouldOpenPlaidLink] = useState(false);
+  const [connectingPlaid, setConnectingPlaid] = useState(false);
+  const [disconnectingPlaid, setDisconnectingPlaid] = useState(false);
+  const [showPlaidDisconnectConfirm, setShowPlaidDisconnectConfirm] = useState(false);
   const [disconnectingQb, setDisconnectingQb] = useState(false);
   const [syncingQb, setSyncingQb] = useState(false);
   const [showQbSourceWarning, setShowQbSourceWarning] = useState(false);
@@ -378,6 +397,7 @@ export default function FinancialsPage() {
       { data: bankData, error: bankError },
       { data: mappingData, error: mappingError },
       { data: connectionData, error: connectionError },
+      { data: plaidConnectionData, error: plaidConnectionError },
       { data: utilitiesData, error: utilitiesError },
       annualDebtByStore,
     ] = await Promise.all([
@@ -403,13 +423,26 @@ export default function FinancialsPage() {
         .eq("store_id", selectedStore.id)
         .maybeSingle(),
       supabase
+        .from("plaid_connections")
+        .select("id, plaid_item_id, institution_name, connected_at")
+        .eq("store_id", selectedStore.id)
+        .maybeSingle(),
+      supabase
         .from("monthly_utilities")
         .select("year, month, water, gas, electric, sewer, trash, internet")
         .eq("store_id", selectedStore.id),
       fetchAnnualDebtServiceByStore(supabase, [selectedStore.id]),
     ]);
 
-    const errors = [storeError, financialsError, bankError, mappingError, connectionError, utilitiesError]
+    const errors = [
+      storeError,
+      financialsError,
+      bankError,
+      mappingError,
+      connectionError,
+      plaidConnectionError,
+      utilitiesError,
+    ]
       .filter(Boolean)
       .map((e) => e!.message);
     if (errors.length > 0) setError(errors.join(" · "));
@@ -439,6 +472,7 @@ export default function FinancialsPage() {
     }
 
     setQbConnection((connectionData as QBConnection | null) ?? null);
+    setPlaidConnection((plaidConnectionData as PlaidConnection | null) ?? null);
 
     if (sorted.length > 0 && !showFormRef.current) {
       setSelectedYear(sorted[0].year);
@@ -999,6 +1033,135 @@ export default function FinancialsPage() {
     }
 
     window.location.href = `/api/quickbooks/authorize?storeId=${store.id}`;
+  }
+
+  const plaidBlockedByQuickBooks = isQuickBooksDataSource(store?.financial_data_source ?? null);
+
+  const { open: openPlaidLink, ready: plaidLinkReady } = usePlaidLink({
+    token: plaidLinkToken,
+    onSuccess: async (publicToken) => {
+      if (!store?.id) return;
+      setConnectingPlaid(true);
+      setError("");
+      setSuccess("");
+
+      try {
+        const response = await fetch("/api/plaid/exchange-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storeId: store.id,
+            public_token: publicToken,
+          }),
+        });
+
+        const payload = (await response.json().catch(() => null)) as
+          | { ok?: boolean; institution_name?: string | null; error?: string }
+          | null;
+
+        if (!response.ok) {
+          throw new Error(payload?.error ?? "Failed to connect bank account");
+        }
+
+        setStore((prev) =>
+          prev && (prev.financial_data_source ?? "manual") === "manual"
+            ? { ...prev, financial_data_source: "bank_import" }
+            : prev
+        );
+        setSuccess("Bank account connected successfully.");
+        await loadData();
+      } catch (connectError) {
+        setError(
+          connectError instanceof Error ? connectError.message : "Failed to connect bank account"
+        );
+      } finally {
+        setConnectingPlaid(false);
+        setPlaidLinkToken(null);
+        setShouldOpenPlaidLink(false);
+      }
+    },
+    onExit: () => {
+      setConnectingPlaid(false);
+      setPlaidLinkToken(null);
+      setShouldOpenPlaidLink(false);
+    },
+  });
+
+  useEffect(() => {
+    if (shouldOpenPlaidLink && plaidLinkToken && plaidLinkReady) {
+      openPlaidLink();
+      setShouldOpenPlaidLink(false);
+    }
+  }, [shouldOpenPlaidLink, plaidLinkToken, plaidLinkReady, openPlaidLink]);
+
+  async function initiatePlaidConnect() {
+    if (!store?.id || plaidBlockedByQuickBooks) return;
+    setConnectingPlaid(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch("/api/plaid/create-link-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId: store.id }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { link_token?: string; error?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Failed to start bank connection");
+      }
+
+      if (!payload?.link_token) {
+        throw new Error("Plaid did not return a link token");
+      }
+
+      setPlaidLinkToken(payload.link_token);
+      setShouldOpenPlaidLink(true);
+    } catch (connectError) {
+      setConnectingPlaid(false);
+      setError(
+        connectError instanceof Error ? connectError.message : "Failed to start bank connection"
+      );
+    }
+  }
+
+  async function disconnectPlaid() {
+    if (!store?.id) return;
+    setDisconnectingPlaid(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch("/api/plaid/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId: store.id }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error ?? "Failed to disconnect bank account");
+      }
+
+      setPlaidConnection(null);
+      setStore((prev) =>
+        prev?.financial_data_source === "bank_import"
+          ? { ...prev, financial_data_source: "manual" }
+          : prev
+      );
+      setShowPlaidDisconnectConfirm(false);
+      setSuccess("Bank account disconnected.");
+    } catch (disconnectError) {
+      setError(
+        disconnectError instanceof Error ? disconnectError.message : "Failed to disconnect bank account"
+      );
+    } finally {
+      setDisconnectingPlaid(false);
+    }
   }
 
   async function forceResyncQuickBooks(months: QuickBooksSyncSkippedMonth[]) {
@@ -1676,6 +1839,83 @@ export default function FinancialsPage() {
       {/* ─── TAB 4: BANK IMPORT ─── */}
       {activeTab === "bank" && (
         <div className="space-y-4">
+          <div className="card flex items-center gap-5">
+            <div
+              className="w-14 h-14 rounded-xl flex items-center justify-center text-white text-[18px] font-bold flex-shrink-0"
+              style={{ background: "#0f4c81" }}
+            >
+              PL
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-0.5">
+                <div className="text-[14px] font-semibold text-slate-100">Plaid Bank Feed</div>
+                {plaidConnection ? (
+                  <span className="badge badge-green text-[10px]">Connected</span>
+                ) : (
+                  <span className="badge badge-amber text-[10px]">Not Connected</span>
+                )}
+              </div>
+              <div className="text-[12px] text-[var(--text-secondary)]">
+                {plaidConnection
+                  ? `Connected to ${formatPlaidConnectionLabel(plaidConnection.institution_name)}.`
+                  : "Connect your bank account to automatically import transactions."}
+              </div>
+              {plaidBlockedByQuickBooks && !plaidConnection && (
+                <div className="text-[11px] text-amber-200 mt-1">{PLAID_QUICKBOOKS_BLOCK_MESSAGE}</div>
+              )}
+            </div>
+            {plaidConnection ? (
+              <button
+                type="button"
+                className="btn-outline flex-shrink-0"
+                onClick={() => setShowPlaidDisconnectConfirm(true)}
+                disabled={disconnectingPlaid}
+              >
+                Disconnect
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={clsx(
+                  "btn-primary flex-shrink-0",
+                  (!store?.id || plaidBlockedByQuickBooks) && "pointer-events-none opacity-50"
+                )}
+                onClick={() => void initiatePlaidConnect()}
+                disabled={!store?.id || connectingPlaid || plaidBlockedByQuickBooks}
+              >
+                {connectingPlaid ? "Connecting…" : "Connect Bank Account"}
+              </button>
+            )}
+          </div>
+
+          {showPlaidDisconnectConfirm && (
+            <div className="card border border-red-500/40 bg-red-500/5">
+              <div className="text-[13px] font-semibold text-slate-100 mb-1">Disconnect bank account?</div>
+              <p className="text-[12px] text-[var(--text-secondary)]">
+                This will stop automatic bank imports. Previously imported transactions will remain in your
+                review queue.
+              </p>
+              <div className="flex gap-2 mt-4">
+                <button
+                  type="button"
+                  className="btn-outline text-[12px]"
+                  onClick={() => setShowPlaidDisconnectConfirm(false)}
+                  disabled={disconnectingPlaid}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="text-[12px] px-4 py-2 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700"
+                  onClick={() => void disconnectPlaid()}
+                  disabled={disconnectingPlaid}
+                >
+                  {disconnectingPlaid ? "Disconnecting…" : "Disconnect Bank Account"}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="card flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="text-[14px] font-semibold text-slate-100">Import Bank Transactions</div>
