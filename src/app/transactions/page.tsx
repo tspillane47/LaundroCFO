@@ -781,6 +781,14 @@ function TransactionsPageContent() {
     [filteredReviewRows, selectedIds]
   );
 
+  const selectedPostableRows = useMemo(
+    () =>
+      selectedActionRows.filter(
+        (row) => row.status !== "posted" && !row.excluded && isCategoryReadyToPost(row.category)
+      ),
+    [selectedActionRows]
+  );
+
   const bulkReclassifyCategories = useMemo((): BankImportCategory[] => {
     if (!bulkReclassifyModal) return [];
     const categories = new Set<BankImportCategory>();
@@ -895,33 +903,88 @@ function TransactionsPageContent() {
     });
   }
 
-  async function handlePostRows(rows: ReviewRow[]) {
+  function buildBulkPostMessage(params: {
+    postedCount: number;
+    totalSelected: number;
+    skippedNeedsCategory: number;
+    skippedAlreadyPosted: number;
+  }): string {
+    const { postedCount, totalSelected, skippedNeedsCategory, skippedAlreadyPosted } = params;
+    const skippedTotal = skippedNeedsCategory + skippedAlreadyPosted;
+
+    if (skippedTotal === 0) {
+      return postedCount === 1
+        ? "Posted 1 transaction to P&L."
+        : postedCount === 0
+          ? "No new transactions were posted (already posted)."
+          : `Posted ${postedCount} transactions to P&L.`;
+    }
+
+    const reasons: string[] = [];
+    if (skippedNeedsCategory > 0) {
+      reasons.push(
+        `${skippedNeedsCategory} skipped because ${skippedNeedsCategory === 1 ? "it still needs" : "they still need"} a category`
+      );
+    }
+    if (skippedAlreadyPosted > 0) {
+      reasons.push(
+        `${skippedAlreadyPosted} skipped because ${skippedAlreadyPosted === 1 ? "it is" : "they are"} already posted`
+      );
+    }
+
+    return `Posted ${postedCount} of ${totalSelected} selected — ${reasons.join("; ")}.`;
+  }
+
+  async function handlePostRows(rows: ReviewRow[], options?: { partial?: boolean }) {
     if (!requireWrite()) return;
     if (!store?.id || !userId || rows.length === 0 || postingRef.current) return;
 
+    const partial = options?.partial ?? false;
+    const totalSelected = rows.length;
+    const skippedAlreadyPosted = rows.filter((row) => row.status === "posted" || row.excluded).length;
     const postableRows = rows.filter((row) => row.status !== "posted" && !row.excluded);
+
     if (postableRows.length === 0) {
       setMessage({ type: "error", text: "These transactions are already posted." });
       return;
     }
 
-    for (const row of postableRows) {
-      if (!isCategoryReadyToPost(row.category)) {
+    let rowsToPost: ReviewRow[];
+    let skippedNeedsCategory = 0;
+
+    if (partial) {
+      rowsToPost = postableRows.filter((row) => isCategoryReadyToPost(row.category));
+      skippedNeedsCategory = postableRows.length - rowsToPost.length;
+      if (rowsToPost.length === 0) {
         setMessage({
           type: "error",
-          text: "Assign a category before posting. Transactions marked Needs Review cannot be posted.",
+          text:
+            skippedNeedsCategory > 0
+              ? "None of the selected transactions are ready to post. Assign a category first."
+              : "These transactions are already posted.",
         });
         return;
       }
+    } else {
+      for (const row of postableRows) {
+        if (!isCategoryReadyToPost(row.category)) {
+          setMessage({
+            type: "error",
+            text: "Assign a category before posting. Transactions marked Needs Review cannot be posted.",
+          });
+          return;
+        }
+      }
+      rowsToPost = postableRows;
     }
 
     postingRef.current = true;
     setPosting(true);
-    setPostingCount(postableRows.length);
+    setPostingCount(rowsToPost.length);
     setMessage(null);
 
     try {
-      const batch: BatchPostTransaction[] = postableRows.map((row) => {
+      const batch: BatchPostTransaction[] = rowsToPost.map((row) => {
         const txn = transactions.find((t) => t.id === row.id);
         return {
           id: row.id,
@@ -954,8 +1017,14 @@ function TransactionsPageContent() {
       invalidateValuationCache(store.id);
       setMessage({
         type: "success",
-        text:
-          result.postedCount === 1
+        text: partial
+          ? buildBulkPostMessage({
+              postedCount: result.postedCount,
+              totalSelected,
+              skippedNeedsCategory,
+              skippedAlreadyPosted,
+            })
+          : result.postedCount === 1
             ? "Posted 1 transaction to P&L."
             : result.postedCount === 0
               ? "No new transactions were posted (already posted)."
@@ -967,6 +1036,12 @@ function TransactionsPageContent() {
       setPosting(false);
       setPostingCount(0);
     }
+  }
+
+  function handleBulkPostSelected() {
+    if (!requireWrite()) return;
+    if (activeTab !== "needs_review") return;
+    void handlePostRows(selectedActionRows, { partial: true });
   }
 
   async function confirmExclude() {
@@ -2000,12 +2075,24 @@ function TransactionsPageContent() {
         {someSelected && (
           <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
             <span className="text-[12px] text-adaptive-info font-medium">{selectedIds.size} selected</span>
+            {activeTab === "needs_review" && (
+              <ReadOnlyGuard>
+                <button
+                  type="button"
+                  className="btn-primary text-[11px]"
+                  onClick={handleBulkPostSelected}
+                  disabled={selectedPostableRows.length === 0 || posting || saving}
+                >
+                  {posting ? "Posting…" : "Post"}
+                </button>
+              </ReadOnlyGuard>
+            )}
             <ReadOnlyGuard>
               <button
                 type="button"
                 className="btn-outline text-[11px]"
                 onClick={openBulkReclassifyModal}
-                disabled={selectedActionRows.length === 0 || saving}
+                disabled={selectedActionRows.length === 0 || saving || posting}
               >
                 Reclassify
               </button>
@@ -2015,7 +2102,7 @@ function TransactionsPageContent() {
                 type="button"
                 className="btn-outline text-[11px] text-red-400 border-red-500/30"
                 onClick={handleBulkExclude}
-                disabled={selectedActionRows.length === 0 || saving}
+                disabled={selectedActionRows.length === 0 || saving || posting}
               >
                 Exclude
               </button>
