@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import {
-  createPlaidLinkToken,
-  getStoreFinancialDataSource,
-  isQuickBooksDataSource,
   logPlaidApiError,
-  PLAID_QUICKBOOKS_BLOCK_MESSAGE,
+  PlaidNotConnectedError,
+  syncPlaidTransactions,
   verifyUserOwnsStore,
 } from "@/lib/plaid";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
@@ -37,18 +35,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const financialDataSource = await getStoreFinancialDataSource(storeId);
-    if (isQuickBooksDataSource(financialDataSource)) {
-      return NextResponse.json({ error: PLAID_QUICKBOOKS_BLOCK_MESSAGE }, { status: 409 });
+    const result = await syncPlaidTransactions(storeId);
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof PlaidNotConnectedError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
     }
 
-    const linkToken = await createPlaidLinkToken(user.id);
-    return NextResponse.json({ link_token: linkToken });
-  } catch (error) {
-    logPlaidApiError("[plaid/create-link-token] route failed", error, {
-      storeId,
-      userId: user.id,
-    });
-    return NextResponse.json({ error: "Failed to create Plaid link token" }, { status: 500 });
+    logPlaidApiError("[plaid/sync-transactions] route failed", error, { storeId, userId: user.id });
+    return NextResponse.json({ error: "Failed to sync Plaid transactions" }, { status: 500 });
   }
 }

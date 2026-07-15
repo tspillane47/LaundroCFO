@@ -83,6 +83,7 @@ import {
   formatPlaidConnectionLabel,
   isQuickBooksDataSource,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
+  type PlaidSyncResult,
 } from "@/lib/plaid-shared";
 
 type TabId = "pl" | "trends" | "ratios" | "bank" | "quickbooks";
@@ -344,6 +345,8 @@ export default function FinancialsPage() {
   const [shouldOpenPlaidLink, setShouldOpenPlaidLink] = useState(false);
   const [connectingPlaid, setConnectingPlaid] = useState(false);
   const [disconnectingPlaid, setDisconnectingPlaid] = useState(false);
+  const [syncingPlaidTransactions, setSyncingPlaidTransactions] = useState(false);
+  const [plaidSyncResult, setPlaidSyncResult] = useState<PlaidSyncResult | null>(null);
   const [showPlaidDisconnectConfirm, setShowPlaidDisconnectConfirm] = useState(false);
   const [disconnectingQb, setDisconnectingQb] = useState(false);
   const [syncingQb, setSyncingQb] = useState(false);
@@ -1129,6 +1132,64 @@ export default function FinancialsPage() {
     }
   }
 
+  async function syncPlaidTransactionsFromBank() {
+    if (!store?.id) return;
+    setSyncingPlaidTransactions(true);
+    setError("");
+    setSuccess("");
+    setPlaidSyncResult(null);
+
+    try {
+      const response = await fetch("/api/plaid/sync-transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId: store.id }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | (PlaidSyncResult & { error?: string })
+        | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Failed to sync Plaid transactions");
+      }
+
+      const result: PlaidSyncResult = {
+        added: payload?.added ?? 0,
+        modified: payload?.modified ?? 0,
+        removed: payload?.removed ?? 0,
+        skippedRemovedPosted: payload?.skippedRemovedPosted ?? 0,
+      };
+      setPlaidSyncResult(result);
+
+      const parts: string[] = [];
+      if (result.added > 0) {
+        parts.push(`${result.added} added`);
+      }
+      if (result.modified > 0) {
+        parts.push(`${result.modified} updated`);
+      }
+      if (result.removed > 0) {
+        parts.push(`${result.removed} removed`);
+      }
+      if (result.skippedRemovedPosted > 0) {
+        parts.push(`${result.skippedRemovedPosted} posted removal${result.skippedRemovedPosted === 1 ? "" : "s"} skipped`);
+      }
+
+      setSuccess(
+        parts.length > 0
+          ? `Plaid sync complete: ${parts.join(", ")}.`
+          : "Plaid sync complete. No transaction changes."
+      );
+
+      await loadData();
+    } catch (syncError) {
+      setError(syncError instanceof Error ? syncError.message : "Failed to sync Plaid transactions");
+    } finally {
+      setSyncingPlaidTransactions(false);
+    }
+  }
+
   async function disconnectPlaid() {
     if (!store?.id) return;
     setDisconnectingPlaid(true);
@@ -1865,14 +1926,24 @@ export default function FinancialsPage() {
               )}
             </div>
             {plaidConnection ? (
-              <button
-                type="button"
-                className="btn-outline flex-shrink-0"
-                onClick={() => setShowPlaidDisconnectConfirm(true)}
-                disabled={disconnectingPlaid}
-              >
-                Disconnect
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => void syncPlaidTransactionsFromBank()}
+                  disabled={syncingPlaidTransactions || disconnectingPlaid}
+                >
+                  {syncingPlaidTransactions ? "Syncing…" : "Sync Transactions"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() => setShowPlaidDisconnectConfirm(true)}
+                  disabled={disconnectingPlaid || syncingPlaidTransactions}
+                >
+                  Disconnect
+                </button>
+              </div>
             ) : (
               <button
                 type="button"
@@ -1887,6 +1958,46 @@ export default function FinancialsPage() {
               </button>
             )}
           </div>
+
+          {plaidConnection && plaidSyncResult && (
+            <div
+              className={clsx(
+                "card border",
+                plaidSyncResult.skippedRemovedPosted > 0
+                  ? "border-amber-500/40 bg-amber-500/5"
+                  : "border-emerald-500/30 bg-emerald-500/5"
+              )}
+            >
+              <div className="text-[13px] font-semibold text-slate-100 mb-2">Last Plaid sync</div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[12px]">
+                <div>
+                  <div className="text-[var(--text-muted)]">Added</div>
+                  <div className="font-semibold text-slate-100">{plaidSyncResult.added}</div>
+                </div>
+                <div>
+                  <div className="text-[var(--text-muted)]">Updated</div>
+                  <div className="font-semibold text-slate-100">{plaidSyncResult.modified}</div>
+                </div>
+                <div>
+                  <div className="text-[var(--text-muted)]">Removed</div>
+                  <div className="font-semibold text-slate-100">{plaidSyncResult.removed}</div>
+                </div>
+                <div>
+                  <div className="text-[var(--text-muted)]">Posted removals skipped</div>
+                  <div className="font-semibold text-slate-100">{plaidSyncResult.skippedRemovedPosted}</div>
+                </div>
+              </div>
+              {plaidSyncResult.added > 0 && (
+                <div className="text-[11px] text-[var(--text-secondary)] mt-3">
+                  New transactions are in the{" "}
+                  <Link href="/transactions" className="text-[var(--accent)] hover:underline">
+                    review queue
+                  </Link>
+                  .
+                </div>
+              )}
+            </div>
+          )}
 
           {showPlaidDisconnectConfirm && (
             <div className="card border border-red-500/40 bg-red-500/5">
