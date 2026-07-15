@@ -1277,18 +1277,6 @@ export default function FinancialsPage() {
     );
   }
 
-  if (records.length === 0) {
-    return (
-      <EmptyState
-        icon="FileSpreadsheet"
-        title="No financial data yet"
-        description="Upload your bank CSV to see your P&L"
-        ctaLabel="Import Transactions"
-        ctaHref="/transactions"
-      />
-    );
-  }
-
   const occupancyPct = ratios && ttm.ttmRevenue > 0 ? (ratios.annualRent / ttm.ttmRevenue) * 100 : 0;
   const reviewCount = bankTransactions.length + stagedTransactions.length;
   return (
@@ -1335,6 +1323,16 @@ export default function FinancialsPage() {
       {/* ─── TAB 1: P&L ─── */}
       {activeTab === "pl" && (
         <div className="space-y-5">
+          {records.length === 0 && (
+            <EmptyState
+              icon="FileSpreadsheet"
+              title="No financial data yet"
+              description="Upload your bank CSV to see your P&L, or use the Bank Import and QuickBooks tabs to connect your accounts."
+              ctaLabel="Import Transactions"
+              ctaHref="/transactions"
+            />
+          )}
+
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-[var(--text-muted)]">Data source:</span>
             <span className="badge badge-blue text-[10px]">
