@@ -113,10 +113,13 @@ export function LoanCalculator({
         ? " · refinance (excludes existing)"
         : "";
 
+  const clipWidgetChrome = isWidget && displayMode !== "panel";
+
   return (
     <div
       className={clsx(
-        isWidget && "loan-calculator-widget rounded-[var(--card-radius)] overflow-hidden",
+        isWidget && "loan-calculator-widget rounded-[var(--card-radius)]",
+        clipWidgetChrome && "overflow-hidden",
         !isWidget && "space-y-5"
       )}
       style={
@@ -159,7 +162,12 @@ export function LoanCalculator({
         </div>
       )}
 
-      <div className={clsx(isWidget ? "p-4 space-y-4" : "space-y-5")}>
+      <div
+        className={clsx(
+          isWidget ? "p-4 space-y-4" : "space-y-5",
+          displayMode === "panel" && "pb-5"
+        )}
+      >
         {!isWidget && (
           <div>
             <h2 className="section-title mb-1">Loan Calculator</h2>
