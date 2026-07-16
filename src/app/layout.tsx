@@ -163,7 +163,6 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
       setChecked(true);
     }
 
-    setChecked(false);
     void checkOnboarding();
 
     return () => {
