@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash, createPublicKey, timingSafeEqual, verify } from "crypto";
 import {
   Configuration,
   CountryCode,
@@ -21,6 +22,7 @@ import {
   isPlaidSyncProtectedStatus,
   isPlaidSyncRemovableStatus,
   isQuickBooksDataSource,
+  DEFAULT_PLAID_WEBHOOK_URL,
   normalizePlaidTransaction,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
   type PlaidSyncResult,
@@ -48,7 +50,36 @@ export type PlaidConnectionRow = {
   connected_at: string;
   updated_at: string;
   sync_cursor: string | null;
+  has_new_transactions: boolean;
+  item_error_code: string | null;
+  item_error_message: string | null;
+  item_error_at: string | null;
 };
+
+export type PlaidWebhookPayload = {
+  webhook_type?: string;
+  webhook_code?: string;
+  item_id?: string;
+  error?: {
+    error_code?: string;
+    error_message?: string;
+    error_type?: string;
+    display_message?: string;
+  };
+};
+
+type PlaidWebhookJwk = {
+  alg: string;
+  kid: string;
+  kty: string;
+  crv?: string;
+  use?: string;
+  x: string;
+  y: string;
+};
+
+const PLAID_WEBHOOK_MAX_AGE_SECONDS = 5 * 60;
+const plaidWebhookKeyCache = new Map<string, PlaidWebhookJwk>();
 
 export class PlaidNotConnectedError extends Error {
   constructor() {
@@ -163,6 +194,217 @@ export function getPlaidClient(): PlaidApi {
   return plaidClient;
 }
 
+export function getPlaidWebhookUrl(): string {
+  const configuredUrl = process.env.PLAID_WEBHOOK_URL?.trim();
+  if (!configuredUrl) {
+    console.warn(
+      "[plaid] PLAID_WEBHOOK_URL is not set; defaulting to production webhook URL. " +
+        "Plaid webhooks will not reach local/dev environments unless this is configured."
+    );
+    return DEFAULT_PLAID_WEBHOOK_URL;
+  }
+
+  return configuredUrl;
+}
+
+function decodeBase64Url(input: string): Buffer {
+  const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
+  const padding = normalized.length % 4;
+  const padded = padding === 0 ? normalized : normalized + "=".repeat(4 - padding);
+  return Buffer.from(padded, "base64");
+}
+
+function timingSafeEqualHex(left: string, right: string): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return timingSafeEqual(Buffer.from(left, "hex"), Buffer.from(right, "hex"));
+}
+
+async function fetchPlaidWebhookVerificationKey(kid: string): Promise<PlaidWebhookJwk> {
+  const cached = plaidWebhookKeyCache.get(kid);
+  if (cached) {
+    return cached;
+  }
+
+  const client = getPlaidClient();
+  const response = await client.webhookVerificationKeyGet({ key_id: kid });
+  const key = response.data.key as PlaidWebhookJwk | undefined;
+
+  if (!key?.kid || key.alg !== "ES256" || key.kty !== "EC") {
+    throw new Error("Plaid webhook verification key was missing or invalid");
+  }
+
+  plaidWebhookKeyCache.set(kid, key);
+  return key;
+}
+
+export async function verifyPlaidWebhookSignature(
+  body: string,
+  verificationHeader: string | null
+): Promise<boolean> {
+  if (!verificationHeader) {
+    return false;
+  }
+
+  const parts = verificationHeader.split(".");
+  if (parts.length !== 3) {
+    return false;
+  }
+
+  const [headerPart, payloadPart, signaturePart] = parts;
+
+  let header: { alg?: string; kid?: string };
+  let payload: { iat?: number; request_body_sha256?: string };
+  try {
+    header = JSON.parse(decodeBase64Url(headerPart).toString("utf8")) as {
+      alg?: string;
+      kid?: string;
+    };
+    payload = JSON.parse(decodeBase64Url(payloadPart).toString("utf8")) as {
+      iat?: number;
+      request_body_sha256?: string;
+    };
+  } catch {
+    return false;
+  }
+
+  if (header.alg !== "ES256" || !header.kid) {
+    return false;
+  }
+
+  let jwk: PlaidWebhookJwk;
+  try {
+    jwk = await fetchPlaidWebhookVerificationKey(header.kid);
+  } catch (error) {
+    logPlaidApiError("webhook verification key fetch failed", error, { kid: header.kid });
+    return false;
+  }
+
+  const publicKey = createPublicKey({ key: jwk, format: "jwk" });
+  const signedContent = `${headerPart}.${payloadPart}`;
+  const signature = decodeBase64Url(signaturePart);
+
+  const signatureValid = verify(null, Buffer.from(signedContent), {
+    key: publicKey,
+    dsaEncoding: "ieee-p1363",
+  }, signature);
+
+  if (!signatureValid) {
+    return false;
+  }
+
+  const issuedAt = payload.iat;
+  if (typeof issuedAt !== "number" || issuedAt < Math.floor(Date.now() / 1000) - PLAID_WEBHOOK_MAX_AGE_SECONDS) {
+    return false;
+  }
+
+  const bodyHash = createHash("sha256").update(body).digest("hex");
+  if (!payload.request_body_sha256 || !timingSafeEqualHex(bodyHash, payload.request_body_sha256)) {
+    return false;
+  }
+
+  return true;
+}
+
+async function updatePlaidConnectionByItemId(
+  itemId: string,
+  updates: Partial<
+    Pick<
+      PlaidConnectionRow,
+      "has_new_transactions" | "item_error_code" | "item_error_message" | "item_error_at"
+    >
+  >
+): Promise<boolean> {
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("plaid_connections")
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("plaid_item_id", itemId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to update Plaid connection for item ${itemId}: ${error.message}`);
+  }
+
+  return Boolean(data);
+}
+
+export async function flagPlaidConnectionNewTransactions(itemId: string): Promise<void> {
+  const updated = await updatePlaidConnectionByItemId(itemId, {
+    has_new_transactions: true,
+  });
+
+  if (!updated) {
+    console.warn("[plaid/webhook] SYNC_UPDATES_AVAILABLE for unknown item", { itemId });
+  }
+}
+
+export async function setPlaidConnectionItemError(
+  itemId: string,
+  errorCode: string,
+  errorMessage: string
+): Promise<void> {
+  const updated = await updatePlaidConnectionByItemId(itemId, {
+    item_error_code: errorCode,
+    item_error_message: errorMessage,
+    item_error_at: new Date().toISOString(),
+  });
+
+  if (!updated) {
+    console.warn("[plaid/webhook] ITEM ERROR for unknown item", { itemId, errorCode });
+  }
+}
+
+export async function clearPlaidConnectionItemError(itemId: string): Promise<void> {
+  const updated = await updatePlaidConnectionByItemId(itemId, {
+    item_error_code: null,
+    item_error_message: null,
+    item_error_at: null,
+  });
+
+  if (!updated) {
+    console.warn("[plaid/webhook] clear item error for unknown item", { itemId });
+  }
+}
+
+export async function handlePlaidWebhookPayload(payload: PlaidWebhookPayload): Promise<void> {
+  const webhookType = payload.webhook_type;
+  const webhookCode = payload.webhook_code;
+  const itemId = payload.item_id;
+
+  if (!webhookType || !webhookCode || !itemId) {
+    console.warn("[plaid/webhook] missing required webhook fields", payload);
+    return;
+  }
+
+  if (webhookType === "TRANSACTIONS" && webhookCode === "SYNC_UPDATES_AVAILABLE") {
+    await flagPlaidConnectionNewTransactions(itemId);
+    return;
+  }
+
+  if (webhookType === "ITEM") {
+    if (webhookCode === "ERROR") {
+      const errorCode = payload.error?.error_code ?? "UNKNOWN";
+      const errorMessage =
+        payload.error?.display_message ??
+        payload.error?.error_message ??
+        "Your bank connection needs attention.";
+      await setPlaidConnectionItemError(itemId, errorCode, errorMessage);
+      return;
+    }
+
+    if (webhookCode === "LOGIN_REPAIRED") {
+      await clearPlaidConnectionItemError(itemId);
+    }
+  }
+}
+
 export async function verifyUserOwnsStore(
   supabase: SupabaseClient,
   userId: string,
@@ -196,12 +438,14 @@ export async function getStoreFinancialDataSource(storeId: string): Promise<Fina
 export async function createPlaidLinkToken(userId: string): Promise<string> {
   const client = getPlaidClient();
   const { env } = getPlaidConfig();
+  const webhookUrl = getPlaidWebhookUrl();
   const linkTokenRequest = {
     user: { client_user_id: userId },
     client_name: "LaundroCFO",
     products: [Products.Transactions],
     country_codes: [CountryCode.Us],
     language: "en",
+    webhook: webhookUrl,
   };
 
   console.info(
@@ -213,6 +457,7 @@ export async function createPlaidLinkToken(userId: string): Promise<string> {
           ...linkTokenRequest,
           products: linkTokenRequest.products.map(String),
           country_codes: linkTokenRequest.country_codes.map(String),
+          webhook: webhookUrl,
         },
       },
       null,
@@ -303,6 +548,10 @@ export async function upsertPlaidConnection(params: {
     plaid_access_token: params.accessToken,
     institution_name: params.institutionName,
     sync_cursor: null,
+    has_new_transactions: false,
+    item_error_code: null,
+    item_error_message: null,
+    item_error_at: null,
     connected_at: now,
     updated_at: now,
   };
@@ -674,6 +923,10 @@ async function persistPlaidSyncCursor(storeId: string, syncCursor: string): Prom
     .from("plaid_connections")
     .update({
       sync_cursor: syncCursor,
+      has_new_transactions: false,
+      item_error_code: null,
+      item_error_message: null,
+      item_error_at: null,
       updated_at: new Date().toISOString(),
     })
     .eq("store_id", storeId);

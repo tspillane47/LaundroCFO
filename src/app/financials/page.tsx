@@ -81,6 +81,7 @@ import {
 } from "@/lib/quickbooks-shared";
 import {
   formatPlaidConnectionLabel,
+  formatPlaidItemErrorMessage,
   isQuickBooksDataSource,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
   type PlaidSyncResult,
@@ -120,6 +121,10 @@ type PlaidConnection = {
   plaid_item_id: string;
   institution_name: string | null;
   connected_at: string;
+  has_new_transactions: boolean;
+  item_error_code: string | null;
+  item_error_message: string | null;
+  item_error_at: string | null;
 };
 
 const QB_ERROR_MESSAGES: Record<string, string> = {
@@ -427,7 +432,9 @@ export default function FinancialsPage() {
         .maybeSingle(),
       supabase
         .from("plaid_connections")
-        .select("id, plaid_item_id, institution_name, connected_at")
+        .select(
+          "id, plaid_item_id, institution_name, connected_at, has_new_transactions, item_error_code, item_error_message, item_error_at"
+        )
         .eq("store_id", selectedStore.id)
         .maybeSingle(),
       supabase
@@ -1128,6 +1135,40 @@ export default function FinancialsPage() {
       setConnectingPlaid(false);
       setError(
         connectError instanceof Error ? connectError.message : "Failed to start bank connection"
+      );
+    }
+  }
+
+  async function reconnectPlaid() {
+    if (!store?.id || !plaidConnection) return;
+    setConnectingPlaid(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const disconnectResponse = await fetch("/api/plaid/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId: store.id }),
+      });
+
+      if (!disconnectResponse.ok) {
+        const payload = (await disconnectResponse.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error ?? "Failed to disconnect bank account");
+      }
+
+      setPlaidConnection(null);
+      setStore((prev) =>
+        prev?.financial_data_source === "bank_import"
+          ? { ...prev, financial_data_source: "manual" }
+          : prev
+      );
+
+      await initiatePlaidConnect();
+    } catch (reconnectError) {
+      setConnectingPlaid(false);
+      setError(
+        reconnectError instanceof Error ? reconnectError.message : "Failed to reconnect bank account"
       );
     }
   }
@@ -1898,6 +1939,34 @@ export default function FinancialsPage() {
       {/* ─── TAB 4: BANK IMPORT ─── */}
       {activeTab === "bank" && (
         <div className="space-y-4">
+          {plaidConnection?.item_error_code && (
+            <div
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-6 py-3 rounded-xl border"
+              style={{
+                background: "var(--bg-warning-tint, var(--bg-info-tint))",
+                borderColor: "var(--border)",
+                color: "var(--text-warning, var(--text-info))",
+              }}
+            >
+              <p className="text-[12px] leading-snug">
+                Your bank connection needs attention.{" "}
+                {formatPlaidItemErrorMessage(
+                  plaidConnection.item_error_code,
+                  plaidConnection.item_error_message
+                )}{" "}
+                Reconnect your bank account to keep your data up to date.
+              </p>
+              <button
+                type="button"
+                className="flex-shrink-0 text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
+                onClick={() => void reconnectPlaid()}
+                disabled={connectingPlaid || disconnectingPlaid || syncingPlaidTransactions}
+              >
+                {connectingPlaid ? "Reconnecting…" : "Reconnect Bank Account"}
+              </button>
+            </div>
+          )}
+
           <div className="card flex items-center gap-5">
             <div
               className="w-14 h-14 rounded-xl flex items-center justify-center text-white text-[18px] font-bold flex-shrink-0"
@@ -1925,14 +1994,21 @@ export default function FinancialsPage() {
             </div>
             {plaidConnection ? (
               <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={() => void syncPlaidTransactionsFromBank()}
-                  disabled={syncingPlaidTransactions || disconnectingPlaid}
-                >
-                  {syncingPlaidTransactions ? "Syncing…" : "Sync Transactions"}
-                </button>
+                <div className="flex flex-col gap-1.5">
+                  {plaidConnection.has_new_transactions && (
+                    <p className="text-[11px] text-emerald-200/90">
+                      New transactions are available — click Sync Now to import them.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => void syncPlaidTransactionsFromBank()}
+                    disabled={syncingPlaidTransactions || disconnectingPlaid}
+                  >
+                    {syncingPlaidTransactions ? "Syncing…" : "Sync Now"}
+                  </button>
+                </div>
                 <button
                   type="button"
                   className="btn-outline"

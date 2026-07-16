@@ -11,6 +11,29 @@ export function formatPlaidConnectionLabel(institutionName: string | null | unde
   return institutionName?.trim() || "Bank connected";
 }
 
+export const DEFAULT_PLAID_WEBHOOK_URL = "https://www.laundrocfo.com/api/webhooks/plaid";
+
+export function formatPlaidItemErrorMessage(
+  errorCode: string | null | undefined,
+  errorMessage: string | null | undefined
+): string {
+  if (errorMessage?.trim()) {
+    return errorMessage.trim();
+  }
+
+  switch (errorCode) {
+    case "ITEM_LOGIN_REQUIRED":
+      return "Your bank login details have changed and need to be updated.";
+    case "USER_PERMISSION_REVOKED":
+      return "Access to this bank account was revoked.";
+    case "PENDING_EXPIRATION":
+    case "PENDING_DISCONNECT":
+      return "Your bank connection is about to expire and needs to be refreshed.";
+    default:
+      return "Your bank connection needs attention.";
+  }
+}
+
 export type PlaidSyncResult = {
   added: number;
   modified: number;

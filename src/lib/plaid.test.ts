@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatPlaidConnectionLabel,
+  formatPlaidItemErrorMessage,
   isPlaidSyncProtectedStatus,
   isPlaidSyncRemovableStatus,
   isQuickBooksDataSource,
@@ -26,6 +27,12 @@ describe("Plaid connection guards", () => {
     expect(formatPlaidConnectionLabel(null)).toBe("Bank connected");
     expect(formatPlaidConnectionLabel("")).toBe("Bank connected");
     expect(formatPlaidConnectionLabel("Chase")).toBe("Chase");
+  });
+
+  it("formats item error messages with friendly fallbacks", () => {
+    expect(formatPlaidItemErrorMessage("ITEM_LOGIN_REQUIRED", null)).toContain("login details");
+    expect(formatPlaidItemErrorMessage(null, "Custom bank error")).toBe("Custom bank error");
+    expect(formatPlaidItemErrorMessage("UNKNOWN_CODE", null)).toContain("needs attention");
   });
 });
 
