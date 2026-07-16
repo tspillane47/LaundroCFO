@@ -1236,6 +1236,7 @@ export default function FinancialsPage() {
     setDisconnectingPlaid(true);
     setError("");
     setSuccess("");
+    setPlaidSyncResult(null);
 
     try {
       const response = await fetch("/api/plaid/disconnect", {
@@ -2075,10 +2076,10 @@ export default function FinancialsPage() {
 
           {showPlaidDisconnectConfirm && (
             <div className="card border border-red-500/40 bg-red-500/5">
-              <div className="text-[13px] font-semibold text-slate-100 mb-1">Disconnect bank account?</div>
+              <div className="text-[13px] font-semibold text-slate-100 mb-1">Disconnect this bank account?</div>
               <p className="text-[12px] text-[var(--text-secondary)]">
-                This will stop automatic bank imports. Previously imported transactions will remain in your
-                review queue.
+                This will stop automatic transaction syncing. Previously imported transactions will remain in
+                your review queue and P&L.
               </p>
               <div className="flex gap-2 mt-4">
                 <button
