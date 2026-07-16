@@ -31,7 +31,8 @@ import {
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { KpiCard } from "@/components/ui/KpiCard";
-import { LoanCalculator } from "@/components/debt/LoanCalculator";
+import { LoanCalculatorMobileShell } from "@/components/debt/LoanCalculatorMobileShell";
+import { LoanCalculatorPanel } from "@/components/debt/LoanCalculatorPanel";
 import { useToast } from "@/components/ui/ToastProvider";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -631,6 +632,14 @@ export default function DebtPage() {
   if (loans.length === 0 && !showForm) {
     const isOwnerOccupied = valuation?.store?.occupancy_type === "owner_occupied";
     const hasFinancialData = ttm.monthsUsed > 0;
+    const calculatorProps = {
+      annualEbitda: ttm.ttmEbitda,
+      businessValue: valuation?.businessValue ?? 0,
+      realEstateValue: valuation?.realEstateValue ?? 0,
+      isOwnerOccupied,
+      existingAnnualDebtService: 0,
+      hasFinancialData,
+    };
 
     return (
       <div className="space-y-5">
@@ -650,25 +659,30 @@ export default function DebtPage() {
           </ReadOnlyGuard>
         </div>
 
-        <LoanCalculator
-          annualEbitda={ttm.ttmEbitda}
-          businessValue={valuation?.businessValue ?? 0}
-          realEstateValue={valuation?.realEstateValue ?? 0}
-          isOwnerOccupied={isOwnerOccupied}
-          existingAnnualDebtService={0}
-          hasFinancialData={hasFinancialData}
-        />
+        <LoanCalculatorMobileShell {...calculatorProps} />
 
-        <EmptyState
-          icon="Landmark"
-          title="No loans added yet"
-          description="Add your loans to track debt service and DSCR"
-          ctaLabel="Add Loan"
-          ctaHref="/debt"
-        />
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-5 xl:gap-6 items-start">
+          <EmptyState
+            icon="Landmark"
+            title="No loans added yet"
+            description="Add your loans to track debt service and DSCR"
+            ctaLabel="Add Loan"
+            ctaHref="/debt"
+          />
+          <LoanCalculatorPanel {...calculatorProps} />
+        </div>
       </div>
     );
   }
+
+  const calculatorProps = {
+    annualEbitda: ttm.ttmEbitda,
+    businessValue: valuation?.businessValue ?? 0,
+    realEstateValue: valuation?.realEstateValue ?? 0,
+    isOwnerOccupied: valuation?.store?.occupancy_type === "owner_occupied",
+    existingAnnualDebtService: debtServiceAnalysis.scheduledAnnual,
+    hasFinancialData: debtServiceAnalysis.hasActualData,
+  };
 
   return (
     <div className="space-y-5">
@@ -681,6 +695,10 @@ export default function DebtPage() {
         </p>
       </div>
 
+      <LoanCalculatorMobileShell {...calculatorProps} />
+
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-5 xl:gap-6 items-start">
+        <div className="space-y-5 min-w-0">
       {/* Section 1 — Hero */}
       <div className="hero-value-card" style={{ padding: "28px 32px" }}>
         <div
@@ -788,16 +806,6 @@ export default function DebtPage() {
           }
         />
       </div>
-
-      {/* Loan Calculator */}
-      <LoanCalculator
-        annualEbitda={ttm.ttmEbitda}
-        businessValue={valuation?.businessValue ?? 0}
-        realEstateValue={valuation?.realEstateValue ?? 0}
-        isOwnerOccupied={valuation?.store?.occupancy_type === "owner_occupied"}
-        existingAnnualDebtService={debtServiceAnalysis.scheduledAnnual}
-        hasFinancialData={debtServiceAnalysis.hasActualData}
-      />
 
       {/* Section 3 — Loans list */}
       <div>
@@ -1367,6 +1375,10 @@ export default function DebtPage() {
           </table>
         </div>
       )}
+        </div>
+
+        <LoanCalculatorPanel {...calculatorProps} />
+      </div>
     </div>
   );
 }
