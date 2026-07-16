@@ -19,6 +19,7 @@ const variantStyles: Record<DisclaimerVariant, string> = {
   "report-footer": "text-[10px] text-[var(--text-muted)] leading-snug",
   tooltip: "text-[11px] text-[var(--text-secondary)] leading-relaxed",
   full: "text-[13px] text-[var(--text-secondary)] leading-relaxed space-y-4",
+  "loan-calculator": "text-[11px] text-[var(--text-muted)] leading-relaxed",
 };
 
 export function Disclaimer({ variant, className }: DisclaimerProps) {

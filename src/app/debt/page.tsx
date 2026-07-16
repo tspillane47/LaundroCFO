@@ -31,6 +31,7 @@ import {
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { KpiCard } from "@/components/ui/KpiCard";
+import { LoanCalculator } from "@/components/debt/LoanCalculator";
 import { useToast } from "@/components/ui/ToastProvider";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -628,6 +629,9 @@ export default function DebtPage() {
   }
 
   if (loans.length === 0 && !showForm) {
+    const isOwnerOccupied = valuation?.store?.occupancy_type === "owner_occupied";
+    const hasFinancialData = ttm.monthsUsed > 0;
+
     return (
       <div className="space-y-5">
         <div className="flex items-start justify-between gap-4">
@@ -645,6 +649,16 @@ export default function DebtPage() {
             </button>
           </ReadOnlyGuard>
         </div>
+
+        <LoanCalculator
+          annualEbitda={ttm.ttmEbitda}
+          businessValue={valuation?.businessValue ?? 0}
+          realEstateValue={valuation?.realEstateValue ?? 0}
+          isOwnerOccupied={isOwnerOccupied}
+          existingAnnualDebtService={0}
+          hasFinancialData={hasFinancialData}
+        />
+
         <EmptyState
           icon="Landmark"
           title="No loans added yet"
@@ -774,6 +788,16 @@ export default function DebtPage() {
           }
         />
       </div>
+
+      {/* Loan Calculator */}
+      <LoanCalculator
+        annualEbitda={ttm.ttmEbitda}
+        businessValue={valuation?.businessValue ?? 0}
+        realEstateValue={valuation?.realEstateValue ?? 0}
+        isOwnerOccupied={valuation?.store?.occupancy_type === "owner_occupied"}
+        existingAnnualDebtService={debtServiceAnalysis.scheduledAnnual}
+        hasFinancialData={debtServiceAnalysis.hasActualData}
+      />
 
       {/* Section 3 — Loans list */}
       <div>
