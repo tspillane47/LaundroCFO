@@ -64,6 +64,7 @@ export function LoanCalculator({
   const [calcMode, setCalcMode] = useState<CalcMode>("forward");
   const [loanAmount, setLoanAmount] = useState(500_000);
   const [targetDscr, setTargetDscr] = useState(DSCR_LENDER_MINIMUM);
+  const [maxLtvPercent, setMaxLtvPercent] = useState(DEFAULT_MAX_LTV_PERCENT);
   const [interestRate, setInterestRate] = useState(7.5);
   const [termMonths, setTermMonths] = useState(120);
   const [interestOnlyEnabled, setInterestOnlyEnabled] = useState(false);
@@ -127,6 +128,7 @@ export function LoanCalculator({
         businessValue,
         realEstateValue,
         isOwnerOccupied,
+        maxLtvPercent,
       }),
     [
       targetDscr,
@@ -140,6 +142,7 @@ export function LoanCalculator({
       businessValue,
       realEstateValue,
       isOwnerOccupied,
+      maxLtvPercent,
     ]
   );
 
@@ -638,7 +641,7 @@ export function LoanCalculator({
             {isOwnerOccupied && realEstateValue > 0 && (
               <RealEstateNote
                 realEstateValue={realEstateValue}
-                footnote={`Included in LTV cap at ${DEFAULT_MAX_LTV_PERCENT}% — business LTV in forward mode uses business value only`}
+                footnote={`Included in LTV cap at ${maxLtvPercent}% — business LTV in forward mode uses business value only`}
               />
             )}
 
@@ -693,6 +696,17 @@ export function LoanCalculator({
                     const n = parseInt(raw.replace(/[^0-9]/g, ""), 10);
                     return Number.isNaN(n) ? null : n;
                   }}
+                  size={isWidget ? "compact" : "default"}
+                />
+                <TouchNumericInput
+                  label="Max LTV"
+                  value={maxLtvPercent}
+                  onChange={setMaxLtvPercent}
+                  min={50}
+                  max={95}
+                  step={1}
+                  decimals={0}
+                  suffix="%"
                   size={isWidget ? "compact" : "default"}
                 />
               </div>
