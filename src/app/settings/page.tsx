@@ -44,7 +44,6 @@ const CONDITION_OPTIONS = ["excellent", "good", "fair", "poor"];
 const TREND_OPTIONS = ["growing", "stable", "declining"];
 const COMPETITION_OPTIONS = ["protected", "normal", "heavy"];
 const STORE_TYPES = ["Coin", "Card", "Hybrid"];
-const PREFERENCES_KEY = "laundrocfo_preferences";
 const VALUATION_SETTINGS_KEY = "laundrocfo_valuation_settings";
 
 type ValuationSettings = {
@@ -59,20 +58,6 @@ const DEFAULT_VALUATION_SETTINGS: ValuationSettings = {
   minDscr: "1.25",
   utilityThreshold: "20",
   occupancyThreshold: "20",
-};
-
-type NotificationPrefs = {
-  emailAlerts: boolean;
-  monthlyReport: boolean;
-  lenderShare: boolean;
-  smsAlerts: boolean;
-};
-
-const DEFAULT_NOTIFICATIONS: NotificationPrefs = {
-  emailAlerts: true,
-  monthlyReport: true,
-  lenderShare: false,
-  smsAlerts: false,
 };
 
 function labelize(value: string): string {
@@ -92,20 +77,12 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [editingStore, setEditingStore] = useState(false);
-  const [editingNotifications, setEditingNotifications] = useState(false);
   const [editingValuation, setEditingValuation] = useState(false);
   const [editingCash, setEditingCash] = useState(false);
   const [savingCash, setSavingCash] = useState(false);
 
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
-
-  const [notifications, setNotifications] = useState({
-    emailAlerts: true,
-    monthlyReport: true,
-    lenderShare: false,
-    smsAlerts: false,
-  });
 
   const [valuationSettings, setValuationSettings] = useState<ValuationSettings>(DEFAULT_VALUATION_SETTINGS);
   const [savedValuationSettings, setSavedValuationSettings] = useState<ValuationSettings>(DEFAULT_VALUATION_SETTINGS);
@@ -146,16 +123,6 @@ export default function SettingsPage() {
       }
       setUserEmail(user.email ?? "");
       setUserName(user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "User");
-
-      try {
-        const saved = localStorage.getItem(PREFERENCES_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved) as Partial<NotificationPrefs>;
-          setNotifications({ ...DEFAULT_NOTIFICATIONS, ...parsed });
-        }
-      } catch {
-        /* ignore invalid preferences */
-      }
 
       try {
         const savedValuation = localStorage.getItem(VALUATION_SETTINGS_KEY);
@@ -277,12 +244,6 @@ export default function SettingsPage() {
       await refreshStores();
     }
     setSavingCash(false);
-  }
-
-  function handleSaveNotifications() {
-    localStorage.setItem(PREFERENCES_KEY, JSON.stringify(notifications));
-    setEditingNotifications(false);
-    toast.success("Settings updated");
   }
 
   function handleSaveValuation() {
@@ -562,67 +523,48 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {/* Notifications */}
+          {/* Notifications — delivery prefs stored locally; email/SMS not wired up yet */}
           <div className="card">
             <div className="section-title">Notifications</div>
-            {editingNotifications ? (
-              <div className="space-y-3">
-                {([
-                  ["emailAlerts", "Email Alerts"],
-                  ["monthlyReport", "Monthly Report"],
-                  ["lenderShare", "Lender Share"],
-                  ["smsAlerts", "SMS Alerts"],
-                ] as const).map(([key, label]) => (
-                  <label key={key} className="flex items-center justify-between py-2 text-[13px] cursor-pointer">
-                    <span className="text-[var(--text-secondary)]">{label}</span>
-                    <input
-                      type="checkbox"
-                      checked={notifications[key]}
-                      onChange={(e) => setNotifications((n) => ({ ...n, [key]: e.target.checked }))}
-                      className="rounded border-[var(--border2)] bg-[var(--bg-input)]"
-                    />
-                  </label>
-                ))}
-                <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={handleSaveNotifications} className="btn-primary flex-1">Save</button>
-                  <button
-                    onClick={() => {
-                      try {
-                        const saved = localStorage.getItem(PREFERENCES_KEY);
-                        if (saved) setNotifications({ ...DEFAULT_NOTIFICATIONS, ...JSON.parse(saved) });
-                      } catch {
-                        setNotifications(DEFAULT_NOTIFICATIONS);
-                      }
-                      setEditingNotifications(false);
-                    }}
-                    className="btn-outline flex-1"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="divide-y divide-white/[0.04]">
-                  {([
-                    ["Email Alerts", notifications.emailAlerts],
-                    ["Monthly Report", notifications.monthlyReport],
-                    ["Lender Share", notifications.lenderShare],
-                    ["SMS Alerts", notifications.smsAlerts],
-                  ] as const).map(([label, on]) => (
-                    <div key={label} className="flex justify-between py-2.5 text-[13px]">
-                      <span className="text-[var(--text-secondary)]">{label}</span>
-                      <span className={on ? "text-green-400 font-semibold" : "text-[var(--text-muted)]"}>
-                        {on ? "Enabled" : "Disabled"}
-                      </span>
+            <p className="text-[12px] mb-3" style={{ color: "var(--text-muted)" }}>
+              Store alerts appear in the app today. Email and SMS delivery options below are coming
+              soon.
+            </p>
+            <div className="divide-y divide-white/[0.04]">
+              {([
+                ["Email Alerts", "Alert emails when thresholds are triggered"],
+                ["Monthly Report", "Monthly operating report by email"],
+                ["Lender Share", "Share reports with lenders automatically"],
+                ["SMS Alerts", "Text message alerts for urgent items"],
+              ] as const).map(([label, description]) => (
+                <div key={label} className="flex items-start justify-between gap-4 py-2.5 text-[13px] opacity-70">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap text-[var(--text-secondary)]">
+                      {label}
+                      <span className="badge badge-amber text-[10px]">Coming soon</span>
                     </div>
-                  ))}
+                    <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                      {description}
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={false}
+                    disabled
+                    aria-label={`${label} (coming soon)`}
+                    className="rounded border-[var(--border2)] bg-[var(--bg-input)] cursor-not-allowed opacity-50 mt-0.5"
+                  />
                 </div>
-                <button type="button" onClick={() => setEditingNotifications(true)} className="btn-outline w-full mt-4">
-                  Manage Notifications
-                </button>
-              </>
-            )}
+              ))}
+            </div>
+            <button
+              type="button"
+              disabled
+              className="btn-outline w-full mt-4 opacity-50 cursor-not-allowed"
+              title="Email and SMS notification preferences are coming soon"
+            >
+              Manage Notifications
+            </button>
           </div>
         </div>
 

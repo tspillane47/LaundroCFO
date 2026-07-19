@@ -41,6 +41,7 @@ type NotificationKey =
   | "monthly_report"
   | "rent_escalation_alerts";
 
+// Email delivery for these preferences is not built yet — toggles stay visible but disabled.
 const NOTIFICATION_TOGGLES: {
   key: NotificationKey;
   label: string;
@@ -49,22 +50,22 @@ const NOTIFICATION_TOGGLES: {
   {
     key: "email_alerts",
     label: "Email Alerts",
-    description: "Get notified when alerts are triggered for your stores",
+    description: "Email when alerts are triggered for your stores (coming soon)",
   },
   {
     key: "weekly_summary",
     label: "Weekly Summary",
-    description: "Receive a weekly performance summary every Monday",
+    description: "Weekly performance summary by email every Monday (coming soon)",
   },
   {
     key: "monthly_report",
     label: "Monthly Report",
-    description: "Receive your monthly operating report automatically",
+    description: "Monthly operating report by email (coming soon)",
   },
   {
     key: "rent_escalation_alerts",
     label: "Rent Escalation Warnings",
-    description: "Get notified 6 months before rent escalations",
+    description: "Email 6 months before rent escalations (coming soon)",
   },
 ];
 
@@ -103,7 +104,6 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
-  const [savingNotification, setSavingNotification] = useState<NotificationKey | null>(null);
   const [error, setError] = useState("");
 
   const [userId, setUserId] = useState<string | null>(null);
@@ -244,7 +244,6 @@ export default function AccountPage() {
 
     const previous = notifications[key];
     setNotifications((n) => ({ ...n, [key]: checked }));
-    setSavingNotification(key);
 
     const { error: updateError } = await supabase
       .from("profiles")
@@ -253,8 +252,6 @@ export default function AccountPage() {
         updated_at: new Date().toISOString(),
       })
       .eq("id", userId);
-
-    setSavingNotification(null);
 
     if (updateError) {
       setNotifications((n) => ({ ...n, [key]: previous }));
@@ -579,16 +576,24 @@ export default function AccountPage() {
       {/* Section 4 — Notifications */}
       <div className="card space-y-1">
         <div className="section-title mb-2">Notifications</div>
+        <p className="text-[12px] mb-3" style={{ color: "var(--text-muted)" }}>
+          Store alerts appear in the app today (dashboard toasts and the Alerts page). Email
+          delivery for the preferences below is coming soon.
+        </p>
 
         {NOTIFICATION_TOGGLES.map(({ key, label, description }) => (
           <div
             key={key}
-            className="flex items-start justify-between gap-4 py-3 border-b last:border-b-0"
+            className="flex items-start justify-between gap-4 py-3 border-b last:border-b-0 opacity-70"
             style={{ borderColor: "var(--border)" }}
           >
             <div className="min-w-0">
-              <div className="text-[13px] font-medium" style={{ color: "var(--text-primary)" }}>
+              <div
+                className="text-[13px] font-medium flex items-center gap-2 flex-wrap"
+                style={{ color: "var(--text-primary)" }}
+              >
                 {label}
+                <span className="badge badge-amber text-[10px]">Coming soon</span>
               </div>
               <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
                 {description}
@@ -597,8 +602,8 @@ export default function AccountPage() {
             <ToggleSwitch
               id={`notification-${key}`}
               checked={notifications[key]}
-              disabled={savingNotification === key}
-              aria-label={label}
+              disabled
+              aria-label={`${label} (coming soon)`}
               onChange={(checked) => void handleNotificationChange(key, checked)}
             />
           </div>

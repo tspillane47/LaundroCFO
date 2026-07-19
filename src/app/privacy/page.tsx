@@ -29,7 +29,10 @@ const sections = [
         <ul className="mt-2 list-disc pl-5 space-y-1">
           <li>Name, email address, and password</li>
           <li>Optional profile details such as phone number, company name, and role</li>
-          <li>Account preferences and notification settings</li>
+          <li>
+            Account preferences and notification settings you save (used for in-app alerts today;
+            optional email delivery preferences are stored for when that feature launches)
+          </li>
         </ul>
         <p className="mt-3 font-medium text-slate-200">Business and financial data you enter</p>
         <ul className="mt-2 list-disc pl-5 space-y-1">
@@ -78,7 +81,10 @@ const sections = [
         <li>Import and categorize bank transactions when you connect accounts via Plaid</li>
         <li>Process payments and manage billing through Stripe</li>
         <li>Send service-related emails such as account verification, password resets, and subscription notices</li>
-        <li>Send optional notifications you have enabled (such as weekly summaries or alert emails)</li>
+        <li>
+          Show operational alerts in the application based on your data; when available, send
+          optional email notifications you opt into (such as weekly summaries or alert digests)
+        </li>
         <li>Respond to support requests and improve the product based on feedback</li>
         <li>Monitor usage trends and fix technical issues</li>
         <li>Comply with legal obligations and enforce our Terms of Service</li>
@@ -191,7 +197,11 @@ const sections = [
           <li><strong className="text-slate-200">Delete</strong> — request deletion of your account and associated data</li>
           <li><strong className="text-slate-200">Export</strong> — request an export of your data (available from your account settings)</li>
           <li><strong className="text-slate-200">Disconnect</strong> — revoke bank connections through Plaid at any time once that feature is available</li>
-          <li><strong className="text-slate-200">Opt out of marketing</strong> — adjust notification preferences in your account settings</li>
+          <li>
+            <strong className="text-slate-200">Opt out of optional communications</strong> — control
+            notification preferences in your account settings when email delivery options are
+            available (alerts are currently shown in the app)
+          </li>
         </ul>
         <p className="mt-3">
           To exercise these rights, contact us at{" "}
