@@ -633,6 +633,7 @@ export default function DebtPage() {
     const isOwnerOccupied = valuation?.store?.occupancy_type === "owner_occupied";
     const hasFinancialData = ttm.monthsUsed > 0;
     const calculatorProps = {
+      storeId: selectedStore.id,
       annualEbitda: ttm.ttmEbitda,
       businessValue: valuation?.businessValue ?? 0,
       realEstateValue: valuation?.realEstateValue ?? 0,
@@ -676,6 +677,7 @@ export default function DebtPage() {
   }
 
   const calculatorProps = {
+    storeId: selectedStore.id,
     annualEbitda: ttm.ttmEbitda,
     businessValue: valuation?.businessValue ?? 0,
     realEstateValue: valuation?.realEstateValue ?? 0,

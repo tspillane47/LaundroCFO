@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import clsx from "clsx";
 import { Calculator } from "lucide-react";
 import {
@@ -21,8 +21,16 @@ import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Disclaimer, DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { TouchNumericInput } from "@/components/ui/TouchNumericInput";
+import { SavedLoanCalculationsSection } from "@/components/debt/SavedLoanCalculationsSection";
+import {
+  buildSavedLoanForwardOutputs,
+  buildSavedLoanInputs,
+  buildSavedLoanReverseOutputs,
+  type SavedLoanCalculationInputs,
+} from "@/lib/savedLoanCalculations";
 
 export type LoanCalculatorProps = {
+  storeId?: string;
   annualEbitda: number;
   businessValue: number;
   realEstateValue?: number;
@@ -53,6 +61,7 @@ const PHASE_TEXT: Record<LoanPhaseType, string> = {
 };
 
 export function LoanCalculator({
+  storeId,
   annualEbitda,
   businessValue,
   realEstateValue = 0,
@@ -188,6 +197,84 @@ export function LoanCalculator({
   const reverseBindingMessage = getReverseBindingMessage(reverseResult);
   const zeroRateMessage = getZeroRateUnboundedMessage(reverseResult);
   const dscrExceededMessage = getDscrExceededMessage(reverseResult, isRefinance);
+
+  const handleLoadSaved = useCallback((inputs: SavedLoanCalculationInputs) => {
+    setCalcMode(inputs.calcMode);
+    setLoanAmount(inputs.loanAmount);
+    setTargetDscr(inputs.targetDscr);
+    setMaxLtvPercent(inputs.maxLtvPercent);
+    setInterestRate(inputs.interestRate);
+    setTermMonths(inputs.termMonths);
+    setInterestOnlyEnabled(inputs.interestOnlyEnabled);
+    setInterestOnlyMonths(inputs.interestOnlyMonths);
+    setDeferredEnabled(inputs.deferredEnabled);
+    setDeferredMonths(inputs.deferredMonths);
+    setIsRefinance(inputs.isRefinance);
+  }, []);
+
+  const buildSnapshot = useCallback(() => {
+    const inputs = buildSavedLoanInputs({
+      calcMode,
+      loanAmount,
+      targetDscr,
+      maxLtvPercent,
+      interestRate,
+      termMonths,
+      interestOnlyEnabled,
+      interestOnlyMonths,
+      deferredEnabled,
+      deferredMonths,
+      isRefinance,
+    });
+
+    if (calcMode === "forward") {
+      return {
+        inputs,
+        outputs: buildSavedLoanForwardOutputs({
+          monthlyPayment: primaryPayment,
+          dscr,
+          businessLtv,
+          annualDebtService: loanResult.annualDebtService,
+          totalAnnualDebtService,
+        }),
+      };
+    }
+
+    return {
+      inputs,
+      outputs: buildSavedLoanReverseOutputs({
+        maxLoanAmount: reverseResult.maxLoanAmount,
+        dscrBasedMaxLoan: reverseResult.dscrBasedMaxLoan,
+        ltvBasedMaxLoan: reverseResult.ltvBasedMaxLoan,
+        bindingConstraint: reverseResult.bindingConstraint,
+        maxLtvPercent: reverseResult.maxLtvPercent,
+        resultingDscr: reverseAchievedDscr,
+      }),
+    };
+  }, [
+    calcMode,
+    loanAmount,
+    targetDscr,
+    maxLtvPercent,
+    interestRate,
+    termMonths,
+    interestOnlyEnabled,
+    interestOnlyMonths,
+    deferredEnabled,
+    deferredMonths,
+    isRefinance,
+    primaryPayment,
+    dscr,
+    businessLtv,
+    loanResult.annualDebtService,
+    totalAnnualDebtService,
+    reverseResult.maxLoanAmount,
+    reverseResult.dscrBasedMaxLoan,
+    reverseResult.ltvBasedMaxLoan,
+    reverseResult.bindingConstraint,
+    reverseResult.maxLtvPercent,
+    reverseAchievedDscr,
+  ]);
 
   const clipWidgetChrome = isWidget && displayMode !== "panel";
 
@@ -792,6 +879,15 @@ export function LoanCalculator({
               )}
             </div>
           </>
+        )}
+
+        {storeId && (
+          <SavedLoanCalculationsSection
+            storeId={storeId}
+            onLoad={handleLoadSaved}
+            buildSnapshot={buildSnapshot}
+            compact={isWidget}
+          />
         )}
 
         <Disclaimer variant="loan-calculator" />
