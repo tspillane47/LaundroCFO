@@ -1102,6 +1102,7 @@ function TransactionsPageContent() {
   async function confirmManualTransaction() {
     if (!requireWrite()) return;
     if (!manualFormValid || !store?.id || !userId) return;
+    if (manualSaving) return;
 
     setManualSaving(true);
     setManualError(null);
@@ -1375,6 +1376,7 @@ function TransactionsPageContent() {
   async function saveStagedToQueue() {
     if (!requireWrite()) return;
     if (!store?.id || !userId || stagedCsv.length === 0) return;
+    if (saving) return;
     setSaving(true);
 
     const rows = stagedCsv.map((t) => ({
@@ -1564,6 +1566,7 @@ function TransactionsPageContent() {
 
   async function saveCategorizationRule() {
     if (!requireWrite()) return;
+    if (ruleFormSaving) return;
     setRuleFormMessage(null);
     let activeUserId = userId;
     if (!activeUserId) {

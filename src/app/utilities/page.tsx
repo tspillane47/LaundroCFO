@@ -43,7 +43,7 @@ import {
   waterCostPerWasher,
   type MonthlyUtilityRow,
 } from "@/lib/utilities";
-import { toNullableText, toNum } from "@/lib/formHelpers";
+import { toNullableText, toNum, findNegativeFieldError } from "@/lib/formHelpers";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { FormBanner } from "@/components/ui/FormBanner";
@@ -472,6 +472,21 @@ export default function UtilitiesPage() {
       return;
     }
     if (!store?.id || !userId || saving || saveStatus === "success") return;
+
+    const negativeFieldError = findNegativeFieldError([
+      { value: toNum(form.water), label: "Water" },
+      { value: toNum(form.gas), label: "Gas" },
+      { value: toNum(form.electric), label: "Electric" },
+      { value: toNum(form.sewer), label: "Sewer" },
+      { value: toNum(form.trash), label: "Trash" },
+      { value: toNum(form.internet), label: "Internet" },
+    ]);
+    if (negativeFieldError) {
+      setSaveStatus("error");
+      setMessage({ type: "error", text: negativeFieldError });
+      return;
+    }
+
     setSaving(true);
     setSaveStatus("idle");
 

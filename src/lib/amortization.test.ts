@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calcAmortizingMonthlyPayment,
   calcMultiPhaseLoan,
+  calcRemainingMonths,
 } from "@/lib/amortization";
 
 /** Reference PMT for cross-checking plain amortizing loans */
@@ -269,5 +270,29 @@ describe("calcMultiPhaseLoan — edge cases", () => {
     expect(result.phases[1].monthlyPayment).toBe(0);
     expect(result.stabilizedPayment).toBe(2_500);
     expect(result.phases[2].months).toBe(48);
+  });
+});
+
+describe("calcRemainingMonths", () => {
+  it("returns null when payment does not cover monthly interest", () => {
+    const remaining = calcRemainingMonths({
+      currentBalance: 100_000,
+      interestRate: 6,
+      monthlyPayment: 400,
+    });
+
+    expect(remaining).toBeNull();
+  });
+
+  it("returns a finite term when payment exceeds monthly interest", () => {
+    const remaining = calcRemainingMonths({
+      currentBalance: 100_000,
+      interestRate: 6,
+      monthlyPayment: 1_000,
+    });
+
+    expect(remaining).not.toBeNull();
+    expect(Number.isFinite(remaining)).toBe(true);
+    expect(remaining!).toBeGreaterThan(0);
   });
 });

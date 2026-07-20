@@ -93,6 +93,10 @@ function EditStoreForm() {
       setMessage({ type: "error", text: blockedReason ?? "Subscribe to make changes." });
       return;
     }
+    if (!form.name.trim()) {
+      setMessage({ type: "error", text: "Store name is required." });
+      return;
+    }
     setSaving(true);
     setSaveStatus("idle");
     setMessage(null);
@@ -101,7 +105,7 @@ function EditStoreForm() {
       const { error: updateError } = await supabase
         .from("stores")
         .update({
-          name: form.name,
+          name: form.name.trim(),
           address: form.address,
           square_footage: toNullableNum(form.square_footage),
           monthly_revenue: toNullableNum(form.monthly_revenue),

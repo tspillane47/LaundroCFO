@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { fmtDollar } from "@/lib/calculations";
-import { toNullableNum } from "@/lib/formHelpers";
+import { toNullableNum, findNegativeFieldError } from "@/lib/formHelpers";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { Logo } from "@/components/ui/Logo";
 import { NavIcon } from "@/components/ui/NavIcons";
@@ -337,6 +337,15 @@ function OnboardingContent() {
     if (!user) return false;
 
     if (form.occupancy === "lease") {
+      const negativeFieldError = findNegativeFieldError([
+        { value: toNullableNum(form.monthlyRent) ?? 0, label: "Monthly rent" },
+        { value: toNullableNum(form.annualEscalation) ?? 0, label: "Annual escalation" },
+      ]);
+      if (negativeFieldError) {
+        setErrorMessage(negativeFieldError);
+        return false;
+      }
+
       await supabase.from("stores").update({ occupancy_type: "leased" }).eq("id", id);
 
       const { error } = await supabase.from("leases").upsert(
@@ -357,6 +366,15 @@ function OnboardingContent() {
         return false;
       }
     } else if (form.occupancy === "own") {
+      const negativeFieldError = findNegativeFieldError([
+        { value: toNullableNum(form.monthlyMortgage) ?? 0, label: "Monthly mortgage" },
+        { value: toNullableNum(form.buildingValue) ?? 0, label: "Building value" },
+      ]);
+      if (negativeFieldError) {
+        setErrorMessage(negativeFieldError);
+        return false;
+      }
+
       await supabase.from("stores").update({ occupancy_type: "owner_occupied" }).eq("id", id);
 
       const { error } = await supabase.from("real_estate").upsert(
@@ -476,6 +494,15 @@ function OnboardingContent() {
     } else if (form.financialMode === "manual") {
       const revenue = toNullableNum(form.monthlyRevenue);
       const expenses = toNullableNum(form.monthlyExpenses);
+      const negativeFieldError = findNegativeFieldError([
+        ...(revenue != null ? [{ value: revenue, label: "Monthly revenue" }] : []),
+        ...(expenses != null ? [{ value: expenses, label: "Monthly expenses" }] : []),
+      ]);
+      if (negativeFieldError) {
+        setErrorMessage(negativeFieldError);
+        return false;
+      }
+
       if (revenue == null && expenses == null) {
         invalidateValuationCache(id);
         return true;

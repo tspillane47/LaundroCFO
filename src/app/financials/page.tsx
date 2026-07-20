@@ -22,6 +22,7 @@ import {
 } from "recharts";
 import { createClient } from "@/lib/supabase";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
+import { findNegativeFieldError } from "@/lib/formHelpers";
 import { useStores } from "@/lib/store-context";
 import { useAlertEvaluation } from "@/components/alerts/AlertNotificationProvider";
 import { fmtDollar, fmtMultiple, fmtPct } from "@/lib/calculations";
@@ -693,6 +694,16 @@ export default function FinancialsPage() {
       });
       return;
     }
+
+    const negativeFieldError = findNegativeFieldError(
+      FORM_FIELDS.map(({ key, label }) => ({ value: form[key] as number, label }))
+    );
+    if (negativeFieldError) {
+      setSaveStatus("error");
+      setError(negativeFieldError);
+      return;
+    }
+
     setSaving(true);
     setSaveStatus("idle");
     setError("");
@@ -797,6 +808,7 @@ export default function FinancialsPage() {
 
   async function saveStagedToBank() {
     if (!store?.id || !userId || stagedTransactions.length === 0) return;
+    if (saving) return;
     setSaving(true);
     const rows = stagedTransactions.map((t) => ({
       store_id: store.id,

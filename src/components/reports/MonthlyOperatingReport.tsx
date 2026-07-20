@@ -256,7 +256,9 @@ export function MonthlyOperatingReport({ data, storeName, generatedDate }: Month
                 <Text style={[styles.tableCellBold, { width: "25%" }]}>{loan.lenderName}</Text>
                 <Text style={[styles.tableCell, { width: "25%", textAlign: "right" }]}>{fmtDollar(loan.monthlyPayment)}/mo</Text>
                 <Text style={[styles.tableCell, { width: "25%", textAlign: "right" }]}>{loan.interestRate.toFixed(2)}%</Text>
-                <Text style={[styles.tableCell, { width: "25%", textAlign: "right" }]}>{loan.remainingMonths} mo left</Text>
+                <Text style={[styles.tableCell, { width: "25%", textAlign: "right" }]}>
+                  {loan.remainingMonths != null ? `${loan.remainingMonths} mo left` : "N/A"}
+                </Text>
               </View>
               <DebtAmortizationBar
                 lenderName=""

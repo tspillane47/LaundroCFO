@@ -32,3 +32,15 @@ export function toNullableText(value: unknown): string | null {
   const text = String(value).trim();
   return text === "" ? null : text;
 }
+
+/** Returns the first negative-field error message, or null if all values are >= 0. */
+export function findNegativeFieldError(
+  fields: { value: number; label: string }[]
+): string | null {
+  for (const { value, label } of fields) {
+    if (value < 0) {
+      return `${label} cannot be negative.`;
+    }
+  }
+  return null;
+}

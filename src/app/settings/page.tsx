@@ -177,13 +177,17 @@ export default function SettingsPage() {
       toast.error(blockedReason ?? "Subscribe to make changes.");
       return;
     }
+    if (!form.name.trim()) {
+      toast.error("Store name is required.");
+      return;
+    }
     setSaving(true);
     setError("");
 
     const { error: updateError } = await supabase
       .from("stores")
       .update({
-        name: form.name,
+        name: form.name.trim(),
         address: form.address,
         square_footage: form.square_footage ? Number(form.square_footage) : null,
         store_type: form.store_type,

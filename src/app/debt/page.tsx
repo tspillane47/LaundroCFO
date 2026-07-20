@@ -39,6 +39,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { useWriteGuard } from "@/lib/useWriteGuard";
+import { findNegativeFieldError } from "@/lib/formHelpers";
 import {
   INPUT_CLASS,
   formatDate,
@@ -86,7 +87,7 @@ type LoanForm = {
 
 type EnrichedLoan = StoreLoan & {
   estimatedCurrentBalance: number;
-  remainingMonths: number;
+  remainingMonths: number | null;
   payoffDate: string;
   pctPaidOff: number;
 };
@@ -169,7 +170,8 @@ function enrichLoan(loan: StoreLoan): EnrichedLoan {
     loanStartDate: loan.loan_start_date ?? undefined,
     amortizationTermMonths: loan.amortization_term_months ?? undefined,
   });
-  const payoffDate = calcPayoffDate(remainingMonths);
+  const payoffDate =
+    remainingMonths != null ? calcPayoffDate(remainingMonths) : "N/A";
   const original = loan.original_balance ?? 0;
   const pctPaidOff =
     original > 0 ? ((original - estimatedCurrentBalance) / original) * 100 : 0;
@@ -413,9 +415,12 @@ export default function DebtPage() {
 
     const earliestPayoff =
       enrichedLoans.length > 0
-        ? enrichedLoans.reduce((min, l) =>
-            l.remainingMonths < min.remainingMonths ? l : min
-          )
+        ? enrichedLoans
+            .filter((l) => l.remainingMonths != null)
+            .reduce<EnrichedLoan | null>(
+              (min, l) => (!min || l.remainingMonths! < min.remainingMonths! ? l : min),
+              null
+            )
         : null;
 
     const storeValue = valuation?.businessValue ?? 0;
@@ -495,6 +500,28 @@ export default function DebtPage() {
     }
     if (parseNum(form.current_balance) == null && parseNum(form.monthly_payment) == null) {
       toast.error("Enter a current balance or monthly payment.");
+      return;
+    }
+
+    const negativeFieldError = findNegativeFieldError([
+      ...(parseNum(form.original_balance) != null
+        ? [{ value: parseNum(form.original_balance)!, label: "Original balance" }]
+        : []),
+      ...(parseNum(form.current_balance) != null
+        ? [{ value: parseNum(form.current_balance)!, label: "Current balance" }]
+        : []),
+      ...(parseNum(form.interest_rate) != null
+        ? [{ value: parseNum(form.interest_rate)!, label: "Interest rate" }]
+        : []),
+      ...(parseNum(form.monthly_payment) != null
+        ? [{ value: parseNum(form.monthly_payment)!, label: "Monthly payment" }]
+        : []),
+      ...(form.balloon_payment && parseNum(form.balloon_amount) != null
+        ? [{ value: parseNum(form.balloon_amount)!, label: "Balloon amount" }]
+        : []),
+    ]);
+    if (negativeFieldError) {
+      toast.error(negativeFieldError);
       return;
     }
 
@@ -904,7 +931,7 @@ export default function DebtPage() {
                   {[
                     { label: "Interest Rate", value: `${(loan.interest_rate ?? 0).toFixed(2)}%` },
                     { label: "Monthly Payment", value: fmtDollar(loan.monthly_payment ?? 0) },
-                    { label: "Remaining Term", value: `${loan.remainingMonths} mo` },
+                    { label: "Remaining Term", value: loan.remainingMonths != null ? `${loan.remainingMonths} mo` : "N/A" },
                     { label: "Est. Payoff Date", value: loan.payoffDate },
                   ].map((stat) => (
                     <div key={stat.label}>

@@ -28,7 +28,9 @@ export function monthsBetween(start: Date, end: Date): number {
   return (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
 }
 
-export function calcRemainingMonths(loan: LoanInputs & { amortizationTermMonths?: number }): number {
+export function calcRemainingMonths(
+  loan: LoanInputs & { amortizationTermMonths?: number }
+): number | null {
   if (loan.amortizationTermMonths && loan.loanStartDate) {
     const elapsed = monthsBetween(new Date(loan.loanStartDate), new Date());
     return Math.max(0, loan.amortizationTermMonths - elapsed);
@@ -38,7 +40,12 @@ export function calcRemainingMonths(loan: LoanInputs & { amortizationTermMonths?
   const monthlyRate = (loan.interestRate / 100) / 12;
   if (monthlyRate === 0 || loan.monthlyPayment <= 0) return 0;
   const balance = loan.currentBalance;
-  const n = Math.log(loan.monthlyPayment / (loan.monthlyPayment - balance * monthlyRate)) / Math.log(1 + monthlyRate);
+  const interestDue = balance * monthlyRate;
+  if (loan.monthlyPayment <= interestDue) return null;
+  const n =
+    Math.log(loan.monthlyPayment / (loan.monthlyPayment - interestDue)) /
+    Math.log(1 + monthlyRate);
+  if (!Number.isFinite(n)) return null;
   return Math.max(0, Math.round(n));
 }
 
@@ -400,6 +407,9 @@ export function calcReverseSolveLoan(inputs: ReverseSolveLoanInputs): ReverseSol
     bindingConstraint = "none";
     maxLoanAmount = 0;
   } else if (dscrAlreadyExceeded) {
+    bindingConstraint = "ltv";
+    maxLoanAmount = ltvBasedMaxLoan;
+  } else if (zeroRateUnbounded && ltvBasedMaxLoan > 0) {
     bindingConstraint = "ltv";
     maxLoanAmount = ltvBasedMaxLoan;
   } else if (ltvBasedMaxLoan <= 0) {

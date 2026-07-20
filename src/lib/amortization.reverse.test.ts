@@ -359,4 +359,23 @@ describe("calcReverseSolveLoan — binding constraint (DSCR vs LTV)", () => {
     expect(dscr).not.toBeNull();
     expect(dscr!).toBeGreaterThanOrEqual(TARGET_DSCR - 0.01);
   });
+
+  it("0% interest-only full term falls back to LTV cap when collateral is available", () => {
+    const result = calcReverseSolveLoan({
+      targetDscr: TARGET_DSCR,
+      annualEbitda: ANNUAL_EBITDA,
+      existingAnnualDebtService: 0,
+      annualInterestRate: 0,
+      termMonths: 120,
+      deferredMonths: 0,
+      interestOnlyMonths: 120,
+      businessValue: 1_000_000,
+      maxLtvPercent: 80,
+    });
+
+    expect(result.zeroRateUnbounded).toBe(true);
+    expect(result.ltvBasedMaxLoan).toBe(800_000);
+    expect(result.bindingConstraint).toBe("ltv");
+    expect(result.maxLoanAmount).toBe(800_000);
+  });
 });

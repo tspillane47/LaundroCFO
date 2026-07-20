@@ -57,7 +57,7 @@ export type EnrichedStoreLoan = {
   estimatedBalance: number;
   interestRate: number;
   monthlyPayment: number;
-  remainingMonths: number;
+  remainingMonths: number | null;
 };
 
 export type BenchmarkMetricRow = {

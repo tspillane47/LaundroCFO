@@ -20,7 +20,7 @@ import {
   gradeColor,
   type EquipmentRecord,
 } from "@/lib/equipment";
-import { calcLeaseScore, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import { calcLeaseScore, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 import {
   AreaChart,
@@ -538,7 +538,6 @@ export default function ValuationPage() {
 
   const equipmentGrade = equipMetrics.grade;
   const dscrNum = computeStoreDscr(annualEbitda, scheduledDebtService);
-  const dscr = dscrNum ?? 0;
   const totalCash =
     (store?.operating_account_balance ?? 0) +
     (store?.reserve_account_balance ?? 0) +
@@ -687,7 +686,11 @@ export default function ValuationPage() {
               <DisclaimerLabel className="!text-[var(--text-secondary)]">DSCR</DisclaimerLabel>
             </div>
             <div style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>
-              <AnimatedNumber value={dscr} decimals={2} suffix="x" duration={1000} />
+              {dscrNum != null ? (
+                <AnimatedNumber value={dscrNum} decimals={2} suffix="x" duration={1000} />
+              ) : (
+                DSCR_NO_DEBT_LABEL
+              )}
             </div>
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
