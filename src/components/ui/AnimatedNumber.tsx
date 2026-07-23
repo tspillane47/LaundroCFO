@@ -18,7 +18,7 @@ export function AnimatedNumber({
   const showPlaceholder = !Number.isFinite(value);
   const [displayValue, setDisplayValue] = useState(0);
   const prevValue = useRef(0);
-  const rafRef = useRef<number>();
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (showPlaceholder) return;

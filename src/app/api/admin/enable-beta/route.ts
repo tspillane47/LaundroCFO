@@ -4,7 +4,7 @@ import { isAdminEmail } from "@/lib/admin";
 import { BETA_MODE_SETTING_KEY } from "@/lib/beta";
 
 export async function POST() {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

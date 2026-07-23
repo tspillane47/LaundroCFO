@@ -41,7 +41,7 @@ function parseForceOverrideMonths(value: unknown): QuickBooksSyncSkippedMonth[] 
 }
 
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

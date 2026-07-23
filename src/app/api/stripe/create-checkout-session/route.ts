@@ -11,7 +11,7 @@ function isPlanKey(value: unknown): value is PlanKey {
 export async function POST(request: Request) {
   console.log("[create-checkout-session] POST received");
 
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

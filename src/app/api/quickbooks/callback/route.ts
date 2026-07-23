@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const expectedCsrf = cookieStore.get(QB_OAUTH_CSRF_COOKIE)?.value;
   if (!expectedCsrf || expectedCsrf !== state.csrf) {
     return NextResponse.redirect(
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
