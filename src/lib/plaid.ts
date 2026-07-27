@@ -18,6 +18,7 @@ import type {
 } from "@/lib/financials";
 import { categorizeWithRules } from "@/lib/financials";
 import { createAdminSupabaseClient } from "@/lib/supabase-admin";
+import { decryptTokenIfEncrypted, encryptToken } from "@/lib/tokenEncryption";
 import {
   isPlaidSyncProtectedStatus,
   isPlaidSyncRemovableStatus,
@@ -80,6 +81,13 @@ type PlaidWebhookJwk = {
 
 const PLAID_WEBHOOK_MAX_AGE_SECONDS = 5 * 60;
 const plaidWebhookKeyCache = new Map<string, PlaidWebhookJwk>();
+
+function decryptPlaidConnectionRow(row: PlaidConnectionRow): PlaidConnectionRow {
+  return {
+    ...row,
+    plaid_access_token: decryptTokenIfEncrypted(row.plaid_access_token),
+  };
+}
 
 export class PlaidNotConnectedError extends Error {
   constructor() {
@@ -545,7 +553,7 @@ export async function upsertPlaidConnection(params: {
     store_id: params.storeId,
     user_id: params.userId,
     plaid_item_id: params.itemId,
-    plaid_access_token: params.accessToken,
+    plaid_access_token: encryptToken(params.accessToken),
     institution_name: params.institutionName,
     sync_cursor: null,
     has_new_transactions: false,
@@ -613,7 +621,7 @@ export async function deletePlaidConnection(storeId: string): Promise<PlaidConne
     throw new Error(`Failed to delete Plaid connection: ${deleteError.message}`);
   }
 
-  return existing as PlaidConnectionRow;
+  return decryptPlaidConnectionRow(existing as PlaidConnectionRow);
 }
 
 export async function removePlaidItem(accessToken: string): Promise<void> {
@@ -646,7 +654,7 @@ async function loadPlaidConnection(storeId: string): Promise<PlaidConnectionRow>
     throw new PlaidNotConnectedError();
   }
 
-  return data as PlaidConnectionRow;
+  return decryptPlaidConnectionRow(data as PlaidConnectionRow);
 }
 
 async function loadCategorizationRules(userId: string): Promise<CategorizationRule[]> {

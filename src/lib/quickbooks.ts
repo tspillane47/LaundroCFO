@@ -14,6 +14,7 @@ import {
   shouldSkipMonthForQuickBooksSync,
   type QuickBooksSyncSkippedMonth,
 } from "@/lib/quickbooks-shared";
+import { decryptTokenIfEncrypted, encryptToken } from "@/lib/tokenEncryption";
 
 export type { QuickBooksSyncSkippedMonth };
 
@@ -189,6 +190,14 @@ function tokenExpiryFromNow(seconds: number): string {
   return new Date(Date.now() + seconds * 1000).toISOString();
 }
 
+function decryptQuickBooksConnectionRow(row: QuickBooksConnectionRow): QuickBooksConnectionRow {
+  return {
+    ...row,
+    access_token: decryptTokenIfEncrypted(row.access_token),
+    refresh_token: decryptTokenIfEncrypted(row.refresh_token),
+  };
+}
+
 export async function upsertQuickBooksConnection(params: {
   storeId: string;
   userId: string;
@@ -201,8 +210,8 @@ export async function upsertQuickBooksConnection(params: {
     store_id: params.storeId,
     user_id: params.userId,
     realm_id: params.realmId,
-    access_token: params.tokens.access_token,
-    refresh_token: params.tokens.refresh_token,
+    access_token: encryptToken(params.tokens.access_token),
+    refresh_token: encryptToken(params.tokens.refresh_token),
     access_token_expires_at: tokenExpiryFromNow(params.tokens.expires_in),
     refresh_token_expires_at: tokenExpiryFromNow(refreshExpiresIn),
     connected_at: new Date().toISOString(),
@@ -269,7 +278,7 @@ export async function deleteQuickBooksConnection(storeId: string): Promise<Quick
     throw new Error(`Failed to delete QuickBooks connection: ${deleteError.message}`);
   }
 
-  return existing as QuickBooksConnectionRow;
+  return decryptQuickBooksConnectionRow(existing as QuickBooksConnectionRow);
 }
 
 export function financialsRedirectUrl(origin: string, status: "connected" | "error", reason?: string): string {
@@ -379,7 +388,7 @@ async function loadQuickBooksConnection(storeId: string): Promise<QuickBooksConn
     throw new QuickBooksNotConnectedError();
   }
 
-  return data as QuickBooksConnectionRow;
+  return decryptQuickBooksConnectionRow(data as QuickBooksConnectionRow);
 }
 
 async function updateQuickBooksTokens(
@@ -389,8 +398,8 @@ async function updateQuickBooksTokens(
   const admin = createAdminSupabaseClient();
   const refreshExpiresIn = tokens.x_refresh_token_expires_in ?? 101 * 24 * 60 * 60;
   const payload = {
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
+    access_token: encryptToken(tokens.access_token),
+    refresh_token: encryptToken(tokens.refresh_token),
     access_token_expires_at: tokenExpiryFromNow(tokens.expires_in),
     refresh_token_expires_at: tokenExpiryFromNow(refreshExpiresIn),
     updated_at: new Date().toISOString(),
