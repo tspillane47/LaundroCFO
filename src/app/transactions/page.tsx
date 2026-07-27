@@ -424,6 +424,7 @@ function TransactionsPageContent() {
   const [auditLoading, setAuditLoading] = useState<Set<string>>(new Set());
 
   const [excludeModal, setExcludeModal] = useState<{ ids: string[]; reason: string } | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ ids: string[] } | null>(null);
   const [reclassifyModal, setReclassifyModal] = useState<{
     row: ReviewRow;
     newCategory: BankImportCategory;
@@ -778,6 +779,11 @@ function TransactionsPageContent() {
 
   const selectedActionRows = useMemo(
     () => filteredReviewRows.filter((row) => selectedIds.has(row.id) && !isExcludedRow(row)),
+    [filteredReviewRows, selectedIds]
+  );
+
+  const selectedExcludedRows = useMemo(
+    () => filteredReviewRows.filter((row) => selectedIds.has(row.id) && isExcludedRow(row)),
     [filteredReviewRows, selectedIds]
   );
 
@@ -1272,6 +1278,60 @@ function TransactionsPageContent() {
       return;
     }
     setExcludeModal({ ids, reason: "" });
+  }
+
+  function openDeleteModal(ids: string[]) {
+    if (!requireWrite()) return;
+    if (activeTab !== "excluded") return;
+    const excludedIds = ids.filter((id) => {
+      const row = filteredReviewRows.find((r) => r.id === id);
+      return row && isExcludedRow(row);
+    });
+    if (excludedIds.length === 0) return;
+    setDeleteModal({ ids: excludedIds });
+  }
+
+  function handleBulkDelete() {
+    if (!requireWrite()) return;
+    const ids = selectedExcludedRows.map((row) => row.id);
+    if (ids.length === 0) {
+      setMessage({ type: "error", text: "Select at least one excluded transaction to delete." });
+      return;
+    }
+    openDeleteModal(ids);
+  }
+
+  async function confirmDelete() {
+    if (!requireWrite()) return;
+    if (!deleteModal || activeTab !== "excluded") return;
+
+    setSaving(true);
+    setMessage(null);
+
+    for (const id of deleteModal.ids) {
+      const row = filteredReviewRows.find((r) => r.id === id);
+      if (!row || !isExcludedRow(row)) {
+        setSaving(false);
+        setMessage({ type: "error", text: "Only excluded transactions can be permanently deleted." });
+        return;
+      }
+
+      const { error } = await supabase.from("bank_transactions").delete().eq("id", id);
+      if (error) {
+        setSaving(false);
+        toast.error("Failed to delete — please try again");
+        return;
+      }
+    }
+
+    const count = deleteModal.ids.length;
+    setDeleteModal(null);
+    setSaving(false);
+    setSelectedIds(new Set());
+    toast.success(
+      count === 1 ? "Transaction permanently deleted" : `${count} transactions permanently deleted`
+    );
+    await loadData();
   }
 
   function handleCSVUpload(file: File) {
@@ -2078,38 +2138,53 @@ function TransactionsPageContent() {
         {someSelected && (
           <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
             <span className="text-[12px] text-adaptive-info font-medium">{selectedIds.size} selected</span>
-            {activeTab === "needs_review" && (
+            {activeTab === "excluded" ? (
               <ReadOnlyGuard>
                 <button
                   type="button"
-                  className="btn-primary text-[11px]"
-                  onClick={handleBulkPostSelected}
-                  disabled={selectedPostableRows.length === 0 || posting || saving}
+                  className="text-[11px] px-3 py-1.5 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                  onClick={handleBulkDelete}
+                  disabled={selectedExcludedRows.length === 0 || saving || posting}
                 >
-                  {posting ? "Posting…" : "Post"}
+                  Delete
                 </button>
               </ReadOnlyGuard>
+            ) : (
+              <>
+                {activeTab === "needs_review" && (
+                  <ReadOnlyGuard>
+                    <button
+                      type="button"
+                      className="btn-primary text-[11px]"
+                      onClick={handleBulkPostSelected}
+                      disabled={selectedPostableRows.length === 0 || posting || saving}
+                    >
+                      {posting ? "Posting…" : "Post"}
+                    </button>
+                  </ReadOnlyGuard>
+                )}
+                <ReadOnlyGuard>
+                  <button
+                    type="button"
+                    className="btn-outline text-[11px]"
+                    onClick={openBulkReclassifyModal}
+                    disabled={selectedActionRows.length === 0 || saving || posting}
+                  >
+                    Reclassify
+                  </button>
+                </ReadOnlyGuard>
+                <ReadOnlyGuard>
+                  <button
+                    type="button"
+                    className="btn-outline text-[11px] text-red-400 border-red-500/30"
+                    onClick={handleBulkExclude}
+                    disabled={selectedActionRows.length === 0 || saving || posting}
+                  >
+                    Exclude
+                  </button>
+                </ReadOnlyGuard>
+              </>
             )}
-            <ReadOnlyGuard>
-              <button
-                type="button"
-                className="btn-outline text-[11px]"
-                onClick={openBulkReclassifyModal}
-                disabled={selectedActionRows.length === 0 || saving || posting}
-              >
-                Reclassify
-              </button>
-            </ReadOnlyGuard>
-            <ReadOnlyGuard>
-              <button
-                type="button"
-                className="btn-outline text-[11px] text-red-400 border-red-500/30"
-                onClick={handleBulkExclude}
-                disabled={selectedActionRows.length === 0 || saving || posting}
-              >
-                Exclude
-              </button>
-            </ReadOnlyGuard>
           </div>
         )}
 
@@ -2534,6 +2609,18 @@ function TransactionsPageContent() {
                               </ReadOnlyGuard>
                             </>
                           )}
+                          {activeTab === "excluded" && excluded && (
+                            <ReadOnlyGuard>
+                              <button
+                                type="button"
+                                className="text-[11px] px-3 py-1.5 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                                onClick={() => openDeleteModal([row.id])}
+                                disabled={saving || posting}
+                              >
+                                Delete
+                              </button>
+                            </ReadOnlyGuard>
+                          )}
                         </td>
                       </tr>
                       {renderHistoryToggle(row, colSpan)}
@@ -2601,6 +2688,39 @@ function TransactionsPageContent() {
               <ReadOnlyGuard>
                 <button type="button" className="btn-primary" onClick={() => void confirmExclude()} disabled={saving}>
                   {saving ? "Excluding…" : "Exclude"}
+                </button>
+              </ReadOnlyGuard>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="card max-w-md w-full space-y-4 border border-red-500/40">
+            <div className="text-[15px] font-semibold text-adaptive-primary">
+              Permanently delete{" "}
+              {deleteModal.ids.length === 1 ? "this transaction" : `${deleteModal.ids.length} transactions`}?
+            </div>
+            <p className="text-[12px] text-adaptive-muted">
+              This cannot be undone. If {deleteModal.ids.length === 1 ? "this transaction" : "any of these transactions"}{" "}
+              came from Plaid or a bank CSV import, deleting{" "}
+              {deleteModal.ids.length === 1 ? "it" : "them"} may cause{" "}
+              {deleteModal.ids.length === 1 ? "it" : "them"} to reappear in a future sync or import, since duplicate
+              detection relies on this record. Its audit history will also be permanently removed.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-outline" onClick={() => setDeleteModal(null)} disabled={saving}>
+                Cancel
+              </button>
+              <ReadOnlyGuard>
+                <button
+                  type="button"
+                  className="text-[12px] px-4 py-2 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                  onClick={() => void confirmDelete()}
+                  disabled={saving}
+                >
+                  {saving ? "Deleting…" : "Delete Permanently"}
                 </button>
               </ReadOnlyGuard>
             </div>
