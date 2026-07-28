@@ -23,6 +23,7 @@ import {
   isPlaidSyncProtectedStatus,
   isPlaidSyncRemovableStatus,
   isQuickBooksDataSource,
+  DEFAULT_PLAID_REDIRECT_URI,
   DEFAULT_PLAID_WEBHOOK_URL,
   normalizePlaidTransaction,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
@@ -213,6 +214,19 @@ export function getPlaidWebhookUrl(): string {
   }
 
   return configuredUrl;
+}
+
+export function getPlaidRedirectUri(): string {
+  const configuredUri = process.env.PLAID_REDIRECT_URI?.trim();
+  if (!configuredUri) {
+    console.warn(
+      "[plaid] PLAID_REDIRECT_URI is not set; defaulting to production redirect URI. " +
+        "OAuth redirect flows may fail in local/dev environments unless this is configured."
+    );
+    return DEFAULT_PLAID_REDIRECT_URI;
+  }
+
+  return configuredUri;
 }
 
 function decodeBase64Url(input: string): Buffer {
@@ -447,6 +461,7 @@ export async function createPlaidLinkToken(userId: string): Promise<string> {
   const client = getPlaidClient();
   const { env } = getPlaidConfig();
   const webhookUrl = getPlaidWebhookUrl();
+  const redirectUri = getPlaidRedirectUri();
   const linkTokenRequest = {
     user: { client_user_id: userId },
     client_name: "LaundroCFO",
@@ -454,6 +469,7 @@ export async function createPlaidLinkToken(userId: string): Promise<string> {
     country_codes: [CountryCode.Us],
     language: "en",
     webhook: webhookUrl,
+    redirect_uri: redirectUri,
   };
 
   console.info(
@@ -466,6 +482,7 @@ export async function createPlaidLinkToken(userId: string): Promise<string> {
           products: linkTokenRequest.products.map(String),
           country_codes: linkTokenRequest.country_codes.map(String),
           webhook: webhookUrl,
+          redirect_uri: redirectUri,
         },
       },
       null,

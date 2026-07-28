@@ -13,6 +13,8 @@ export function formatPlaidConnectionLabel(institutionName: string | null | unde
 
 export const DEFAULT_PLAID_WEBHOOK_URL = "https://www.laundrocfo.com/api/webhooks/plaid";
 
+export const DEFAULT_PLAID_REDIRECT_URI = "https://www.laundrocfo.com/financials";
+
 export function formatPlaidItemErrorMessage(
   errorCode: string | null | undefined,
   errorMessage: string | null | undefined
