@@ -100,7 +100,7 @@ function formatAxisValue(value: number): string {
 
 const REVENUE_BAR_FILL = "rgba(34, 197, 94, 0.35)";
 const REVENUE_BAR_STROKE = "rgba(34, 197, 94, 0.8)";
-const EBITDA_LINE_COLOR = "#38bdf8";
+const EBITDA_LINE_COLOR = "#2563eb";
 const EBITDA_GLOW = "drop-shadow(0 0 4px rgba(56, 189, 248, 0.95)) drop-shadow(0 0 10px rgba(56, 189, 248, 0.55))";
 
 const ChartTooltip = ({ active, payload, label }: any) => {
@@ -849,8 +849,8 @@ export default function DashboardPage() {
                 >
                   <defs>
                     <filter id="ebitdaLineGlow" x="-20%" y="-20%" width="140%" height="140%">
-                      <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor="#38bdf8" floodOpacity="0.95" />
-                      <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#38bdf8" floodOpacity="0.45" />
+                      <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor="#2563eb" floodOpacity="0.95" />
+                      <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#2563eb" floodOpacity="0.45" />
                     </filter>
                   </defs>
                   <CartesianGrid

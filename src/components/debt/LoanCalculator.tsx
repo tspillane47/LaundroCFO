@@ -56,7 +56,7 @@ const PHASE_COLORS: Record<LoanPhaseType, string> = {
 
 const PHASE_TEXT: Record<LoanPhaseType, string> = {
   deferred: "#fbbf24",
-  "interest-only": "#38bdf8",
+  "interest-only": "#2563eb",
   amortizing: "#4ade80",
 };
 
@@ -1082,9 +1082,9 @@ function ReverseNotice({
           color: "#fbbf24",
         }
       : {
-          background: "rgba(56,189,248,0.1)",
-          border: "1px solid rgba(56,189,248,0.25)",
-          color: "#38bdf8",
+          background: "rgba(37,99,235,0.1)",
+          border: "1px solid rgba(37,99,235,0.25)",
+          color: "#2563eb",
         };
 
   return (

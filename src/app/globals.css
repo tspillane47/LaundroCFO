@@ -12,7 +12,7 @@
   --bg-sidebar-hover: #1e2a3a;
   --bg-input: #1e2a3a;
   --bg-nav-active: #1e3a5f;
-  --nav-active-border: #38bdf8;
+  --nav-active-border: var(--accent-blue);
   --nav-active-text: #f1f5f9;
 
   --text-primary: #f1f5f9;
@@ -29,7 +29,7 @@
 
   --accent: #22c55e;
   --accent-muted: #16a34a;
-  --accent-blue: #38bdf8;
+  --accent-blue: #2563eb;
   --accent-red: #ef4444;
   --accent-yellow: #f59e0b;
   --accent-purple: #a78bfa;
@@ -43,10 +43,10 @@
   --btn-outline-border: #94a3b8;
   --btn-outline-text: #f1f5f9;
 
-  --input-focus-border: #38bdf8;
+  --input-focus-border: var(--accent-blue);
   --input-placeholder: #64748b;
 
-  --text-info: #38bdf8;
+  --text-info: var(--accent-blue);
   --text-success: #22c55e;
   --text-success-muted: #16a34a;
   --text-warning: #f59e0b;
@@ -58,7 +58,7 @@
   --card-radius: 14px;
   --hero-bg: linear-gradient(135deg, #0f1e3d 0%, #1e3a5f 100%);
 
-  --bg-info-tint: rgba(56, 189, 248, 0.1);
+  --bg-info-tint: rgba(37, 99, 235, 0.1);
   --bg-success-tint: rgba(34, 197, 94, 0.08);
   --bg-warning-tint: rgba(245, 158, 11, 0.08);
   --bg-danger-tint: rgba(239, 68, 68, 0.08);
@@ -417,7 +417,7 @@ html, body {
   }
 
   /* Tinted info cards */
-  .card-info { background: var(--bg-info-tint); border-color: rgba(56, 189, 248, 0.15); }
+  .card-info { background: var(--bg-info-tint); border-color: rgba(37, 99, 235, 0.15); }
   .card-success { background: var(--bg-success-tint); border-color: rgba(34, 197, 94, 0.15); }
   .card-warning { background: var(--bg-warning-tint); border-color: rgba(245, 158, 11, 0.15); }
   .card-danger { background: var(--bg-danger-tint); border-color: rgba(239, 68, 68, 0.15); }
