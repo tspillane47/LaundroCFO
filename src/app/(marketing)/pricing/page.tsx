@@ -107,14 +107,14 @@ export default function PricingPage() {
     <div className="pt-32 pb-24 bg-[var(--bg-page)]">
       <div className="max-w-5xl mx-auto px-6 space-y-8">
         {betaMode && (
-          <div className="rounded-lg px-4 py-3 text-center text-[13px] font-medium border border-blue-200 bg-blue-50 text-blue-700">
+          <div className="rounded-lg px-4 py-3 text-center text-[13px] font-medium border border-[var(--border2)] bg-[var(--bg-card2)] text-[var(--accent-blue)]">
             LaundroCFO is free during beta — all features unlocked
           </div>
         )}
 
         <div className="text-center">
-          <h1 className="text-[32px] font-bold tracking-tight text-slate-900">Pricing</h1>
-          <p className="text-[15px] mt-2 text-slate-500">
+          <h1 className="text-[32px] font-bold tracking-tight text-[var(--text-primary)]">Pricing</h1>
+          <p className="text-[15px] mt-2 text-[var(--text-secondary)]">
             {betaMode
               ? "All plans are free during beta. Paid tiers launch when beta ends."
               : "Simple plans that scale with your portfolio."}
@@ -122,7 +122,7 @@ export default function PricingPage() {
         </div>
 
         {checkoutError && (
-          <div className="rounded-lg px-4 py-3 text-center text-[13px] font-medium border border-red-200 bg-red-50 text-red-700">
+          <div className="rounded-lg px-4 py-3 text-center text-[13px] font-medium border border-[var(--text-danger)] bg-[var(--bg-danger-tint)] text-[var(--text-danger)]">
             {checkoutError}
           </div>
         )}
@@ -132,27 +132,27 @@ export default function PricingPage() {
             const plan = PLANS[tier.key];
             const isLoading = checkoutPlan === tier.key;
             const buttonClassName = tier.highlighted
-              ? "w-full text-center py-2.5 text-[13px] font-semibold rounded-lg bg-[#2563eb] text-white hover:bg-[#1d4ed8] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              : "w-full text-center py-2.5 text-[13px] font-semibold rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
+              ? "w-full text-center py-2.5 text-[13px] font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              : "w-full text-center py-2.5 text-[13px] font-semibold rounded-lg border border-[var(--border2)] text-[var(--text-secondary)] hover:bg-[var(--bg-card2)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
 
             return (
               <div
                 key={tier.key}
-                className={`flex flex-col relative p-8 rounded-2xl border bg-white ${
+                className={`flex flex-col relative p-8 rounded-2xl border ${
                   tier.highlighted
-                    ? "border-[#2563eb] shadow-lg ring-1 ring-[#2563eb]"
-                    : "border-slate-200 hover:shadow-lg transition-shadow"
+                    ? "bg-[var(--bg-card2)] border-[var(--accent-blue)] ring-1 ring-[var(--accent-blue)]"
+                    : "bg-[var(--bg-card)] border-[var(--border)] hover:border-[var(--border2)] transition-colors"
                 }`}
               >
                 {tier.badge && (
-                  <div className="absolute -top-2.5 left-4 px-2 py-0.5 rounded text-[10px] font-semibold text-white bg-[#2563eb]">
+                  <div className="absolute -top-2.5 left-4 px-2 py-0.5 rounded text-[10px] font-semibold text-[var(--text-primary)] bg-[var(--accent-blue)]">
                     {tier.badge}
                   </div>
                 )}
                 <div className="mb-5">
-                  <h2 className="text-[16px] font-bold mb-1 text-slate-900">{plan.name}</h2>
+                  <h2 className="text-[16px] font-bold mb-1 text-[var(--text-primary)]">{plan.name}</h2>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-[32px] font-extrabold tracking-tight text-slate-900">
+                    <span className="text-[32px] font-extrabold tracking-tight text-[var(--text-primary)]">
                       ${plan.price}
                     </span>
                     <span className="text-[14px] text-[var(--text-secondary)]">/month</span>
@@ -160,8 +160,8 @@ export default function PricingPage() {
                 </div>
                 <ul className="space-y-2 mb-6 flex-1">
                   {tier.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-[13px] text-slate-600">
-                      <span className="mt-0.5 flex-shrink-0 text-emerald-500">✓</span>
+                    <li key={feature} className="flex items-start gap-2 text-[13px] text-[var(--text-secondary)]">
+                      <span className="mt-0.5 flex-shrink-0 text-[var(--text-success)]">✓</span>
                       {feature}
                     </li>
                   ))}

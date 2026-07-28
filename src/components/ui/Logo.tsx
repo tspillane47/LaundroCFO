@@ -3,19 +3,32 @@ import Link from "next/link";
 import { WashingMachineIcon } from "@/components/ui/WashingMachineIcon";
 
 interface LogoProps {
-  variant?: "marketing" | "sidebar";
+  variant?: "marketing" | "sidebar" | "wordmark";
   iconSize?: number;
   className?: string;
 }
 
 const MARKETING_ACCENT_CLASS = "text-[var(--text-success)]";
-const SIDEBAR_ACCENT_CLASS = "text-[var(--accent-blue)]";
+const BRAND_ACCENT_CLASS = "text-[var(--accent-blue)]";
+
+/** White "Laundro" + blue "CFO" — shared by sidebar, marketing nav, footer, and mock UI. */
+export function Wordmark({ className }: { className?: string }) {
+  return (
+    <span className={clsx("font-bold tracking-tight leading-none", className)}>
+      <span className="text-[var(--text-primary)]">Laundro</span>
+      <span className={BRAND_ACCENT_CLASS}>CFO</span>
+    </span>
+  );
+}
 
 export function Logo({ variant = "marketing", iconSize, className }: LogoProps) {
   const size = iconSize ?? (variant === "sidebar" ? 20 : 24);
   const isSidebar = variant === "sidebar";
+  const isWordmark = variant === "wordmark";
 
-  const wordmark = (
+  const wordmark = isWordmark ? (
+    <Wordmark className={className} />
+  ) : (
     <span
       className={clsx(
         "font-bold tracking-tight leading-none",
@@ -31,9 +44,13 @@ export function Logo({ variant = "marketing", iconSize, className }: LogoProps) 
       >
         Laundro
       </span>
-      <span className={isSidebar ? SIDEBAR_ACCENT_CLASS : MARKETING_ACCENT_CLASS}>CFO</span>
+      <span className={isSidebar ? BRAND_ACCENT_CLASS : MARKETING_ACCENT_CLASS}>CFO</span>
     </span>
   );
+
+  if (isWordmark) {
+    return wordmark;
+  }
 
   const content = (
     <div className={clsx("inline-flex items-center gap-2", className)}>

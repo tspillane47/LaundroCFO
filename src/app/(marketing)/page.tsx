@@ -10,7 +10,7 @@ function TrustIcon({ variant }: { variant: "shield" | "chart" | "doc" }) {
     fill: "none",
     stroke: "currentColor",
     strokeWidth: 1.5,
-    className: "text-blue-400 shrink-0",
+    className: "text-[var(--accent-blue)] shrink-0",
   };
 
   switch (variant) {
@@ -202,10 +202,10 @@ export default function MarketingHomePage() {
   return (
     <>
       {/* Hero */}
-      <section className="relative min-h-screen flex items-center overflow-x-hidden pt-16 bg-[#020B1F]">
+      <section className="relative min-h-screen flex items-center overflow-x-hidden pt-16 bg-[var(--bg-page)]">
         <div
           className="pointer-events-none absolute top-1/4 right-0 w-[600px] h-[600px] rounded-full opacity-40 blur-[120px]"
-          style={{ background: "radial-gradient(circle, rgba(37,99,235,0.35) 0%, transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--accent-blue) 35%, transparent) 0%, transparent 70%)" }}
           aria-hidden
         />
 
@@ -213,24 +213,14 @@ export default function MarketingHomePage() {
           <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-12 hero-banner">
             <div className="w-full lg:w-[45%]">
               <div
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium mb-8"
-                style={{
-                  background: "rgba(37,99,235,0.1)",
-                  border: "1px solid rgba(37,99,235,0.3)",
-                  color: "#93c5fd",
-                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium mb-8 bg-[var(--bg-info-tint)] border border-[var(--border2)] text-[var(--accent-blue)]"
               >
                 Now in Beta — Free Access
               </div>
 
-              <h1 className="text-[36px] lg:text-[56px] font-bold text-white tracking-tight leading-[1.08] mb-6">
+              <h1 className="text-[36px] lg:text-[56px] font-bold text-[var(--text-primary)] tracking-tight leading-[1.08] mb-6">
                 The Financial Operating System{" "}
-                <span
-                  className="bg-clip-text text-transparent"
-                  style={{ backgroundImage: "linear-gradient(to right, #3b82f6, #60a5fa)" }}
-                >
-                  for Laundromats
-                </span>
+                <span className="text-[var(--accent-blue)]">for Laundromats</span>
               </h1>
 
               <p className="text-[18px] text-[var(--text-secondary)] leading-relaxed mb-10 max-w-xl">
@@ -241,20 +231,20 @@ export default function MarketingHomePage() {
               <div className="flex flex-col sm:flex-row gap-3 mb-6">
                 <Link
                   href="/signup"
-                  className="inline-flex items-center justify-center px-6 py-3 rounded-lg text-[14px] font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors"
-                  style={{ boxShadow: "0 0 24px rgba(37,99,235,0.4)" }}
+                  className="inline-flex items-center justify-center px-6 py-3 rounded-lg text-[14px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  style={{ boxShadow: "0 0 24px color-mix(in srgb, var(--accent-blue) 40%, transparent)" }}
                 >
                   Start Free Trial →
                 </Link>
                 <a
                   href="#features"
-                  className="inline-flex items-center justify-center px-6 py-3 rounded-lg text-[14px] font-semibold border border-white/30 text-white hover:border-white/50 hover:bg-[var(--bg-card2)] transition-colors"
+                  className="inline-flex items-center justify-center px-6 py-3 rounded-lg text-[14px] font-semibold border border-[var(--border2)] text-[var(--text-primary)] hover:bg-[var(--bg-card2)] transition-colors"
                 >
                   See How It Works
                 </a>
               </div>
 
-              <p className="text-[13px] text-slate-500 mb-8">
+              <p className="text-[13px] text-[var(--text-muted)] mb-8">
                 No credit card required · Free during beta · Cancel anytime
               </p>
 
@@ -262,11 +252,7 @@ export default function MarketingHomePage() {
                 {heroTrustBadges.map((badge) => (
                   <span
                     key={badge.label}
-                    className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] px-3 py-1.5 rounded-full"
-                    style={{
-                      background: "rgba(30,41,59,0.5)",
-                      border: "1px solid rgba(59,130,246,0.15)",
-                    }}
+                    className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] px-3 py-1.5 rounded-full bg-[var(--bg-card2)] border border-[var(--border)]"
                   >
                     <TrustIcon variant={badge.icon} />
                     {badge.label}
@@ -283,16 +269,16 @@ export default function MarketingHomePage() {
       </section>
 
       {/* Social proof */}
-      <section className="py-10 bg-[#0f1e3d] border-t border-slate-800">
+      <section className="py-12 bg-[var(--bg-card)] border-y border-[var(--border)]">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-[13px] text-slate-500 mb-6 uppercase tracking-wider">
+          <p className="text-[13px] text-[var(--text-muted)] mb-6 uppercase tracking-wider">
             Trusted by laundromat owners, brokers, and lenders
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             {trustBadges.map((badge) => (
               <span
                 key={badge}
-                className="px-3 py-1.5 rounded text-[12px] font-medium text-[var(--text-secondary)] border border-slate-700"
+                className="px-3 py-1.5 rounded text-[12px] font-medium text-[var(--text-secondary)] border border-[var(--border2)] bg-[var(--bg-card2)]"
               >
                 {badge}
               </span>
@@ -302,19 +288,19 @@ export default function MarketingHomePage() {
       </section>
 
       {/* Problem/Solution */}
-      <section className="py-20 bg-[var(--bg-page)] border-b border-[var(--border)]">
+      <section className="py-24 bg-[var(--bg-page)]">
         <div className="max-w-7xl mx-auto px-6">
-          <h2 className="text-[28px] lg:text-[36px] font-bold text-slate-900 text-center max-w-4xl mx-auto leading-tight mb-12">
+          <h2 className="text-[28px] lg:text-[36px] font-bold text-[var(--text-primary)] text-center max-w-4xl mx-auto leading-tight mb-14">
             Laundromats are one of America&apos;s best small businesses. Managing them shouldn&apos;t feel like
             guesswork.
           </h2>
           <div className="grid md:grid-cols-3 gap-6">
             {problems.map((item) => (
-              <div key={item.title} className="p-6 rounded-lg bg-[var(--bg-card)] border border-[var(--border)]">
+              <div key={item.title} className="p-6 rounded-xl bg-[var(--bg-card)] border border-[var(--border)]">
                 <div className="mb-4">
                   <GeoIcon variant={item.icon} />
                 </div>
-                <h3 className="text-[16px] font-semibold text-slate-900 mb-2">{item.title}</h3>
+                <h3 className="text-[16px] font-semibold text-[var(--text-primary)] mb-2">{item.title}</h3>
                 <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed">{item.description}</p>
               </div>
             ))}
@@ -323,10 +309,10 @@ export default function MarketingHomePage() {
       </section>
 
       {/* Features */}
-      <section id="features" className="py-20 bg-slate-50 border-b border-slate-200">
+      <section id="features" className="py-24 bg-[var(--bg-card)] border-y border-[var(--border)]">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-[28px] lg:text-[36px] font-bold text-slate-900 mb-3">
+          <div className="text-center mb-14">
+            <h2 className="text-[28px] lg:text-[36px] font-bold text-[var(--text-primary)] mb-3">
               Everything you need to run your laundromat like a CFO
             </h2>
             <p className="text-[16px] text-[var(--text-secondary)]">
@@ -337,11 +323,11 @@ export default function MarketingHomePage() {
             style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "16px" }}
           >
             {features.map((item) => (
-              <div key={item.title} className="p-6 rounded-lg bg-[var(--bg-card)] border border-[var(--border)]">
+              <div key={item.title} className="p-6 rounded-xl bg-[var(--bg-card2)] border border-[var(--border)]">
                 <div className="mb-3">
                   <GeoIcon variant={item.icon} />
                 </div>
-                <h3 className="text-[15px] font-semibold text-slate-900 mb-2">{item.title}</h3>
+                <h3 className="text-[15px] font-semibold text-[var(--text-primary)] mb-2">{item.title}</h3>
                 <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{item.description}</p>
               </div>
             ))}
@@ -350,17 +336,17 @@ export default function MarketingHomePage() {
       </section>
 
       {/* Who it's for */}
-      <section className="py-20 bg-[var(--bg-page)] border-b border-[var(--border)]">
+      <section className="py-24 bg-[var(--bg-page)]">
         <div className="max-w-7xl mx-auto px-6">
-          <h2 className="text-[28px] lg:text-[36px] font-bold text-slate-900 text-center mb-12">
+          <h2 className="text-[28px] lg:text-[36px] font-bold text-[var(--text-primary)] text-center mb-14">
             Built for everyone in the laundromat industry
           </h2>
           <div
             style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "16px" }}
           >
             {audiences.map((item) => (
-              <div key={item.title} className="p-5 rounded-lg bg-[var(--bg-card)] border border-[var(--border)]">
-                <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{item.title}</h3>
+              <div key={item.title} className="p-5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)]">
+                <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-2">{item.title}</h3>
                 <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{item.description}</p>
               </div>
             ))}
@@ -369,13 +355,13 @@ export default function MarketingHomePage() {
       </section>
 
       {/* Valuation preview */}
-      <section className="py-20 bg-[#0a1628]">
+      <section className="py-24 bg-[var(--bg-card)] border-t border-[var(--border)]">
         <div className="max-w-3xl mx-auto px-6">
-          <h2 className="text-[28px] lg:text-[32px] font-bold text-white text-center mb-10">
+          <h2 className="text-[28px] lg:text-[32px] font-bold text-[var(--text-primary)] text-center mb-10">
             See exactly why your store is worth what it&apos;s worth
           </h2>
-          <div className="rounded-lg p-6 border border-slate-700 bg-[#0f1e3d]">
-            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-5">
+          <div className="rounded-xl p-6 border border-[var(--border2)] bg-[var(--bg-card2)]">
+            <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-5">
               Valuation Breakdown
             </div>
             <div className="space-y-2">
@@ -385,10 +371,10 @@ export default function MarketingHomePage() {
                   <span
                     className={
                       line.type === "positive"
-                        ? "font-semibold text-green-400 tabular-nums"
+                        ? "font-semibold text-[var(--text-success)] tabular-nums"
                         : line.type === "negative"
-                          ? "font-semibold text-red-400 tabular-nums"
-                          : "font-semibold text-slate-200 tabular-nums"
+                          ? "font-semibold text-[var(--text-danger)] tabular-nums"
+                          : "font-semibold text-[var(--text-primary)] tabular-nums"
                     }
                   >
                     {line.value}
@@ -396,18 +382,18 @@ export default function MarketingHomePage() {
                 </div>
               ))}
             </div>
-            <div className="border-t border-slate-700 mt-5 pt-5 space-y-2">
+            <div className="border-t border-[var(--border)] mt-5 pt-5 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Final Multiple</span>
-                <span className="text-[20px] font-bold text-blue-400 tabular-nums">4.70x</span>
+                <span className="text-[20px] font-bold text-[var(--accent-blue)] tabular-nums">4.70x</span>
               </div>
               <div className="flex items-center justify-between text-[13px]">
-                <span className="text-slate-500">× EBITDA</span>
-                <span className="font-semibold text-slate-200 tabular-nums">$237,843</span>
+                <span className="text-[var(--text-muted)]">× EBITDA</span>
+                <span className="font-semibold text-[var(--text-primary)] tabular-nums">$237,843</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Store Value</span>
-                <span className="text-[24px] font-bold text-green-400 tabular-nums">$1,098,472</span>
+                <span className="text-[24px] font-bold text-[var(--text-success)] tabular-nums">$1,098,472</span>
               </div>
             </div>
           </div>
@@ -415,19 +401,19 @@ export default function MarketingHomePage() {
       </section>
 
       {/* CTA */}
-      <section className="py-20 bg-[#0f1e3d] border-t border-slate-800">
+      <section className="py-24 bg-[var(--bg-page)] border-t border-[var(--border)]">
         <div className="max-w-3xl mx-auto px-6 text-center">
-          <h2 className="text-[28px] lg:text-[36px] font-bold text-white mb-3">
+          <h2 className="text-[28px] lg:text-[36px] font-bold text-[var(--text-primary)] mb-3">
             Start tracking your laundromat&apos;s value today.
           </h2>
           <p className="text-[16px] text-[var(--text-secondary)] mb-8">Free during beta. No credit card required.</p>
           <Link
             href="/signup"
-            className="inline-flex items-center justify-center px-8 py-3 rounded-md text-[15px] font-semibold bg-[#1D4ED8] text-white hover:opacity-90 transition-opacity"
+            className="inline-flex items-center justify-center px-8 py-3 rounded-lg text-[15px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-opacity"
           >
             Create Free Account
           </Link>
-          <p className="text-[13px] text-slate-500 mt-6">
+          <p className="text-[13px] text-[var(--text-muted)] mt-6">
             Join laundromat owners, brokers, and lenders already using LaundroCFO
           </p>
         </div>

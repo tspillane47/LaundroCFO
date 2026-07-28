@@ -44,9 +44,9 @@ const audiences = [
 export default function AboutPage() {
   return (
     <div>
-      <section className="pt-32 pb-20" style={{ background: "#0a1628" }}>
+      <section className="pt-32 pb-20 bg-[var(--bg-card)] border-b border-[var(--border)]">
         <div className="max-w-4xl mx-auto px-6 text-center">
-          <h1 className="text-[36px] lg:text-[48px] font-bold text-white tracking-tight leading-tight mb-6">
+          <h1 className="text-[36px] lg:text-[48px] font-bold text-[var(--text-primary)] tracking-tight leading-tight mb-6">
             Built by people who understand laundromats and finance.
           </h1>
           <p className="text-[18px] lg:text-[20px] text-[var(--text-secondary)] leading-relaxed">
@@ -58,7 +58,7 @@ export default function AboutPage() {
 
       <section className="py-24 bg-[var(--bg-page)]">
         <div className="max-w-3xl mx-auto px-6">
-          <h2 className="text-[32px] font-bold text-slate-900 mb-6">Our Mission</h2>
+          <h2 className="text-[32px] font-bold text-[var(--text-primary)] mb-6">Our Mission</h2>
           <p className="text-[16px] text-[var(--text-secondary)] leading-relaxed">
             Laundromats are one of America&apos;s most resilient small businesses — recession-resistant, cash-flowing,
             and community-essential. But most owners manage them with spreadsheets, gut instinct, and outdated
@@ -69,16 +69,16 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="py-24" style={{ background: "#F8FAFC" }}>
+      <section className="py-24 bg-[var(--bg-card)] border-y border-[var(--border)]">
         <div className="max-w-7xl mx-auto px-6">
-          <h2 className="text-[32px] font-bold text-slate-900 text-center mb-16">What we believe</h2>
+          <h2 className="text-[32px] font-bold text-[var(--text-primary)] text-center mb-16">What we believe</h2>
           <div className="grid md:grid-cols-3 gap-8">
             {beliefs.map((item) => (
               <div
                 key={item.title}
-                className="p-8 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] hover:shadow-lg transition-shadow"
+                className="p-8 rounded-2xl bg-[var(--bg-card2)] border border-[var(--border)] hover:border-[var(--border2)] transition-colors"
               >
-                <h3 className="text-[18px] font-bold text-slate-900 mb-3">{item.title}</h3>
+                <h3 className="text-[18px] font-bold text-[var(--text-primary)] mb-3">{item.title}</h3>
                 <p className="text-[15px] text-[var(--text-secondary)] leading-relaxed">{item.description}</p>
               </div>
             ))}
@@ -88,14 +88,14 @@ export default function AboutPage() {
 
       <section className="py-24 bg-[var(--bg-page)]">
         <div className="max-w-7xl mx-auto px-6">
-          <h2 className="text-[32px] font-bold text-slate-900 text-center mb-16">Who uses LaundroCFO</h2>
+          <h2 className="text-[32px] font-bold text-[var(--text-primary)] text-center mb-16">Who uses LaundroCFO</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {audiences.map((item) => (
               <div
                 key={item.title}
-                className="p-7 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] hover:shadow-lg transition-shadow"
+                className="p-7 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--border2)] transition-colors"
               >
-                <h3 className="text-[16px] font-bold text-slate-900 mb-2">{item.title}</h3>
+                <h3 className="text-[16px] font-bold text-[var(--text-primary)] mb-2">{item.title}</h3>
                 <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{item.description}</p>
               </div>
             ))}
@@ -103,12 +103,12 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="py-24" style={{ background: "#0f1e3d" }}>
+      <section className="py-24 bg-[var(--bg-card)] border-t border-[var(--border)]">
         <div className="max-w-3xl mx-auto px-6 text-center">
-          <h2 className="text-[32px] font-bold text-white mb-8">Ready to see what your store is worth?</h2>
+          <h2 className="text-[32px] font-bold text-[var(--text-primary)] mb-8">Ready to see what your store is worth?</h2>
           <Link
             href="/signup"
-            className="inline-flex items-center justify-center px-10 py-4 rounded-xl text-[16px] font-semibold bg-[#2563eb] text-white hover:bg-[#1d4ed8] transition-colors"
+            className="inline-flex items-center justify-center px-10 py-4 rounded-xl text-[16px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
           >
             Start Free Trial
           </Link>

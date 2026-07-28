@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { Wordmark } from "@/components/ui/Logo";
 
 /* ── Mini charts (div-only) ── */
 
@@ -394,7 +395,7 @@ export default function HeroDashboard() {
 
         {/* Header */}
         <div className="flex items-center justify-between mb-3 lg:mb-4">
-          <span className="text-[13px] lg:text-[15px] font-bold text-blue-400 tracking-tight">LaundroCFO</span>
+          <Wordmark className="text-[13px] lg:text-[15px]" />
           <div className="flex items-center gap-1.5">
             <span className="hero-live-dot w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full bg-emerald-400" />
             <span className="text-[9px] lg:text-[11px] text-emerald-400 font-medium">Live Data</span>
