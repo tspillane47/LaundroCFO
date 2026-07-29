@@ -457,29 +457,49 @@ export async function getStoreFinancialDataSource(storeId: string): Promise<Fina
   return (data?.financial_data_source as FinancialDataSource | undefined) ?? null;
 }
 
-export async function createPlaidLinkToken(userId: string): Promise<string> {
+async function createPlaidLinkTokenInternal(
+  userId: string,
+  options?: { accessToken?: string }
+): Promise<string> {
   const client = getPlaidClient();
   const { env } = getPlaidConfig();
   const webhookUrl = getPlaidWebhookUrl();
   const redirectUri = getPlaidRedirectUri();
-  const linkTokenRequest = {
-    user: { client_user_id: userId },
-    client_name: "LaundroCFO",
-    products: [Products.Transactions],
-    country_codes: [CountryCode.Us],
-    language: "en",
-    webhook: webhookUrl,
-    redirect_uri: redirectUri,
-  };
+  const isUpdateMode = Boolean(options?.accessToken);
+
+  const linkTokenRequest = isUpdateMode
+    ? {
+        user: { client_user_id: userId },
+        client_name: "LaundroCFO",
+        country_codes: [CountryCode.Us],
+        language: "en",
+        webhook: webhookUrl,
+        redirect_uri: redirectUri,
+        access_token: options!.accessToken!,
+      }
+    : {
+        user: { client_user_id: userId },
+        client_name: "LaundroCFO",
+        products: [Products.Transactions],
+        country_codes: [CountryCode.Us],
+        language: "en",
+        webhook: webhookUrl,
+        redirect_uri: redirectUri,
+      };
 
   console.info(
     "[plaid] linkTokenCreate request",
     JSON.stringify(
       {
         env,
+        updateMode: isUpdateMode,
         request: {
           ...linkTokenRequest,
-          products: linkTokenRequest.products.map(String),
+          access_token: isUpdateMode ? "[redacted]" : undefined,
+          products:
+            "products" in linkTokenRequest && linkTokenRequest.products
+              ? linkTokenRequest.products.map(String)
+              : undefined,
           country_codes: linkTokenRequest.country_codes.map(String),
           webhook: webhookUrl,
           redirect_uri: redirectUri,
@@ -501,13 +521,73 @@ export async function createPlaidLinkToken(userId: string): Promise<string> {
   } catch (error) {
     logPlaidApiError("linkTokenCreate failed", error, {
       env,
+      updateMode: isUpdateMode,
       request: {
         ...linkTokenRequest,
-        products: linkTokenRequest.products.map(String),
+        access_token: isUpdateMode ? "[redacted]" : undefined,
+        products:
+          "products" in linkTokenRequest && linkTokenRequest.products
+            ? linkTokenRequest.products.map(String)
+            : undefined,
         country_codes: linkTokenRequest.country_codes.map(String),
       },
     });
     throw error;
+  }
+}
+
+export async function createPlaidLinkToken(userId: string): Promise<string> {
+  return createPlaidLinkTokenInternal(userId);
+}
+
+export async function createPlaidUpdateModeLinkToken(
+  userId: string,
+  accessToken: string
+): Promise<string> {
+  return createPlaidLinkTokenInternal(userId, { accessToken });
+}
+
+export async function getPlaidConnectionForStore(
+  storeId: string
+): Promise<PlaidConnectionRow | null> {
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("plaid_connections")
+    .select("*")
+    .eq("store_id", storeId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load Plaid connection: ${error.message}`);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return decryptPlaidConnectionRow(data as PlaidConnectionRow);
+}
+
+export async function clearPlaidConnectionItemErrorByStoreId(storeId: string): Promise<void> {
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("plaid_connections")
+    .update({
+      item_error_code: null,
+      item_error_message: null,
+      item_error_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("store_id", storeId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to clear Plaid item error: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new PlaidNotConnectedError();
   }
 }
 

@@ -4,6 +4,7 @@ import {
   formatPlaidItemErrorMessage,
   isPlaidSyncProtectedStatus,
   isPlaidSyncRemovableStatus,
+  isPlaidUpdateModeEligible,
   isQuickBooksDataSource,
   normalizePlaidTransaction,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
@@ -33,6 +34,15 @@ describe("Plaid connection guards", () => {
     expect(formatPlaidItemErrorMessage("ITEM_LOGIN_REQUIRED", null)).toContain("login details");
     expect(formatPlaidItemErrorMessage(null, "Custom bank error")).toBe("Custom bank error");
     expect(formatPlaidItemErrorMessage("UNKNOWN_CODE", null)).toContain("needs attention");
+  });
+
+  it("identifies item errors eligible for Plaid update mode", () => {
+    expect(isPlaidUpdateModeEligible("ITEM_LOGIN_REQUIRED")).toBe(true);
+    expect(isPlaidUpdateModeEligible("PENDING_EXPIRATION")).toBe(true);
+    expect(isPlaidUpdateModeEligible("USER_PERMISSION_REVOKED")).toBe(true);
+    expect(isPlaidUpdateModeEligible("ITEM_NOT_FOUND")).toBe(false);
+    expect(isPlaidUpdateModeEligible("INVALID_UPDATED_USERNAME")).toBe(false);
+    expect(isPlaidUpdateModeEligible(null)).toBe(false);
   });
 });
 

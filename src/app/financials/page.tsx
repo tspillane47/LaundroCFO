@@ -83,6 +83,7 @@ import {
 import {
   formatPlaidConnectionLabel,
   formatPlaidItemErrorMessage,
+  isPlaidUpdateModeEligible,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
   type PlaidSyncResult,
 } from "@/lib/plaid-shared";
@@ -350,6 +351,7 @@ export default function FinancialsPage() {
   const [plaidConnection, setPlaidConnection] = useState<PlaidConnection | null>(null);
   const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
   const [shouldOpenPlaidLink, setShouldOpenPlaidLink] = useState(false);
+  const plaidLinkModeRef = useRef<"connect" | "update">("connect");
   const [connectingPlaid, setConnectingPlaid] = useState(false);
   const [disconnectingPlaid, setDisconnectingPlaid] = useState(false);
   const [syncingPlaidTransactions, setSyncingPlaidTransactions] = useState(false);
@@ -1068,7 +1070,32 @@ export default function FinancialsPage() {
       setError("");
       setSuccess("");
 
+      const isUpdateMode = plaidLinkModeRef.current === "update";
+
       try {
+        if (isUpdateMode) {
+          const response = await fetch("/api/plaid/complete-update-mode", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ storeId: store.id }),
+          });
+
+          const payload = (await response.json().catch(() => null)) as
+            | { ok?: boolean; sync?: PlaidSyncResult | null; error?: string }
+            | null;
+
+          if (!response.ok) {
+            throw new Error(payload?.error ?? "Failed to reconnect bank account");
+          }
+
+          setSuccess("Bank account reconnected successfully.");
+          if (payload?.sync) {
+            setPlaidSyncResult(payload.sync);
+          }
+          await loadData(store.id);
+          return;
+        }
+
         const response = await fetch("/api/plaid/exchange-token", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1101,12 +1128,14 @@ export default function FinancialsPage() {
         setConnectingPlaid(false);
         setPlaidLinkToken(null);
         setShouldOpenPlaidLink(false);
+        plaidLinkModeRef.current = "connect";
       }
     },
     onExit: () => {
       setConnectingPlaid(false);
       setPlaidLinkToken(null);
       setShouldOpenPlaidLink(false);
+      plaidLinkModeRef.current = "connect";
     },
   });
 
@@ -1119,6 +1148,7 @@ export default function FinancialsPage() {
 
   async function initiatePlaidConnect() {
     if (!store?.id || plaidBlockedByQuickBooks) return;
+    plaidLinkModeRef.current = "connect";
     setConnectingPlaid(true);
     setError("");
     setSuccess("");
@@ -1154,30 +1184,39 @@ export default function FinancialsPage() {
 
   async function reconnectPlaid() {
     if (!store?.id || !plaidConnection) return;
+    if (!isPlaidUpdateModeEligible(plaidConnection.item_error_code)) {
+      setError(
+        "This connection cannot be repaired in place. Disconnect and connect a different bank account."
+      );
+      return;
+    }
+
+    plaidLinkModeRef.current = "update";
     setConnectingPlaid(true);
     setError("");
     setSuccess("");
 
     try {
-      const disconnectResponse = await fetch("/api/plaid/disconnect", {
+      const response = await fetch("/api/plaid/create-link-token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storeId: store.id }),
+        body: JSON.stringify({ storeId: store.id, updateMode: true }),
       });
 
-      if (!disconnectResponse.ok) {
-        const payload = (await disconnectResponse.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(payload?.error ?? "Failed to disconnect bank account");
+      const payload = (await response.json().catch(() => null)) as
+        | { link_token?: string; error?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Failed to start bank reconnection");
       }
 
-      setPlaidConnection(null);
-      setStore((prev) =>
-        prev?.financial_data_source === "bank_import"
-          ? { ...prev, financial_data_source: "manual" }
-          : prev
-      );
+      if (!payload?.link_token) {
+        throw new Error("Plaid did not return a link token");
+      }
 
-      await initiatePlaidConnect();
+      setPlaidLinkToken(payload.link_token);
+      setShouldOpenPlaidLink(true);
     } catch (reconnectError) {
       setConnectingPlaid(false);
       setError(
@@ -1968,16 +2007,30 @@ export default function FinancialsPage() {
                   plaidConnection.item_error_code,
                   plaidConnection.item_error_message
                 )}{" "}
-                Reconnect your bank account to keep your data up to date.
+                {isPlaidUpdateModeEligible(plaidConnection.item_error_code)
+                  ? "Reconnect to sign in again without losing your transaction history."
+                  : "Disconnect and connect a different bank account to restore imports."}
               </p>
-              <button
-                type="button"
-                className="flex-shrink-0 text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
-                onClick={() => void reconnectPlaid()}
-                disabled={connectingPlaid || disconnectingPlaid || syncingPlaidTransactions}
-              >
-                {connectingPlaid ? "Reconnecting…" : "Reconnect Bank Account"}
-              </button>
+              <div className="flex flex-shrink-0 items-center gap-4">
+                {isPlaidUpdateModeEligible(plaidConnection.item_error_code) && (
+                  <button
+                    type="button"
+                    className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
+                    onClick={() => void reconnectPlaid()}
+                    disabled={connectingPlaid || disconnectingPlaid || syncingPlaidTransactions}
+                  >
+                    {connectingPlaid ? "Reconnecting…" : "Reconnect"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
+                  onClick={() => setShowPlaidDisconnectConfirm(true)}
+                  disabled={connectingPlaid || disconnectingPlaid || syncingPlaidTransactions}
+                >
+                  Disconnect
+                </button>
+              </div>
             </div>
           )}
 

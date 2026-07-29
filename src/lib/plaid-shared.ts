@@ -15,6 +15,24 @@ export const DEFAULT_PLAID_WEBHOOK_URL = "https://www.laundrocfo.com/api/webhook
 
 export const DEFAULT_PLAID_REDIRECT_URI = "https://www.laundrocfo.com/financials";
 
+/** Item error codes that Plaid resolves via Link update mode (re-auth without a new Item). */
+export function isPlaidUpdateModeEligible(
+  errorCode: string | null | undefined
+): boolean {
+  switch (errorCode) {
+    case "ITEM_LOGIN_REQUIRED":
+    case "PENDING_EXPIRATION":
+    case "PENDING_DISCONNECT":
+    case "USER_PERMISSION_REVOKED":
+      return true;
+    case "ITEM_NOT_FOUND":
+    case "INVALID_UPDATED_USERNAME":
+      return false;
+    default:
+      return Boolean(errorCode?.trim());
+  }
+}
+
 export function formatPlaidItemErrorMessage(
   errorCode: string | null | undefined,
   errorMessage: string | null | undefined
