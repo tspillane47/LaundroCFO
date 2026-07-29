@@ -22,6 +22,15 @@ export function parseBetaSettingValue(value: unknown): boolean {
   return BETA_MODE;
 }
 
+/** Resolve beta mode from an app_settings query. Read errors fail closed (beta off). */
+export function resolveBetaModeFromQuery(result: {
+  data: { value: unknown } | null;
+  error: unknown;
+}): boolean {
+  if (result.error) return false;
+  return parseBetaSettingValue(result.data?.value);
+}
+
 export function trialEndsAtFromNow(now = new Date()): string {
   const endsAt = new Date(now);
   endsAt.setUTCDate(endsAt.getUTCDate() + TRIAL_LENGTH_DAYS);

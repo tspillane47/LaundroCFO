@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { BETA_MODE as BETA_MODE_FALLBACK } from "@/lib/config";
-import { parseBetaSettingValue, BETA_MODE_SETTING_KEY } from "@/lib/beta";
+import { BETA_MODE_SETTING_KEY, resolveBetaModeFromQuery } from "@/lib/beta";
 import { createClient } from "@/lib/supabase";
 
 const REVALIDATE_MS = 60_000;
@@ -17,14 +17,13 @@ let betaModeCache: BetaModeCache | null = null;
 
 async function fetchBetaModeFromDb(): Promise<boolean> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const result = await supabase
     .from("app_settings")
     .select("value")
     .eq("key", BETA_MODE_SETTING_KEY)
     .maybeSingle();
 
-  if (error) return BETA_MODE_FALLBACK;
-  return parseBetaSettingValue(data?.value);
+  return resolveBetaModeFromQuery(result);
 }
 
 export function invalidateBetaModeCache() {

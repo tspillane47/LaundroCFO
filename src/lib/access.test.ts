@@ -75,6 +75,24 @@ describe("getAccessStatus", () => {
     });
   });
 
+  it("treats app_settings read errors as beta off and falls back to subscription access", async () => {
+    const result = await getAccessStatus(
+      createMockSupabase({
+        betaError: true,
+        subscription: {
+          plan: "pro",
+          status: "active",
+          trial_ends_at: null,
+        },
+      }),
+      USER_ID,
+      NOW
+    );
+
+    expect(result.reason).toBe("active");
+    expect(result.isReadOnly).toBe(false);
+  });
+
   it("returns active access for an active subscription", async () => {
     const result = await getAccessStatus(
       createMockSupabase({
