@@ -324,10 +324,12 @@ function normalizeTransactionAmount(amount: number, field: PlCategoryField): num
 }
 
 export default function FinancialsPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
+  const selectedStoreIdRef = useRef<string | undefined>(selectedStore?.id);
+  selectedStoreIdRef.current = selectedStore?.id;
   const { evaluateAlerts } = useAlertEvaluation();
   const { canWrite, blockedReason } = useWriteGuard();
 
@@ -377,8 +379,9 @@ export default function FinancialsPage() {
   const currentYear = new Date().getFullYear();
   const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
 
-  const loadData = useCallback(async () => {
-    if (!selectedStore?.id) {
+  const loadData = useCallback(async (storeIdOverride?: string) => {
+    const storeId = storeIdOverride ?? selectedStoreIdRef.current;
+    if (!storeId) {
       setStore(null);
       setRecords([]);
       setBankTransactions([]);
@@ -410,39 +413,39 @@ export default function FinancialsPage() {
       { data: utilitiesData, error: utilitiesError },
       annualDebtByStore,
     ] = await Promise.all([
-      supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
+      supabase.from("stores").select("*").eq("id", storeId).single(),
       supabase
         .from("monthly_financials")
         .select("*")
-        .eq("store_id", selectedStore.id)
+        .eq("store_id", storeId)
         .order("year", { ascending: false })
         .order("month", { ascending: false }),
       supabase
         .from("bank_transactions")
         .select("*")
-        .eq("store_id", selectedStore.id)
+        .eq("store_id", storeId)
         .eq("is_reviewed", false)
         .order("transaction_date", { ascending: false }),
-      supabase.from("quickbooks_mapping").select("*").eq("store_id", selectedStore.id),
+      supabase.from("quickbooks_mapping").select("*").eq("store_id", storeId),
       supabase
         .from("quickbooks_connections")
         .select(
           "id, realm_id, connected_at, last_synced_at, last_sync_months_synced, last_sync_skipped_count, last_sync_unmapped_count"
         )
-        .eq("store_id", selectedStore.id)
+        .eq("store_id", storeId)
         .maybeSingle(),
       supabase
         .from("plaid_connections")
         .select(
           "id, plaid_item_id, institution_name, connected_at, has_new_transactions, item_error_code, item_error_message, item_error_at"
         )
-        .eq("store_id", selectedStore.id)
+        .eq("store_id", storeId)
         .maybeSingle(),
       supabase
         .from("monthly_utilities")
         .select("year, month, water, gas, electric, sewer, trash, internet")
-        .eq("store_id", selectedStore.id),
-      fetchAnnualDebtServiceByStore(supabase, [selectedStore.id]),
+        .eq("store_id", storeId),
+      fetchAnnualDebtServiceByStore(supabase, [storeId]),
     ]);
 
     const errors = [
@@ -459,7 +462,7 @@ export default function FinancialsPage() {
     if (errors.length > 0) setError(errors.join(" · "));
 
     setStore(storeData as StoreFinancialProfile);
-    setScheduledAnnualDebtService(annualDebtByStore[selectedStore.id] ?? 0);
+    setScheduledAnnualDebtService(annualDebtByStore[storeId] ?? 0);
     const utilitiesLookup = buildUtilitiesLookup((utilitiesData ?? []) as MonthlyUtilityRecord[]);
     const sorted = enrichMonthlyRecords(
       sortRecordsDesc((financialsData ?? []) as MonthlyFinancialRecord[]),
@@ -495,12 +498,12 @@ export default function FinancialsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedStore?.id, supabase]);
+  }, [supabase]);
 
   useEffect(() => {
     if (storesLoading) return;
-    loadData();
-  }, [storesLoading, loadData]);
+    loadData(selectedStore?.id);
+  }, [storesLoading, selectedStore?.id, loadData]);
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -782,7 +785,7 @@ export default function FinancialsPage() {
         setSaveStatus("idle");
         setSaving(false);
       }, 600);
-      await loadData();
+      await loadData(store.id);
     } catch (err) {
       console.error("Unexpected monthly financials save error:", err);
       setSaveStatus("error");
@@ -828,7 +831,7 @@ export default function FinancialsPage() {
     setStagedTransactions([]);
     setSuccess(`Saved ${rows.length} transactions to review queue.`);
     setSaving(false);
-    await loadData();
+    await loadData(store.id);
   }
 
   async function postTransactionToPL(
@@ -885,7 +888,7 @@ export default function FinancialsPage() {
     }
 
     setSuccess(`Posted to ${MONTH_NAMES[month - 1]} ${year} P&L (${CATEGORY_LABELS[category]}).`);
-    await loadData();
+    await loadData(store.id);
     if (store?.id) {
       void evaluateAlerts({ storeIds: [store.id] });
     }
@@ -923,7 +926,7 @@ export default function FinancialsPage() {
 
     setSuccess("QuickBooks account mappings saved.");
     setSaving(false);
-    await loadData();
+    await loadData(store.id);
   }
 
   async function disconnectQuickBooks() {
@@ -1019,7 +1022,7 @@ export default function FinancialsPage() {
 
       invalidateValuationCache(store.id);
       void evaluateAlerts({ storeIds: [store.id] });
-      await loadData();
+      await loadData(store.id);
     } catch (syncError) {
       setError(syncError instanceof Error ? syncError.message : "Failed to sync QuickBooks");
     } finally {
@@ -1091,7 +1094,7 @@ export default function FinancialsPage() {
             : prev
         );
         setSuccess("Bank account connected successfully.");
-        await loadData();
+        await loadData(store.id);
       } catch (connectError) {
         setError(
           connectError instanceof Error ? connectError.message : "Failed to connect bank account"
@@ -1235,7 +1238,7 @@ export default function FinancialsPage() {
           : "Plaid sync complete. No transaction changes."
       );
 
-      await loadData();
+      await loadData(store.id);
     } catch (syncError) {
       setError(syncError instanceof Error ? syncError.message : "Failed to sync Plaid transactions");
     } finally {
