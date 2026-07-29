@@ -43,6 +43,7 @@ function isPublicRoute(pathname: string): boolean {
 function isOnboardingRedirectExempt(pathname: string): boolean {
   if (isPublicRoute(pathname)) return true
   if (pathname === '/onboarding' || pathname.startsWith('/onboarding/')) return true
+  if (pathname.startsWith('/api/')) return true
   return false
 }
 
