@@ -293,9 +293,21 @@ export default function AccountPage() {
     if (deleteConfirmText !== "DELETE" || deletingAccount) return;
 
     setDeletingAccount(true);
-    toast.success("Account deletion requested — our team will process this within 24 hours");
-    await supabase.auth.signOut();
-    router.push("/login");
+    try {
+      const response = await fetch("/api/account/delete", { method: "POST" });
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to delete account");
+      }
+
+      toast.success("Your account has been permanently deleted");
+      await supabase.auth.signOut();
+      router.push("/login");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete account");
+      setDeletingAccount(false);
+    }
   }
 
   if (loading) {
@@ -665,8 +677,8 @@ export default function AccountPage() {
                 Delete Account
               </h2>
               <p className="text-[12px] mt-2" style={{ color: "var(--text-secondary)" }}>
-                This will request permanent deletion of your account and all associated data. Type{" "}
-                <strong>DELETE</strong> to confirm.
+                This will permanently delete your account and all associated data, including
+                connected QuickBooks and bank accounts. Type <strong>DELETE</strong> to confirm.
               </p>
             </div>
 
