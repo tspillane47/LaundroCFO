@@ -1,14 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   formatSkippedMonthLabel,
   shouldSkipMonthForQuickBooksSync,
 } from "@/lib/quickbooks-shared";
 import {
+  buildAuthorizationUrl,
   extractProfitAndLossAccountRows,
+  getIntuitTidFromResponse,
   getQuickBooksSyncDateRange,
+  logQuickBooksApiError,
   mapProfitAndLossToMonthlyAmounts,
   parseMonthColumnTitle,
   parseProfitAndLossMonthColumns,
+  resetQuickBooksOAuthDiscoveryCacheForTests,
   type QuickBooksProfitAndLossReport,
 } from "@/lib/quickbooks";
 
@@ -226,5 +230,104 @@ describe("formatSkippedMonthLabel", () => {
   it("formats year and month for sync summaries", () => {
     expect(formatSkippedMonthLabel(2026, 3)).toBe("March 2026");
     expect(formatSkippedMonthLabel(2026, 4)).toBe("April 2026");
+  });
+});
+
+describe("getIntuitTidFromResponse", () => {
+  it("extracts the intuit_tid response header", () => {
+    const response = new Response(null, {
+      status: 500,
+      headers: { intuit_tid: "abc-123-tid" },
+    });
+
+    expect(getIntuitTidFromResponse(response)).toBe("abc-123-tid");
+  });
+
+  it("returns undefined when the header is missing", () => {
+    expect(getIntuitTidFromResponse(new Response(null, { status: 500 }))).toBeUndefined();
+  });
+});
+
+describe("logQuickBooksApiError", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("includes intuit_tid in structured error logs", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    logQuickBooksApiError("token refresh failed", new Error("boom"), {
+      responseStatus: 500,
+      intuit_tid: "abc-123-tid",
+      responseBody: '{"Fault":{"Error":[{"Message":"Service error"}]}}',
+    });
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[quickbooks] token refresh failed",
+      expect.stringContaining('"intuit_tid": "abc-123-tid"')
+    );
+  });
+});
+
+describe("buildAuthorizationUrl", () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    resetQuickBooksOAuthDiscoveryCacheForTests();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("uses OAuth discovery document endpoints when available", async () => {
+    process.env.QUICKBOOKS_CLIENT_ID = "client-id";
+    process.env.QUICKBOOKS_CLIENT_SECRET = "client-secret";
+    process.env.QUICKBOOKS_REDIRECT_URI = "https://example.com/callback";
+    process.env.QUICKBOOKS_ENVIRONMENT = "production";
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("/.well-known/openid_configuration")) {
+          return new Response(
+            JSON.stringify({
+              authorization_endpoint: "https://discovery.example/authorize",
+              token_endpoint: "https://discovery.example/token",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      })
+    );
+
+    const authorizeUrl = await buildAuthorizationUrl("store-1", "csrf-token");
+
+    expect(authorizeUrl).toContain("https://discovery.example/authorize?");
+    expect(authorizeUrl).toContain("client_id=client-id");
+    expect(authorizeUrl).toContain("redirect_uri=https%3A%2F%2Fexample.com%2Fcallback");
+  });
+
+  it("falls back to hardcoded OAuth endpoints when discovery fetch fails", async () => {
+    process.env.QUICKBOOKS_CLIENT_ID = "client-id";
+    process.env.QUICKBOOKS_CLIENT_SECRET = "client-secret";
+    process.env.QUICKBOOKS_REDIRECT_URI = "https://example.com/callback";
+    process.env.QUICKBOOKS_ENVIRONMENT = "sandbox";
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("Unavailable", { status: 503 }))
+    );
+
+    const authorizeUrl = await buildAuthorizationUrl("store-1", "csrf-token");
+
+    expect(authorizeUrl).toContain("https://appcenter.intuit.com/connect/oauth2?");
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[quickbooks] Failed to fetch Intuit OAuth discovery document; using fallback endpoint URLs",
+      expect.objectContaining({
+        discoveryUrl: "https://developer.api.intuit.com/.well-known/openid_sandbox_configuration",
+      })
+    );
   });
 });

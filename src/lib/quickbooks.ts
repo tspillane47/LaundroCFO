@@ -18,9 +18,30 @@ import { decryptTokenIfEncrypted, encryptToken } from "@/lib/tokenEncryption";
 
 export type { QuickBooksSyncSkippedMonth };
 
-const INTUIT_AUTHORIZE_URL = "https://appcenter.intuit.com/connect/oauth2";
-const INTUIT_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
-const INTUIT_REVOKE_URL = "https://developer.api.intuit.com/v2/oauth2/tokens/revoke";
+const FALLBACK_INTUIT_AUTHORIZE_URL = "https://appcenter.intuit.com/connect/oauth2";
+const FALLBACK_INTUIT_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
+const FALLBACK_INTUIT_REVOKE_URL = "https://developer.api.intuit.com/v2/oauth2/tokens/revoke";
+const INTUIT_DISCOVERY_URL_PRODUCTION =
+  "https://developer.api.intuit.com/.well-known/openid_configuration";
+const INTUIT_DISCOVERY_URL_SANDBOX =
+  "https://developer.api.intuit.com/.well-known/openid_sandbox_configuration";
+const OAUTH_DISCOVERY_CACHE_TTL_MS = 4 * 60 * 60 * 1000;
+
+type IntuitOAuthDiscoveryDocument = {
+  authorization_endpoint?: string;
+  token_endpoint?: string;
+  revocation_endpoint?: string;
+};
+
+type IntuitOAuthEndpoints = {
+  authorizeUrl: string;
+  tokenUrl: string;
+  revokeUrl: string;
+  fetchedAt: number;
+};
+
+let cachedOAuthEndpoints: IntuitOAuthEndpoints | null = null;
+let oauthEndpointsFetchPromise: Promise<IntuitOAuthEndpoints> | null = null;
 const QB_SCOPE = "com.intuit.quickbooks.accounting";
 const QB_API_MINOR_VERSION = "70";
 const ACCESS_TOKEN_REFRESH_BUFFER_MS = 60_000;
@@ -109,8 +130,122 @@ export function decodeOAuthState(value: string): QuickBooksOAuthState | null {
   }
 }
 
-export function buildAuthorizationUrl(storeId: string, csrfToken: string): string {
+function getIntuitDiscoveryDocumentUrl(): string {
+  const environment = process.env.QUICKBOOKS_ENVIRONMENT?.toLowerCase();
+  if (environment === "production") {
+    return INTUIT_DISCOVERY_URL_PRODUCTION;
+  }
+  return INTUIT_DISCOVERY_URL_SANDBOX;
+}
+
+function isOAuthEndpointsCacheValid(endpoints: IntuitOAuthEndpoints): boolean {
+  return Date.now() - endpoints.fetchedAt < OAUTH_DISCOVERY_CACHE_TTL_MS;
+}
+
+function fallbackOAuthEndpoints(): IntuitOAuthEndpoints {
+  return {
+    authorizeUrl: FALLBACK_INTUIT_AUTHORIZE_URL,
+    tokenUrl: FALLBACK_INTUIT_TOKEN_URL,
+    revokeUrl: FALLBACK_INTUIT_REVOKE_URL,
+    fetchedAt: Date.now(),
+  };
+}
+
+async function fetchOAuthEndpointsFromDiscovery(): Promise<IntuitOAuthEndpoints> {
+  const discoveryUrl = getIntuitDiscoveryDocumentUrl();
+
+  try {
+    const response = await fetch(discoveryUrl, {
+      headers: { Accept: "application/json" },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Discovery document fetch failed (${response.status})`);
+    }
+
+    const document = (await response.json()) as IntuitOAuthDiscoveryDocument;
+    const authorizeUrl = document.authorization_endpoint;
+    const tokenUrl = document.token_endpoint;
+
+    if (!authorizeUrl || !tokenUrl) {
+      throw new Error("Discovery document missing authorization_endpoint or token_endpoint");
+    }
+
+    return {
+      authorizeUrl,
+      tokenUrl,
+      revokeUrl: document.revocation_endpoint ?? FALLBACK_INTUIT_REVOKE_URL,
+      fetchedAt: Date.now(),
+    };
+  } catch (error) {
+    console.warn(
+      "[quickbooks] Failed to fetch Intuit OAuth discovery document; using fallback endpoint URLs",
+      {
+        discoveryUrl,
+        message: error instanceof Error ? error.message : String(error),
+      }
+    );
+    return fallbackOAuthEndpoints();
+  }
+}
+
+async function getOAuthEndpoints(): Promise<IntuitOAuthEndpoints> {
+  if (cachedOAuthEndpoints && isOAuthEndpointsCacheValid(cachedOAuthEndpoints)) {
+    return cachedOAuthEndpoints;
+  }
+
+  if (!oauthEndpointsFetchPromise) {
+    oauthEndpointsFetchPromise = fetchOAuthEndpointsFromDiscovery().finally(() => {
+      oauthEndpointsFetchPromise = null;
+    });
+  }
+
+  cachedOAuthEndpoints = await oauthEndpointsFetchPromise;
+  return cachedOAuthEndpoints;
+}
+
+export function getIntuitTidFromResponse(response: Response): string | undefined {
+  return response.headers.get("intuit_tid") ?? undefined;
+}
+
+export function logQuickBooksApiError(
+  context: string,
+  error: unknown,
+  extra?: Record<string, unknown>
+): void {
+  const details = {
+    context,
+    ...extra,
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+  };
+
+  console.error(`[quickbooks] ${context}`, JSON.stringify(details, null, 2));
+  console.error(`[quickbooks] ${context} (raw error)`, error);
+}
+
+function logQuickBooksFetchFailure(
+  context: string,
+  response: Response,
+  responseBody: string,
+  extra?: Record<string, unknown>
+): void {
+  logQuickBooksApiError(
+    context,
+    new Error(`${context} (${response.status})`),
+    {
+      ...extra,
+      responseStatus: response.status,
+      responseStatusText: response.statusText,
+      intuit_tid: getIntuitTidFromResponse(response),
+      responseBody,
+    }
+  );
+}
+
+export async function buildAuthorizationUrl(storeId: string, csrfToken: string): Promise<string> {
   const { clientId, redirectUri } = getQuickBooksConfig();
+  const { authorizeUrl } = await getOAuthEndpoints();
   const state = encodeOAuthState({ storeId, csrf: csrfToken });
   const params = new URLSearchParams({
     client_id: clientId,
@@ -119,7 +254,7 @@ export function buildAuthorizationUrl(storeId: string, csrfToken: string): strin
     scope: QB_SCOPE,
     state,
   });
-  return `${INTUIT_AUTHORIZE_URL}?${params.toString()}`;
+  return `${authorizeUrl}?${params.toString()}`;
 }
 
 function basicAuthHeader(clientId: string, clientSecret: string): string {
@@ -128,13 +263,14 @@ function basicAuthHeader(clientId: string, clientSecret: string): string {
 
 export async function exchangeAuthorizationCode(code: string): Promise<QuickBooksTokenResponse> {
   const { clientId, clientSecret, redirectUri } = getQuickBooksConfig();
+  const { tokenUrl } = await getOAuthEndpoints();
   const body = new URLSearchParams({
     grant_type: "authorization_code",
     code,
     redirect_uri: redirectUri,
   });
 
-  const response = await fetch(INTUIT_TOKEN_URL, {
+  const response = await fetch(tokenUrl, {
     method: "POST",
     headers: {
       Authorization: basicAuthHeader(clientId, clientSecret),
@@ -147,6 +283,7 @@ export async function exchangeAuthorizationCode(code: string): Promise<QuickBook
 
   if (!response.ok) {
     const detail = await response.text();
+    logQuickBooksFetchFailure("token exchange failed", response, detail);
     throw new Error(`QuickBooks token exchange failed (${response.status}): ${detail}`);
   }
 
@@ -155,7 +292,8 @@ export async function exchangeAuthorizationCode(code: string): Promise<QuickBook
 
 export async function revokeQuickBooksToken(token: string): Promise<void> {
   const { clientId, clientSecret } = getQuickBooksConfig();
-  const response = await fetch(INTUIT_REVOKE_URL, {
+  const { revokeUrl } = await getOAuthEndpoints();
+  const response = await fetch(revokeUrl, {
     method: "POST",
     headers: {
       Authorization: basicAuthHeader(clientId, clientSecret),
@@ -167,6 +305,7 @@ export async function revokeQuickBooksToken(token: string): Promise<void> {
 
   if (!response.ok) {
     const detail = await response.text();
+    logQuickBooksFetchFailure("token revoke failed", response, detail);
     throw new Error(`QuickBooks token revoke failed (${response.status}): ${detail}`);
   }
 }
@@ -414,12 +553,13 @@ async function updateQuickBooksTokens(
 
 export async function refreshQuickBooksAccessToken(refreshToken: string): Promise<QuickBooksTokenResponse> {
   const { clientId, clientSecret } = getQuickBooksConfig();
+  const { tokenUrl } = await getOAuthEndpoints();
   const body = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: refreshToken,
   });
 
-  const response = await fetch(INTUIT_TOKEN_URL, {
+  const response = await fetch(tokenUrl, {
     method: "POST",
     headers: {
       Authorization: basicAuthHeader(clientId, clientSecret),
@@ -433,8 +573,10 @@ export async function refreshQuickBooksAccessToken(refreshToken: string): Promis
   if (!response.ok) {
     const detail = await response.text();
     if (response.status === 400 && detail.includes("invalid_grant")) {
+      logQuickBooksFetchFailure("token refresh failed (reconnect required)", response, detail);
       throw new QuickBooksReconnectRequiredError();
     }
+    logQuickBooksFetchFailure("token refresh failed", response, detail);
     throw new Error(`QuickBooks token refresh failed (${response.status}): ${detail}`);
   }
 
@@ -510,10 +652,20 @@ export async function fetchProfitAndLossReport(params: {
   if (!response.ok) {
     const detail = await response.text();
     if (response.status === 401) {
+      logQuickBooksFetchFailure("P&L report failed (reconnect required)", response, detail, {
+        realmId: params.realmId,
+        startDate: params.startDate,
+        endDate: params.endDate,
+      });
       throw new QuickBooksReconnectRequiredError(
         "QuickBooks access was denied. Please reconnect QuickBooks."
       );
     }
+    logQuickBooksFetchFailure("P&L report failed", response, detail, {
+      realmId: params.realmId,
+      startDate: params.startDate,
+      endDate: params.endDate,
+    });
     throw new Error(`QuickBooks P&L report failed (${response.status}): ${detail}`);
   }
 
@@ -954,4 +1106,9 @@ export async function syncQuickBooksFinancials(
     unmappedAccounts,
     skippedMonths,
   };
+}
+
+export function resetQuickBooksOAuthDiscoveryCacheForTests(): void {
+  cachedOAuthEndpoints = null;
+  oauthEndpointsFetchPromise = null;
 }

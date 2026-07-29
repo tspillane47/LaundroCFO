@@ -32,7 +32,7 @@ export async function GET(request: Request) {
 
   try {
     const csrfToken = createOAuthCsrfToken();
-    const authorizeUrl = buildAuthorizationUrl(storeId, csrfToken);
+    const authorizeUrl = await buildAuthorizationUrl(storeId, csrfToken);
     const response = NextResponse.redirect(authorizeUrl);
 
     response.cookies.set(QB_OAUTH_CSRF_COOKIE, csrfToken, {
