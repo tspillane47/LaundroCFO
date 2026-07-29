@@ -83,7 +83,6 @@ import {
 import {
   formatPlaidConnectionLabel,
   formatPlaidItemErrorMessage,
-  isQuickBooksDataSource,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
   type PlaidSyncResult,
 } from "@/lib/plaid-shared";
@@ -461,7 +460,18 @@ export default function FinancialsPage() {
       .map((e) => e!.message);
     if (errors.length > 0) setError(errors.join(" · "));
 
-    setStore(storeData as StoreFinancialProfile);
+    let resolvedStore = storeData as StoreFinancialProfile;
+    if (resolvedStore?.financial_data_source === "quickbooks" && !connectionData) {
+      const { error: reconcileError } = await supabase
+        .from("stores")
+        .update({ financial_data_source: "manual" as const })
+        .eq("id", storeId);
+      if (!reconcileError) {
+        resolvedStore = { ...resolvedStore, financial_data_source: "manual" };
+      }
+    }
+
+    setStore(resolvedStore);
     setScheduledAnnualDebtService(annualDebtByStore[storeId] ?? 0);
     const utilitiesLookup = buildUtilitiesLookup((utilitiesData ?? []) as MonthlyUtilityRecord[]);
     const sorted = enrichMonthlyRecords(
@@ -1041,26 +1051,14 @@ export default function FinancialsPage() {
     window.location.href = `/api/quickbooks/authorize?storeId=${store.id}`;
   }
 
-  async function confirmQuickBooksConnect() {
+  function confirmQuickBooksConnect() {
     if (!store?.id) return;
     setConnectingQb(true);
     setError("");
-
-    const { error: updateError } = await supabase
-      .from("stores")
-      .update({ financial_data_source: "quickbooks" as const })
-      .eq("id", store.id);
-
-    if (updateError) {
-      setError(updateError.message);
-      setConnectingQb(false);
-      return;
-    }
-
     window.location.href = `/api/quickbooks/authorize?storeId=${store.id}`;
   }
 
-  const plaidBlockedByQuickBooks = isQuickBooksDataSource(store?.financial_data_source ?? null);
+  const plaidBlockedByQuickBooks = Boolean(qbConnection);
 
   const { open: openPlaidLink, ready: plaidLinkReady } = usePlaidLink({
     token: plaidLinkToken,

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import {
+  reconcileStoreFinancialDataSourceWithQuickBooksConnection,
+  storeHasQuickBooksConnection,
+} from "@/lib/quickbooks";
+import {
   exchangePlaidPublicToken,
-  getStoreFinancialDataSource,
-  isQuickBooksDataSource,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
   updateStoreFinancialDataSourceOnPlaidConnect,
   upsertPlaidConnection,
@@ -43,8 +45,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const financialDataSource = await getStoreFinancialDataSource(storeId);
-    if (isQuickBooksDataSource(financialDataSource)) {
+    await reconcileStoreFinancialDataSourceWithQuickBooksConnection(storeId);
+    if (await storeHasQuickBooksConnection(storeId)) {
       return NextResponse.json({ error: PLAID_QUICKBOOKS_BLOCK_MESSAGE }, { status: 409 });
     }
 

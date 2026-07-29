@@ -366,13 +366,58 @@ export async function upsertQuickBooksConnection(params: {
   }
 }
 
+export async function storeHasQuickBooksConnection(storeId: string): Promise<boolean> {
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("quickbooks_connections")
+    .select("store_id")
+    .eq("store_id", storeId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to check QuickBooks connection: ${error.message}`);
+  }
+
+  return Boolean(data);
+}
+
+/** Heal stores stuck with financial_data_source=quickbooks but no connection row. */
+export async function reconcileStoreFinancialDataSourceWithQuickBooksConnection(
+  storeId: string
+): Promise<boolean> {
+  const admin = createAdminSupabaseClient();
+  const [{ data: store, error: storeError }, hasConnection] = await Promise.all([
+    admin.from("stores").select("financial_data_source").eq("id", storeId).maybeSingle(),
+    storeHasQuickBooksConnection(storeId),
+  ]);
+
+  if (storeError) {
+    throw new Error(`Failed to load store financial data source: ${storeError.message}`);
+  }
+
+  if (!store || store.financial_data_source !== "quickbooks" || hasConnection) {
+    return false;
+  }
+
+  const { error } = await admin
+    .from("stores")
+    .update({ financial_data_source: "manual" satisfies FinancialDataSource })
+    .eq("id", storeId);
+
+  if (error) {
+    throw new Error(`Failed to reconcile store financial data source: ${error.message}`);
+  }
+
+  return true;
+}
+
 export async function updateStoreFinancialDataSourceOnQuickBooksConnect(storeId: string): Promise<void> {
   const admin = createAdminSupabaseClient();
   const { error } = await admin
     .from("stores")
     .update({ financial_data_source: "quickbooks" satisfies FinancialDataSource })
     .eq("id", storeId)
-    .eq("financial_data_source", "manual");
+    .in("financial_data_source", ["manual", "bank_import"]);
 
   if (error) {
     throw new Error(`Failed to update store financial data source: ${error.message}`);
@@ -384,8 +429,7 @@ export async function resetStoreFinancialDataSourceOnQuickBooksDisconnect(storeI
   const { error } = await admin
     .from("stores")
     .update({ financial_data_source: "manual" satisfies FinancialDataSource })
-    .eq("id", storeId)
-    .eq("financial_data_source", "quickbooks");
+    .eq("id", storeId);
 
   if (error) {
     throw new Error(`Failed to reset store financial data source: ${error.message}`);

@@ -93,12 +93,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { loadStores(); }, []);
 
   useEffect(() => {
+    // Skip until loadStores finishes — initial isAllStores=true would wipe sessionStorage
+    // before the persisted store id is read back on full page refresh.
+    if (loading) return;
+
     if (isAllStores || !selectedStore?.id) {
       writePersistedStoreId(null);
       return;
     }
     writePersistedStoreId(selectedStore.id);
-  }, [selectedStore?.id, isAllStores]);
+  }, [selectedStore?.id, isAllStores, loading]);
 
   return (
     <StoreContext.Provider value={{
