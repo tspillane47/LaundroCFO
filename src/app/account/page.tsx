@@ -86,6 +86,10 @@ function boolOrDefault(value: boolean | null, fallback: boolean): boolean {
   return value ?? fallback;
 }
 
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
 export default function AccountPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -108,6 +112,10 @@ export default function AccountPage() {
 
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("");
+  const [emailInput, setEmailInput] = useState("");
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [emailSuccess, setEmailSuccess] = useState("");
   const [lastSignInAt, setLastSignInAt] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
@@ -148,6 +156,7 @@ export default function AccountPage() {
 
     setUserId(user.id);
     setUserEmail(user.email ?? "");
+    setEmailInput(user.email ?? "");
     setLastSignInAt(user.last_sign_in_at ?? null);
 
     const { data: profile, error: profileError } = await supabase
@@ -218,6 +227,40 @@ export default function AccountPage() {
     }
 
     setSavingProfile(false);
+  }
+
+  async function handleSaveEmail() {
+    const trimmed = emailInput.trim();
+    setEmailError("");
+    setEmailSuccess("");
+
+    if (!trimmed) {
+      setEmailError("Email address is required");
+      return;
+    }
+
+    if (!isValidEmail(trimmed)) {
+      setEmailError("Please enter a valid email address");
+      return;
+    }
+
+    if (trimmed.toLowerCase() === userEmail.toLowerCase()) {
+      setEmailError("This is already your current email address");
+      return;
+    }
+
+    setSavingEmail(true);
+    const { error: updateError } = await supabase.auth.updateUser({ email: trimmed });
+    setSavingEmail(false);
+
+    if (updateError) {
+      setEmailError(updateError.message);
+    } else {
+      setEmailSuccess(
+        `Confirmation email sent to ${trimmed}. Click the link in that email to complete the change. Your current email remains active until confirmed.`
+      );
+      setEmailInput(userEmail);
+    }
   }
 
   async function handleChangePassword() {
@@ -352,13 +395,33 @@ export default function AccountPage() {
           <div className="metric-label mb-1.5">Email</div>
           <input
             type="email"
-            value={userEmail}
-            readOnly
-            className={`${INPUT_CLASS} opacity-70 cursor-not-allowed`}
+            value={emailInput}
+            onChange={(e) => {
+              setEmailInput(e.target.value);
+              setEmailError("");
+              setEmailSuccess("");
+            }}
+            className={INPUT_CLASS}
+            placeholder="you@example.com"
           />
-          <p className="text-[11px] mt-1.5" style={{ color: "var(--text-muted)" }}>
-            Contact support to change email
-          </p>
+          {emailError && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[12px] text-red-400 mt-2">
+              {emailError}
+            </div>
+          )}
+          {emailSuccess && (
+            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-[12px] text-green-400 mt-2">
+              {emailSuccess}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => void handleSaveEmail()}
+            disabled={savingEmail}
+            className="btn-primary w-full sm:w-auto mt-3"
+          >
+            {savingEmail ? "Saving..." : "Update Email"}
+          </button>
         </div>
 
         <div>
