@@ -33,6 +33,28 @@ export type QuickBooksSyncHistory = {
   last_sync_unmapped_count: number | null;
 };
 
+export type QuickBooksConnectionError = {
+  error_code: string | null;
+  error_message: string | null;
+  error_at: string | null;
+};
+
+export function formatQuickBooksConnectionErrorMessage(
+  errorCode: string | null | undefined,
+  errorMessage: string | null | undefined
+): string {
+  if (errorMessage?.trim()) {
+    return errorMessage.trim();
+  }
+
+  switch (errorCode) {
+    case "RECONNECT_REQUIRED":
+      return "Your QuickBooks connection expired. Please reconnect to keep your data up to date.";
+    default:
+      return "Your QuickBooks connection needs attention.";
+  }
+}
+
 export function formatQuickBooksSyncStatus(history: QuickBooksSyncHistory): string {
   if (!history.last_synced_at) {
     return "Never synced";

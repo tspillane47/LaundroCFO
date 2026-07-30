@@ -233,6 +233,22 @@ describe("formatSkippedMonthLabel", () => {
   });
 });
 
+describe("formatQuickBooksConnectionErrorMessage", () => {
+  it("formats reconnect and fallback error messages", async () => {
+    const { formatQuickBooksConnectionErrorMessage } = await import("@/lib/quickbooks-shared");
+
+    expect(formatQuickBooksConnectionErrorMessage("RECONNECT_REQUIRED", null)).toContain(
+      "expired"
+    );
+    expect(formatQuickBooksConnectionErrorMessage(null, "Custom QuickBooks error")).toBe(
+      "Custom QuickBooks error"
+    );
+    expect(formatQuickBooksConnectionErrorMessage("SYNC_FAILED", null)).toContain(
+      "needs attention"
+    );
+  });
+});
+
 describe("getIntuitTidFromResponse", () => {
   it("extracts the intuit_tid response header", () => {
     const response = new Response(null, {

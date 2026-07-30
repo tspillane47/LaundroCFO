@@ -96,6 +96,9 @@ export type QuickBooksConnectionRow = {
   last_sync_months_synced: number | null;
   last_sync_skipped_count: number | null;
   last_sync_unmapped_count: number | null;
+  error_code: string | null;
+  error_message: string | null;
+  error_at: string | null;
 };
 
 export function getQuickBooksConfig(): QuickBooksConfig {
@@ -355,6 +358,9 @@ export async function upsertQuickBooksConnection(params: {
     refresh_token_expires_at: tokenExpiryFromNow(refreshExpiresIn),
     connected_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    error_code: null,
+    error_message: null,
+    error_at: null,
   };
 
   const { error } = await admin.from("quickbooks_connections").upsert(payload, {
@@ -1087,6 +1093,48 @@ async function upsertSyncedMonthlyFinancials(params: {
   return { monthsSynced, skippedMonths };
 }
 
+async function setQuickBooksConnectionError(
+  storeId: string,
+  errorCode: string,
+  errorMessage: string
+): Promise<void> {
+  const admin = createAdminSupabaseClient();
+  const { error } = await admin
+    .from("quickbooks_connections")
+    .update({
+      error_code: errorCode,
+      error_message: errorMessage,
+      error_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("store_id", storeId);
+
+  if (error) {
+    throw new Error(`Failed to record QuickBooks connection error: ${error.message}`);
+  }
+}
+
+export async function persistQuickBooksSyncError(
+  storeId: string,
+  error: unknown
+): Promise<void> {
+  if (error instanceof QuickBooksNotConnectedError) {
+    return;
+  }
+
+  let errorCode = "SYNC_FAILED";
+  let errorMessage = "Failed to sync QuickBooks data.";
+
+  if (error instanceof QuickBooksReconnectRequiredError) {
+    errorCode = "RECONNECT_REQUIRED";
+    errorMessage = error.message;
+  } else if (error instanceof Error) {
+    errorMessage = error.message;
+  }
+
+  await setQuickBooksConnectionError(storeId, errorCode, errorMessage);
+}
+
 async function recordQuickBooksSyncHistory(params: {
   storeId: string;
   monthsSynced: number;
@@ -1101,6 +1149,9 @@ async function recordQuickBooksSyncHistory(params: {
       last_sync_months_synced: params.monthsSynced,
       last_sync_skipped_count: params.skippedCount,
       last_sync_unmapped_count: params.unmappedCount,
+      error_code: null,
+      error_message: null,
+      error_at: null,
       updated_at: new Date().toISOString(),
     })
     .eq("store_id", params.storeId);
@@ -1114,42 +1165,54 @@ export async function syncQuickBooksFinancials(
   storeId: string,
   options: QuickBooksSyncOptions = {}
 ): Promise<QuickBooksSyncResult> {
-  const { accessToken, realmId, userId } = await getValidAccessToken(storeId);
-  const mappings = await loadQuickBooksMappings(storeId);
-  const isFirstSync = !(await storeHasMonthlyFinancials(storeId));
-  const { startDate, endDate } = getQuickBooksSyncDateRange(isFirstSync);
+  try {
+    const { accessToken, realmId, userId } = await getValidAccessToken(storeId);
+    const mappings = await loadQuickBooksMappings(storeId);
+    const isFirstSync = !(await storeHasMonthlyFinancials(storeId));
+    const { startDate, endDate } = getQuickBooksSyncDateRange(isFirstSync);
 
-  const report = await fetchProfitAndLossReport({
-    realmId,
-    accessToken,
-    startDate,
-    endDate,
-  });
+    const report = await fetchProfitAndLossReport({
+      realmId,
+      accessToken,
+      startDate,
+      endDate,
+    });
 
-  const { monthlyAmounts, unmappedAccounts } = mapProfitAndLossToMonthlyAmounts({
-    report,
-    mappings,
-  });
+    const { monthlyAmounts, unmappedAccounts } = mapProfitAndLossToMonthlyAmounts({
+      report,
+      mappings,
+    });
 
-  const { monthsSynced, skippedMonths } = await upsertSyncedMonthlyFinancials({
-    storeId,
-    userId,
-    monthlyAmounts,
-    forceOverrideMonths: options.forceOverrideMonths,
-  });
+    const { monthsSynced, skippedMonths } = await upsertSyncedMonthlyFinancials({
+      storeId,
+      userId,
+      monthlyAmounts,
+      forceOverrideMonths: options.forceOverrideMonths,
+    });
 
-  await recordQuickBooksSyncHistory({
-    storeId,
-    monthsSynced,
-    skippedCount: skippedMonths.length,
-    unmappedCount: unmappedAccounts.length,
-  });
+    await recordQuickBooksSyncHistory({
+      storeId,
+      monthsSynced,
+      skippedCount: skippedMonths.length,
+      unmappedCount: unmappedAccounts.length,
+    });
 
-  return {
-    monthsSynced,
-    unmappedAccounts,
-    skippedMonths,
-  };
+    return {
+      monthsSynced,
+      unmappedAccounts,
+      skippedMonths,
+    };
+  } catch (error) {
+    try {
+      await persistQuickBooksSyncError(storeId, error);
+    } catch (persistError) {
+      console.error("[quickbooks] failed to persist connection error after sync failure", {
+        storeId,
+        persistError,
+      });
+    }
+    throw error;
+  }
 }
 
 export function resetQuickBooksOAuthDiscoveryCacheForTests(): void {

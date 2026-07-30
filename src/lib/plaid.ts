@@ -136,6 +136,33 @@ function getAxiosLikeError(error: unknown): {
   };
 }
 
+export function extractPlaidApiErrorBody(error: unknown): PlaidApiErrorBody | null {
+  const axiosError = getAxiosLikeError(error);
+  const responseData = axiosError?.response?.data;
+  if (responseData && typeof responseData === "object") {
+    return responseData as PlaidApiErrorBody;
+  }
+  return null;
+}
+
+export async function persistPlaidSyncItemErrorIfApplicable(
+  itemId: string,
+  error: unknown
+): Promise<boolean> {
+  const plaidBody = extractPlaidApiErrorBody(error);
+  if (!plaidBody?.error_code) {
+    return false;
+  }
+
+  const errorMessage =
+    plaidBody.display_message ??
+    plaidBody.error_message ??
+    "Your bank connection needs attention.";
+
+  await setPlaidConnectionItemError(itemId, plaidBody.error_code, errorMessage);
+  return true;
+}
+
 export function logPlaidApiError(
   context: string,
   error: unknown,
@@ -1043,43 +1070,57 @@ async function persistPlaidSyncCursor(storeId: string, syncCursor: string): Prom
 
 export async function syncPlaidTransactions(storeId: string): Promise<PlaidSyncResult> {
   const connection = await loadPlaidConnection(storeId);
-  const rules = await loadCategorizationRules(connection.user_id);
 
-  const batch = await fetchAllPlaidTransactionUpdates(
-    connection.plaid_access_token,
-    connection.sync_cursor
-  );
+  try {
+    const rules = await loadCategorizationRules(connection.user_id);
 
-  const allPlaidIds = [
-    ...batch.added.map((txn) => txn.transaction_id),
-    ...batch.modified.map((txn) => txn.transaction_id),
-    ...batch.removed.map((txn) => txn.transaction_id),
-  ];
+    const batch = await fetchAllPlaidTransactionUpdates(
+      connection.plaid_access_token,
+      connection.sync_cursor
+    );
 
-  const existingByPlaidId = await loadExistingPlaidTransactions(storeId, allPlaidIds);
+    const allPlaidIds = [
+      ...batch.added.map((txn) => txn.transaction_id),
+      ...batch.modified.map((txn) => txn.transaction_id),
+      ...batch.removed.map((txn) => txn.transaction_id),
+    ];
 
-  const added = await insertPlaidAddedTransactions({
-    storeId,
-    userId: connection.user_id,
-    added: batch.added,
-    rules,
-    existingByPlaidId,
-  });
+    const existingByPlaidId = await loadExistingPlaidTransactions(storeId, allPlaidIds);
 
-  const modified = await applyPlaidModifiedTransactions({
-    storeId,
-    modified: batch.modified,
-    rules,
-    existingByPlaidId,
-  });
+    const added = await insertPlaidAddedTransactions({
+      storeId,
+      userId: connection.user_id,
+      added: batch.added,
+      rules,
+      existingByPlaidId,
+    });
 
-  const { removed, skippedRemovedPosted } = await applyPlaidRemovedTransactions({
-    storeId,
-    removed: batch.removed,
-    existingByPlaidId,
-  });
+    const modified = await applyPlaidModifiedTransactions({
+      storeId,
+      modified: batch.modified,
+      rules,
+      existingByPlaidId,
+    });
 
-  await persistPlaidSyncCursor(storeId, batch.nextCursor);
+    const { removed, skippedRemovedPosted } = await applyPlaidRemovedTransactions({
+      storeId,
+      removed: batch.removed,
+      existingByPlaidId,
+    });
 
-  return { added, modified, removed, skippedRemovedPosted };
+    await persistPlaidSyncCursor(storeId, batch.nextCursor);
+
+    return { added, modified, removed, skippedRemovedPosted };
+  } catch (error) {
+    try {
+      await persistPlaidSyncItemErrorIfApplicable(connection.plaid_item_id, error);
+    } catch (persistError) {
+      console.error("[plaid] failed to persist item error after sync failure", {
+        storeId,
+        itemId: connection.plaid_item_id,
+        persistError,
+      });
+    }
+    throw error;
+  }
 }

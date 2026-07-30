@@ -76,6 +76,7 @@ import {
   suggestTransactionCategory,
 } from "@/lib/financials";
 import {
+  formatQuickBooksConnectionErrorMessage,
   formatQuickBooksSyncStatus,
   formatSkippedMonthLabel,
   type QuickBooksSyncSkippedMonth,
@@ -115,6 +116,9 @@ type QBConnection = {
   last_sync_months_synced: number | null;
   last_sync_skipped_count: number | null;
   last_sync_unmapped_count: number | null;
+  error_code: string | null;
+  error_message: string | null;
+  error_at: string | null;
 };
 
 type PlaidConnection = {
@@ -431,7 +435,7 @@ export default function FinancialsPage() {
       supabase
         .from("quickbooks_connections")
         .select(
-          "id, realm_id, connected_at, last_synced_at, last_sync_months_synced, last_sync_skipped_count, last_sync_unmapped_count"
+          "id, realm_id, connected_at, last_synced_at, last_sync_months_synced, last_sync_skipped_count, last_sync_unmapped_count, error_code, error_message, error_at"
         )
         .eq("store_id", storeId)
         .maybeSingle(),
@@ -1037,6 +1041,7 @@ export default function FinancialsPage() {
       await loadData(store.id);
     } catch (syncError) {
       setError(syncError instanceof Error ? syncError.message : "Failed to sync QuickBooks");
+      await loadData(store.id);
     } finally {
       setSyncingQb(false);
       setForceResyncingMonths(new Set());
@@ -2335,6 +2340,44 @@ export default function FinancialsPage() {
       {/* ─── TAB 5: QUICKBOOKS ─── */}
       {activeTab === "quickbooks" && (
         <div className="space-y-4 max-w-3xl">
+          {qbConnection?.error_code && (
+            <div
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-6 py-3 rounded-xl border"
+              style={{
+                background: "var(--bg-warning-tint, var(--bg-info-tint))",
+                borderColor: "var(--border)",
+                color: "var(--text-warning, var(--text-info))",
+              }}
+            >
+              <p className="text-[12px] leading-snug">
+                Your QuickBooks connection needs attention.{" "}
+                {formatQuickBooksConnectionErrorMessage(
+                  qbConnection.error_code,
+                  qbConnection.error_message
+                )}{" "}
+                Reconnect to keep your data up to date.
+              </p>
+              <div className="flex flex-shrink-0 items-center gap-4">
+                <button
+                  type="button"
+                  className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
+                  onClick={initiateQuickBooksConnect}
+                  disabled={connectingQb || disconnectingQb || syncingQb}
+                >
+                  {connectingQb ? "Reconnecting…" : "Reconnect"}
+                </button>
+                <button
+                  type="button"
+                  className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
+                  onClick={() => setShowQbDisconnectConfirm(true)}
+                  disabled={connectingQb || disconnectingQb || syncingQb}
+                >
+                  Disconnect
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="card flex items-center gap-5">
             <div
               className="w-14 h-14 rounded-xl flex items-center justify-center text-white text-[18px] font-bold flex-shrink-0"
