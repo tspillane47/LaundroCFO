@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { INPUT_CLASS, formatDate } from "@/components/occupancy/shared";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -92,6 +92,7 @@ function isValidEmail(email: string): boolean {
 
 export default function AccountPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const toast = useToast();
   const { betaMode, loading: betaLoading } = useBetaMode();
@@ -203,6 +204,22 @@ export default function AccountPage() {
     void loadAccount();
   }, [loadAccount]);
 
+  useEffect(() => {
+    if (searchParams.get("email_updated") === "1") {
+      setEmailSuccess("Your email address has been updated.");
+      setEmailError("");
+      router.replace("/account", { scroll: false });
+    } else if (searchParams.get("error") === "email_change_failed") {
+      const detail = searchParams.get("message");
+      setEmailError(
+        detail ??
+          "We couldn't confirm your email change. The link may have expired — request a new confirmation email and try again."
+      );
+      setEmailSuccess("");
+      router.replace("/account", { scroll: false });
+    }
+  }, [router, searchParams]);
+
   async function handleSaveProfile() {
     if (!userId) return;
     setSavingProfile(true);
@@ -250,7 +267,13 @@ export default function AccountPage() {
     }
 
     setSavingEmail(true);
-    const { error: updateError } = await supabase.auth.updateUser({ email: trimmed });
+    const emailConfirmNext = encodeURIComponent("/account?email_updated=1");
+    const { error: updateError } = await supabase.auth.updateUser(
+      { email: trimmed },
+      {
+        emailRedirectTo: `${window.location.origin}/auth/confirm?next=${emailConfirmNext}`,
+      }
+    );
     setSavingEmail(false);
 
     if (updateError) {

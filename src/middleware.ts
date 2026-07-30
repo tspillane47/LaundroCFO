@@ -12,6 +12,8 @@ const PUBLIC_ROUTES = [
   '/forgot-password',
   '/reset-password',
   '/auth/callback',
+  '/auth/confirm',
+  '/auth/auth-code-error',
   '/terms',
   '/privacy',
 ]
@@ -36,6 +38,8 @@ const PROTECTED_PREFIXES = [
 function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_ROUTES.includes(pathname)) return true
   if (pathname.startsWith('/auth/callback')) return true
+  if (pathname.startsWith('/auth/confirm')) return true
+  if (pathname.startsWith('/auth/auth-code-error')) return true
   return false
 }
 
@@ -58,6 +62,26 @@ function isProtectedRoute(pathname: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Supabase falls back to Site URL (/) when redirect_to isn't allowlisted.
+  // Catch confirmation params on the home page and route them to the handler.
+  if (pathname === '/') {
+    const code = request.nextUrl.searchParams.get('code')
+    const tokenHash = request.nextUrl.searchParams.get('token_hash')
+    const type = request.nextUrl.searchParams.get('type')
+    if (tokenHash && type) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/confirm'
+      return NextResponse.redirect(url)
+    }
+    if (code) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/callback'
+      return NextResponse.redirect(url)
+    }
+  }
+
   let response = NextResponse.next({ request: { headers: request.headers } })
 
   const supabase = createServerClient(
@@ -79,7 +103,6 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const { pathname } = request.nextUrl
 
   if (!user && isProtectedRoute(pathname)) {
     return NextResponse.redirect(new URL('/login', request.url))

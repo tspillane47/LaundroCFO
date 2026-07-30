@@ -104,7 +104,7 @@ const pageTitles: Record<string, string> = {
   "/admin/feedback": "Feedback Admin",
 };
 
-const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password", "/auth/callback"];
+const authPages = ["/login", "/signup", "/forgot-password", "/onboarding", "/reset-password", "/auth/callback", "/auth/confirm", "/auth/auth-code-error"];
 const publicPages = ["/terms", "/privacy"];
 const marketingPages = ["/", "/about", "/pricing"];
 const onboardingExemptPaths = [
@@ -115,6 +115,8 @@ const onboardingExemptPaths = [
   "/forgot-password",
   "/reset-password",
   "/auth/callback",
+  "/auth/confirm",
+  "/auth/auth-code-error",
   "/onboarding",
 ];
 
@@ -124,7 +126,7 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const supabase = createClient();
   const [checked, setChecked] = useState(false);
-  const isExempt = onboardingExemptPaths.includes(pathname) || pathname.startsWith("/auth/callback");
+  const isExempt = onboardingExemptPaths.includes(pathname) || pathname.startsWith("/auth/callback") || pathname.startsWith("/auth/confirm") || pathname.startsWith("/auth/auth-code-error");
   const isAddingStore = pathname === "/onboarding" && searchParams.get("add") === "true";
 
   useEffect(() => {
