@@ -15,6 +15,7 @@ import {
   formatPct,
   parseDate,
 } from "./shared";
+import { TEXT_LIMITS, trimToMaxLength, validateMaxLength } from "@/lib/textLimits";
 import {
   calcBuildingEquity,
   calcCombinedValueEstimate,
@@ -377,6 +378,28 @@ export function RealEstateModule({ store }: Props) {
       return;
     }
 
+    const ownershipNotesError = validateMaxLength(
+      form.ownership_notes,
+      TEXT_LIMITS.notesField,
+      "Ownership notes"
+    );
+    if (ownershipNotesError) {
+      setError(ownershipNotesError);
+      setSaving(false);
+      return;
+    }
+
+    const mortgageNotesError = validateMaxLength(
+      form.mortgage_notes,
+      TEXT_LIMITS.notesField,
+      "Mortgage notes"
+    );
+    if (mortgageNotesError) {
+      setError(mortgageNotesError);
+      setSaving(false);
+      return;
+    }
+
     const payload = {
       store_id: store.id,
       user_id: user.id,
@@ -396,7 +419,9 @@ export function RealEstateModule({ store }: Props) {
         ? Number(form.laundromat_square_footage)
         : null,
       other_tenants: form.other_tenants,
-      ownership_notes: form.ownership_notes || null,
+      ownership_notes: form.ownership_notes.trim()
+        ? trimToMaxLength(form.ownership_notes.trim(), TEXT_LIMITS.notesField)
+        : null,
       mortgage_lender: form.mortgage_lender || null,
       original_loan_amount: form.original_loan_amount ? Number(form.original_loan_amount) : null,
       current_loan_balance: form.current_loan_balance ? Number(form.current_loan_balance) : null,
@@ -409,7 +434,9 @@ export function RealEstateModule({ store }: Props) {
       amortization_term: form.amortization_term ? Number(form.amortization_term) : null,
       balloon_payment: form.balloon_payment,
       balloon_date: form.balloon_payment ? form.balloon_date || null : null,
-      mortgage_notes: form.mortgage_notes || null,
+      mortgage_notes: form.mortgage_notes.trim()
+        ? trimToMaxLength(form.mortgage_notes.trim(), TEXT_LIMITS.notesField)
+        : null,
       monthly_rent_charged: form.monthly_rent_charged
         ? Number(form.monthly_rent_charged)
         : null,
@@ -865,6 +892,7 @@ export function RealEstateModule({ store }: Props) {
               <textarea
                 value={form.ownership_notes}
                 onChange={(e) => setField("ownership_notes", e.target.value)}
+                maxLength={TEXT_LIMITS.notesField}
                 className={INPUT_CLASS + " min-h-[80px] resize-y"}
                 placeholder="Partnership structure, easements, zoning notes..."
               />
@@ -990,6 +1018,7 @@ export function RealEstateModule({ store }: Props) {
               <textarea
                 value={form.mortgage_notes}
                 onChange={(e) => setField("mortgage_notes", e.target.value)}
+                maxLength={TEXT_LIMITS.notesField}
                 className={INPUT_CLASS + " min-h-[80px] resize-y"}
                 placeholder="Prepayment penalties, rate adjustments, covenants..."
               />

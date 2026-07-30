@@ -528,6 +528,7 @@ export function buildPortfolioTtmCashFlow(
 import type { createClient } from "@/lib/supabase";
 import { calcDSCR, calcGlobalDSCR, DSCR_NO_DEBT_LABEL, fmtMultiple } from "@/lib/calculations";
 import { toNum, toNullableText } from "@/lib/formHelpers";
+import { TEXT_LIMITS, trimToMaxLength, validateMaxLength } from "@/lib/textLimits";
 
 type FinancialsSupabaseClient = ReturnType<typeof createClient>;
 
@@ -2039,7 +2040,76 @@ export type PostTransactionsBatchParams = {
 export type PostTransactionsBatchResult = {
   postedCount: number;
   error: string | null;
+  /** When true, the client should reload transaction/P&L state (e.g. after a cross-tab race). */
+  refreshRecommended?: boolean;
+  alreadyPostedCount?: number;
 };
+
+export function isPostgresUniqueViolation(
+  error: { code?: string; message?: string } | null | undefined
+): boolean {
+  if (!error) return false;
+  if (error.code === "23505") return true;
+  const msg = error.message?.toLowerCase() ?? "";
+  return msg.includes("duplicate key") || msg.includes("unique constraint");
+}
+
+export const ALREADY_POSTED_MESSAGE =
+  "This transaction was already posted (possibly from another tab). Refreshing to show the latest state.";
+
+export function formatAlreadyPostedMessage(count: number): string {
+  if (count === 1) return ALREADY_POSTED_MESSAGE;
+  return `${count} transactions were already posted (possibly from another tab). Refreshing to show the latest state.`;
+}
+
+async function deleteTransactionPlLinks(
+  supabase: FinancialsSupabaseClient,
+  transactionIds: string[]
+): Promise<{ error: string | null }> {
+  if (transactionIds.length === 0) return { error: null };
+  const { error } = await supabase
+    .from("transaction_pl_links")
+    .delete()
+    .in("transaction_id", transactionIds);
+  return { error: error?.message ?? null };
+}
+
+type PostingBatchItem = {
+  txn: BatchPostTransaction;
+  year: number;
+  month: number;
+  amount: number;
+  importCategory: BankImportCategory;
+  postingTarget: PostingTarget;
+};
+
+function accumulatePostingDeltas(
+  items: PostingBatchItem[],
+  utilityDeltaMap: Map<string, Record<UtilityImportField, number>>,
+  revenueDeltaMap: Map<string, Partial<Record<RevenueBreakdownField, number>>>,
+  financialDeltaMap: Map<string, Partial<Record<PlCategoryField, number>>>
+): void {
+  for (const item of items) {
+    const periodKey = monthKey(item.year, item.month);
+
+    if (isRevenueBreakdownColumn(item.postingTarget.column)) {
+      const deltas = revenueDeltaMap.get(periodKey) ?? {};
+      const column = item.postingTarget.column;
+      deltas[column] = (deltas[column] ?? 0) + item.amount;
+      revenueDeltaMap.set(periodKey, deltas);
+    } else if (item.postingTarget.table === "monthly_utilities") {
+      const deltas = utilityDeltaMap.get(periodKey) ?? emptyUtilityDelta();
+      const column = item.postingTarget.column as UtilityImportField;
+      deltas[column] += item.amount;
+      utilityDeltaMap.set(periodKey, deltas);
+    } else {
+      const column = item.postingTarget.column as PlCategoryField;
+      const fieldDeltas = financialDeltaMap.get(periodKey) ?? {};
+      fieldDeltas[column] = (fieldDeltas[column] ?? 0) + item.amount;
+      financialDeltaMap.set(periodKey, fieldDeltas);
+    }
+  }
+}
 
 function normalizeTransactionAmount(amount: number): number {
   return Math.abs(amount);
@@ -2331,14 +2401,7 @@ export async function postTransactionsBatch(
     }
   }
 
-  type BatchItem = {
-    txn: BatchPostTransaction;
-    year: number;
-    month: number;
-    amount: number;
-    importCategory: BankImportCategory;
-    postingTarget: PostingTarget;
-  };
+  type BatchItem = PostingBatchItem;
 
   const items: BatchItem[] = postableTransactions.map((txn) => {
     const date = new Date(txn.transaction_date.split("T")[0] + "T12:00:00");
@@ -2355,32 +2418,54 @@ export async function postTransactionsBatch(
     };
   });
 
-  const utilityDeltaMap = new Map<string, Record<UtilityImportField, number>>();
-  const revenueDeltaMap = new Map<string, Partial<Record<RevenueBreakdownField, number>>>();
-  const financialDeltaMap = new Map<string, Partial<Record<PlCategoryField, number>>>();
-
-  for (const item of items) {
-    const periodKey = monthKey(item.year, item.month);
-
-    if (isRevenueBreakdownColumn(item.postingTarget.column)) {
-      const deltas = revenueDeltaMap.get(periodKey) ?? {};
-      const column = item.postingTarget.column;
-      deltas[column] = (deltas[column] ?? 0) + item.amount;
-      revenueDeltaMap.set(periodKey, deltas);
-    } else if (item.postingTarget.table === "monthly_utilities") {
-      const deltas = utilityDeltaMap.get(periodKey) ?? emptyUtilityDelta();
-      const column = item.postingTarget.column as UtilityImportField;
-      deltas[column] += item.amount;
-      utilityDeltaMap.set(periodKey, deltas);
-    } else {
-      const column = item.postingTarget.column as PlCategoryField;
-      const fieldDeltas = financialDeltaMap.get(periodKey) ?? {};
-      fieldDeltas[column] = (fieldDeltas[column] ?? 0) + item.amount;
-      financialDeltaMap.set(periodKey, fieldDeltas);
-    }
-  }
-
   try {
+    const linkedItems: BatchItem[] = [];
+    let alreadyPostedCount = 0;
+
+    for (const item of items) {
+      const { error: linkError } = await supabase.from("transaction_pl_links").insert({
+        transaction_id: item.txn.id,
+        store_id: storeId,
+        year: item.year,
+        month: item.month,
+        category: item.postingTarget.column,
+        amount_applied: item.amount,
+      });
+
+      if (linkError) {
+        if (isPostgresUniqueViolation(linkError)) {
+          alreadyPostedCount += 1;
+          continue;
+        }
+
+        const rollback = await deleteTransactionPlLinks(
+          supabase,
+          linkedItems.map((linked) => linked.txn.id)
+        );
+        if (rollback.error) return { postedCount: 0, error: rollback.error };
+
+        return { postedCount: 0, error: linkError.message };
+      }
+
+      linkedItems.push(item);
+    }
+
+    if (linkedItems.length === 0) {
+      return {
+        postedCount: 0,
+        error:
+          alreadyPostedCount > 0 ? formatAlreadyPostedMessage(alreadyPostedCount) : null,
+        refreshRecommended: alreadyPostedCount > 0,
+        alreadyPostedCount,
+      };
+    }
+
+    const utilityDeltaMap = new Map<string, Record<UtilityImportField, number>>();
+    const revenueDeltaMap = new Map<string, Partial<Record<RevenueBreakdownField, number>>>();
+    const financialDeltaMap = new Map<string, Partial<Record<PlCategoryField, number>>>();
+
+    accumulatePostingDeltas(linkedItems, utilityDeltaMap, revenueDeltaMap, financialDeltaMap);
+
     if (utilityDeltaMap.size > 0) {
       const utilityRowsByPeriod = new Map(
         existingUtilityRecords.map((row) => [monthKey(row.year, row.month), row])
@@ -2408,7 +2493,14 @@ export async function postTransactionsBatch(
           .from("monthly_utilities")
           .upsert(payload, { onConflict: "store_id,year,month" });
 
-        if (upsertError) return { postedCount: 0, error: upsertError.message };
+        if (upsertError) {
+          const rollback = await deleteTransactionPlLinks(
+            supabase,
+            linkedItems.map((linked) => linked.txn.id)
+          );
+          if (rollback.error) return { postedCount: 0, error: rollback.error };
+          return { postedCount: 0, error: upsertError.message };
+        }
       }
     }
 
@@ -2478,28 +2570,31 @@ export async function postTransactionsBatch(
           .from("monthly_financials")
           .update(payload)
           .eq("id", existing.id);
-        if (error) return { postedCount: 0, error: error.message };
+        if (error) {
+          const rollback = await deleteTransactionPlLinks(
+            supabase,
+            linkedItems.map((linked) => linked.txn.id)
+          );
+          if (rollback.error) return { postedCount: 0, error: rollback.error };
+          return { postedCount: 0, error: error.message };
+        }
       } else {
         const { error } = await supabase.from("monthly_financials").insert(payload);
-        if (error) return { postedCount: 0, error: error.message };
+        if (error) {
+          const rollback = await deleteTransactionPlLinks(
+            supabase,
+            linkedItems.map((linked) => linked.txn.id)
+          );
+          if (rollback.error) return { postedCount: 0, error: rollback.error };
+          return { postedCount: 0, error: error.message };
+        }
       }
     }
 
-    for (const item of items) {
-      const { txn, year, month, amount, importCategory, postingTarget } = item;
+    for (const item of linkedItems) {
+      const { txn, importCategory } = item;
       const previousStatus = txn.status ?? "needs_review";
       const now = new Date().toISOString();
-
-      const { error: linkError } = await supabase.from("transaction_pl_links").insert({
-        transaction_id: txn.id,
-        store_id: storeId,
-        year,
-        month,
-        category: postingTarget.column,
-        amount_applied: amount,
-      });
-
-      if (linkError) return { postedCount: 0, error: linkError.message };
 
       const updatePayload: Record<string, unknown> = {
         is_reviewed: true,
@@ -2516,7 +2611,14 @@ export async function postTransactionsBatch(
         .update(updatePayload)
         .eq("id", txn.id);
 
-      if (txnError) return { postedCount: 0, error: txnError.message };
+      if (txnError) {
+        const rollback = await deleteTransactionPlLinks(
+          supabase,
+          linkedItems.map((linked) => linked.txn.id)
+        );
+        if (rollback.error) return { postedCount: 0, error: rollback.error };
+        return { postedCount: 0, error: txnError.message };
+      }
 
       const { error: auditError } = await writeTransactionAuditLog(supabase, {
         transactionId: txn.id,
@@ -2528,10 +2630,22 @@ export async function postTransactionsBatch(
         changeSource,
       });
 
-      if (auditError) return { postedCount: 0, error: auditError };
+      if (auditError) {
+        const rollback = await deleteTransactionPlLinks(
+          supabase,
+          linkedItems.map((linked) => linked.txn.id)
+        );
+        if (rollback.error) return { postedCount: 0, error: rollback.error };
+        return { postedCount: 0, error: auditError };
+      }
     }
 
-    return { postedCount: postableTransactions.length, error: null };
+    return {
+      postedCount: linkedItems.length,
+      error: null,
+      refreshRecommended: alreadyPostedCount > 0,
+      alreadyPostedCount,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to post transactions.";
     return { postedCount: 0, error: message };
@@ -2545,6 +2659,17 @@ export async function excludeTransaction(
   userId: string,
   store?: StoreFinancialProfile | null
 ): Promise<{ error: string | null }> {
+  const trimmedReason = reason.trim();
+  if (!trimmedReason) {
+    return { error: "Enter a reason before excluding." };
+  }
+  const lengthError = validateMaxLength(
+    trimmedReason,
+    TEXT_LIMITS.exclusionReason,
+    "Exclusion reason"
+  );
+  if (lengthError) return { error: lengthError };
+
   const { data: transaction, error: fetchError } = await supabase
     .from("bank_transactions")
     .select("*")
@@ -2599,7 +2724,7 @@ export async function excludeTransaction(
     .update({
       excluded: true,
       status: "excluded",
-      exclusion_reason: reason,
+      exclusion_reason: trimToMaxLength(trimmedReason, TEXT_LIMITS.exclusionReason),
       modified_at: now,
     })
     .eq("id", transactionId);

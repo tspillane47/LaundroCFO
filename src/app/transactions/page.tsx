@@ -17,6 +17,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { DesktopOnlyGate } from "@/components/ui/DesktopOnlyGate";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { useWriteGuard } from "@/lib/useWriteGuard";
+import { TEXT_LIMITS, trimToMaxLength, validateMaxLength } from "@/lib/textLimits";
 import { RuleApplyPrompt } from "@/components/financials/RuleApplyPrompt";
 import {
   BANK_IMPORT_CATEGORY_LABELS,
@@ -39,6 +40,7 @@ import {
   reclassifyPostedTransaction,
   sortRecordsDesc,
   suggestTransactionCategory,
+  type PostTransactionsBatchResult,
   MONTH_SHORT,
   type BankImportCategory,
   type BankTransaction,
@@ -854,10 +856,20 @@ function TransactionsPageContent() {
     const previous = transactions.find((t) => t.id === id)?.notes ?? "";
     if (notes === previous) return;
 
+    const trimmed = notes.trim();
+    const lengthError = validateMaxLength(trimmed, TEXT_LIMITS.transactionNote, "Note");
+    if (lengthError) {
+      setMessage({ type: "error", text: lengthError });
+      return;
+    }
+
     const now = new Date().toISOString();
     const { error } = await supabase
       .from("bank_transactions")
-      .update({ notes: notes.trim() || null, modified_at: now })
+      .update({
+        notes: trimmed ? trimToMaxLength(trimmed, TEXT_LIMITS.transactionNote) : null,
+        modified_at: now,
+      })
       .eq("id", id);
 
     if (error) {
@@ -941,6 +953,37 @@ function TransactionsPageContent() {
     return `Posted ${postedCount} of ${totalSelected} selected — ${reasons.join("; ")}.`;
   }
 
+  function buildAlreadyPostedSuffix(alreadyPostedCount?: number): string {
+    if (!alreadyPostedCount || alreadyPostedCount <= 0) return "";
+    return alreadyPostedCount === 1
+      ? " 1 was already posted and skipped."
+      : ` ${alreadyPostedCount} were already posted and skipped.`;
+  }
+
+  async function finalizePostBatchResult(
+    result: PostTransactionsBatchResult,
+    successText: string
+  ): Promise<void> {
+    if (result.refreshRecommended) {
+      await loadData();
+    }
+
+    if (result.error) {
+      setMessage({ type: "error", text: result.error });
+      return;
+    }
+
+    if (store?.id) invalidateValuationCache(store.id);
+    setMessage({
+      type: "success",
+      text: `${successText}${buildAlreadyPostedSuffix(result.alreadyPostedCount)}`,
+    });
+
+    if (!result.refreshRecommended) {
+      await loadData();
+    }
+  }
+
   async function handlePostRows(rows: ReviewRow[], options?: { partial?: boolean }) {
     if (!requireWrite()) return;
     if (!store?.id || !userId || rows.length === 0 || postingRef.current) return;
@@ -1016,14 +1059,13 @@ function TransactionsPageContent() {
       });
 
       if (result.error) {
-        setMessage({ type: "error", text: result.error });
+        await finalizePostBatchResult(result, "");
         return;
       }
 
-      invalidateValuationCache(store.id);
-      setMessage({
-        type: "success",
-        text: partial
+      await finalizePostBatchResult(
+        result,
+        partial
           ? buildBulkPostMessage({
               postedCount: result.postedCount,
               totalSelected,
@@ -1034,9 +1076,8 @@ function TransactionsPageContent() {
             ? "Posted 1 transaction to P&L."
             : result.postedCount === 0
               ? "No new transactions were posted (already posted)."
-              : `Posted ${result.postedCount} transactions to P&L.`,
-      });
-      await loadData();
+              : `Posted ${result.postedCount} transactions to P&L.`
+      );
     } finally {
       postingRef.current = false;
       setPosting(false);
@@ -1115,6 +1156,26 @@ function TransactionsPageContent() {
 
     const amount = parseFloat(manualDraft.amount);
     const category = manualDraft.category;
+    const description = manualDraft.description.trim();
+    const note = manualDraft.note.trim();
+
+    const descriptionError = validateMaxLength(
+      description,
+      TEXT_LIMITS.transactionDescription,
+      "Description"
+    );
+    if (descriptionError) {
+      setManualSaving(false);
+      setManualError(descriptionError);
+      return;
+    }
+
+    const noteError = validateMaxLength(note, TEXT_LIMITS.transactionNote, "Note");
+    if (noteError) {
+      setManualSaving(false);
+      setManualError(noteError);
+      return;
+    }
 
     const { data, error } = await supabase
       .from("bank_transactions")
@@ -1122,7 +1183,7 @@ function TransactionsPageContent() {
         store_id: store.id,
         user_id: userId,
         transaction_date: manualDraft.date,
-        description: manualDraft.description.trim(),
+        description: trimToMaxLength(description, TEXT_LIMITS.transactionDescription),
         amount,
         category,
         transaction_type: manualDraft.type,
@@ -1130,7 +1191,7 @@ function TransactionsPageContent() {
         status: "user_classified" as TransactionStatus,
         is_reviewed: false,
         excluded: false,
-        notes: manualDraft.note.trim() || null,
+        notes: note ? trimToMaxLength(note, TEXT_LIMITS.transactionNote) : null,
       })
       .select("id")
       .single();
@@ -1597,22 +1658,19 @@ function TransactionsPageContent() {
       });
 
       if (result.error) {
-        setMessage({ type: "error", text: result.error });
+        await finalizePostBatchResult(result, "");
         return;
       }
 
-      invalidateValuationCache(store.id);
-      setMessage({
-        type: "success",
-        text:
-          result.postedCount === 1
-            ? "Posted 1 transaction to P&L."
-            : result.postedCount === 0
-              ? "No new transactions were posted (already posted)."
-              : `Posted ${result.postedCount} transactions to P&L.`,
-      });
+      await finalizePostBatchResult(
+        result,
+        result.postedCount === 1
+          ? "Posted 1 transaction to P&L."
+          : result.postedCount === 0
+            ? "No new transactions were posted (already posted)."
+            : `Posted ${result.postedCount} transactions to P&L.`
+      );
       clearRuleApplyFlow();
-      await loadData();
       void evaluateAlerts({ storeIds: [store.id] });
     } finally {
       setRulePostBusy(false);
@@ -1647,13 +1705,23 @@ function TransactionsPageContent() {
         return;
       }
 
+      const vendorPattern = trimToMaxLength(
+        ruleFormVendorPattern.trim().toUpperCase(),
+        TEXT_LIMITS.vendorPattern
+      );
+      const patternError = validateMaxLength(vendorPattern, TEXT_LIMITS.vendorPattern, "Vendor pattern");
+      if (patternError) {
+        setRuleFormMessage({ type: "error", text: patternError });
+        return;
+      }
+
       setRuleFormSaving(true);
       try {
         const { data, error: insertError } = await supabase
           .from("categorization_rules")
           .insert({
             user_id: activeUserId,
-            vendor_pattern: ruleFormVendorPattern.trim().toUpperCase(),
+            vendor_pattern: vendorPattern,
             category: ruleFormCategory,
             rule_type: "vendor",
           })
@@ -1850,6 +1918,7 @@ function TransactionsPageContent() {
         disabled={readOnly || !canWrite}
         readOnly={!canWrite}
         placeholder="Add note…"
+        maxLength={TEXT_LIMITS.transactionNote}
         className={clsx(INPUT_CLASS, "w-full min-w-[120px] py-1 text-[11px]")}
       />
     );
@@ -2678,6 +2747,7 @@ function TransactionsPageContent() {
                 onChange={(e) => setExcludeModal({ ...excludeModal, reason: e.target.value })}
                 className={clsx(INPUT_CLASS, "w-full py-2 text-[12px]")}
                 placeholder="e.g. Internal transfer, personal expense"
+                maxLength={TEXT_LIMITS.exclusionReason}
                 autoFocus
               />
             </div>
@@ -2837,6 +2907,7 @@ function TransactionsPageContent() {
                   onChange={(e) => setManualDraft((prev) => ({ ...prev, description: e.target.value }))}
                   className={clsx(INPUT_CLASS, "w-full py-2 text-[12px]")}
                   placeholder="e.g. Cash deposit, vendor payment"
+                  maxLength={TEXT_LIMITS.transactionDescription}
                   autoFocus
                 />
               </div>
@@ -2916,6 +2987,7 @@ function TransactionsPageContent() {
                   value={manualDraft.note}
                   onChange={(e) => setManualDraft((prev) => ({ ...prev, note: e.target.value }))}
                   className={clsx(INPUT_CLASS, "w-full py-2 text-[12px]")}
+                  maxLength={TEXT_LIMITS.transactionNote}
                 />
               </div>
             </div>

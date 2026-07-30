@@ -18,6 +18,7 @@ import {
   parseDate,
   preventEnterSubmit,
 } from "./shared";
+import { TEXT_LIMITS, trimToMaxLength, validateMaxLength } from "@/lib/textLimits";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useAlertEvaluation } from "@/components/alerts/AlertNotificationProvider";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
@@ -365,6 +366,17 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
       return;
     }
     if (saving || saveStatus === "success") return;
+
+    const restrictionsError = validateMaxLength(
+      leaseForm.use_restrictions,
+      TEXT_LIMITS.notesField,
+      "Use restrictions"
+    );
+    if (restrictionsError) {
+      toast.error(restrictionsError);
+      return;
+    }
+
     setSaving(true);
     setSaveStatus("idle");
     setError("");
@@ -399,7 +411,9 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             assignment_rights: leaseForm.assignment_rights || null,
             sublease_rights: toLeaseBoolean(leaseForm.sublease_rights),
             exclusivity_clause: toLeaseBoolean(leaseForm.exclusivity_clause),
-            use_restrictions: leaseForm.use_restrictions || null,
+            use_restrictions: leaseForm.use_restrictions.trim()
+              ? trimToMaxLength(leaseForm.use_restrictions.trim(), TEXT_LIMITS.notesField)
+              : null,
             updated_at: new Date().toISOString(),
           },
           { onConflict: "store_id" }
@@ -924,6 +938,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                 value={leaseForm.use_restrictions}
                 onChange={(e) => setLeaseField("use_restrictions", e.target.value)}
                 onKeyDown={preventEnterSubmit}
+                maxLength={TEXT_LIMITS.notesField}
                 className={INPUT_CLASS + " min-h-[80px] resize-y"}
                 placeholder="Any use restrictions in the lease..."
               />

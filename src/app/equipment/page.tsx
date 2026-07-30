@@ -28,6 +28,7 @@ import {
   formatAdjustment,
 } from "@/lib/equipment";
 import { fmtDollar } from "@/lib/calculations";
+import { TEXT_LIMITS, trimToMaxLength, validateMaxLength } from "@/lib/textLimits";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { useToast } from "@/components/ui/ToastProvider";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -246,6 +247,12 @@ export default function EquipmentPage() {
       return;
     }
 
+    const notesError = validateMaxLength(form.notes, TEXT_LIMITS.notesField, "Notes");
+    if (notesError) {
+      toast.error(notesError);
+      return;
+    }
+
     setSaving(true);
     setSaveStatus("idle");
 
@@ -260,7 +267,9 @@ export default function EquipmentPage() {
         installation_year: installationYear,
         high_speed_extract: form.machine_type === "Washer" ? form.high_speed_extract : false,
         condition: form.condition,
-        notes: form.notes.trim() || null,
+        notes: form.notes.trim()
+          ? trimToMaxLength(form.notes.trim(), TEXT_LIMITS.notesField)
+          : null,
       };
 
       const { error: saveError } = editingId
@@ -632,6 +641,7 @@ export default function EquipmentPage() {
                       value={form.notes}
                       onChange={(e) => updateForm("notes", e.target.value)}
                       onKeyDown={preventEnterSubmit}
+                      maxLength={TEXT_LIMITS.notesField}
                       className={clsx(INPUT_CLASS, "min-h-[80px] resize-y")}
                       placeholder="Optional notes about this machine group..."
                     />

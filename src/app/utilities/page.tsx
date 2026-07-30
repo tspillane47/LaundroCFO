@@ -44,6 +44,7 @@ import {
   type MonthlyUtilityRow,
 } from "@/lib/utilities";
 import { toNullableText, toNum, findNegativeFieldError } from "@/lib/formHelpers";
+import { TEXT_LIMITS, trimToMaxLength, validateMaxLength } from "@/lib/textLimits";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { FormBanner } from "@/components/ui/FormBanner";
@@ -487,6 +488,13 @@ export default function UtilitiesPage() {
       return;
     }
 
+    const notesError = validateMaxLength(form.notes, TEXT_LIMITS.notesField, "Notes");
+    if (notesError) {
+      setSaveStatus("error");
+      setMessage({ type: "error", text: notesError });
+      return;
+    }
+
     setSaving(true);
     setSaveStatus("idle");
 
@@ -502,7 +510,7 @@ export default function UtilitiesPage() {
         sewer: toNum(form.sewer),
         trash: toNum(form.trash),
         internet: toNum(form.internet),
-        notes: toNullableText(form.notes),
+        notes: toNullableText(trimToMaxLength(form.notes, TEXT_LIMITS.notesField)),
       };
 
       const { error } = await supabase
@@ -752,6 +760,7 @@ export default function UtilitiesPage() {
             <textarea
               value={form.notes}
               onChange={(e) => setFormField("notes", e.target.value)}
+              maxLength={TEXT_LIMITS.notesField}
               className={clsx(INPUT_CLASS, "min-h-[72px]")}
               placeholder="Optional notes"
             />

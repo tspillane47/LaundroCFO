@@ -40,6 +40,7 @@ import { PageError } from "@/components/ui/PageError";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { useWriteGuard } from "@/lib/useWriteGuard";
 import { findNegativeFieldError } from "@/lib/formHelpers";
+import { TEXT_LIMITS, trimToMaxLength, validateMaxLength } from "@/lib/textLimits";
 import {
   INPUT_CLASS,
   formatDate,
@@ -525,6 +526,12 @@ export default function DebtPage() {
       return;
     }
 
+    const notesError = validateMaxLength(form.notes, TEXT_LIMITS.notesField, "Notes");
+    if (notesError) {
+      toast.error(notesError);
+      return;
+    }
+
     setSaving(true);
     setSaveStatus("idle");
 
@@ -545,7 +552,9 @@ export default function DebtPage() {
         balloon_payment: form.balloon_payment,
         balloon_date: form.balloon_payment ? form.balloon_date || null : null,
         balloon_amount: form.balloon_payment ? parseNum(form.balloon_amount) : null,
-        notes: form.notes || null,
+        notes: form.notes.trim()
+          ? trimToMaxLength(form.notes.trim(), TEXT_LIMITS.notesField)
+          : null,
         updated_at: new Date().toISOString(),
       };
 
@@ -1276,6 +1285,7 @@ export default function DebtPage() {
               value={form.notes}
               onChange={(e) => updateForm("notes", e.target.value)}
               rows={3}
+              maxLength={TEXT_LIMITS.notesField}
               className={clsx(INPUT_CLASS, "resize-y")}
               placeholder="Optional notes about this loan..."
             />

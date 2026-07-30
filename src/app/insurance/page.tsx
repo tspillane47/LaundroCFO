@@ -21,6 +21,7 @@ import {
   formatDate,
   parseDate,
 } from "@/components/occupancy/shared";
+import { TEXT_LIMITS, trimToMaxLength, validateMaxLength } from "@/lib/textLimits";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -667,6 +668,13 @@ export default function InsurancePage() {
       return;
     }
     if (!store || !userId || saving || saveStatus === "success") return;
+
+    const notesError = validateMaxLength(policyForm.notes, TEXT_LIMITS.notesField, "Notes");
+    if (notesError) {
+      toast.error(notesError);
+      return;
+    }
+
     setSaving(true);
     setSaveStatus("idle");
 
@@ -710,7 +718,9 @@ export default function InsurancePage() {
         wind_deductible: parseNum(policyForm.wind_deductible),
         flood_deductible: parseNum(policyForm.flood_deductible),
         equipment_deductible: parseNum(policyForm.equipment_deductible),
-        notes: policyForm.notes || null,
+        notes: policyForm.notes.trim()
+          ? trimToMaxLength(policyForm.notes.trim(), TEXT_LIMITS.notesField)
+          : null,
       };
 
       if (editingPolicyId) {
@@ -1246,6 +1256,7 @@ export default function InsurancePage() {
                   className={clsx(INPUT_CLASS, "min-h-[80px] resize-y")}
                   value={policyForm.notes}
                   onChange={(e) => updatePolicyForm("notes", e.target.value)}
+                  maxLength={TEXT_LIMITS.notesField}
                   placeholder="Policy notes, endorsements, special conditions..."
                 />
               </FormSection>

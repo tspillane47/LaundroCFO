@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 import { useToast } from "@/components/ui/ToastProvider";
+import { TEXT_LIMITS, trimToMaxLength, validateMaxLength } from "@/lib/textLimits";
 
 export const FEEDBACK_TYPES = [
   { value: "bug", label: "Bug" },
@@ -61,6 +62,12 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
       return;
     }
 
+    const lengthError = validateMaxLength(trimmed, TEXT_LIMITS.feedbackMessage, "Message");
+    if (lengthError) {
+      setError(lengthError);
+      return;
+    }
+
     setSubmitting(true);
     setError("");
 
@@ -84,7 +91,7 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
         store_id: !isAllStores && selectedStore?.id ? selectedStore.id : null,
         page_url: pageUrl,
         feedback_type: feedbackType,
-        message: trimmed,
+        message: trimToMaxLength(trimmed, TEXT_LIMITS.feedbackMessage),
         status: "new",
         priority: "normal",
       });
@@ -163,6 +170,7 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={5}
+                maxLength={TEXT_LIMITS.feedbackMessage}
                 className={clsx(INPUT_CLASS, "w-full resize-y min-h-[120px]")}
                 placeholder="Describe what happened or what you'd like to see..."
                 disabled={submitting}
