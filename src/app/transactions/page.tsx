@@ -20,6 +20,11 @@ import { useWriteGuard } from "@/lib/useWriteGuard";
 import { TEXT_LIMITS, trimToMaxLength, validateMaxLength } from "@/lib/textLimits";
 import { RuleApplyPrompt } from "@/components/financials/RuleApplyPrompt";
 import {
+  TransactionReviewTipsBanner,
+  TransactionReviewTipsToggle,
+  useTransactionReviewTips,
+} from "@/components/transactions/TransactionReviewTipsBanner";
+import {
   BANK_IMPORT_CATEGORY_LABELS,
   applyCategorizationRuleToTransactions,
   buildUtilitiesLookup,
@@ -380,6 +385,8 @@ function TransactionsPageContent() {
   const toast = useToast();
   const { evaluateAlerts } = useAlertEvaluation();
   const { canWrite, blockedReason } = useWriteGuard();
+  const { visible: reviewTipsVisible, dismiss: dismissReviewTips, show: showReviewTips } =
+    useTransactionReviewTips();
 
   function requireWrite(): boolean {
     if (!canWrite) {
@@ -2055,7 +2062,7 @@ function TransactionsPageContent() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         {(
           [
             ["needs_review", `Needs Review (${statusCounts.needsReview})`],
@@ -2078,7 +2085,18 @@ function TransactionsPageContent() {
             {label}
           </button>
         ))}
+        {activeTab === "needs_review" && (
+          <TransactionReviewTipsToggle
+            expanded={reviewTipsVisible}
+            onToggle={() => (reviewTipsVisible ? dismissReviewTips() : showReviewTips())}
+            className="ml-auto"
+          />
+        )}
       </div>
+
+      {activeTab === "needs_review" && reviewTipsVisible && (
+        <TransactionReviewTipsBanner onDismiss={dismissReviewTips} />
+      )}
 
       <div className="card">
         <div className="section-title flex flex-wrap items-center gap-3">

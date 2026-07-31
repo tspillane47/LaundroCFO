@@ -15,6 +15,7 @@ import {
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
+import { TransactionReviewGuide } from "@/components/transactions/TransactionReviewGuide";
 
 function resolveInitialStoreId(
   stores: Array<{ id: string }>,
@@ -371,6 +372,8 @@ export default function GettingStartedPage() {
               <SetupSectionCard key={section.id} section={section} />
             ))}
           </ul>
+
+          <TransactionReviewGuide />
         </>
       )}
 
