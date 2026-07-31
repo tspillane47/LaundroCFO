@@ -1,8 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type SetupSectionId = "equipment" | "occupancy" | "debt" | "transactions";
+export type SetupSectionId = "equipment" | "occupancy" | "debt" | "financials";
 
 export type SetupSectionStatus = "complete" | "not_started";
+
+export type FinancialDataOptionId = "quickbooks" | "plaid" | "csv";
+
+export type FinancialDataOption = {
+  id: FinancialDataOptionId;
+  label: string;
+  connectedLabel: string;
+  description: string;
+  href: string;
+  connected: boolean;
+};
 
 export type SetupSection = {
   id: SetupSectionId;
@@ -10,6 +21,7 @@ export type SetupSection = {
   description: string;
   href: string;
   status: SetupSectionStatus;
+  financialOptions?: FinancialDataOption[];
 };
 
 export type StoreSetupStatus = {
@@ -38,8 +50,45 @@ export function isDebtComplete(loanCount: number): boolean {
   return loanCount > 0;
 }
 
-export function isTransactionsComplete(transactionCount: number): boolean {
-  return transactionCount > 0;
+export function isFinancialDataComplete(
+  hasQuickBooks: boolean,
+  hasPlaid: boolean,
+  transactionCount: number
+): boolean {
+  return hasQuickBooks || hasPlaid || transactionCount > 0;
+}
+
+export function buildFinancialDataOptions(input: {
+  hasQuickBooks: boolean;
+  hasPlaid: boolean;
+  hasTransactions: boolean;
+}): FinancialDataOption[] {
+  return [
+    {
+      id: "quickbooks",
+      label: "Connect QuickBooks",
+      connectedLabel: "QuickBooks connected",
+      description: "Sync your books automatically if you already use QuickBooks.",
+      href: "/financials?tab=quickbooks",
+      connected: input.hasQuickBooks,
+    },
+    {
+      id: "plaid",
+      label: "Connect Bank Account",
+      connectedLabel: "Bank account connected",
+      description: "Link your business bank account for automatic transaction imports.",
+      href: "/financials?tab=bank",
+      connected: input.hasPlaid,
+    },
+    {
+      id: "csv",
+      label: "Import Bank Statement (CSV)",
+      connectedLabel: "Bank transactions imported",
+      description: "Upload a CSV export from your bank if you prefer not to connect accounts.",
+      href: "/transactions",
+      connected: input.hasTransactions,
+    },
+  ];
 }
 
 export function buildStoreSetupStatus(input: {
@@ -48,8 +97,16 @@ export function buildStoreSetupStatus(input: {
   hasLease: boolean;
   hasRealEstate: boolean;
   loanCount: number;
+  hasQuickBooks: boolean;
+  hasPlaid: boolean;
   transactionCount: number;
 }): StoreSetupStatus {
+  const financialOptions = buildFinancialDataOptions({
+    hasQuickBooks: input.hasQuickBooks,
+    hasPlaid: input.hasPlaid,
+    hasTransactions: input.transactionCount > 0,
+  });
+
   const sections: SetupSection[] = [
     {
       id: "equipment",
@@ -75,11 +132,14 @@ export function buildStoreSetupStatus(input: {
       status: isDebtComplete(input.loanCount) ? "complete" : "not_started",
     },
     {
-      id: "transactions",
-      label: "Bank Import & Transactions",
-      description: "Import bank transactions to build your P&L and unlock full financial insights.",
-      href: "/transactions",
-      status: isTransactionsComplete(input.transactionCount) ? "complete" : "not_started",
+      id: "financials",
+      label: "Connect Your Financial Data",
+      description: "Choose how you'd like to bring in revenue and expenses — any one option counts.",
+      href: "/financials",
+      status: isFinancialDataComplete(input.hasQuickBooks, input.hasPlaid, input.transactionCount)
+        ? "complete"
+        : "not_started",
+      financialOptions,
     },
   ];
 
@@ -102,6 +162,8 @@ export async function fetchStoreSetupStatus(
     { data: lease },
     { data: realEstate },
     { count: loanCount },
+    { data: quickBooksConnection },
+    { data: plaidConnection },
     { count: transactionCount },
   ] = await Promise.all([
     supabase
@@ -115,6 +177,8 @@ export async function fetchStoreSetupStatus(
       .from("store_loans")
       .select("id", { count: "exact", head: true })
       .eq("store_id", storeId),
+    supabase.from("quickbooks_connections").select("id").eq("store_id", storeId).maybeSingle(),
+    supabase.from("plaid_connections").select("id").eq("store_id", storeId).maybeSingle(),
     supabase
       .from("bank_transactions")
       .select("id", { count: "exact", head: true })
@@ -127,6 +191,8 @@ export async function fetchStoreSetupStatus(
     hasLease: Boolean(lease),
     hasRealEstate: Boolean(realEstate),
     loanCount: loanCount ?? 0,
+    hasQuickBooks: Boolean(quickBooksConnection),
+    hasPlaid: Boolean(plaidConnection),
     transactionCount: transactionCount ?? 0,
   });
 }

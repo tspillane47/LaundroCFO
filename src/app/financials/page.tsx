@@ -528,6 +528,8 @@ export default function FinancialsPage() {
 
     if (tab === "quickbooks") {
       setActiveTab("quickbooks");
+    } else if (tab === "bank") {
+      setActiveTab("bank");
     }
 
     if (qbStatus === "connected") {

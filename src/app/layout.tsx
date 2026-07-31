@@ -542,10 +542,17 @@ function AppShell({ children }: { children: React.ReactNode }) {
           style={{ borderColor: "var(--border)" }}
           ref={sidebarStoreRef}
         >
+          <div
+            className="sidebar-store-label-header text-[10px] font-semibold uppercase tracking-wide mb-2 px-1"
+            style={{ color: "var(--sidebar-section)" }}
+          >
+            Store
+          </div>
           <button
             type="button"
             onClick={() => setShowStoreDropdown((v) => !v)}
             className="sidebar-store-button group relative w-full rounded-lg px-3 py-2.5 flex items-center justify-between gap-2 transition-colors hover:opacity-90"
+            aria-label={`Switch store. Current: ${isAllStores ? "All Stores" : (selectedStore?.name ?? "Select store")}`}
             style={{
               background: "var(--bg-card2)",
               border: "1px solid var(--border)",
@@ -631,9 +638,14 @@ function AppShell({ children }: { children: React.ReactNode }) {
                   <button
                     type="button"
                     onClick={() => setShowStoreDropdown((v) => !v)}
-                    className="topbar-store-badge flex items-center gap-1.5 text-[14px] md:text-[12px] transition-colors hover:opacity-80 min-h-[44px] md:min-h-0 truncate max-w-[140px] sm:max-w-[200px] md:max-w-none"
+                    className="topbar-store-badge flex items-center gap-1.5 text-[14px] md:text-[12px] transition-colors hover:opacity-80 min-h-[44px] md:min-h-0 truncate max-w-[180px] sm:max-w-[240px] md:max-w-none"
                     style={{ color: "var(--text-muted)" }}
+                    aria-label={`Switch store. Current: ${dropdownLabel}`}
                   >
+                    <span className="hidden md:inline-flex items-center gap-1 flex-shrink-0">
+                      <StoreIcon />
+                      <span style={{ color: "var(--text-secondary)" }}>Store:</span>
+                    </span>
                     <span className="truncate">{dropdownLabel}</span>
                     <ChevronDownIcon />
                   </button>
