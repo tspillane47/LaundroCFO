@@ -10,7 +10,6 @@ import { toNullableNum, findNegativeFieldError } from "@/lib/formHelpers";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { Logo } from "@/components/ui/Logo";
 import { NavIcon } from "@/components/ui/NavIcons";
-import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import {
   categorizeWithRules,
@@ -22,9 +21,9 @@ import { canAddStore, storeLimitUpgradeMessage } from "@/lib/access";
 import { useAccessStatus, invalidateAccessStatusCache } from "@/lib/useAccessStatus";
 import { isOnboardingComplete } from "@/lib/onboarding";
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 4;
 
-const STEP_LABELS = ["Welcome", "Your Store", "Occupancy", "Equipment", "Financials"];
+const STEP_LABELS = ["Welcome", "Your Store", "Occupancy", "Financials"];
 
 const STORE_TYPES = [
   { label: "Coin Laundry", value: "Coin" },
@@ -58,11 +57,6 @@ type OnboardingForm = {
   annualEscalation: string;
   monthlyMortgage: string;
   buildingValue: string;
-  washers: string;
-  dryers: string;
-  avgVendPrice: string;
-  avgEquipmentAge: string;
-  highSpeedExtract: boolean;
   financialMode: FinancialMode;
   monthlyRevenue: string;
   monthlyExpenses: string;
@@ -83,11 +77,6 @@ const DEFAULT_FORM: OnboardingForm = {
   annualEscalation: "",
   monthlyMortgage: "",
   buildingValue: "",
-  washers: "",
-  dryers: "",
-  avgVendPrice: "",
-  avgEquipmentAge: "",
-  highSpeedExtract: false,
   financialMode: null,
   monthlyRevenue: "",
   monthlyExpenses: "",
@@ -398,72 +387,6 @@ function OnboardingContent() {
     return true;
   }
 
-  async function saveEquipment(id: string): Promise<boolean> {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return false;
-
-    const washerCount = toNullableNum(form.washers) ?? 0;
-    const dryerCount = toNullableNum(form.dryers) ?? 0;
-    const avgAge = toNullableNum(form.avgEquipmentAge);
-    const currentYear = new Date().getFullYear();
-    const installationYear = avgAge != null ? Math.max(1980, currentYear - avgAge) : currentYear;
-
-    const rows = [];
-
-    if (washerCount > 0) {
-      rows.push({
-        user_id: user.id,
-        store_id: id,
-        machine_type: "Washer",
-        manufacturer: "Mixed",
-        machine_size: "Mixed",
-        quantity: washerCount,
-        installation_year: installationYear,
-        high_speed_extract: form.highSpeedExtract,
-        condition: "Good",
-        avg_vend_price: toNullableNum(form.avgVendPrice),
-      });
-    }
-
-    if (dryerCount > 0) {
-      rows.push({
-        user_id: user.id,
-        store_id: id,
-        machine_type: "Dryer",
-        manufacturer: "Mixed",
-        machine_size: "Mixed",
-        quantity: dryerCount,
-        installation_year: installationYear,
-        high_speed_extract: false,
-        condition: "Good",
-        avg_vend_price: null,
-      });
-    }
-
-    if (rows.length === 0) return true;
-
-    const { error } = await supabase.from("equipment_inventory").insert(rows);
-    if (error) {
-      console.error("Equipment save error:", error);
-      setErrorMessage("We couldn't save equipment details. Please try again.");
-      return false;
-    }
-
-    await supabase
-      .from("stores")
-      .update({
-        washers: washerCount || null,
-        dryers: dryerCount || null,
-        avg_machine_age: avgAge,
-      })
-      .eq("id", id);
-
-    invalidateValuationCache(id);
-    return true;
-  }
-
   async function saveFinancials(id: string): Promise<boolean> {
     const {
       data: { user },
@@ -616,22 +539,6 @@ function OnboardingContent() {
     setBusy(true);
     setErrorMessage("");
 
-    if (!skip && (form.washers || form.dryers)) {
-      const ok = await saveEquipment(storeId);
-      setBusy(false);
-      if (!ok) return;
-    } else {
-      setBusy(false);
-    }
-
-    goToStep(5, "left");
-  }
-
-  async function handleStep5Next(skip = false) {
-    if (!storeId) return;
-    setBusy(true);
-    setErrorMessage("");
-
     let nextHasEstimate = hasValuationEstimate;
     let nextEstimate = estimatedValue;
 
@@ -681,7 +588,7 @@ function OnboardingContent() {
         .eq("id", user.id);
     }
 
-    router.push(isAddingStore ? "/portfolio" : "/dashboard");
+    router.push(isAddingStore ? "/portfolio" : "/getting-started");
   }
 
   if (!ready) {
@@ -785,10 +692,10 @@ function OnboardingContent() {
                   </h1>
                   <p className="text-[15px] text-[var(--text-secondary)] mb-8 max-w-md mx-auto">
                     {hasValuationEstimate
-                      ? `Based on what you've shared so far, your preliminary business value estimate is ${fmtDollar(estimatedValue)}. Add equipment, lease, and store details on the Valuation page to refine this.`
+                      ? `Based on what you've shared so far, your preliminary business value estimate is ${fmtDollar(estimatedValue)}. Finish setup to refine this on the Valuation page.`
                       : isAddingStore
                         ? "Your new store is in your portfolio — add more data anytime to unlock its full valuation."
-                        : "Your dashboard is ready — add more data to unlock your full valuation."}
+                        : "Great start — we'll walk you through a few optional steps to unlock your full dashboard."}
                   </p>
                   <button
                     type="button"
@@ -799,10 +706,10 @@ function OnboardingContent() {
                     {completing
                       ? isAddingStore
                         ? "Opening portfolio..."
-                        : "Opening dashboard..."
+                        : "Continuing..."
                       : isAddingStore
                         ? "Back to Portfolio →"
-                        : "Go to My Dashboard →"}
+                        : "Continue Setup →"}
                   </button>
                 </div>
               ) : (
@@ -813,7 +720,7 @@ function OnboardingContent() {
                         Welcome to LaundroCFO
                       </h1>
                       <p className="text-[15px] text-[var(--text-secondary)] mb-8 max-w-lg mx-auto leading-relaxed">
-                        Let&apos;s get your store set up in about 5 minutes. We&apos;ll use this to
+                        Let&apos;s get your store set up in a few minutes. We&apos;ll use this to
                         calculate your store&apos;s value, benchmarks, and financial health.
                       </p>
 
@@ -1048,76 +955,6 @@ function OnboardingContent() {
                   {step === 4 && (
                     <div>
                       <h2 className="text-[24px] font-bold text-[var(--text-primary)] mb-1">
-                        Tell us about your machines
-                      </h2>
-                      <p className="text-[13px] text-[var(--text-muted)] mb-6">
-                        Equipment age and mix help score your store&apos;s condition.
-                      </p>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <Field label="Number of Washers">
-                          <input
-                            type="number"
-                            value={form.washers}
-                            onChange={(e) => setField("washers", e.target.value)}
-                            onKeyDown={preventEnterSubmit}
-                            className={INPUT_CLASS}
-                            placeholder="28"
-                          />
-                        </Field>
-                        <Field label="Number of Dryers">
-                          <input
-                            type="number"
-                            value={form.dryers}
-                            onChange={(e) => setField("dryers", e.target.value)}
-                            onKeyDown={preventEnterSubmit}
-                            className={INPUT_CLASS}
-                            placeholder="32"
-                          />
-                        </Field>
-                        <Field label="Average Washer Vend Price ($)">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={form.avgVendPrice}
-                            onChange={(e) => setField("avgVendPrice", e.target.value)}
-                            onKeyDown={preventEnterSubmit}
-                            className={INPUT_CLASS}
-                            placeholder="4.50"
-                          />
-                        </Field>
-                        <Field label="Average Equipment Age (years)">
-                          <input
-                            type="number"
-                            value={form.avgEquipmentAge}
-                            onChange={(e) => setField("avgEquipmentAge", e.target.value)}
-                            onKeyDown={preventEnterSubmit}
-                            className={INPUT_CLASS}
-                            placeholder="6"
-                          />
-                        </Field>
-                      </div>
-
-                      <div className="flex items-center justify-between mt-5 pt-4 border-t border-[var(--border)]">
-                        <div>
-                          <div className="text-[13px] font-medium text-[var(--text-primary)]">
-                            High Speed Extract (200G+)
-                          </div>
-                          <div className="text-[12px] text-[var(--text-muted)]">
-                            Modern washers with 200G extraction
-                          </div>
-                        </div>
-                        <ToggleSwitch
-                          checked={form.highSpeedExtract}
-                          onChange={(checked) => setField("highSpeedExtract", checked)}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {step === 5 && (
-                    <div>
-                      <h2 className="text-[24px] font-bold text-[var(--text-primary)] mb-1">
                         Add your financial data
                       </h2>
                       <p className="text-[13px] text-[var(--text-muted)] mb-6">
@@ -1225,12 +1062,11 @@ function OnboardingContent() {
                             disabled={busy}
                             onClick={() => {
                               if (step === 3) void handleStep3Next(true);
-                              else if (step === 4) void handleStep4Next(true);
-                              else void handleStep5Next(true);
+                              else void handleStep4Next(true);
                             }}
                             className="text-[13px] text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-40 px-2 py-2"
                           >
-                            {step === 5
+                            {step === 4
                               ? "I'll add this later — start with estimates"
                               : "I'll add this later"}
                           </button>
@@ -1243,13 +1079,12 @@ function OnboardingContent() {
                             if (step === 2) void handleStep2Next();
                             else if (step === 3) void handleStep3Next(false);
                             else if (step === 4) void handleStep4Next(false);
-                            else if (step === 5) void handleStep5Next(false);
                           }}
                           className="btn-primary px-8 py-2.5 text-[13px] disabled:opacity-50"
                         >
                           {busy
                             ? "Saving..."
-                            : step === 5
+                            : step === 4
                               ? "Continue →"
                               : "Next →"}
                         </button>

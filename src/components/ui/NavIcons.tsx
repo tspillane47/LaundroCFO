@@ -19,6 +19,13 @@ export function NavIcon({ name }: { name: string }) {
           <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
         </svg>
       );
+    case "getting-started":
+      return (
+        <svg {...props}>
+          <path d="M9 11l3 3L22 4" />
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+        </svg>
+      );
     case "dashboard":
       return (
         <svg {...props}>

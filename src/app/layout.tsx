@@ -45,7 +45,10 @@ function getUserInitials(fullName: string | null, email: string | null): string 
 const navSections = [
   {
     label: "PORTFOLIO",
-    items: [{ href: "/portfolio", label: "Portfolio", icon: "portfolio" }],
+    items: [
+      { href: "/getting-started", label: "Getting Started", icon: "getting-started" },
+      { href: "/portfolio", label: "Portfolio", icon: "portfolio" },
+    ],
   },
   {
     label: "STORE",
@@ -82,6 +85,7 @@ const navSections = [
 
 const pageTitles: Record<string, string> = {
   "/portfolio": "Portfolio",
+  "/getting-started": "Getting Started",
   "/dashboard": "Store Dashboard",
   "/financials": "Financials",
   "/transactions": "Transactions",
