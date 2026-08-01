@@ -149,8 +149,8 @@ export function buildAlertDigestHtml(params: {
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; margin: 0; padding: 40px 20px;">
   <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-    <div style="background: #0f1e3d; padding: 32px 40px;">
-      <div style="color: #60a5fa; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">LaundroCFO</div>
+    <div style="padding: 32px 40px 0;">
+      <span style="font-size: 20px; font-weight: 700; color: #0f172a;">Laundro<span style="color: #2563eb;">CFO</span></span>
     </div>
     <div style="padding: 40px;">
       <div style="font-size: 22px; font-weight: 700; color: #1e293b; margin-bottom: 16px;">Daily alert digest</div>
