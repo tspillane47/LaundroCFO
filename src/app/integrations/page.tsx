@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 const integrations = [
   {
@@ -21,42 +20,16 @@ const integrations = [
     name: "Plaid — Bank Feed",
     description: "Connect your business bank account for real-time cash flow and transaction categorization.",
     syncs: ["Bank Transactions", "Cash Balance", "Payments"],
-    status: "coming_soon",
+    status: "disconnected",
     color: "#1a3a5c",
     label: "PL",
-    cta: "Join Waitlist",
-    ctaStyle: "btn-outline",
-    disabled: true,
-  },
-  {
-    id: "utility",
-    name: "Utility Bill Upload",
-    description: "Upload PG&E, Edison, or any utility PDFs — LaundroCFO extracts monthly utility costs automatically.",
-    syncs: ["Gas", "Electric", "Water"],
-    status: "disconnected",
-    color: "#1e3a8a",
-    label: "UT",
-    cta: "Upload Bill",
-    ctaStyle: "btn-outline",
-    href: "/utilities",
-  },
-  {
-    id: "lease",
-    name: "Lease PDF Upload",
-    description: "Upload your lease document — LaundroCFO extracts key terms, dates, rent schedule, and renewal options.",
-    syncs: ["Rent", "CAM", "Terms", "Options"],
-    status: "disconnected",
-    color: "#374151",
-    label: "LS",
-    cta: "Upload Lease",
-    ctaStyle: "btn-outline",
-    href: "/lease",
+    cta: "Connect Bank Account",
+    ctaStyle: "btn-primary",
+    href: "/financials",
   },
 ];
 
 export default function IntegrationsPage() {
-  const router = useRouter();
-
   return (
     <div className="space-y-5 max-w-3xl">
       <div>
@@ -94,22 +67,9 @@ export default function IntegrationsPage() {
                 ))}
               </div>
             </div>
-            {i.href ? (
-              <Link href={i.href} className={`${i.ctaStyle} flex-shrink-0 whitespace-nowrap`}>
-                {i.cta}
-              </Link>
-            ) : (
-              <button
-                type="button"
-                className={`${i.ctaStyle} flex-shrink-0 whitespace-nowrap disabled:opacity-50`}
-                disabled={i.disabled}
-                onClick={() => {
-                  if (!i.disabled) router.push("/transactions");
-                }}
-              >
-                {i.cta}
-              </button>
-            )}
+            <Link href={i.href} className={`${i.ctaStyle} flex-shrink-0 whitespace-nowrap`}>
+              {i.cta}
+            </Link>
           </div>
         ))}
       </div>

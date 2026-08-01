@@ -173,12 +173,7 @@ function ReportsPageContent() {
   const [portfolioCashFlow, setPortfolioCashFlow] = useState<PortfolioTtmCashFlow | null>(null);
 
   const [generatingPdf, setGeneratingPdf] = useState(false);
-  const [sharing, setSharing] = useState(false);
   const [error, setError] = useState("");
-  const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [shareUrl, setShareUrl] = useState("");
-  const [shareExpires, setShareExpires] = useState("");
-  const [copied, setCopied] = useState(false);
   const [reportMode, setReportMode] = useState<ReportMode>("store");
   const [portfolioData, setPortfolioData] = useState<PortfolioReportData | null>(null);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
@@ -548,80 +543,6 @@ function ReportsPageContent() {
     }
   }
 
-  async function handleShareWithLender() {
-    if (!userId) {
-      setError("You must be signed in to share reports.");
-      return;
-    }
-    if (reportMode === "portfolio" && !portfolioData) return;
-    if (reportMode === "store" && (!reportProps || !store)) return;
-
-    setSharing(true);
-    setError("");
-
-    try {
-      const blob = await buildPdfBlob();
-      const timestamp = Date.now();
-      const filePath =
-        reportMode === "portfolio"
-          ? `${userId}/portfolio/report-${timestamp}.pdf`
-          : `${userId}/${store!.id}/report-${timestamp}.pdf`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("reports")
-        .upload(filePath, blob, { contentType: "application/pdf", upsert: false });
-
-      if (uploadError) throw uploadError;
-
-      const sevenDays = 60 * 60 * 24 * 7;
-      const { data: signedData, error: signError } = await supabase.storage
-        .from("reports")
-        .createSignedUrl(filePath, sevenDays);
-
-      if (signError || !signedData?.signedUrl) {
-        throw signError ?? new Error("Failed to create signed URL");
-      }
-
-      const expiresAt = new Date(Date.now() + sevenDays * 1000).toISOString();
-
-      const { error: insertError } = await supabase.from("shared_reports").insert({
-        user_id: userId,
-        store_id: reportMode === "portfolio" ? null : store!.id,
-        file_path: filePath,
-        signed_url: signedData.signedUrl,
-        expires_at: expiresAt,
-      });
-
-      if (insertError) throw insertError;
-
-      setShareUrl(signedData.signedUrl);
-      setShareExpires(
-        new Date(expiresAt).toLocaleDateString("en-US", {
-          month: "long",
-          day: "numeric",
-          year: "numeric",
-        })
-      );
-      setShareModalOpen(true);
-      setCopied(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to share report");
-    } finally {
-      setSharing(false);
-    }
-  }
-
-  async function handleCopyLink() {
-    if (!shareUrl) return;
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setError("Could not copy link to clipboard");
-    }
-  }
-
   const storeName = store?.name ?? "Your Store";
   const isStoreReady = Boolean(store && valuation && metrics && portfolioTtm);
   const portfolioReady = Boolean(portfolioData && portfolioData.totals.storeCount > 0);
@@ -630,9 +551,7 @@ function ReportsPageContent() {
   const storeDetails = portfolioData?.storeDetails ?? [];
 
   const pdfDisabled =
-    generatingPdf ||
-    sharing ||
-    (reportMode === "portfolio" ? !portfolioReady : !isStoreReady);
+    generatingPdf || (reportMode === "portfolio" ? !portfolioReady : !isStoreReady);
 
   return (
     <div className="report-mode space-y-4 w-full">
@@ -672,14 +591,6 @@ function ReportsPageContent() {
             disabled={pdfDisabled}
           >
             {generatingPdf ? "Generating..." : "Generate PDF"}
-          </button>
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={handleShareWithLender}
-            disabled={pdfDisabled || !userId}
-          >
-            {sharing ? "Sharing..." : "Share with Lender"}
           </button>
         </div>
       </div>
@@ -1188,35 +1099,6 @@ function ReportsPageContent() {
         </>
       )}
 
-      {/* Share modal */}
-      {shareModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="card max-w-lg w-full">
-            <div className="text-[15px] font-semibold text-[var(--text-primary)] mb-1">Share with Lender</div>
-            <p className="text-[12px] text-[var(--text-secondary)] mb-4">
-              This secure link expires on {shareExpires} (7 days).
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                readOnly
-                value={shareUrl}
-                className="flex-1 bg-[var(--bg-input)] border border-[var(--border2)] rounded-lg px-3 py-2 text-[12px] text-[var(--text-primary)]"
-              />
-              <button type="button" className="btn-primary text-[12px] px-4" onClick={handleCopyLink}>
-                {copied ? "Copied!" : "Copy"}
-              </button>
-            </div>
-            <button
-              type="button"
-              className="btn-outline w-full mt-4 text-[12px]"
-              onClick={() => setShareModalOpen(false)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
