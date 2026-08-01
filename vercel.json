@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/sync-integrations",
       "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/cron/send-alert-digest",
+      "schedule": "0 12 * * *"
     }
   ]
 }

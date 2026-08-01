@@ -41,16 +41,18 @@ type NotificationKey =
   | "monthly_report"
   | "rent_escalation_alerts";
 
-// Email delivery for these preferences is not built yet — toggles stay visible but disabled.
+// Email delivery is live for daily alert digests; other notification types remain placeholders.
 const NOTIFICATION_TOGGLES: {
   key: NotificationKey;
   label: string;
   description: string;
+  enabled?: boolean;
 }[] = [
   {
     key: "email_alerts",
     label: "Email Alerts",
-    description: "Email when alerts are triggered for your stores (coming soon)",
+    description: "Daily email digest when new alerts are triggered for your stores",
+    enabled: true,
   },
   {
     key: "weekly_summary",
@@ -675,14 +677,16 @@ export default function AccountPage() {
       <div className="card space-y-1">
         <div className="section-title mb-2">Notifications</div>
         <p className="text-[12px] mb-3" style={{ color: "var(--text-muted)" }}>
-          Store alerts appear in the app today (dashboard toasts and the Alerts page). Email
-          delivery for the preferences below is coming soon.
+          Store alerts appear in the app today (dashboard toasts and the Alerts page). Daily email
+          digests are sent when Email Alerts is enabled and new alerts are detected.
         </p>
 
-        {NOTIFICATION_TOGGLES.map(({ key, label, description }) => (
+        {NOTIFICATION_TOGGLES.map(({ key, label, description, enabled = false }) => (
           <div
             key={key}
-            className="flex items-start justify-between gap-4 py-3 border-b last:border-b-0 opacity-70"
+            className={`flex items-start justify-between gap-4 py-3 border-b last:border-b-0 ${
+              enabled ? "" : "opacity-70"
+            }`}
             style={{ borderColor: "var(--border)" }}
           >
             <div className="min-w-0">
@@ -691,7 +695,9 @@ export default function AccountPage() {
                 style={{ color: "var(--text-primary)" }}
               >
                 {label}
-                <span className="badge badge-amber text-[10px]">Coming soon</span>
+                {!enabled && (
+                  <span className="badge badge-amber text-[10px]">Coming soon</span>
+                )}
               </div>
               <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
                 {description}
@@ -700,8 +706,8 @@ export default function AccountPage() {
             <ToggleSwitch
               id={`notification-${key}`}
               checked={notifications[key]}
-              disabled
-              aria-label={`${label} (coming soon)`}
+              disabled={!enabled}
+              aria-label={enabled ? label : `${label} (coming soon)`}
               onChange={(checked) => void handleNotificationChange(key, checked)}
             />
           </div>
