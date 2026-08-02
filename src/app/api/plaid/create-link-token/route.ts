@@ -6,7 +6,7 @@ import {
 import {
   createPlaidLinkToken,
   createPlaidUpdateModeLinkToken,
-  getPlaidConnectionForStore,
+  getPlaidConnectionById,
   logPlaidApiError,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
   verifyUserOwnsStore,
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { storeId?: unknown; updateMode?: unknown };
+  let body: { storeId?: unknown; connectionId?: unknown; updateMode?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -32,7 +32,9 @@ export async function POST(request: Request) {
   }
 
   const storeId = typeof body.storeId === "string" ? body.storeId : null;
+  const connectionId = typeof body.connectionId === "string" ? body.connectionId : null;
   const updateMode = body.updateMode === true;
+
   if (!storeId) {
     return NextResponse.json({ error: "Missing storeId" }, { status: 400 });
   }
@@ -49,9 +51,13 @@ export async function POST(request: Request) {
     }
 
     if (updateMode) {
-      const connection = await getPlaidConnectionForStore(storeId);
-      if (!connection) {
-        return NextResponse.json({ error: "No bank connection found for this store" }, { status: 404 });
+      if (!connectionId) {
+        return NextResponse.json({ error: "Missing connectionId" }, { status: 400 });
+      }
+
+      const connection = await getPlaidConnectionById(connectionId);
+      if (!connection || connection.store_id !== storeId) {
+        return NextResponse.json({ error: "Bank connection not found for this store" }, { status: 404 });
       }
 
       if (
@@ -71,7 +77,7 @@ export async function POST(request: Request) {
         user.id,
         connection.plaid_access_token
       );
-      return NextResponse.json({ link_token: linkToken, update_mode: true });
+      return NextResponse.json({ link_token: linkToken, update_mode: true, connectionId });
     }
 
     const linkToken = await createPlaidLinkToken(user.id);
@@ -79,6 +85,7 @@ export async function POST(request: Request) {
   } catch (error) {
     logPlaidApiError("[plaid/create-link-token] route failed", error, {
       storeId,
+      connectionId,
       userId: user.id,
     });
     return NextResponse.json({ error: "Failed to create Plaid link token" }, { status: 500 });

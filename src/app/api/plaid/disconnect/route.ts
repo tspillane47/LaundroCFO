@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   deletePlaidConnection,
-  removePlaidItem,
-  resetStoreFinancialDataSourceOnPlaidDisconnect,
+  getPlaidConnectionById,
   verifyUserOwnsStore,
 } from "@/lib/plaid";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
@@ -17,7 +16,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { storeId?: unknown };
+  let body: { storeId?: unknown; connectionId?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -25,8 +24,13 @@ export async function POST(request: Request) {
   }
 
   const storeId = typeof body.storeId === "string" ? body.storeId : null;
+  const connectionId = typeof body.connectionId === "string" ? body.connectionId : null;
+
   if (!storeId) {
     return NextResponse.json({ error: "Missing storeId" }, { status: 400 });
+  }
+  if (!connectionId) {
+    return NextResponse.json({ error: "Missing connectionId" }, { status: 400 });
   }
 
   const ownsStore = await verifyUserOwnsStore(supabase, user.id, storeId);
@@ -35,19 +39,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const connection = await deletePlaidConnection(storeId);
-
-    if (connection?.plaid_access_token) {
-      try {
-        await removePlaidItem(connection.plaid_access_token);
-      } catch (removeError) {
-        console.error("[plaid/disconnect] item remove failed", removeError);
-      }
+    const existing = await getPlaidConnectionById(connectionId);
+    if (!existing || existing.store_id !== storeId) {
+      return NextResponse.json({ error: "Bank connection not found for this store" }, { status: 404 });
     }
 
-    await resetStoreFinancialDataSourceOnPlaidDisconnect(storeId);
+    const connection = await deletePlaidConnection(connectionId);
+    if (!connection) {
+      return NextResponse.json({ error: "Bank connection not found for this store" }, { status: 404 });
+    }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, connectionId });
   } catch (error) {
     console.error("[plaid/disconnect] failed", error);
     return NextResponse.json({ error: "Failed to disconnect bank account" }, { status: 500 });

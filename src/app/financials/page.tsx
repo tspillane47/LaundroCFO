@@ -126,11 +126,51 @@ type PlaidConnection = {
   plaid_item_id: string;
   institution_name: string | null;
   connected_at: string;
+  updated_at: string;
   has_new_transactions: boolean;
   item_error_code: string | null;
   item_error_message: string | null;
   item_error_at: string | null;
 };
+
+type PlaidSyncAllResponse = PlaidSyncResult & {
+  error?: string;
+  synced?: number;
+  total?: number;
+  connections?: Array<PlaidSyncResult & { connectionId: string; ok: boolean; error?: string }>;
+};
+
+function formatPlaidLastSynced(connection: PlaidConnection): string {
+  if (connection.has_new_transactions) {
+    return "New transactions available";
+  }
+
+  const syncedAt = new Date(connection.updated_at);
+  if (Number.isNaN(syncedAt.getTime())) {
+    return "Not synced yet";
+  }
+
+  return `Last synced ${syncedAt.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  })}`;
+}
+
+function formatPlaidSyncSummary(result: PlaidSyncResult): string {
+  const parts: string[] = [];
+  if (result.added > 0) parts.push(`${result.added} added`);
+  if (result.modified > 0) parts.push(`${result.modified} updated`);
+  if (result.removed > 0) parts.push(`${result.removed} removed`);
+  if (result.skippedRemovedPosted > 0) {
+    parts.push(
+      `${result.skippedRemovedPosted} posted removal${result.skippedRemovedPosted === 1 ? "" : "s"} skipped`
+    );
+  }
+
+  return parts.length > 0
+    ? `Plaid sync complete: ${parts.join(", ")}.`
+    : "Plaid sync complete. No transaction changes.";
+}
 
 const QB_ERROR_MESSAGES: Record<string, string> = {
   missing_params: "QuickBooks did not return the expected authorization data.",
@@ -352,15 +392,19 @@ export default function FinancialsPage() {
   const [stagedTransactions, setStagedTransactions] = useState<StagedTransaction[]>([]);
   const [qbMappings, setQbMappings] = useState<QBMappingRow[]>(DEFAULT_QB_MAPPINGS);
   const [qbConnection, setQbConnection] = useState<QBConnection | null>(null);
-  const [plaidConnection, setPlaidConnection] = useState<PlaidConnection | null>(null);
+  const [plaidConnections, setPlaidConnections] = useState<PlaidConnection[]>([]);
   const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
   const [shouldOpenPlaidLink, setShouldOpenPlaidLink] = useState(false);
   const plaidLinkModeRef = useRef<"connect" | "update">("connect");
+  const plaidLinkConnectionIdRef = useRef<string | null>(null);
   const [connectingPlaid, setConnectingPlaid] = useState(false);
-  const [disconnectingPlaid, setDisconnectingPlaid] = useState(false);
-  const [syncingPlaidTransactions, setSyncingPlaidTransactions] = useState(false);
-  const [plaidSyncResult, setPlaidSyncResult] = useState<PlaidSyncResult | null>(null);
-  const [showPlaidDisconnectConfirm, setShowPlaidDisconnectConfirm] = useState(false);
+  const [disconnectingPlaidConnectionId, setDisconnectingPlaidConnectionId] = useState<string | null>(null);
+  const [syncingPlaidConnectionId, setSyncingPlaidConnectionId] = useState<string | null>(null);
+  const [plaidSyncResults, setPlaidSyncResults] = useState<Record<string, PlaidSyncResult>>({});
+  const [plaidSyncAllResult, setPlaidSyncAllResult] = useState<PlaidSyncResult | null>(null);
+  const [plaidDisconnectConfirmConnectionId, setPlaidDisconnectConfirmConnectionId] = useState<string | null>(
+    null
+  );
   const [disconnectingQb, setDisconnectingQb] = useState(false);
   const [syncingQb, setSyncingQb] = useState(false);
   const [showQbSourceWarning, setShowQbSourceWarning] = useState(false);
@@ -414,7 +458,7 @@ export default function FinancialsPage() {
       { data: bankData, error: bankError },
       { data: mappingData, error: mappingError },
       { data: connectionData, error: connectionError },
-      { data: plaidConnectionData, error: plaidConnectionError },
+      { data: plaidConnectionsData, error: plaidConnectionsError },
       { data: utilitiesData, error: utilitiesError },
       annualDebtByStore,
     ] = await Promise.all([
@@ -442,10 +486,10 @@ export default function FinancialsPage() {
       supabase
         .from("plaid_connections")
         .select(
-          "id, plaid_item_id, institution_name, connected_at, has_new_transactions, item_error_code, item_error_message, item_error_at"
+          "id, plaid_item_id, institution_name, connected_at, updated_at, has_new_transactions, item_error_code, item_error_message, item_error_at"
         )
         .eq("store_id", storeId)
-        .maybeSingle(),
+        .order("connected_at", { ascending: true }),
       supabase
         .from("monthly_utilities")
         .select("year, month, water, gas, electric, sewer, trash, internet")
@@ -459,7 +503,7 @@ export default function FinancialsPage() {
       bankError,
       mappingError,
       connectionError,
-      plaidConnectionError,
+      plaidConnectionsError,
       utilitiesError,
     ]
       .filter(Boolean)
@@ -502,7 +546,7 @@ export default function FinancialsPage() {
     }
 
     setQbConnection((connectionData as QBConnection | null) ?? null);
-    setPlaidConnection((plaidConnectionData as PlaidConnection | null) ?? null);
+    setPlaidConnections((plaidConnectionsData as PlaidConnection[] | null) ?? []);
 
     if (sorted.length > 0 && !showFormRef.current) {
       setSelectedYear(sorted[0].year);
@@ -1050,8 +1094,14 @@ export default function FinancialsPage() {
     }
   }
 
+  const hasPlaidConnections = plaidConnections.length > 0;
+
   function initiateQuickBooksConnect() {
     if (!store?.id) return;
+    if (hasPlaidConnections) {
+      setError("Disconnect all bank accounts before connecting QuickBooks for this store.");
+      return;
+    }
     const source = store.financial_data_source ?? "manual";
     if (source === "bank_import") {
       setShowQbSourceWarning(true);
@@ -1061,13 +1111,18 @@ export default function FinancialsPage() {
   }
 
   function confirmQuickBooksConnect() {
-    if (!store?.id) return;
+    if (!store?.id || hasPlaidConnections) return;
     setConnectingQb(true);
     setError("");
     window.location.href = `/api/quickbooks/authorize?storeId=${store.id}`;
   }
 
   const plaidBlockedByQuickBooks = Boolean(qbConnection);
+  const quickBooksBlockedByPlaid = hasPlaidConnections;
+  const plaidActionBusy =
+    connectingPlaid ||
+    disconnectingPlaidConnectionId !== null ||
+    syncingPlaidConnectionId !== null;
 
   const { open: openPlaidLink, ready: plaidLinkReady } = usePlaidLink({
     token: plaidLinkToken,
@@ -1078,13 +1133,18 @@ export default function FinancialsPage() {
       setSuccess("");
 
       const isUpdateMode = plaidLinkModeRef.current === "update";
+      const connectionId = plaidLinkConnectionIdRef.current;
 
       try {
         if (isUpdateMode) {
+          if (!connectionId) {
+            throw new Error("Missing bank connection for reconnection");
+          }
+
           const response = await fetch("/api/plaid/complete-update-mode", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ storeId: store.id }),
+            body: JSON.stringify({ storeId: store.id, connectionId }),
           });
 
           const payload = (await response.json().catch(() => null)) as
@@ -1097,7 +1157,7 @@ export default function FinancialsPage() {
 
           setSuccess("Bank account reconnected successfully.");
           if (payload?.sync) {
-            setPlaidSyncResult(payload.sync);
+            setPlaidSyncResults((prev) => ({ ...prev, [connectionId]: payload.sync! }));
           }
           await loadData(store.id);
           return;
@@ -1136,6 +1196,7 @@ export default function FinancialsPage() {
         setPlaidLinkToken(null);
         setShouldOpenPlaidLink(false);
         plaidLinkModeRef.current = "connect";
+        plaidLinkConnectionIdRef.current = null;
       }
     },
     onExit: () => {
@@ -1143,6 +1204,7 @@ export default function FinancialsPage() {
       setPlaidLinkToken(null);
       setShouldOpenPlaidLink(false);
       plaidLinkModeRef.current = "connect";
+      plaidLinkConnectionIdRef.current = null;
     },
   });
 
@@ -1156,6 +1218,7 @@ export default function FinancialsPage() {
   async function initiatePlaidConnect() {
     if (!store?.id || plaidBlockedByQuickBooks) return;
     plaidLinkModeRef.current = "connect";
+    plaidLinkConnectionIdRef.current = null;
     setConnectingPlaid(true);
     setError("");
     setSuccess("");
@@ -1189,9 +1252,13 @@ export default function FinancialsPage() {
     }
   }
 
-  async function reconnectPlaid() {
-    if (!store?.id || !plaidConnection) return;
-    if (!isPlaidUpdateModeEligible(plaidConnection.item_error_code)) {
+  async function reconnectPlaid(connectionId: string) {
+    if (!store?.id) return;
+
+    const connection = plaidConnections.find((entry) => entry.id === connectionId);
+    if (!connection) return;
+
+    if (!isPlaidUpdateModeEligible(connection.item_error_code)) {
       setError(
         "This connection cannot be repaired in place. Disconnect and connect a different bank account."
       );
@@ -1199,6 +1266,7 @@ export default function FinancialsPage() {
     }
 
     plaidLinkModeRef.current = "update";
+    plaidLinkConnectionIdRef.current = connectionId;
     setConnectingPlaid(true);
     setError("");
     setSuccess("");
@@ -1207,7 +1275,7 @@ export default function FinancialsPage() {
       const response = await fetch("/api/plaid/create-link-token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storeId: store.id, updateMode: true }),
+        body: JSON.stringify({ storeId: store.id, connectionId, updateMode: true }),
       });
 
       const payload = (await response.json().catch(() => null)) as
@@ -1226,24 +1294,25 @@ export default function FinancialsPage() {
       setShouldOpenPlaidLink(true);
     } catch (reconnectError) {
       setConnectingPlaid(false);
+      plaidLinkConnectionIdRef.current = null;
       setError(
         reconnectError instanceof Error ? reconnectError.message : "Failed to reconnect bank account"
       );
     }
   }
 
-  async function syncPlaidTransactionsFromBank() {
+  async function syncPlaidConnection(connectionId: string) {
     if (!store?.id) return;
-    setSyncingPlaidTransactions(true);
+    setSyncingPlaidConnectionId(connectionId);
+    setPlaidSyncAllResult(null);
     setError("");
     setSuccess("");
-    setPlaidSyncResult(null);
 
     try {
       const response = await fetch("/api/plaid/sync-transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storeId: store.id }),
+        body: JSON.stringify({ storeId: store.id, connectionId }),
       });
 
       const payload = (await response.json().catch(() => null)) as
@@ -1260,48 +1329,81 @@ export default function FinancialsPage() {
         removed: payload?.removed ?? 0,
         skippedRemovedPosted: payload?.skippedRemovedPosted ?? 0,
       };
-      setPlaidSyncResult(result);
-
-      const parts: string[] = [];
-      if (result.added > 0) {
-        parts.push(`${result.added} added`);
-      }
-      if (result.modified > 0) {
-        parts.push(`${result.modified} updated`);
-      }
-      if (result.removed > 0) {
-        parts.push(`${result.removed} removed`);
-      }
-      if (result.skippedRemovedPosted > 0) {
-        parts.push(`${result.skippedRemovedPosted} posted removal${result.skippedRemovedPosted === 1 ? "" : "s"} skipped`);
-      }
-
-      setSuccess(
-        parts.length > 0
-          ? `Plaid sync complete: ${parts.join(", ")}.`
-          : "Plaid sync complete. No transaction changes."
-      );
-
+      setPlaidSyncResults((prev) => ({ ...prev, [connectionId]: result }));
+      setSuccess(formatPlaidSyncSummary(result));
       await loadData(store.id);
     } catch (syncError) {
       setError(syncError instanceof Error ? syncError.message : "Failed to sync Plaid transactions");
     } finally {
-      setSyncingPlaidTransactions(false);
+      setSyncingPlaidConnectionId(null);
     }
   }
 
-  async function disconnectPlaid() {
+  async function syncAllPlaidConnections() {
     if (!store?.id) return;
-    setDisconnectingPlaid(true);
+    setSyncingPlaidConnectionId("all");
     setError("");
     setSuccess("");
-    setPlaidSyncResult(null);
+
+    try {
+      const response = await fetch("/api/plaid/sync-transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId: store.id }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as PlaidSyncAllResponse | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Failed to sync Plaid transactions");
+      }
+
+      const totals: PlaidSyncResult = {
+        added: payload?.added ?? 0,
+        modified: payload?.modified ?? 0,
+        removed: payload?.removed ?? 0,
+        skippedRemovedPosted: payload?.skippedRemovedPosted ?? 0,
+      };
+
+      setPlaidSyncAllResult(totals);
+
+      const nextResults: Record<string, PlaidSyncResult> = {};
+      for (const connectionResult of payload?.connections ?? []) {
+        if (!connectionResult.ok) continue;
+        nextResults[connectionResult.connectionId] = {
+          added: connectionResult.added,
+          modified: connectionResult.modified,
+          removed: connectionResult.removed,
+          skippedRemovedPosted: connectionResult.skippedRemovedPosted,
+        };
+      }
+      setPlaidSyncResults((prev) => ({ ...prev, ...nextResults }));
+
+      const failedCount = (payload?.connections ?? []).filter((entry) => !entry.ok).length;
+      if (failedCount > 0) {
+        setError(`${failedCount} bank connection${failedCount === 1 ? "" : "s"} failed to sync.`);
+      }
+
+      setSuccess(formatPlaidSyncSummary(totals));
+      await loadData(store.id);
+    } catch (syncError) {
+      setError(syncError instanceof Error ? syncError.message : "Failed to sync Plaid transactions");
+    } finally {
+      setSyncingPlaidConnectionId(null);
+    }
+  }
+
+  async function disconnectPlaid(connectionId: string) {
+    if (!store?.id) return;
+    setDisconnectingPlaidConnectionId(connectionId);
+    setError("");
+    setSuccess("");
 
     try {
       const response = await fetch("/api/plaid/disconnect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storeId: store.id }),
+        body: JSON.stringify({ storeId: store.id, connectionId }),
       });
 
       if (!response.ok) {
@@ -1309,20 +1411,20 @@ export default function FinancialsPage() {
         throw new Error(payload?.error ?? "Failed to disconnect bank account");
       }
 
-      setPlaidConnection(null);
-      setStore((prev) =>
-        prev?.financial_data_source === "bank_import"
-          ? { ...prev, financial_data_source: "manual" }
-          : prev
-      );
-      setShowPlaidDisconnectConfirm(false);
+      setPlaidSyncResults((prev) => {
+        const next = { ...prev };
+        delete next[connectionId];
+        return next;
+      });
+      setPlaidDisconnectConfirmConnectionId(null);
       setSuccess("Bank account disconnected.");
+      await loadData(store.id);
     } catch (disconnectError) {
       setError(
         disconnectError instanceof Error ? disconnectError.message : "Failed to disconnect bank account"
       );
     } finally {
-      setDisconnectingPlaid(false);
+      setDisconnectingPlaidConnectionId(null);
     }
   }
 
@@ -1999,49 +2101,7 @@ export default function FinancialsPage() {
       {/* ─── TAB 4: BANK IMPORT ─── */}
       {activeTab === "bank" && (
         <div className="space-y-4">
-          {plaidConnection?.item_error_code && (
-            <div
-              className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-6 py-3 rounded-xl border"
-              style={{
-                background: "var(--bg-warning-tint, var(--bg-info-tint))",
-                borderColor: "var(--border)",
-                color: "var(--text-warning, var(--text-info))",
-              }}
-            >
-              <p className="text-[12px] leading-snug">
-                Your bank connection needs attention.{" "}
-                {formatPlaidItemErrorMessage(
-                  plaidConnection.item_error_code,
-                  plaidConnection.item_error_message
-                )}{" "}
-                {isPlaidUpdateModeEligible(plaidConnection.item_error_code)
-                  ? "Reconnect to sign in again without losing your transaction history."
-                  : "Disconnect and connect a different bank account to restore imports."}
-              </p>
-              <div className="flex flex-shrink-0 items-center gap-4">
-                {isPlaidUpdateModeEligible(plaidConnection.item_error_code) && (
-                  <button
-                    type="button"
-                    className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
-                    onClick={() => void reconnectPlaid()}
-                    disabled={connectingPlaid || disconnectingPlaid || syncingPlaidTransactions}
-                  >
-                    {connectingPlaid ? "Reconnecting…" : "Reconnect"}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
-                  onClick={() => setShowPlaidDisconnectConfirm(true)}
-                  disabled={connectingPlaid || disconnectingPlaid || syncingPlaidTransactions}
-                >
-                  Disconnect
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="card flex items-center gap-5">
+          <div className="card flex flex-col sm:flex-row sm:items-center gap-4">
             <div
               className="w-14 h-14 rounded-xl flex items-center justify-center text-white text-[18px] font-bold flex-shrink-0"
               style={{ background: "#0f4c81" }}
@@ -2051,125 +2111,267 @@ export default function FinancialsPage() {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-0.5">
                 <div className="text-[14px] font-semibold text-slate-100">Plaid Bank Feed</div>
-                {plaidConnection ? (
-                  <span className="badge badge-green text-[10px]">Connected</span>
+                {hasPlaidConnections ? (
+                  <span className="badge badge-green text-[10px]">
+                    {plaidConnections.length} connected
+                  </span>
                 ) : (
                   <span className="badge badge-amber text-[10px]">Not Connected</span>
                 )}
               </div>
               <div className="text-[12px] text-[var(--text-secondary)]">
-                {plaidConnection
-                  ? `Connected to ${formatPlaidConnectionLabel(plaidConnection.institution_name)}.`
-                  : "Connect your bank account to automatically import transactions."}
+                {hasPlaidConnections
+                  ? "Connect checking, savings, or credit card accounts to automatically import transactions."
+                  : "Connect your bank accounts to automatically import transactions."}
               </div>
-              {plaidBlockedByQuickBooks && !plaidConnection && (
+              {plaidBlockedByQuickBooks && !hasPlaidConnections && (
                 <div className="text-[11px] text-amber-200 mt-1">{PLAID_QUICKBOOKS_BLOCK_MESSAGE}</div>
               )}
             </div>
-            {plaidConnection ? (
-              <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
-                <div className="flex flex-col gap-1.5">
-                  {plaidConnection.has_new_transactions && (
-                    <p className="text-[11px] text-emerald-200/90">
-                      New transactions are available — click Sync Now to import them.
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={() => void syncPlaidTransactionsFromBank()}
-                    disabled={syncingPlaidTransactions || disconnectingPlaid}
-                  >
-                    {syncingPlaidTransactions ? "Syncing…" : "Sync Now"}
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  className="btn-outline"
-                  onClick={() => setShowPlaidDisconnectConfirm(true)}
-                  disabled={disconnectingPlaid || syncingPlaidTransactions}
-                >
-                  Disconnect
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className={clsx(
-                  "btn-primary flex-shrink-0",
-                  (!store?.id || plaidBlockedByQuickBooks) && "pointer-events-none opacity-50"
-                )}
-                onClick={() => void initiatePlaidConnect()}
-                disabled={!store?.id || connectingPlaid || plaidBlockedByQuickBooks}
-              >
-                {connectingPlaid ? "Connecting…" : "Connect Bank Account"}
-              </button>
-            )}
+            <button
+              type="button"
+              className={clsx(
+                "btn-primary flex-shrink-0",
+                (!store?.id || plaidBlockedByQuickBooks) && "pointer-events-none opacity-50"
+              )}
+              onClick={() => void initiatePlaidConnect()}
+              disabled={!store?.id || connectingPlaid || plaidBlockedByQuickBooks}
+            >
+              {connectingPlaid && plaidLinkModeRef.current === "connect"
+                ? "Connecting…"
+                : hasPlaidConnections
+                  ? "Connect Another Account"
+                  : "Connect Bank Account"}
+            </button>
           </div>
 
-          {plaidConnection && plaidSyncResult && (
+          {plaidConnections.length > 1 && (
+            <div className="card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="text-[13px] font-semibold text-slate-100">Sync all connected accounts</div>
+                <div className="text-[12px] text-[var(--text-secondary)]">
+                  Import new transactions from all {plaidConnections.length} bank connections at once.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-primary flex-shrink-0"
+                onClick={() => void syncAllPlaidConnections()}
+                disabled={plaidActionBusy}
+              >
+                {syncingPlaidConnectionId === "all" ? "Syncing All…" : "Sync All"}
+              </button>
+            </div>
+          )}
+
+          {plaidSyncAllResult && (
             <div
               className={clsx(
                 "card border",
-                plaidSyncResult.skippedRemovedPosted > 0
+                plaidSyncAllResult.skippedRemovedPosted > 0
                   ? "border-amber-500/40 bg-amber-500/5"
                   : "border-emerald-500/30 bg-emerald-500/5"
               )}
             >
-              <div className="text-[13px] font-semibold text-slate-100 mb-2">Last Plaid sync</div>
+              <div className="text-[13px] font-semibold text-slate-100 mb-2">Last sync (all accounts)</div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[12px]">
                 <div>
                   <div className="text-[var(--text-muted)]">Added</div>
-                  <div className="font-semibold text-slate-100">{plaidSyncResult.added}</div>
+                  <div className="font-semibold text-slate-100">{plaidSyncAllResult.added}</div>
                 </div>
                 <div>
                   <div className="text-[var(--text-muted)]">Updated</div>
-                  <div className="font-semibold text-slate-100">{plaidSyncResult.modified}</div>
+                  <div className="font-semibold text-slate-100">{plaidSyncAllResult.modified}</div>
                 </div>
                 <div>
                   <div className="text-[var(--text-muted)]">Removed</div>
-                  <div className="font-semibold text-slate-100">{plaidSyncResult.removed}</div>
+                  <div className="font-semibold text-slate-100">{plaidSyncAllResult.removed}</div>
                 </div>
                 <div>
                   <div className="text-[var(--text-muted)]">Posted removals skipped</div>
-                  <div className="font-semibold text-slate-100">{plaidSyncResult.skippedRemovedPosted}</div>
+                  <div className="font-semibold text-slate-100">{plaidSyncAllResult.skippedRemovedPosted}</div>
                 </div>
               </div>
-              {plaidSyncResult.added > 0 && (
-                <div className="text-[11px] text-[var(--text-secondary)] mt-3">
-                  New transactions are in the{" "}
-                  <Link href="/transactions" className="text-[var(--accent)] hover:underline">
-                    review queue
-                  </Link>
-                  .
-                </div>
-              )}
             </div>
           )}
 
-          {showPlaidDisconnectConfirm && (
+          {plaidConnections.map((connection) => {
+            const syncResult = plaidSyncResults[connection.id];
+            const isSyncing = syncingPlaidConnectionId === connection.id;
+            const isReconnecting =
+              connectingPlaid &&
+              plaidLinkModeRef.current === "update" &&
+              plaidLinkConnectionIdRef.current === connection.id;
+
+            return (
+              <div key={connection.id} className="space-y-3">
+                {connection.item_error_code && (
+                  <div
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-6 py-3 rounded-xl border"
+                    style={{
+                      background: "var(--bg-warning-tint, var(--bg-info-tint))",
+                      borderColor: "var(--border)",
+                      color: "var(--text-warning, var(--text-info))",
+                    }}
+                  >
+                    <p className="text-[12px] leading-snug">
+                      <span className="font-semibold">
+                        {formatPlaidConnectionLabel(connection.institution_name)}:
+                      </span>{" "}
+                      {formatPlaidItemErrorMessage(
+                        connection.item_error_code,
+                        connection.item_error_message
+                      )}{" "}
+                      {isPlaidUpdateModeEligible(connection.item_error_code)
+                        ? "Reconnect to sign in again without losing your transaction history."
+                        : "Disconnect and connect a different bank account to restore imports."}
+                    </p>
+                    <div className="flex flex-shrink-0 items-center gap-4">
+                      {isPlaidUpdateModeEligible(connection.item_error_code) && (
+                        <button
+                          type="button"
+                          className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
+                          onClick={() => void reconnectPlaid(connection.id)}
+                          disabled={plaidActionBusy}
+                        >
+                          {isReconnecting ? "Reconnecting…" : "Reconnect"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
+                        onClick={() => setPlaidDisconnectConfirmConnectionId(connection.id)}
+                        disabled={plaidActionBusy}
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="card flex flex-col lg:flex-row lg:items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <div className="text-[14px] font-semibold text-slate-100 truncate">
+                        {formatPlaidConnectionLabel(connection.institution_name)}
+                      </div>
+                      {connection.item_error_code ? (
+                        <span className="badge badge-amber text-[10px]">Needs attention</span>
+                      ) : (
+                        <span className="badge badge-green text-[10px]">Connected</span>
+                      )}
+                    </div>
+                    <div className="text-[12px] text-[var(--text-secondary)]">
+                      Connected {new Date(connection.connected_at).toLocaleDateString(undefined, { dateStyle: "medium" })}
+                      {" · "}
+                      {formatPlaidLastSynced(connection)}
+                    </div>
+                    {connection.has_new_transactions && !connection.item_error_code && (
+                      <p className="text-[11px] text-emerald-200/90 mt-1">
+                        New transactions are available — click Sync Now to import them.
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => void syncPlaidConnection(connection.id)}
+                      disabled={plaidActionBusy}
+                    >
+                      {isSyncing ? "Syncing…" : "Sync Now"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-outline"
+                      onClick={() => setPlaidDisconnectConfirmConnectionId(connection.id)}
+                      disabled={plaidActionBusy}
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
+
+                {syncResult && (
+                  <div
+                    className={clsx(
+                      "card border",
+                      syncResult.skippedRemovedPosted > 0
+                        ? "border-amber-500/40 bg-amber-500/5"
+                        : "border-emerald-500/30 bg-emerald-500/5"
+                    )}
+                  >
+                    <div className="text-[13px] font-semibold text-slate-100 mb-2">
+                      Last sync — {formatPlaidConnectionLabel(connection.institution_name)}
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[12px]">
+                      <div>
+                        <div className="text-[var(--text-muted)]">Added</div>
+                        <div className="font-semibold text-slate-100">{syncResult.added}</div>
+                      </div>
+                      <div>
+                        <div className="text-[var(--text-muted)]">Updated</div>
+                        <div className="font-semibold text-slate-100">{syncResult.modified}</div>
+                      </div>
+                      <div>
+                        <div className="text-[var(--text-muted)]">Removed</div>
+                        <div className="font-semibold text-slate-100">{syncResult.removed}</div>
+                      </div>
+                      <div>
+                        <div className="text-[var(--text-muted)]">Posted removals skipped</div>
+                        <div className="font-semibold text-slate-100">{syncResult.skippedRemovedPosted}</div>
+                      </div>
+                    </div>
+                    {syncResult.added > 0 && (
+                      <div className="text-[11px] text-[var(--text-secondary)] mt-3">
+                        New transactions are in the{" "}
+                        <Link href="/transactions" className="text-[var(--accent)] hover:underline">
+                          review queue
+                        </Link>
+                        .
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {plaidDisconnectConfirmConnectionId && (
             <div className="card border border-red-500/40 bg-red-500/5">
               <div className="text-[13px] font-semibold text-slate-100 mb-1">Disconnect this bank account?</div>
               <p className="text-[12px] text-[var(--text-secondary)]">
-                This will stop automatic transaction syncing. Previously imported transactions will remain in
-                your review queue and P&L.
+                {(() => {
+                  const connection = plaidConnections.find(
+                    (entry) => entry.id === plaidDisconnectConfirmConnectionId
+                  );
+                  const label = formatPlaidConnectionLabel(connection?.institution_name);
+                  return (
+                    <>
+                      This will stop automatic syncing for <span className="text-slate-100">{label}</span>.
+                      Previously imported transactions will remain in your review queue and P&L.
+                    </>
+                  );
+                })()}
               </p>
               <div className="flex gap-2 mt-4">
                 <button
                   type="button"
                   className="btn-outline text-[12px]"
-                  onClick={() => setShowPlaidDisconnectConfirm(false)}
-                  disabled={disconnectingPlaid}
+                  onClick={() => setPlaidDisconnectConfirmConnectionId(null)}
+                  disabled={disconnectingPlaidConnectionId !== null}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   className="text-[12px] px-4 py-2 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700"
-                  onClick={() => void disconnectPlaid()}
-                  disabled={disconnectingPlaid}
+                  onClick={() => void disconnectPlaid(plaidDisconnectConfirmConnectionId)}
+                  disabled={disconnectingPlaidConnectionId !== null}
                 >
-                  {disconnectingPlaid ? "Disconnecting…" : "Disconnect Bank Account"}
+                  {disconnectingPlaidConnectionId === plaidDisconnectConfirmConnectionId
+                    ? "Disconnecting…"
+                    : "Disconnect Bank Account"}
                 </button>
               </div>
             </div>
@@ -2406,6 +2608,11 @@ export default function FinancialsPage() {
                   {formatQuickBooksSyncStatus(qbConnection)}
                 </div>
               )}
+              {quickBooksBlockedByPlaid && !qbConnection && (
+                <div className="text-[11px] text-amber-200 mt-1">
+                  Disconnect all bank accounts before connecting QuickBooks for this store.
+                </div>
+              )}
             </div>
             {qbConnection ? (
               <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
@@ -2429,9 +2636,12 @@ export default function FinancialsPage() {
             ) : (
               <button
                 type="button"
-                className={clsx("btn-primary flex-shrink-0", !store?.id && "pointer-events-none opacity-50")}
+                className={clsx(
+                  "btn-primary flex-shrink-0",
+                  (!store?.id || quickBooksBlockedByPlaid) && "pointer-events-none opacity-50"
+                )}
                 onClick={initiateQuickBooksConnect}
-                disabled={!store?.id || connectingQb}
+                disabled={!store?.id || connectingQb || quickBooksBlockedByPlaid}
               >
                 {connectingQb ? "Connecting…" : "Connect QuickBooks"}
               </button>

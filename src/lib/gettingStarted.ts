@@ -163,7 +163,7 @@ export async function fetchStoreSetupStatus(
     { data: realEstate },
     { count: loanCount },
     { data: quickBooksConnection },
-    { data: plaidConnection },
+    { data: plaidConnectionsData },
     { count: transactionCount },
   ] = await Promise.all([
     supabase
@@ -178,7 +178,7 @@ export async function fetchStoreSetupStatus(
       .select("id", { count: "exact", head: true })
       .eq("store_id", storeId),
     supabase.from("quickbooks_connections").select("id").eq("store_id", storeId).maybeSingle(),
-    supabase.from("plaid_connections").select("id").eq("store_id", storeId).maybeSingle(),
+    supabase.from("plaid_connections").select("id").eq("store_id", storeId).limit(1),
     supabase
       .from("bank_transactions")
       .select("id", { count: "exact", head: true })
@@ -192,7 +192,7 @@ export async function fetchStoreSetupStatus(
     hasRealEstate: Boolean(realEstate),
     loanCount: loanCount ?? 0,
     hasQuickBooks: Boolean(quickBooksConnection),
-    hasPlaid: Boolean(plaidConnection),
+    hasPlaid: (plaidConnectionsData?.length ?? 0) > 0,
     transactionCount: transactionCount ?? 0,
   });
 }

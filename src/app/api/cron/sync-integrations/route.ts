@@ -20,6 +20,7 @@ type IntegrationKind = "quickbooks" | "plaid";
 type ConnectionSyncResult = {
   storeId: string;
   integration: IntegrationKind;
+  connectionId?: string;
   ok: boolean;
   error?: string;
   reconnectRequired?: boolean;
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
   const [{ data: quickbooksConnections, error: quickbooksError }, { data: plaidConnections, error: plaidError }] =
     await Promise.all([
       admin.from("quickbooks_connections").select("store_id"),
-      admin.from("plaid_connections").select("store_id"),
+      admin.from("plaid_connections").select("id, store_id"),
     ]);
 
   if (quickbooksError) {
@@ -90,18 +91,26 @@ export async function GET(request: Request) {
 
   for (const connection of plaidConnections ?? []) {
     const storeId = connection.store_id;
+    const connectionId = connection.id;
+
     try {
-      await syncPlaidTransactions(storeId);
-      results.push({ storeId, integration: "plaid", ok: true });
+      await syncPlaidTransactions(connectionId);
+      results.push({ storeId, connectionId, integration: "plaid", ok: true });
     } catch (error) {
       if (error instanceof PlaidNotConnectedError) {
-        results.push({ storeId, integration: "plaid", ok: false, error: error.message });
+        results.push({
+          storeId,
+          connectionId,
+          integration: "plaid",
+          ok: false,
+          error: error.message,
+        });
         continue;
       }
 
-      logPlaidApiError("[cron/sync-integrations] Plaid sync failed", error, { storeId });
+      logPlaidApiError("[cron/sync-integrations] Plaid sync failed", error, { storeId, connectionId });
       const message = error instanceof Error ? error.message : "Unknown Plaid sync error";
-      results.push({ storeId, integration: "plaid", ok: false, error: message });
+      results.push({ storeId, connectionId, integration: "plaid", ok: false, error: message });
     }
   }
 

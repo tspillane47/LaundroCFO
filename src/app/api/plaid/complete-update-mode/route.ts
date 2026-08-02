@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
-  clearPlaidConnectionItemErrorByStoreId,
+  clearPlaidConnectionItemErrorById,
+  getPlaidConnectionById,
   PlaidNotConnectedError,
   syncPlaidTransactions,
   verifyUserOwnsStore,
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { storeId?: unknown };
+  let body: { storeId?: unknown; connectionId?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -25,8 +26,13 @@ export async function POST(request: Request) {
   }
 
   const storeId = typeof body.storeId === "string" ? body.storeId : null;
+  const connectionId = typeof body.connectionId === "string" ? body.connectionId : null;
+
   if (!storeId) {
     return NextResponse.json({ error: "Missing storeId" }, { status: 400 });
+  }
+  if (!connectionId) {
+    return NextResponse.json({ error: "Missing connectionId" }, { status: 400 });
   }
 
   const ownsStore = await verifyUserOwnsStore(supabase, user.id, storeId);
@@ -35,16 +41,21 @@ export async function POST(request: Request) {
   }
 
   try {
-    await clearPlaidConnectionItemErrorByStoreId(storeId);
+    const connection = await getPlaidConnectionById(connectionId);
+    if (!connection || connection.store_id !== storeId) {
+      return NextResponse.json({ error: "Bank connection not found for this store" }, { status: 404 });
+    }
+
+    await clearPlaidConnectionItemErrorById(connectionId);
 
     let syncResult = null;
     try {
-      syncResult = await syncPlaidTransactions(storeId);
+      syncResult = await syncPlaidTransactions(connectionId);
     } catch (syncError) {
       console.warn("[plaid/complete-update-mode] post-repair sync failed", syncError);
     }
 
-    return NextResponse.json({ ok: true, sync: syncResult });
+    return NextResponse.json({ ok: true, connectionId, sync: syncResult });
   } catch (error) {
     if (error instanceof PlaidNotConnectedError) {
       return NextResponse.json({ error: "No bank connection found for this store" }, { status: 404 });

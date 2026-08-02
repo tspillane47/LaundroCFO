@@ -574,14 +574,31 @@ export async function createPlaidUpdateModeLinkToken(
   return createPlaidLinkTokenInternal(userId, { accessToken });
 }
 
-export async function getPlaidConnectionForStore(
+export async function getPlaidConnectionsForStore(
   storeId: string
-): Promise<PlaidConnectionRow | null> {
+): Promise<PlaidConnectionRow[]> {
   const admin = createAdminSupabaseClient();
   const { data, error } = await admin
     .from("plaid_connections")
     .select("*")
     .eq("store_id", storeId)
+    .order("connected_at", { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to load Plaid connections: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => decryptPlaidConnectionRow(row as PlaidConnectionRow));
+}
+
+export async function getPlaidConnectionById(
+  connectionId: string
+): Promise<PlaidConnectionRow | null> {
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("plaid_connections")
+    .select("*")
+    .eq("id", connectionId)
     .maybeSingle();
 
   if (error) {
@@ -595,7 +612,15 @@ export async function getPlaidConnectionForStore(
   return decryptPlaidConnectionRow(data as PlaidConnectionRow);
 }
 
-export async function clearPlaidConnectionItemErrorByStoreId(storeId: string): Promise<void> {
+/** @deprecated Prefer getPlaidConnectionsForStore — retained for callers not yet migrated. */
+export async function getPlaidConnectionForStore(
+  storeId: string
+): Promise<PlaidConnectionRow | null> {
+  const connections = await getPlaidConnectionsForStore(storeId);
+  return connections[0] ?? null;
+}
+
+export async function clearPlaidConnectionItemErrorById(connectionId: string): Promise<void> {
   const admin = createAdminSupabaseClient();
   const { data, error } = await admin
     .from("plaid_connections")
@@ -605,7 +630,7 @@ export async function clearPlaidConnectionItemErrorByStoreId(storeId: string): P
       item_error_at: null,
       updated_at: new Date().toISOString(),
     })
-    .eq("store_id", storeId)
+    .eq("id", connectionId)
     .select("id")
     .maybeSingle();
 
@@ -670,31 +695,70 @@ export async function upsertPlaidConnection(params: {
   itemId: string;
   accessToken: string;
   institutionName: string | null;
-}): Promise<void> {
+}): Promise<PlaidConnectionRow> {
   const admin = createAdminSupabaseClient();
   const now = new Date().toISOString();
-  const payload = {
-    store_id: params.storeId,
-    user_id: params.userId,
-    plaid_item_id: params.itemId,
-    plaid_access_token: encryptToken(params.accessToken),
-    institution_name: params.institutionName,
-    sync_cursor: null,
-    has_new_transactions: false,
-    item_error_code: null,
-    item_error_message: null,
-    item_error_at: null,
-    connected_at: now,
-    updated_at: now,
-  };
+  const encryptedAccessToken = encryptToken(params.accessToken);
 
-  const { error } = await admin.from("plaid_connections").upsert(payload, {
-    onConflict: "store_id",
-  });
+  const { data: existing, error: existingError } = await admin
+    .from("plaid_connections")
+    .select("id")
+    .eq("plaid_item_id", params.itemId)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new Error(`Failed to look up Plaid connection: ${existingError.message}`);
+  }
+
+  if (existing) {
+    const { data, error } = await admin
+      .from("plaid_connections")
+      .update({
+        store_id: params.storeId,
+        user_id: params.userId,
+        plaid_access_token: encryptedAccessToken,
+        institution_name: params.institutionName,
+        has_new_transactions: false,
+        item_error_code: null,
+        item_error_message: null,
+        item_error_at: null,
+        updated_at: now,
+      })
+      .eq("id", existing.id)
+      .select("*")
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to refresh Plaid connection: ${error.message}`);
+    }
+
+    return decryptPlaidConnectionRow(data as PlaidConnectionRow);
+  }
+
+  const { data, error } = await admin
+    .from("plaid_connections")
+    .insert({
+      store_id: params.storeId,
+      user_id: params.userId,
+      plaid_item_id: params.itemId,
+      plaid_access_token: encryptedAccessToken,
+      institution_name: params.institutionName,
+      sync_cursor: null,
+      has_new_transactions: false,
+      item_error_code: null,
+      item_error_message: null,
+      item_error_at: null,
+      connected_at: now,
+      updated_at: now,
+    })
+    .select("*")
+    .single();
 
   if (error) {
     throw new Error(`Failed to save Plaid connection: ${error.message}`);
   }
+
+  return decryptPlaidConnectionRow(data as PlaidConnectionRow);
 }
 
 export async function updateStoreFinancialDataSourceOnPlaidConnect(storeId: string): Promise<void> {
@@ -712,6 +776,19 @@ export async function updateStoreFinancialDataSourceOnPlaidConnect(storeId: stri
 
 export async function resetStoreFinancialDataSourceOnPlaidDisconnect(storeId: string): Promise<void> {
   const admin = createAdminSupabaseClient();
+  const { count, error: countError } = await admin
+    .from("plaid_connections")
+    .select("id", { count: "exact", head: true })
+    .eq("store_id", storeId);
+
+  if (countError) {
+    throw new Error(`Failed to count remaining Plaid connections: ${countError.message}`);
+  }
+
+  if ((count ?? 0) > 0) {
+    return;
+  }
+
   const { error } = await admin
     .from("stores")
     .update({ financial_data_source: "manual" satisfies FinancialDataSource })
@@ -723,12 +800,12 @@ export async function resetStoreFinancialDataSourceOnPlaidDisconnect(storeId: st
   }
 }
 
-export async function deletePlaidConnection(storeId: string): Promise<PlaidConnectionRow | null> {
+export async function deletePlaidConnection(connectionId: string): Promise<PlaidConnectionRow | null> {
   const admin = createAdminSupabaseClient();
   const { data: existing, error: fetchError } = await admin
     .from("plaid_connections")
     .select("*")
-    .eq("store_id", storeId)
+    .eq("id", connectionId)
     .maybeSingle();
 
   if (fetchError) {
@@ -739,13 +816,32 @@ export async function deletePlaidConnection(storeId: string): Promise<PlaidConne
     return null;
   }
 
-  const { error: deleteError } = await admin.from("plaid_connections").delete().eq("store_id", storeId);
+  const connection = decryptPlaidConnectionRow(existing as PlaidConnectionRow);
+
+  const { error: deleteError } = await admin
+    .from("plaid_connections")
+    .delete()
+    .eq("id", connectionId);
 
   if (deleteError) {
     throw new Error(`Failed to delete Plaid connection: ${deleteError.message}`);
   }
 
-  return decryptPlaidConnectionRow(existing as PlaidConnectionRow);
+  if (connection.plaid_access_token) {
+    try {
+      await removePlaidItem(connection.plaid_access_token);
+    } catch (removeError) {
+      console.error("[plaid] item remove failed during disconnect", {
+        connectionId,
+        storeId: connection.store_id,
+        removeError,
+      });
+    }
+  }
+
+  await resetStoreFinancialDataSourceOnPlaidDisconnect(connection.store_id);
+
+  return connection;
 }
 
 export async function removePlaidItem(accessToken: string): Promise<void> {
@@ -762,23 +858,14 @@ type PlaidTransactionSyncBatch = {
   nextCursor: string;
 };
 
-async function loadPlaidConnection(storeId: string): Promise<PlaidConnectionRow> {
-  const admin = createAdminSupabaseClient();
-  const { data, error } = await admin
-    .from("plaid_connections")
-    .select("*")
-    .eq("store_id", storeId)
-    .maybeSingle();
+async function loadPlaidConnection(connectionId: string): Promise<PlaidConnectionRow> {
+  const connection = await getPlaidConnectionById(connectionId);
 
-  if (error) {
-    throw new Error(`Failed to load Plaid connection: ${error.message}`);
-  }
-
-  if (!data) {
+  if (!connection) {
     throw new PlaidNotConnectedError();
   }
 
-  return decryptPlaidConnectionRow(data as PlaidConnectionRow);
+  return connection;
 }
 
 async function loadCategorizationRules(userId: string): Promise<CategorizationRule[]> {
@@ -1049,7 +1136,7 @@ async function applyPlaidRemovedTransactions(params: {
   return { removed: removedCount, skippedRemovedPosted };
 }
 
-async function persistPlaidSyncCursor(storeId: string, syncCursor: string): Promise<void> {
+async function persistPlaidSyncCursor(connectionId: string, syncCursor: string): Promise<void> {
   const admin = createAdminSupabaseClient();
   const { error } = await admin
     .from("plaid_connections")
@@ -1061,15 +1148,16 @@ async function persistPlaidSyncCursor(storeId: string, syncCursor: string): Prom
       item_error_at: null,
       updated_at: new Date().toISOString(),
     })
-    .eq("store_id", storeId);
+    .eq("id", connectionId);
 
   if (error) {
     throw new Error(`Failed to persist Plaid sync cursor: ${error.message}`);
   }
 }
 
-export async function syncPlaidTransactions(storeId: string): Promise<PlaidSyncResult> {
-  const connection = await loadPlaidConnection(storeId);
+export async function syncPlaidTransactions(connectionId: string): Promise<PlaidSyncResult> {
+  const connection = await loadPlaidConnection(connectionId);
+  const storeId = connection.store_id;
 
   try {
     const rules = await loadCategorizationRules(connection.user_id);
@@ -1108,7 +1196,7 @@ export async function syncPlaidTransactions(storeId: string): Promise<PlaidSyncR
       existingByPlaidId,
     });
 
-    await persistPlaidSyncCursor(storeId, batch.nextCursor);
+    await persistPlaidSyncCursor(connectionId, batch.nextCursor);
 
     return { added, modified, removed, skippedRemovedPosted };
   } catch (error) {
@@ -1116,6 +1204,7 @@ export async function syncPlaidTransactions(storeId: string): Promise<PlaidSyncR
       await persistPlaidSyncItemErrorIfApplicable(connection.plaid_item_id, error);
     } catch (persistError) {
       console.error("[plaid] failed to persist item error after sync failure", {
+        connectionId,
         storeId,
         itemId: connection.plaid_item_id,
         persistError,
