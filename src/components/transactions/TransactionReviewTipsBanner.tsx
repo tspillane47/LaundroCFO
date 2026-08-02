@@ -8,6 +8,7 @@ const DISMISS_KEY = "laundrocfo_tx_review_tips_dismissed";
 
 type TransactionReviewTipsBannerProps = {
   onDismiss: () => void;
+  uncategorizedCount: number;
 };
 
 export function TransactionReviewTipsToggle({
@@ -38,7 +39,15 @@ export function TransactionReviewTipsToggle({
   );
 }
 
-export function TransactionReviewTipsBanner({ onDismiss }: TransactionReviewTipsBannerProps) {
+export function TransactionReviewTipsBanner({
+  onDismiss,
+  uncategorizedCount,
+}: TransactionReviewTipsBannerProps) {
+  const countMessage =
+    uncategorizedCount === 0
+      ? "All transactions in this queue have a category — post when you're ready."
+      : `${uncategorizedCount} transaction${uncategorizedCount === 1 ? "" : "s"} still need${uncategorizedCount === 1 ? "s" : ""} a category`;
+
   return (
     <div
       className="rounded-lg px-4 py-3 flex items-start justify-between gap-4"
@@ -51,7 +60,8 @@ export function TransactionReviewTipsBanner({ onDismiss }: TransactionReviewTips
       aria-label="Transaction review tips"
     >
       <div className="min-w-0">
-        <p className="text-[12px] font-semibold mb-2">Quick reminders while you review</p>
+        <p className="text-[12px] font-semibold mb-1">{countMessage}</p>
+        <p className="text-[11px] mb-2 opacity-80">Quick reminders while you review</p>
         <ul className="space-y-1.5">
           {TRANSACTION_REVIEW_TIPS.map((tip) => (
             <li key={tip} className="text-[12px] leading-snug flex gap-2">

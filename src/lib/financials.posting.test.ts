@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   ALREADY_POSTED_MESSAGE,
   formatAlreadyPostedMessage,
+  getReviewQueueProgress,
   isPostgresUniqueViolation,
+  needsCategorySelection,
   postTransactionsBatch,
   type BatchPostTransaction,
   type MonthlyFinancialRecord,
@@ -293,5 +295,30 @@ describe("postTransactionsBatch", () => {
     expect(state.insertedLinkIds).toEqual(["txn-1"]);
     expect(state.deletedLinkIds).toEqual(["txn-1"]);
     expect(state.financialUpdateCount).toBe(1);
+  });
+});
+
+describe("getReviewQueueProgress", () => {
+  it("counts ready and uncategorized rows in the review queue", () => {
+    const progress = getReviewQueueProgress([
+      { category: "needs_review" },
+      { category: "needs_review" },
+      { category: "rent" },
+      { category: "water" },
+      { category: "utilities" },
+    ]);
+
+    expect(progress).toEqual({
+      total: 5,
+      ready: 2,
+      uncategorized: 2,
+    });
+  });
+});
+
+describe("needsCategorySelection", () => {
+  it("is true only for the needs_review category", () => {
+    expect(needsCategorySelection("needs_review")).toBe(true);
+    expect(needsCategorySelection("rent")).toBe(false);
   });
 });

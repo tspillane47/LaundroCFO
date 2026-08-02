@@ -24,6 +24,11 @@ import {
   TransactionReviewTipsToggle,
   useTransactionReviewTips,
 } from "@/components/transactions/TransactionReviewTipsBanner";
+import { ReviewQueueProgress } from "@/components/transactions/ReviewQueueProgress";
+import {
+  NEEDS_CATEGORY_ROW_CLASS,
+  NEEDS_CATEGORY_SELECT_CLASS,
+} from "@/components/transactions/transactionReviewStyles";
 import {
   BANK_IMPORT_CATEGORY_LABELS,
   applyCategorizationRuleToTransactions,
@@ -34,8 +39,10 @@ import {
   fetchUnpostedBankTransactions,
   findMatchingAmountRule,
   getImportCategoriesForType,
+  getReviewQueueProgress,
   inferTransactionType,
   isCategoryReadyToPost,
+  needsCategorySelection,
   isGenericTransactionDescription,
   markDuplicateTransactions,
   normalizeVendorPattern,
@@ -168,7 +175,7 @@ function StatusBadge({ status, excluded }: { status: TransactionStatus; excluded
     return <span className="badge badge-red text-[10px]">Excluded</span>;
   }
   if (status === "posted") return <span className="badge badge-green text-[10px]">Posted</span>;
-  if (status === "needs_review") return <span className="badge badge-amber text-[10px]">Needs Review</span>;
+  if (status === "needs_review") return <span className="badge badge-amber text-[10px]">Needs Category</span>;
   if (status === "user_classified") return <span className="badge badge-blue text-[10px]">User Classified</span>;
   if (status === "system_classified") return <span className="badge badge-blue text-[10px]">Auto-Classified</span>;
   if (status === "reviewed") return <span className="badge text-[10px]">Reviewed</span>;
@@ -675,6 +682,8 @@ function TransactionsPageContent() {
     });
   }, [transactions, categorizationRules, categoryOverrides]);
 
+  const reviewProgress = useMemo(() => getReviewQueueProgress(reviewRows), [reviewRows]);
+
   const filterOptions = useMemo(() => {
     const vendors = new Set<string>();
     const names = new Set<string>();
@@ -1026,7 +1035,7 @@ function TransactionsPageContent() {
         if (!isCategoryReadyToPost(row.category)) {
           setMessage({
             type: "error",
-            text: "Assign a category before posting. Transactions marked Needs Review cannot be posted.",
+            text: "Assign a category before posting. Transactions still marked Needs Category cannot be posted.",
           });
           return;
         }
@@ -1810,8 +1819,20 @@ function TransactionsPageContent() {
     }
   }
 
-  function reviewRowClass(index: number) {
-    return clsx("review-row", index % 2 === 0 ? "review-row--odd" : "review-row--even");
+  function reviewRowClass(index: number, needsCategory = false) {
+    return clsx(
+      "review-row",
+      index % 2 === 0 ? "review-row--odd" : "review-row--even",
+      needsCategory && NEEDS_CATEGORY_ROW_CLASS
+    );
+  }
+
+  function categorySelectClass(category: BankImportCategory, sizeClass: string) {
+    return clsx(
+      "select-tan",
+      sizeClass,
+      needsCategorySelection(category) && NEEDS_CATEGORY_SELECT_CLASS
+    );
   }
 
   function renderVendorDescription(vendorPattern: string, rawDescription: string, prefixSample = false) {
@@ -1831,7 +1852,10 @@ function TransactionsPageContent() {
   function renderGroupSubRow(item: ReviewRow) {
     const storedCategory = transactions.find((t) => t.id === item.id)?.category ?? null;
     return (
-      <tr key={`sub-${item.id}`} className="border-b border-[var(--border)] bg-[var(--bg-card2)]">
+      <tr key={`sub-${item.id}`} className={clsx(
+        "border-b border-[var(--border)] bg-[var(--bg-card2)]",
+        needsCategorySelection(item.category) && NEEDS_CATEGORY_ROW_CLASS
+      )}>
         <td className="py-2 pr-2 pl-2">
           <input
             type="checkbox"
@@ -1862,11 +1886,7 @@ function TransactionsPageContent() {
             value={item.category}
             onChange={(e) => void updateCategory(item.id, e.target.value as BankImportCategory, storedCategory, true)}
             disabled={!canWrite}
-            className={clsx(
-              "select-tan",
-              "w-40 text-[11px]",
-              item.category === "needs_review" && "border-amber-500/40"
-            )}
+            className={categorySelectClass(item.category, "w-40 text-[11px]")}
           >
             {getImportCategoriesForType(item.type).map((f) => (
               <option key={f} value={f}>
@@ -2094,8 +2114,19 @@ function TransactionsPageContent() {
         )}
       </div>
 
+      {activeTab === "needs_review" && reviewRows.length > 0 && (
+        <ReviewQueueProgress
+          ready={reviewProgress.ready}
+          total={reviewProgress.total}
+          className="mb-4"
+        />
+      )}
+
       {activeTab === "needs_review" && reviewTipsVisible && (
-        <TransactionReviewTipsBanner onDismiss={dismissReviewTips} />
+        <TransactionReviewTipsBanner
+          onDismiss={dismissReviewTips}
+          uncategorizedCount={reviewProgress.uncategorized}
+        />
       )}
 
       <div className="card">
@@ -2379,7 +2410,7 @@ function TransactionsPageContent() {
                   const canExpand = group.count > 1;
                   return (
                   <Fragment key={group.groupKey}>
-                    <tr className={reviewRowClass(groupIndex)}>
+                    <tr className={reviewRowClass(groupIndex, needsCategorySelection(group.category))}>
                       <td className="py-3 pr-2">
                         <input
                           type="checkbox"
@@ -2422,7 +2453,7 @@ function TransactionsPageContent() {
                             updateGroupCategory(group.groupKey, e.target.value as BankImportCategory)
                           }
                           disabled={!canWrite}
-                          className={clsx("select-tan", "w-40 text-[12px]")}
+                          className={categorySelectClass(group.category, "w-40 text-[12px]")}
                         >
                           {getImportCategoriesForType(group.type).map((f) => (
                             <option key={f} value={f}>
@@ -2542,7 +2573,7 @@ function TransactionsPageContent() {
 
                   return (
                     <Fragment key={row.id}>
-                      <tr className={reviewRowClass(rowIndex)}>
+                      <tr className={reviewRowClass(rowIndex, needsCategorySelection(row.category))}>
                         <td className="py-3 pr-2">
                           <input
                             type="checkbox"
@@ -2596,11 +2627,7 @@ function TransactionsPageContent() {
                                   void updateCategory(row.id, newCategory, storedCategory, true);
                                 }}
                                 disabled={!canWrite}
-                                className={clsx(
-                                  "select-tan",
-                                  "w-40 text-[12px]",
-                                  row.category === "needs_review" && "border-amber-500/40"
-                                )}
+                                className={categorySelectClass(row.category, "w-40 text-[12px]")}
                               >
                                 {getImportCategoriesForType(row.type).map((f) => (
                                   <option key={f} value={f}>

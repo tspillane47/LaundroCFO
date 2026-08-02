@@ -959,7 +959,7 @@ export const BANK_IMPORT_CATEGORY_LABELS: Record<BankImportCategory, string> = {
   debt_service: "Debt Service",
   bank_fees: "Bank Fees",
   other_expenses: "Other Expenses",
-  needs_review: "Needs Review",
+  needs_review: "Needs Category",
 };
 
 export type RuleType = "vendor" | "amount";
@@ -1219,6 +1219,28 @@ export function sumRevenueBreakdown(
 
 export function isCategoryReadyToPost(category: BankImportCategory): boolean {
   return category !== "needs_review" && category !== "utilities";
+}
+
+export function needsCategorySelection(category: BankImportCategory): boolean {
+  return category === "needs_review";
+}
+
+export type ReviewQueueProgress = {
+  total: number;
+  ready: number;
+  uncategorized: number;
+};
+
+export function getReviewQueueProgress(
+  rows: ReadonlyArray<{ category: BankImportCategory }>
+): ReviewQueueProgress {
+  let ready = 0;
+  let uncategorized = 0;
+  for (const row of rows) {
+    if (needsCategorySelection(row.category)) uncategorized += 1;
+    if (isCategoryReadyToPost(row.category)) ready += 1;
+  }
+  return { total: rows.length, ready, uncategorized };
 }
 
 export function mapBankCategoryToPlField(category: BankImportCategory): PlCategoryField | null {
@@ -2390,7 +2412,7 @@ export async function postTransactionsBatch(
     if (!isCategoryReadyToPost(txn.category)) {
       return {
         postedCount: 0,
-        error: "Assign a category before posting. Transactions marked Needs Review cannot be posted.",
+        error: "Assign a category before posting. Transactions still marked Needs Category cannot be posted.",
       };
     }
     if (!resolvePostingTarget(txn.category)) {
