@@ -421,6 +421,19 @@ html, body {
   .card-success { background: var(--bg-success-tint); border-color: rgba(34, 197, 94, 0.15); }
   .card-warning { background: var(--bg-warning-tint); border-color: rgba(245, 158, 11, 0.15); }
   .card-danger { background: var(--bg-danger-tint); border-color: rgba(239, 68, 68, 0.15); }
+
+  /* Transaction review queue — uncategorized row wash */
+  .needs-category-row {
+    background: var(--bg-warning-tint);
+  }
+  .needs-category-select {
+    background: transparent;
+    border-color: rgba(245, 158, 11, 0.35);
+    color: var(--text-warning);
+  }
+  .needs-category-select:focus {
+    border-color: rgba(245, 158, 11, 0.55);
+  }
 }
 
 .select-tan {

@@ -14,13 +14,15 @@ import {
 export interface FeedItem {
   id: string;
   date: string;
-  category: 'financial' | 'valuation' | 'equipment' | 'insurance' | 'lease' | 'portfolio';
+  category: 'financial' | 'valuation' | 'equipment' | 'insurance' | 'lease' | 'portfolio' | 'transactions';
   icon: string;
   headline: string;
   description: string;
   severity: 'info' | 'warning' | 'success' | 'danger';
   storeId: string;
   storeName?: string;
+  actionHref?: string;
+  actionCount?: number;
 }
 
 export type StoreFeedFinancials = {
@@ -59,6 +61,8 @@ export type StoreFeedOptions = {
   valuation?: StoreFeedValuation | null;
   valuationMonthlyChange?: number;
   positiveEvents?: PositiveEventInput;
+  /** Uncategorized transactions in the review queue (category = needs_review). */
+  uncategorizedTransactionCount?: number;
 };
 
 const POSITIVE_EVENT_PREFIXES = ["revenue-up-", "dscr-improved-", "val-change-"] as const;
@@ -465,6 +469,22 @@ export function generateStoreFeed(
       description: 'No active insurance policies on file for this store.',
       severity: 'warning',
       storeName: store.name,
+    });
+  }
+
+  const uncategorizedCount = options?.uncategorizedTransactionCount ?? 0;
+  if (uncategorizedCount > 0) {
+    items.push({
+      id: 'tx-review-' + store.id,
+      date: formatDate(now),
+      category: 'transactions',
+      icon: '🏷️',
+      headline: `${uncategorizedCount} transaction${uncategorizedCount === 1 ? '' : 's'} need${uncategorizedCount === 1 ? 's' : ''} a category`,
+      description: 'Assign categories in the review queue before posting to your P&L.',
+      severity: 'warning',
+      storeName: store.name,
+      actionHref: '/transactions?tab=needs_review',
+      actionCount: uncategorizedCount,
     });
   }
 

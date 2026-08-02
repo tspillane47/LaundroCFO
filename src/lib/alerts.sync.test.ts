@@ -334,4 +334,25 @@ describe("generateStoreFeed unified evaluator", () => {
     );
     expect(valItem?.description).toContain(`${canonical.finalMultiple.toFixed(2)}x EBITDA multiple`);
   });
+
+  it("emits a transaction review feed item when uncategorized count is above zero", () => {
+    const items = generateStoreFeed(makeStore(), undefined, [], [], {
+      uncategorizedTransactionCount: 3,
+    });
+
+    const txItem = items.find((item) => item.id === `tx-review-${STORE_ID}`);
+    expect(txItem?.category).toBe("transactions");
+    expect(txItem?.severity).toBe("warning");
+    expect(txItem?.headline).toBe("3 transactions need a category");
+    expect(txItem?.actionHref).toBe("/transactions?tab=needs_review");
+    expect(txItem?.actionCount).toBe(3);
+  });
+
+  it("omits the transaction review feed item when count is zero", () => {
+    const items = generateStoreFeed(makeStore(), undefined, [], [], {
+      uncategorizedTransactionCount: 0,
+    });
+
+    expect(items.some((item) => item.id === `tx-review-${STORE_ID}`)).toBe(false);
+  });
 });

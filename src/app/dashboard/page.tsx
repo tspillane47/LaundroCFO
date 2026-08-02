@@ -15,6 +15,7 @@ import {
   calcTtmMetrics,
   enrichMonthlyRecords,
   fetchStoreMonthlyFinancials,
+  fetchUncategorizedReviewCountsByStore,
   sortRecordsDesc,
   type CalculatedMonthly,
   type MonthlyUtilityRecord,
@@ -204,6 +205,7 @@ export default function DashboardPage() {
   const [scheduledDebtService, setScheduledDebtService] = useState(0);
   const [monthlyFinancials, setMonthlyFinancials] = useState<CalculatedMonthly[]>([]);
   const [monthlyUtilities, setMonthlyUtilities] = useState<MonthlyUtilityRecord[]>([]);
+  const [uncategorizedTransactionCount, setUncategorizedTransactionCount] = useState(0);
   const supabase = createClient();
 
   const loadDashboardData = useCallback(async () => {
@@ -214,6 +216,7 @@ export default function DashboardPage() {
       setScheduledDebtService(0);
       setMonthlyFinancials([]);
       setMonthlyUtilities([]);
+      setUncategorizedTransactionCount(0);
       setLoadError(false);
       setDetailLoading(false);
       return;
@@ -229,15 +232,17 @@ export default function DashboardPage() {
       const storeValuation = await getStoreValuation(loadedStore.id);
       setValuation(storeValuation);
 
-      const [debt, scheduledAnnual, financialsData, { data: utilitiesData, error: utilitiesError }] =
+      const [debt, scheduledAnnual, financialsData, { data: utilitiesData, error: utilitiesError }, uncategorizedCounts] =
         await Promise.all([
         getStoreDebt(loadedStore.id),
         getStoreScheduledDebtService(loadedStore.id),
         fetchStoreMonthlyFinancials(supabase, loadedStore.id),
         supabase.from("monthly_utilities").select("*").eq("store_id", loadedStore.id),
+        fetchUncategorizedReviewCountsByStore(supabase, [loadedStore.id]),
       ]);
       setTotalDebt(debt);
       setScheduledDebtService(scheduledAnnual);
+      setUncategorizedTransactionCount(uncategorizedCounts[loadedStore.id] ?? 0);
       if (utilitiesError) throw utilitiesError;
       const utilitiesLookup = buildUtilitiesLookup((utilitiesData ?? []) as MonthlyUtilityRecord[]);
       setMonthlyUtilities((utilitiesData ?? []) as MonthlyUtilityRecord[]);
@@ -470,6 +475,7 @@ export default function DashboardPage() {
                 }
               : null,
             valuationMonthlyChange: monthlyChange,
+            uncategorizedTransactionCount,
           })
         : [],
     [
@@ -483,6 +489,7 @@ export default function DashboardPage() {
       valuation,
       monthlyChange,
       ttm,
+      uncategorizedTransactionCount,
     ]
   );
 

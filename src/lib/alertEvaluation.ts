@@ -13,6 +13,7 @@ import {
   enrichMonthlyRecords,
   fetchMonthlyFinancialsForStores,
   fetchMonthlyUtilitiesForStores,
+  fetchUncategorizedReviewCountsByStore,
   sortRecordsDesc,
   type MonthlyFinancialRecord,
 } from "@/lib/financials";
@@ -242,9 +243,10 @@ export async function buildPortfolioFeedItems(
       (scheduledDebtServiceByStore[id] ?? 0) + (loan.monthly_payment ?? 0) * 12;
   }
 
-  const [financialsData, utilitiesData] = await Promise.all([
+  const [financialsData, utilitiesData, uncategorizedCounts] = await Promise.all([
     fetchMonthlyFinancialsForStores(supabase, storeIds),
     fetchMonthlyUtilitiesForStores(supabase, storeIds),
+    fetchUncategorizedReviewCountsByStore(supabase, storeIds),
   ]);
   const portfolioTtmSummary = buildPortfolioTtmSummary(
     financialsData,
@@ -281,6 +283,7 @@ export async function buildPortfolioFeedItems(
         scheduledAnnualDebtService: scheduledDebtServiceByStore[storeId] ?? 0,
         resolvedFinancials: valuation?.resolvedFinancials,
       }),
+      uncategorizedTransactionCount: uncategorizedCounts[storeId] ?? 0,
     };
 
     const feedItems = generateStoreFeed(

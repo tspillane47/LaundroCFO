@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar } from "@/lib/calculations";
@@ -28,6 +29,7 @@ import { ReviewQueueProgress } from "@/components/transactions/ReviewQueueProgre
 import {
   NEEDS_CATEGORY_ROW_CLASS,
   NEEDS_CATEGORY_SELECT_CLASS,
+  importCategoryOptionLabel,
 } from "@/components/transactions/transactionReviewStyles";
 import {
   BANK_IMPORT_CATEGORY_LABELS,
@@ -278,7 +280,7 @@ function RuleFormPanel({
           >
             {getImportCategoriesForType(type).map((f) => (
               <option key={f} value={f}>
-                {BANK_IMPORT_CATEGORY_LABELS[f]}
+                {importCategoryOptionLabel(f)}
               </option>
             ))}
           </select>
@@ -314,7 +316,7 @@ function RuleFormPanel({
           >
             {getImportCategoriesForType(type).map((f) => (
               <option key={f} value={f}>
-                {BANK_IMPORT_CATEGORY_LABELS[f]}
+                {importCategoryOptionLabel(f)}
               </option>
             ))}
           </select>
@@ -388,6 +390,7 @@ export default function TransactionsPage() {
 
 function TransactionsPageContent() {
   const supabase = useMemo(() => createClient(), []);
+  const searchParams = useSearchParams();
   const { selectedStore, loading: storesLoading } = useStores();
   const toast = useToast();
   const { evaluateAlerts } = useAlertEvaluation();
@@ -633,6 +636,13 @@ function TransactionsPageContent() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "needs_review" || tab === "posted" || tab === "excluded" || tab === "all") {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     setFilterVendor("");
@@ -1853,8 +1863,8 @@ function TransactionsPageContent() {
     const storedCategory = transactions.find((t) => t.id === item.id)?.category ?? null;
     return (
       <tr key={`sub-${item.id}`} className={clsx(
-        "border-b border-[var(--border)] bg-[var(--bg-card2)]",
-        needsCategorySelection(item.category) && NEEDS_CATEGORY_ROW_CLASS
+        "border-b border-[var(--border)]",
+        needsCategorySelection(item.category) ? NEEDS_CATEGORY_ROW_CLASS : "bg-[var(--bg-card2)]"
       )}>
         <td className="py-2 pr-2 pl-2">
           <input
@@ -1890,7 +1900,7 @@ function TransactionsPageContent() {
           >
             {getImportCategoriesForType(item.type).map((f) => (
               <option key={f} value={f}>
-                {BANK_IMPORT_CATEGORY_LABELS[f]}
+                {importCategoryOptionLabel(f)}
               </option>
             ))}
           </select>
@@ -2457,7 +2467,7 @@ function TransactionsPageContent() {
                         >
                           {getImportCategoriesForType(group.type).map((f) => (
                             <option key={f} value={f}>
-                              {BANK_IMPORT_CATEGORY_LABELS[f]}
+                              {importCategoryOptionLabel(f)}
                             </option>
                           ))}
                         </select>
@@ -2631,7 +2641,7 @@ function TransactionsPageContent() {
                               >
                                 {getImportCategoriesForType(row.type).map((f) => (
                                   <option key={f} value={f}>
-                                    {BANK_IMPORT_CATEGORY_LABELS[f]}
+                                    {importCategoryOptionLabel(f)}
                                   </option>
                                 ))}
                               </select>
@@ -3020,7 +3030,7 @@ function TransactionsPageContent() {
                 >
                   {getManualEntryCategories(manualDraft.type).map((f) => (
                     <option key={f} value={f}>
-                      {BANK_IMPORT_CATEGORY_LABELS[f]}
+                      {importCategoryOptionLabel(f)}
                     </option>
                   ))}
                 </select>

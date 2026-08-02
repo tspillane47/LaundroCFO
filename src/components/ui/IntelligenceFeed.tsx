@@ -1,6 +1,7 @@
 "use client";
 import { FeedItem } from "@/lib/intelligence";
 import Link from "next/link";
+import { TransactionReviewActionCard } from "@/components/transactions/TransactionReviewActionCard";
 
 const categoryLinks: Record<string, string> = {
   financial: "/financials",
@@ -9,6 +10,7 @@ const categoryLinks: Record<string, string> = {
   insurance: "/insurance",
   lease: "/lease",
   portfolio: "/portfolio",
+  transactions: "/transactions?tab=needs_review",
 };
 
 const categoryLabels: Record<string, string> = {
@@ -18,6 +20,7 @@ const categoryLabels: Record<string, string> = {
   insurance: "INS",
   lease: "LSE",
   portfolio: "PRT",
+  transactions: "TXN",
 };
 
 const severityStyles = {
@@ -54,8 +57,21 @@ export function IntelligenceFeed({
   return (
     <div className="space-y-2">
       {displayed.map((item) => {
+        if (item.category === "transactions" && item.actionCount != null && item.actionCount > 0) {
+          return (
+            <TransactionReviewActionCard
+              key={item.id}
+              count={item.actionCount}
+              href={item.actionHref ?? categoryLinks.transactions}
+              storeName={showStoreName ? item.storeName : undefined}
+              compact={showStoreName}
+            />
+          );
+        }
+
         const style = severityStyles[item.severity];
         const catLabel = categoryLabels[item.category] ?? item.category.slice(0, 3).toUpperCase();
+        const itemHref = item.actionHref ?? categoryLinks[item.category] ?? "/dashboard";
         return (
           <div
             key={item.id}
@@ -96,7 +112,7 @@ export function IntelligenceFeed({
                   </div>
                 </div>
                 <Link
-                  href={categoryLinks[item.category] ?? "/dashboard"}
+                  href={itemHref}
                   className="text-[11px] flex-shrink-0 mt-0.5 hover:underline"
                   style={{ color: "var(--text-muted)" }}
                 >

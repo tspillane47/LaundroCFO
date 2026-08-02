@@ -10,6 +10,7 @@ import { shouldTriggerLowDscrAlert } from "@/lib/dscr";
 import {
   fetchMonthlyFinancialsForStores,
   fetchMonthlyUtilitiesForStores,
+  fetchUncategorizedReviewCountsByStore,
   type PortfolioTtmSummary,
 } from "@/lib/financials";
 import {
@@ -124,6 +125,7 @@ export default function PortfolioPage() {
   const [totalAnnualDebtServiceFromLoans, setTotalAnnualDebtServiceFromLoans] = useState(0);
   const [scheduledDebtServiceByStore, setScheduledDebtServiceByStore] = useState<Record<string, number>>({});
   const [portfolioTtmSummary, setPortfolioTtmSummary] = useState<PortfolioTtmSummary | null>(null);
+  const [uncategorizedCountsByStore, setUncategorizedCountsByStore] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (localStorage.getItem("laundrocfo_show_welcome") === "true") {
@@ -172,6 +174,7 @@ export default function PortfolioPage() {
         { data: loansData, error: loansError },
         financialsData,
         utilitiesData,
+        uncategorizedCounts,
       ] = await Promise.all([
         supabase.from("leases").select("id, store_id, lease_end_date, monthly_rent").in("store_id", storeIds),
         supabase.from("real_estate").select("store_id, estimated_value").in("store_id", storeIds),
@@ -180,6 +183,7 @@ export default function PortfolioPage() {
         supabase.from("store_loans").select("store_id, monthly_payment").in("store_id", storeIds).eq("is_active", true),
         fetchMonthlyFinancialsForStores(supabase, storeIds),
         fetchMonthlyUtilitiesForStores(supabase, storeIds),
+        fetchUncategorizedReviewCountsByStore(supabase, storeIds),
       ]);
 
       const errors = [leasesError, reError, equipmentError, insuranceError, loansError].filter(Boolean);
@@ -201,6 +205,7 @@ export default function PortfolioPage() {
         insMap[p.store_id].push(p);
       }
       setInsuranceByStore(insMap);
+      setUncategorizedCountsByStore(uncategorizedCounts);
 
       const valuations = await Promise.all(
         (stores as Store[]).map(async (store) => {
@@ -382,11 +387,12 @@ export default function PortfolioPage() {
               finalMultiple: valuation.finalMultiple,
             }
           : null,
+        uncategorizedTransactionCount: uncategorizedCountsByStore[store.id] ?? 0,
       });
     });
     const order = { danger: 0, warning: 1, success: 2, info: 3 };
     return items.sort((a, b) => order[a.severity] - order[b.severity]);
-  }, [stores, leases, equipmentByStore, insuranceByStore, scheduledDebtServiceByStore, valuationByStoreId, portfolioTtmSummary]);
+  }, [stores, leases, equipmentByStore, insuranceByStore, scheduledDebtServiceByStore, valuationByStoreId, portfolioTtmSummary, uncategorizedCountsByStore]);
 
   const acquisitionMessage =
     !aggregates.hasDebtData

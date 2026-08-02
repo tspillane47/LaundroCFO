@@ -1243,6 +1243,31 @@ export function getReviewQueueProgress(
   return { total: rows.length, ready, uncategorized };
 }
 
+/** Review-queue rows still on the default needs_review category (matches Transactions → Needs Review tab). */
+export async function fetchUncategorizedReviewCountsByStore(
+  supabase: FinancialsSupabaseClient,
+  storeIds: string[]
+): Promise<Record<string, number>> {
+  if (storeIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from("bank_transactions")
+    .select("store_id")
+    .in("store_id", storeIds)
+    .eq("excluded", false)
+    .not("status", "in", '("posted","excluded","reviewed")')
+    .eq("category", "needs_review");
+
+  if (error) throw error;
+
+  const counts: Record<string, number> = Object.fromEntries(storeIds.map((id) => [id, 0]));
+  for (const row of data ?? []) {
+    const storeId = String(row.store_id);
+    counts[storeId] = (counts[storeId] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export function mapBankCategoryToPlField(category: BankImportCategory): PlCategoryField | null {
   if (
     category === "needs_review" ||

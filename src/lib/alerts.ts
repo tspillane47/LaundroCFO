@@ -86,6 +86,7 @@ const CATEGORY_ACTION: Record<string, { action: string; label: string }> = {
   insurance: { action: "insurance", label: "View Insurance" },
   lease: { action: "lease", label: "View Lease" },
   portfolio: { action: "portfolio", label: "View Portfolio" },
+  transactions: { action: "transactions", label: "Review Transactions" },
 };
 
 const CATEGORY_HREF: Record<string, string> = {
@@ -95,6 +96,7 @@ const CATEGORY_HREF: Record<string, string> = {
   insurance: "/insurance",
   lease: "/lease",
   portfolio: "/portfolio",
+  transactions: "/transactions?tab=needs_review",
 };
 
 const SEVERITY_TO_ACTION = {
@@ -242,7 +244,7 @@ export function feedItemsToActionItems(
         severityLabel: actionMeta.severityLabel,
         title: cleanHeadline(item.headline),
         description: cleanDescription(item.description),
-        href: CATEGORY_HREF[item.category] ?? "/dashboard",
+        href: item.actionHref ?? CATEGORY_HREF[item.category] ?? "/dashboard",
       };
     });
 }
@@ -439,7 +441,9 @@ function storedAlertToAlertItem(
   row: StoredStoreAlert,
   storeName?: string
 ): AlertItem {
-  const categoryTag = row.alert_key.includes("lease")
+  const categoryTag = row.alert_key.startsWith("tx-review-")
+    ? "transactions"
+    : row.alert_key.includes("lease")
     ? "lease"
     : row.alert_key.includes("ins")
       ? "insurance"
