@@ -88,7 +88,6 @@ export default function AlertsPage() {
 
       setAlerts(
         await fetchPortfolioStoreAlerts(supabase, {
-          userId: user.id,
           storeNamesById,
         })
       );

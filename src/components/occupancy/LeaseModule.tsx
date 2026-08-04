@@ -449,7 +449,6 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
 
         const optionPayload = {
           lease_id: leaseId,
-          store_id: store.id,
           user_id: user.id,
           option_number: Number(form.option_number) || 0,
           option_years: Number(form.option_years) || 0,

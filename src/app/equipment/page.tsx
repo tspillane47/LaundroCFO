@@ -150,7 +150,6 @@ export default function EquipmentPage() {
       const { data: equipmentData, error: equipmentError } = await supabase
         .from("equipment_inventory")
         .select("*")
-        .eq("user_id", user.id)
         .eq("store_id", storeData.id)
         .order("machine_type", { ascending: true })
         .order("installation_year", { ascending: false });

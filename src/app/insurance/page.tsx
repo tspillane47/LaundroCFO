@@ -516,7 +516,6 @@ export default function InsurancePage() {
       const { data: policyData, error: policyError } = await supabase
         .from("insurance_policies")
         .select("*")
-        .eq("user_id", user.id)
         .eq("store_id", storeData.id)
         .eq("is_active", true)
         .order("expiration_date", { ascending: true });

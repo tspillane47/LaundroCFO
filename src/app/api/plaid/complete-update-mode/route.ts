@@ -4,8 +4,8 @@ import {
   getPlaidConnectionById,
   PlaidNotConnectedError,
   syncPlaidTransactions,
-  verifyUserOwnsStore,
 } from "@/lib/plaid";
+import { verifyUserCanAccessStore } from "@/lib/store-access";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 export async function POST(request: Request) {
@@ -35,8 +35,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing connectionId" }, { status: 400 });
   }
 
-  const ownsStore = await verifyUserOwnsStore(supabase, user.id, storeId);
-  if (!ownsStore) {
+  const canAccessStore = await verifyUserCanAccessStore(supabase, storeId);
+  if (!canAccessStore) {
     return NextResponse.json({ error: "Store not found" }, { status: 403 });
   }
 

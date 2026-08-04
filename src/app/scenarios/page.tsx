@@ -83,12 +83,11 @@ function ScenariosPageContent() {
   const [saving, setSaving] = useState(false);
 
   const loadSavedScenarios = useCallback(
-    async (storeId: string, uid: string) => {
+    async (storeId: string) => {
       const { data, error } = await supabase
         .from("saved_scenarios")
         .select("id, scenario_name, inputs, outputs, created_at")
         .eq("store_id", storeId)
-        .eq("user_id", uid)
         .order("created_at", { ascending: false });
       if (!error && data) setSavedScenarios(data as SavedScenarioRow[]);
     },
@@ -201,7 +200,7 @@ function ScenariosPageContent() {
 
       setCtx(nextCtx);
       setInputParams(buildDefaultScenarioInputs(nextCtx));
-      await loadSavedScenarios(selectedStore.id, user.id);
+      await loadSavedScenarios(selectedStore.id);
     } catch {
       setLoadError(true);
       setCtx(null);
@@ -288,7 +287,7 @@ function ScenariosPageContent() {
       });
       if (error) throw error;
       toast.success("Scenario saved");
-      await loadSavedScenarios(selectedStore.id, userId);
+      await loadSavedScenarios(selectedStore.id);
       setSavedExpanded(true);
     } catch {
       toast.error("Failed to save — please try again");
@@ -317,7 +316,7 @@ function ScenariosPageContent() {
       }
       if (!selectedStore?.id || !userId) return;
       await supabase.from("saved_scenarios").delete().eq("id", id);
-      await loadSavedScenarios(selectedStore.id, userId);
+      await loadSavedScenarios(selectedStore.id);
     },
     [selectedStore?.id, userId, supabase, loadSavedScenarios, canWrite, blockedReason, toast]
   );

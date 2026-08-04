@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
+import { fetchAccessibleStores } from "@/lib/store-access";
 import { useStores } from "@/lib/store-context";
 import { getStoreValuation } from "@/lib/getStoreValuation";
 import type { ValuationResult } from "@/lib/valuation";
@@ -301,11 +302,7 @@ function ReportsPageContent() {
       setPortfolioLoading(true);
       setError("");
       try {
-        const { data: userStores } = await supabase
-          .from("stores")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("archived", false);
+        const { data: userStores } = await fetchAccessibleStores(supabase);
 
         const storeIds = (userStores ?? []).map((s) => s.id);
         const [financialsData, utilitiesData, annualDebtByStore] = await Promise.all([
@@ -320,7 +317,7 @@ function ReportsPageContent() {
           utilitiesData
         );
         setPortfolioCashFlow(cashFlow);
-        const data = await getPortfolioReport(userId, {
+        const data = await getPortfolioReport({
           financialsData,
           utilitiesData,
           annualDebtByStore,

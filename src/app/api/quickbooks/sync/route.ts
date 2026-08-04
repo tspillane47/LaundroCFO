@@ -3,9 +3,9 @@ import {
   QuickBooksNotConnectedError,
   QuickBooksReconnectRequiredError,
   syncQuickBooksFinancials,
-  verifyUserOwnsStore,
 } from "@/lib/quickbooks";
 import type { QuickBooksSyncSkippedMonth } from "@/lib/quickbooks-shared";
+import { verifyUserCanAccessStore } from "@/lib/store-access";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 function parseForceOverrideMonths(value: unknown): QuickBooksSyncSkippedMonth[] | null | undefined {
@@ -67,8 +67,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid forceOverrideMonths" }, { status: 400 });
   }
 
-  const ownsStore = await verifyUserOwnsStore(supabase, user.id, storeId);
-  if (!ownsStore) {
+  const canAccessStore = await verifyUserCanAccessStore(supabase, storeId);
+  if (!canAccessStore) {
     return NextResponse.json({ error: "Store not found" }, { status: 403 });
   }
 

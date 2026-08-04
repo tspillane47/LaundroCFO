@@ -313,21 +313,6 @@ export async function revokeQuickBooksToken(token: string): Promise<void> {
   }
 }
 
-export async function verifyUserOwnsStore(
-  supabase: SupabaseClient,
-  userId: string,
-  storeId: string
-): Promise<boolean> {
-  const { data } = await supabase
-    .from("stores")
-    .select("id")
-    .eq("id", storeId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  return Boolean(data);
-}
-
 function tokenExpiryFromNow(seconds: number): string {
   return new Date(Date.now() + seconds * 1000).toISOString();
 }

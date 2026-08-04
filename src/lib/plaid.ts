@@ -454,21 +454,6 @@ export async function handlePlaidWebhookPayload(payload: PlaidWebhookPayload): P
   }
 }
 
-export async function verifyUserOwnsStore(
-  supabase: SupabaseClient,
-  userId: string,
-  storeId: string
-): Promise<boolean> {
-  const { data } = await supabase
-    .from("stores")
-    .select("id")
-    .eq("id", storeId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  return Boolean(data);
-}
-
 export async function getStoreFinancialDataSource(storeId: string): Promise<FinancialDataSource | null> {
   const admin = createAdminSupabaseClient();
   const { data, error } = await admin

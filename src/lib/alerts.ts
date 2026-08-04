@@ -402,14 +402,12 @@ export async function syncPositiveEvents(
 export async function fetchUnshownStoreAlerts(
   supabase: SupabaseClient,
   params: {
-    userId: string;
     storeIds?: string[];
   }
 ): Promise<StoredStoreAlert[]> {
   let query = supabase
     .from("store_alerts")
     .select("id, store_id, alert_key, severity, title, body, created_at, toast_shown_at, resolved_at")
-    .eq("user_id", params.userId)
     .is("toast_shown_at", null)
     .order("created_at", { ascending: true });
 
@@ -473,14 +471,12 @@ function storedAlertToAlertItem(
 export async function fetchPortfolioStoreAlerts(
   supabase: SupabaseClient,
   params: {
-    userId: string;
     storeNamesById?: Record<string, string>;
   }
 ): Promise<AlertItem[]> {
   const { data, error } = await supabase
     .from("store_alerts")
     .select("id, store_id, alert_key, severity, title, body, created_at, toast_shown_at, resolved_at")
-    .eq("user_id", params.userId)
     .order("created_at", { ascending: false });
 
   if (error) throw error;

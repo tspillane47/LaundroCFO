@@ -40,13 +40,11 @@ export function SavedLoanCalculationsSection({
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
 
-  const loadSaved = useCallback(
-    async (uid: string) => {
+  const loadSaved = useCallback(async () => {
       const { data, error } = await supabase
         .from("saved_loan_calculations")
         .select("id, name, inputs, outputs, created_at")
         .eq("store_id", storeId)
-        .eq("user_id", uid)
         .order("created_at", { ascending: false });
 
       if (error || !data) return;
@@ -64,9 +62,7 @@ export function SavedLoanCalculationsSection({
         });
       }
       setSavedItems(rows);
-    },
-    [storeId, supabase]
-  );
+  }, [storeId, supabase]);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,7 +72,7 @@ export function SavedLoanCalculationsSection({
       } = await supabase.auth.getUser();
       if (cancelled || !user) return;
       setUserId(user.id);
-      await loadSaved(user.id);
+      await loadSaved();
     }
     void init();
     return () => {
@@ -120,7 +116,7 @@ export function SavedLoanCalculationsSection({
       setSaveDialogOpen(false);
       setSaveName("");
       setExpanded(true);
-      await loadSaved(userId);
+      await loadSaved();
     } catch {
       toast.error("Failed to save — please try again");
     } finally {
@@ -141,7 +137,7 @@ export function SavedLoanCalculationsSection({
       toast.error("Failed to delete — please try again");
       return;
     }
-    await loadSaved(userId);
+    await loadSaved();
   };
 
   const handleLoad = (item: SavedLoanCalculationRow) => {

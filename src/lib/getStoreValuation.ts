@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase";
+import { fetchAccessibleStores } from "@/lib/store-access";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import {
   buildUtilitiesLookup,
@@ -288,13 +289,9 @@ export async function getStoreValuation(
   return result;
 }
 
-export async function getPortfolioValuation(userId: string) {
+export async function getPortfolioValuation(_userId: string) {
   const supabase = createClient();
-  const { data: stores } = await supabase
-    .from("stores")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("archived", false);
+  const { data: stores } = await fetchAccessibleStores(supabase);
 
   if (!stores || stores.length === 0) {
     return { totalValue: 0, storeValuations: [] as { store: Record<string, unknown>; valuation: StoreValuationResult }[] };

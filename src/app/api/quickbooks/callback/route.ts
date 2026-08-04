@@ -7,8 +7,8 @@ import {
   financialsRedirectUrl,
   updateStoreFinancialDataSourceOnQuickBooksConnect,
   upsertQuickBooksConnection,
-  verifyUserOwnsStore,
 } from "@/lib/quickbooks";
+import { verifyUserCanAccessStore } from "@/lib/store-access";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 export async function GET(request: Request) {
@@ -56,8 +56,8 @@ export async function GET(request: Request) {
     );
   }
 
-  const ownsStore = await verifyUserOwnsStore(supabase, user.id, state.storeId);
-  if (!ownsStore) {
+  const canAccessStore = await verifyUserCanAccessStore(supabase, state.storeId);
+  if (!canAccessStore) {
     return NextResponse.redirect(
       financialsRedirectUrl(origin, "error", "forbidden")
     );

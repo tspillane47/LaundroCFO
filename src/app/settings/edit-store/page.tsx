@@ -55,7 +55,7 @@ function EditStoreForm() {
       }
 
       const paramStoreId = searchParams.get("store");
-      let query = supabase.from("stores").select("*").eq("user_id", user.id);
+      let query = supabase.from("stores").select("*");
 
       if (paramStoreId) {
         query = query.eq("id", paramStoreId);

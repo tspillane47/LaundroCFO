@@ -177,14 +177,18 @@ export function buildAlertDigestHtml(params: {
 export async function fetchDigestAlertsForUser(
   supabase: SupabaseClient,
   params: {
-    userId: string;
     since: Date;
+    storeIds: string[];
   }
 ): Promise<DigestAlert[]> {
+  if (params.storeIds.length === 0) {
+    return [];
+  }
+
   const { data, error } = await supabase
     .from("store_alerts")
     .select("id, store_id, severity, title, body, created_at")
-    .eq("user_id", params.userId)
+    .in("store_id", params.storeIds)
     .gt("created_at", params.since.toISOString())
     .is("resolved_at", null)
     .in("severity", [...DIGEST_SEVERITIES])

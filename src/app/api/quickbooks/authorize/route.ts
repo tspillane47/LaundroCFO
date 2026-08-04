@@ -4,8 +4,8 @@ import {
   QB_OAUTH_CSRF_COOKIE,
   buildAuthorizationUrl,
   createOAuthCsrfToken,
-  verifyUserOwnsStore,
 } from "@/lib/quickbooks";
+import { verifyUserCanAccessStore } from "@/lib/store-access";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 export async function GET(request: Request) {
@@ -25,8 +25,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const ownsStore = await verifyUserOwnsStore(supabase, user.id, storeId);
-  if (!ownsStore) {
+  const canAccessStore = await verifyUserCanAccessStore(supabase, storeId);
+  if (!canAccessStore) {
     return NextResponse.json({ error: "Store not found" }, { status: 403 });
   }
 

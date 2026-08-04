@@ -8,6 +8,7 @@ import {
   syncUserAlertsForDigest,
 } from "@/lib/email/alertDigest";
 import { createAdminSupabaseClient } from "@/lib/supabase-admin";
+import { fetchAccessibleStoresForUserId } from "@/lib/store-access";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -65,11 +66,10 @@ export async function GET(request: Request) {
         continue;
       }
 
-      const { data: stores, error: storesError } = await admin
-        .from("stores")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("archived", false);
+      const { data: stores, error: storesError } = await fetchAccessibleStoresForUserId(
+        admin,
+        userId
+      );
 
       if (storesError) {
         throw storesError;
@@ -92,7 +92,10 @@ export async function GET(request: Request) {
       });
 
       const since = getDigestWindowStart(profile.last_alert_digest_sent_at, startedAt);
-      const alerts = await fetchDigestAlertsForUser(admin, { userId, since });
+      const alerts = await fetchDigestAlertsForUser(admin, {
+        since,
+        storeIds: stores.map((store) => String(store.id)),
+      });
 
       if (alerts.length === 0) {
         results.push({

@@ -324,7 +324,6 @@ export async function evaluatePortfolioAlerts(
 
   const targetStoreIds = params.storeIds ?? params.stores.map((store) => String(store.id));
   const unshown = await fetchUnshownStoreAlerts(supabase, {
-    userId: params.userId,
     storeIds: targetStoreIds,
   });
 

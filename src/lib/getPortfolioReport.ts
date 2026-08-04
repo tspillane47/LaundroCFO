@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase";
+import { fetchAccessibleStores } from "@/lib/store-access";
 import { calcDebtYield, calcLeaseScore } from "@/lib/calculations";
 import {
   computeEquipmentMetrics,
@@ -67,7 +68,6 @@ export interface PortfolioReportData {
 }
 
 export async function getPortfolioReport(
-  userId: string,
   options?: {
     financialsData?: MonthlyFinancialRecord[];
     utilitiesData?: MonthlyUtilityRecordWithStore[];
@@ -76,11 +76,7 @@ export async function getPortfolioReport(
 ): Promise<PortfolioReportData> {
   const supabase = createClient();
 
-  const { data: stores } = await supabase
-    .from("stores")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("archived", false);
+  const { data: stores } = await fetchAccessibleStores(supabase);
 
   if (!stores || stores.length === 0) {
     return {

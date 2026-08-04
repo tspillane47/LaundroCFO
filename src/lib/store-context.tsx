@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { fetchAccessibleStores } from "@/lib/store-access";
 
 const SELECTED_STORE_STORAGE_KEY = "laundrocfo:selected-store-id";
 
@@ -59,11 +60,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       return;
     }
-    const { data } = await supabase
-      .from("stores")
-      .select("*")
-      .eq("user_id", user.id)
-      .or("archived.is.null,archived.eq.false");
+    const { data } = await fetchAccessibleStores(supabase);
     if (data) {
       setStores(data);
       if (data.length === 1) {
