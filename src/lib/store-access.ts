@@ -86,3 +86,18 @@ export async function verifyUserCanAccessStore(
   const { data } = await supabase.from("stores").select("id").eq("id", storeId).maybeSingle();
   return Boolean(data);
 }
+
+/** True when the session user is the original store owner (stores.user_id). */
+export async function verifyUserOwnsStore(
+  supabase: SupabaseClient,
+  storeId: string,
+  userId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("stores")
+    .select("id")
+    .eq("id", storeId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return Boolean(data);
+}

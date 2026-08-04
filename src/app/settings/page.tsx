@@ -13,6 +13,7 @@ import { formatAccessStatusLabel, planDisplayName } from "@/lib/access";
 import { useAccessStatus } from "@/lib/useAccessStatus";
 import { useBetaMode } from "@/lib/useBetaMode";
 import { useWriteGuard } from "@/lib/useWriteGuard";
+import { ManageAccessSection } from "@/components/settings/ManageAccessSection";
 
 const inputClass = INPUT_CLASS;
 
@@ -424,6 +425,8 @@ export default function SettingsPage() {
               </>
             )}
           </div>
+
+          <ManageAccessSection storeId={selectedStore.id} />
 
           {/* Cash & Bank Accounts */}
           <div className="card">

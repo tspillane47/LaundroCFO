@@ -55,3 +55,22 @@ export async function lookupAccountByEmail(
 
   return match ? { userId: match.id } : null;
 }
+
+/** Resolve a user's email by id via the GoTrue admin API. Server-only. */
+export async function lookupEmailByUserId(userId: string): Promise<string | null> {
+  const serviceKey = getServiceRoleKey();
+  const response = await fetch(`${goTrueAdminUsersUrl()}/${userId}`, {
+    headers: {
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const body = (await response.json()) as { email?: string };
+  return body.email ?? null;
+}
