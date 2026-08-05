@@ -4,6 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 
+type StoreOwner = {
+  userId: string;
+  email: string;
+};
+
 type StoreMember = {
   user_id: string;
   email: string;
@@ -23,6 +28,7 @@ function formatAddedDate(iso: string): string {
 }
 
 export function ManageAccessSection({ storeId }: ManageAccessSectionProps) {
+  const [owner, setOwner] = useState<StoreOwner | null>(null);
   const [members, setMembers] = useState<StoreMember[]>([]);
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -36,14 +42,19 @@ export function ManageAccessSection({ storeId }: ManageAccessSectionProps) {
     try {
       const res = await fetch(`/api/stores/${storeId}/members`);
       if (!res.ok) {
-        setMessage({ type: "error", text: "Failed to load co-owners." });
+        setMessage({ type: "error", text: "Failed to load store access." });
         return;
       }
-      const data = (await res.json()) as { members: StoreMember[]; isOwner: boolean };
+      const data = (await res.json()) as {
+        owner: StoreOwner;
+        members: StoreMember[];
+        isOwner: boolean;
+      };
+      setOwner(data.owner);
       setMembers(data.members);
       setIsOwner(data.isOwner);
     } catch {
-      setMessage({ type: "error", text: "Failed to load co-owners." });
+      setMessage({ type: "error", text: "Failed to load store access." });
     } finally {
       setLoading(false);
     }
@@ -143,19 +154,32 @@ export function ManageAccessSection({ storeId }: ManageAccessSectionProps) {
 
       {loading ? (
         <p className="text-[13px] text-[var(--text-muted)] py-2">Loading…</p>
-      ) : members.length === 0 ? (
-        <p className="text-[13px] text-[var(--text-muted)] py-2">
-          {isOwner ? "No co-owners yet." : "Only the store owner has access."}
-        </p>
       ) : (
         <div className="divide-y divide-white/[0.04] mb-4">
+          {owner && (
+            <div className="flex items-center justify-between gap-3 py-2.5 text-[13px]">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="font-semibold text-slate-100 truncate">{owner.email}</div>
+                  <span className="badge badge-green text-[10px] shrink-0">Owner</span>
+                </div>
+                <div className="text-[11px] text-[var(--text-muted)]">
+                  Full control — can add/remove members and delete the store
+                </div>
+              </div>
+            </div>
+          )}
+
           {members.map((member) => (
             <div
               key={member.user_id}
               className="flex items-center justify-between gap-3 py-2.5 text-[13px]"
             >
               <div className="min-w-0">
-                <div className="font-semibold text-slate-100 truncate">{member.email}</div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="font-semibold text-slate-100 truncate">{member.email}</div>
+                  <span className="badge badge-blue text-[10px] shrink-0">Co-owner</span>
+                </div>
                 <div className="text-[11px] text-[var(--text-muted)]">
                   Added {formatAddedDate(member.added_at)}
                 </div>
@@ -172,6 +196,12 @@ export function ManageAccessSection({ storeId }: ManageAccessSectionProps) {
               )}
             </div>
           ))}
+
+          {members.length === 0 && (
+            <p className="text-[13px] text-[var(--text-muted)] py-2.5">
+              {isOwner ? "No co-owners yet." : "No co-owners — only the owner has access."}
+            </p>
+          )}
         </div>
       )}
 

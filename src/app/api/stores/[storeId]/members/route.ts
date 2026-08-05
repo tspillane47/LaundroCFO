@@ -25,6 +25,17 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const isOwner = await verifyUserOwnsStore(supabase, storeId, user.id);
 
+  const { data: store, error: storeError } = await supabase
+    .from("stores")
+    .select("user_id")
+    .eq("id", storeId)
+    .maybeSingle();
+
+  if (storeError || !store) {
+    console.error("[stores/members GET] store lookup failed", storeError);
+    return NextResponse.json({ error: "Store not found" }, { status: 404 });
+  }
+
   const { data: rows, error } = await supabase
     .from("store_members")
     .select("user_id, added_at")
@@ -44,7 +55,12 @@ export async function GET(_request: Request, context: RouteContext) {
     }))
   );
 
-  return NextResponse.json({ members, isOwner });
+  const owner = {
+    userId: store.user_id as string,
+    email: (await lookupEmailByUserId(store.user_id as string)) ?? "Unknown",
+  };
+
+  return NextResponse.json({ owner, members, isOwner });
 }
 
 export async function POST(request: Request, context: RouteContext) {
