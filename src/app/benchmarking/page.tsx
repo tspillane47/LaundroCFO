@@ -244,11 +244,68 @@ const NETWORK_OPT_IN_THRESHOLD = 15;
 
 /* ─── Network Benchmarking ─── */
 
+type NetworkOptedInStatusProps = {
+  saving: boolean;
+  onOptOut: () => void;
+};
+
+function NetworkOptedInStatus({ saving, onOptOut }: NetworkOptedInStatusProps) {
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="flex items-center gap-2 text-[13px] text-[var(--text-success)]">
+          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-[var(--text-success)] font-bold text-[12px]">
+            ✓
+          </span>
+          You are opted in — we will notify you when network benchmarking launches
+        </div>
+        {!confirming && (
+          <ReadOnlyGuard>
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              className="text-[12px] text-[var(--text-muted)] underline underline-offset-2 hover:text-[var(--text-secondary)] transition-colors"
+            >
+              Opt out
+            </button>
+          </ReadOnlyGuard>
+        )}
+      </div>
+      {confirming && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-secondary)]">
+          <span>Stop sharing anonymized benchmark data?</span>
+          <ReadOnlyGuard>
+            <button
+              type="button"
+              onClick={() => void onOptOut()}
+              disabled={saving}
+              className="font-semibold underline underline-offset-2 hover:opacity-80 disabled:opacity-60"
+            >
+              {saving ? "Saving..." : "Yes, opt out"}
+            </button>
+          </ReadOnlyGuard>
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            disabled={saving}
+            className="text-[var(--text-muted)] underline underline-offset-2 hover:opacity-80 disabled:opacity-60"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 type NetworkBenchmarkingSectionProps = {
   optedIn: boolean;
   optInCount: number | null;
   saving: boolean;
   onOptIn: () => void;
+  onOptOut: () => void;
 };
 
 function NetworkBenchmarkingSection({
@@ -256,6 +313,7 @@ function NetworkBenchmarkingSection({
   optInCount,
   saving,
   onOptIn,
+  onOptOut,
 }: NetworkBenchmarkingSectionProps) {
   const count = optInCount ?? 0;
   const thresholdMet = count >= NETWORK_OPT_IN_THRESHOLD;
@@ -282,14 +340,7 @@ function NetworkBenchmarkingSection({
                 comparisons will appear here as network benchmarking rolls out.
               </p>
             </div>
-            {optedIn && (
-              <div className="flex items-center gap-2 text-[13px] text-[var(--text-success)]">
-                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-[var(--text-success)] font-bold text-[12px]">
-                  ✓
-                </span>
-                You are opted in — we will notify you when network benchmarking launches
-              </div>
-            )}
+            {optedIn && <NetworkOptedInStatus saving={saving} onOptOut={onOptOut} />}
           </div>
         ) : (
           <div className="space-y-5">
@@ -319,12 +370,7 @@ function NetworkBenchmarkingSection({
             </div>
 
             {optedIn ? (
-              <div className="flex items-center gap-2 text-[13px] text-[var(--text-success)]">
-                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-[var(--text-success)] font-bold text-[12px]">
-                  ✓
-                </span>
-                You are opted in — we will notify you when network benchmarking launches
-              </div>
+              <NetworkOptedInStatus saving={saving} onOptOut={onOptOut} />
             ) : (
               <ReadOnlyGuard>
                 <button
@@ -514,6 +560,36 @@ function BenchmarkingPageContent() {
     } else {
       setNetworkOptedIn(true);
       toast.success("You are opted in to Network Benchmarking");
+      const { data: refreshedCount } = await supabase.rpc("get_network_benchmark_contributor_count");
+      if (typeof refreshedCount === "number") {
+        setNetworkOptInCount(refreshedCount);
+      }
+    }
+
+    setNetworkOptInSaving(false);
+  }, [canWrite, blockedReason, networkOptedIn, networkOptInSaving, selectedStore?.id, supabase, toast]);
+
+  const handleNetworkOptOut = useCallback(async () => {
+    if (!selectedStore?.id || !networkOptedIn || networkOptInSaving) return;
+    if (!canWrite) {
+      toast.error(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
+
+    setNetworkOptInSaving(true);
+
+    const { error } = await supabase
+      .from("stores")
+      .update({
+        network_benchmark_opted_in: false,
+      })
+      .eq("id", selectedStore.id);
+
+    if (error) {
+      toast.error("Failed to opt out — please try again");
+    } else {
+      setNetworkOptedIn(false);
+      toast.success("You have opted out of Network Benchmarking");
       const { data: refreshedCount } = await supabase.rpc("get_network_benchmark_contributor_count");
       if (typeof refreshedCount === "number") {
         setNetworkOptInCount(refreshedCount);
@@ -778,6 +854,7 @@ function BenchmarkingPageContent() {
           optInCount={networkOptInCount}
           saving={networkOptInSaving}
           onOptIn={handleNetworkOptIn}
+          onOptOut={handleNetworkOptOut}
         />
 
         {/* Footnote */}
