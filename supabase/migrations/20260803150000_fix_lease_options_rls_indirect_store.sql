@@ -30,7 +30,7 @@ CREATE POLICY "Users can insert accessible lease options"
     EXISTS (
       SELECT 1
       FROM leases l
-      WHERE l.id = lease_id
+      WHERE l.id = lease_options.lease_id
         AND public.user_can_write_store(auth.uid(), l.store_id)
     )
   );
@@ -50,7 +50,7 @@ CREATE POLICY "Users can update accessible lease options"
     EXISTS (
       SELECT 1
       FROM leases l
-      WHERE l.id = lease_id
+      WHERE l.id = lease_options.lease_id
         AND public.user_can_write_store(auth.uid(), l.store_id)
     )
   );

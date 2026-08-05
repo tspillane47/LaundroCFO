@@ -10,11 +10,11 @@ CREATE POLICY "Users can select accessible stores"
   ON stores
   FOR SELECT
   USING (
-    auth.uid() = user_id
+    auth.uid() = stores.user_id
     OR EXISTS (
       SELECT 1
       FROM store_members sm
-      WHERE sm.store_id = id
+      WHERE sm.store_id = stores.id
         AND sm.user_id = auth.uid()
     )
   );
