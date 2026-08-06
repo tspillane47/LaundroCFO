@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/Logo";
+import { FacebookIcon, InstagramIcon, YoutubeIcon } from "@/components/ui/SocialIcons";
 
 const navLinks = [
   { href: "/#features", label: "Features" },
@@ -20,6 +21,24 @@ const footerLinks = [
   { href: "/signup", label: "Sign Up" },
   { href: "/terms", label: "Terms" },
   { href: "/privacy", label: "Privacy" },
+];
+
+const socialLinks = [
+  {
+    href: "https://www.facebook.com/laundrocfo",
+    label: "Follow LaundroCFO on Facebook",
+    Icon: FacebookIcon,
+  },
+  {
+    href: "https://www.instagram.com/laundrocfo",
+    label: "Follow LaundroCFO on Instagram",
+    Icon: InstagramIcon,
+  },
+  {
+    href: "https://www.youtube.com/@laundrocfo",
+    label: "Follow LaundroCFO on YouTube",
+    Icon: YoutubeIcon,
+  },
 ];
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
@@ -153,6 +172,20 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               <p className="text-[14px] text-[var(--text-secondary)] mt-2 max-w-xs leading-relaxed">
                 The financial operating system for laundromat owners, buyers, brokers, and lenders.
               </p>
+              <div className="flex items-center gap-4 mt-4">
+                {socialLinks.map(({ href, label, Icon }) => (
+                  <a
+                    key={href}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={label}
+                    className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    <Icon className="w-[18px] h-[18px]" />
+                  </a>
+                ))}
+              </div>
             </div>
             <div className="flex flex-wrap gap-x-8 gap-y-3">
               {footerLinks.map((link) => (
