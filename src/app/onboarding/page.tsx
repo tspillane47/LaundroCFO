@@ -17,7 +17,7 @@ import {
   type TransactionType,
 } from "@/lib/financials";
 import { getStoreValuation, invalidateValuationCache } from "@/lib/getStoreValuation";
-import { canAddStore, storeLimitUpgradeMessage } from "@/lib/access";
+import { canAddStore, storeCreationBlockedMessage } from "@/lib/access";
 import { useAccessStatus, invalidateAccessStatusCache } from "@/lib/useAccessStatus";
 import {
   completeOnboarding,
@@ -174,16 +174,24 @@ function OnboardingContent() {
     plan: accessPlan,
     maxStores,
     storeCount,
+    isReadOnly,
+    reason,
+    trialEndsAt,
+    currentPeriodEnd,
     loading: accessLoading,
   } = useAccessStatus();
-  const accessStatus = {
-    plan: accessPlan,
-    isReadOnly: false,
-    reason: "active" as const,
-    trialEndsAt: null,
-    currentPeriodEnd: null,
-    maxStores,
-  };
+  const accessStatus = useMemo(
+    () => ({
+      plan: accessPlan,
+      isReadOnly,
+      reason,
+      trialEndsAt,
+      currentPeriodEnd,
+      maxStores,
+    }),
+    [accessPlan, isReadOnly, reason, trialEndsAt, currentPeriodEnd, maxStores]
+  );
+  const canCreateStore = !accessLoading && canAddStore(accessStatus, storeCount);
 
   const [phase, setPhase] = useState<OnboardingPhase>(isAddingStore ? "wizard" : "choice");
   const [step, setStep] = useState(isAddingStore ? 2 : 1);
@@ -254,7 +262,7 @@ function OnboardingContent() {
       }
 
       if (!canAddStore(accessStatus, storeCount)) {
-        setErrorMessage(storeLimitUpgradeMessage(accessPlan));
+        setErrorMessage(storeCreationBlockedMessage(accessStatus));
         setReady(true);
         return;
       }
@@ -266,7 +274,7 @@ function OnboardingContent() {
     return () => {
       cancelled = true;
     };
-  }, [router, supabase, isAddingStore, accessLoading, accessPlan, maxStores, storeCount]);
+  }, [router, supabase, isAddingStore, accessLoading, accessStatus, storeCount, canCreateStore]);
 
   async function createStore(): Promise<string | null> {
     const {
@@ -278,7 +286,7 @@ function OnboardingContent() {
     }
 
     if (!canAddStore(accessStatus, storeCount)) {
-      setErrorMessage(storeLimitUpgradeMessage(accessStatus.plan));
+      setErrorMessage(storeCreationBlockedMessage(accessStatus));
       return null;
     }
 
@@ -311,8 +319,8 @@ function OnboardingContent() {
 
     const payload = await response.json().catch(() => null);
 
-    if (response.status === 403 && payload?.error === "store_limit_reached") {
-      setErrorMessage(payload.message ?? storeLimitUpgradeMessage(accessStatus.plan));
+    if (response.status === 403) {
+      setErrorMessage(payload?.message ?? storeCreationBlockedMessage(accessStatus));
       return null;
     }
 
@@ -738,11 +746,21 @@ function OnboardingContent() {
                     <button
                       type="button"
                       onClick={() => {
+                        if (!canCreateStore) {
+                          setErrorMessage(storeCreationBlockedMessage(accessStatus));
+                          return;
+                        }
                         setPhase("wizard");
                         setStep(1);
                         setErrorMessage("");
                       }}
-                      className="rounded-xl border-2 px-4 py-6 text-left transition-colors min-h-[120px] border-[var(--border)] hover:border-blue-400/50"
+                      disabled={!canCreateStore}
+                      className={clsx(
+                        "rounded-xl border-2 px-4 py-6 text-left transition-colors min-h-[120px] border-[var(--border)]",
+                        canCreateStore
+                          ? "hover:border-blue-400/50"
+                          : "opacity-60 cursor-not-allowed"
+                      )}
                     >
                       <div className="text-[16px] font-semibold text-[var(--text-primary)] mb-2">
                         Setting up my own store
@@ -805,6 +823,25 @@ function OnboardingContent() {
                     >
                       {completing ? "Continuing..." : "Go to Portfolio →"}
                     </button>
+                  </div>
+                </div>
+              ) : !canCreateStore ? (
+                <div className="text-center py-4">
+                  <h1 className="text-[28px] sm:text-[32px] font-bold text-[var(--text-primary)] mb-3">
+                    Subscribe to add a store
+                  </h1>
+                  <p className="text-[15px] text-[var(--text-secondary)] mb-8 max-w-md mx-auto leading-relaxed">
+                    {errorMessage || storeCreationBlockedMessage(accessStatus)}
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <Link href="/pricing" className="btn-primary px-10 py-3.5 text-[15px] font-semibold">
+                      View plans →
+                    </Link>
+                    {isAddingStore ? (
+                      <Link href="/portfolio" className="btn-outline px-6 py-2.5 text-[13px]">
+                        Back to Portfolio
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
               ) : showCompletion ? (

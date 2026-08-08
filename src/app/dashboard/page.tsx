@@ -44,6 +44,7 @@ import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { AddStoreLink } from "@/components/ui/AddStoreLink";
 import { CopyableEmail } from "@/components/onboarding/CopyableEmail";
 import { JOIN_STORE_SETTINGS_HINT } from "@/lib/onboarding";
 import { useOnboardingStatus } from "@/lib/useOnboardingStatus";
@@ -569,18 +570,28 @@ export default function DashboardPage() {
               <CopyableEmail email={userEmail} />
             </div>
           ) : null}
+          <div className="text-center">
+            <AddStoreLink className="text-[13px] font-medium underline underline-offset-2">
+              Or set up your own store instead
+            </AddStoreLink>
+          </div>
         </div>
       );
     }
 
     return (
-      <EmptyState
-        icon="Store"
-        title="No stores yet"
-        description="Add your first store to start tracking performance, financials, and alerts."
-        ctaLabel="Add Your First Store"
-        ctaHref="/portfolio"
-      />
+      <div className="space-y-5">
+        <EmptyState
+          icon="Store"
+          title="No stores yet"
+          description="Add your first store to start tracking performance, financials, and alerts."
+        />
+        <div className="text-center">
+          <AddStoreLink className="btn-primary inline-flex text-[13px]">
+            Add Your First Store →
+          </AddStoreLink>
+        </div>
+      </div>
     );
   }
 

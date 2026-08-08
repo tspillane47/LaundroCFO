@@ -545,13 +545,12 @@ export default function PortfolioPage() {
           ))}
         </div>
 
-        <Link
-          href="/onboarding?add=true"
+        <AddStoreLink
           className="inline-flex items-center gap-2 px-10 py-4 rounded-xl text-[17px] font-bold text-white transition-opacity hover:opacity-90"
           style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}
         >
-          Add Your First Store →
-        </Link>
+          Add Your First Store
+        </AddStoreLink>
       </div>
     );
   }

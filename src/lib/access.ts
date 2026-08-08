@@ -177,8 +177,16 @@ export async function getUserStoreCount(
 }
 
 export function canAddStore(access: AccessStatus, storeCount: number): boolean {
+  if (access.isReadOnly) return false;
   if (access.maxStores === null) return true;
   return storeCount < access.maxStores;
+}
+
+export function storeCreationBlockedMessage(access: AccessStatus): string {
+  if (access.isReadOnly) {
+    return readOnlyActionCopy(access.reason).message;
+  }
+  return storeLimitUpgradeMessage(access.plan);
 }
 
 export function planDisplayName(plan: PlanKey | null): string {

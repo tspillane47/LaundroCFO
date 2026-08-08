@@ -10,12 +10,14 @@ import { useWriteGuard } from "@/lib/useWriteGuard";
 
 type AddStoreLinkProps = {
   className?: string;
+  style?: React.CSSProperties;
   children?: React.ReactNode;
   firstStore?: boolean;
 };
 
 export function AddStoreLink({
   className,
+  style,
   children = "+ Add Store",
   firstStore = false,
 }: AddStoreLinkProps) {
@@ -26,11 +28,23 @@ export function AddStoreLink({
   const href = firstStore ? "/onboarding" : "/onboarding?add=true";
   const atLimit = !loading && maxStores !== null && storeCount >= maxStores;
 
+  if (loading) {
+    return (
+      <span
+        className={clsx(className, "opacity-60 cursor-not-allowed")}
+        style={style}
+        aria-disabled="true"
+      >
+        {children}
+      </span>
+    );
+  }
+
   // Read-only first: expired trial / canceled subs can't save regardless of store count.
   if (!canWrite) {
     return (
       <ReadOnlyGuard align="end">
-        <Link href={href} className={className}>
+        <Link href={href} className={className} style={style}>
           {children}
         </Link>
       </ReadOnlyGuard>
@@ -43,6 +57,7 @@ export function AddStoreLink({
         <button
           type="button"
           className={clsx(className, "opacity-60 cursor-not-allowed")}
+          style={style}
           onClick={() => setLimitMessage(storeLimitUpgradeMessage(plan))}
         >
           {children}
@@ -60,7 +75,7 @@ export function AddStoreLink({
   }
 
   return (
-    <Link href={href} className={className}>
+    <Link href={href} className={className} style={style}>
       {children}
     </Link>
   );

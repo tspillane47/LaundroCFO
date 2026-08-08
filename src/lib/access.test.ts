@@ -220,6 +220,45 @@ describe("getAccessStatus", () => {
 });
 
 describe("store limits", () => {
+  it("blocks store creation when access is read-only, even under the store limit", () => {
+    const trialExpiredAccess: AccessStatus = {
+      plan: "starter",
+      isReadOnly: true,
+      reason: "trial_expired",
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      maxStores: 1,
+    };
+
+    expect(canAddStore(trialExpiredAccess, 0)).toBe(false);
+  });
+
+  it("blocks store creation for read-only growth plans with unlimited stores", () => {
+    const canceledGrowthAccess: AccessStatus = {
+      plan: "growth",
+      isReadOnly: true,
+      reason: "canceled",
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      maxStores: null,
+    };
+
+    expect(canAddStore(canceledGrowthAccess, 0)).toBe(false);
+  });
+
+  it("blocks store creation with no subscription", () => {
+    const noSubscriptionAccess: AccessStatus = {
+      plan: null,
+      isReadOnly: true,
+      reason: "no_subscription",
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      maxStores: 0,
+    };
+
+    expect(canAddStore(noSubscriptionAccess, 0)).toBe(false);
+  });
+
   it("blocks adding stores at the plan limit but not below it", () => {
     const starterAccess: AccessStatus = {
       plan: "starter",

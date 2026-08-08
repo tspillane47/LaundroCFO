@@ -3,7 +3,7 @@ import {
   canAddStore,
   getAccessStatus,
   getUserStoreCount,
-  storeLimitUpgradeMessage,
+  storeCreationBlockedMessage,
 } from "@/lib/access";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -53,8 +53,8 @@ export async function POST(request: Request) {
   if (!canAddStore(access, storeCount)) {
     return NextResponse.json(
       {
-        error: "store_limit_reached",
-        message: storeLimitUpgradeMessage(access.plan),
+        error: access.isReadOnly ? "subscription_required" : "store_limit_reached",
+        message: storeCreationBlockedMessage(access),
       },
       { status: 403 }
     );
