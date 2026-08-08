@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildFinancialDataOptions,
   buildStoreSetupStatus,
+  isCoOwnerComplete,
   isDebtComplete,
   isEquipmentComplete,
   isFinancialDataComplete,
@@ -34,6 +35,11 @@ describe("gettingStarted status helpers", () => {
     expect(isFinancialDataComplete(false, false, 3)).toBe(true);
   });
 
+  it("marks co-owner complete when at least one store member exists", () => {
+    expect(isCoOwnerComplete(0)).toBe(false);
+    expect(isCoOwnerComplete(1)).toBe(true);
+  });
+
   it("builds financial data options with connected flags", () => {
     const options = buildFinancialDataOptions({
       hasQuickBooks: true,
@@ -56,6 +62,7 @@ describe("gettingStarted status helpers", () => {
       hasQuickBooks: true,
       hasPlaid: false,
       transactionCount: 0,
+      coOwnerCount: 0,
     });
 
     expect(status.completedCount).toBe(3);
@@ -63,5 +70,27 @@ describe("gettingStarted status helpers", () => {
     expect(status.sections.find((s) => s.id === "debt")?.status).toBe("not_started");
     expect(status.sections.find((s) => s.id === "financials")?.status).toBe("complete");
     expect(status.sections.find((s) => s.id === "financials")?.financialOptions).toHaveLength(3);
+    expect(status.optionalSections).toHaveLength(1);
+    expect(status.optionalSections[0]?.id).toBe("co_owner");
+    expect(status.optionalSections[0]?.status).toBe("not_started");
+    expect(status.optionalSections[0]?.optional).toBe(true);
+  });
+
+  it("marks optional co-owner section complete without affecting core progress", () => {
+    const status = buildStoreSetupStatus({
+      equipmentCount: 2,
+      occupancyType: "leased",
+      hasLease: true,
+      hasRealEstate: false,
+      loanCount: 1,
+      hasQuickBooks: true,
+      hasPlaid: false,
+      transactionCount: 0,
+      coOwnerCount: 2,
+    });
+
+    expect(status.completedCount).toBe(4);
+    expect(status.totalCount).toBe(4);
+    expect(status.optionalSections[0]?.status).toBe("complete");
   });
 });

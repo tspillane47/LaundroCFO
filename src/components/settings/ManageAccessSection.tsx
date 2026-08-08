@@ -142,7 +142,7 @@ export function ManageAccessSection({ storeId }: ManageAccessSectionProps) {
   }
 
   return (
-    <div className="card">
+    <div id="manage-access" className="card">
       <div className="section-title">Manage Access</div>
       <p className="text-[12px] mb-3" style={{ color: "var(--text-muted)" }}>
         {isOwner

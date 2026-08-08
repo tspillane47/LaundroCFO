@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type SetupSectionId = "equipment" | "occupancy" | "debt" | "financials";
+export type SetupSectionId =
+  | "equipment"
+  | "occupancy"
+  | "debt"
+  | "financials"
+  | "co_owner";
 
 export type SetupSectionStatus = "complete" | "not_started";
 
@@ -22,10 +27,13 @@ export type SetupSection = {
   href: string;
   status: SetupSectionStatus;
   financialOptions?: FinancialDataOption[];
+  optional?: boolean;
+  actionLabel?: string;
 };
 
 export type StoreSetupStatus = {
   sections: SetupSection[];
+  optionalSections: SetupSection[];
   completedCount: number;
   totalCount: number;
 };
@@ -56,6 +64,10 @@ export function isFinancialDataComplete(
   transactionCount: number
 ): boolean {
   return hasQuickBooks || hasPlaid || transactionCount > 0;
+}
+
+export function isCoOwnerComplete(coOwnerCount: number): boolean {
+  return coOwnerCount > 0;
 }
 
 export function buildFinancialDataOptions(input: {
@@ -100,6 +112,7 @@ export function buildStoreSetupStatus(input: {
   hasQuickBooks: boolean;
   hasPlaid: boolean;
   transactionCount: number;
+  coOwnerCount: number;
 }): StoreSetupStatus {
   const financialOptions = buildFinancialDataOptions({
     hasQuickBooks: input.hasQuickBooks,
@@ -143,10 +156,24 @@ export function buildStoreSetupStatus(input: {
     },
   ];
 
+  const optionalSections: SetupSection[] = [
+    {
+      id: "co_owner",
+      label: "Invite a Co-Owner",
+      description:
+        "Share access with a business partner or co-owner so you can both manage this store together.",
+      href: "/settings#manage-access",
+      status: isCoOwnerComplete(input.coOwnerCount) ? "complete" : "not_started",
+      optional: true,
+      actionLabel: "Manage Access →",
+    },
+  ];
+
   const completedCount = sections.filter((s) => s.status === "complete").length;
 
   return {
     sections,
+    optionalSections,
     completedCount,
     totalCount: sections.length,
   };
@@ -165,6 +192,7 @@ export async function fetchStoreSetupStatus(
     { data: quickBooksConnection },
     { data: plaidConnectionsData },
     { count: transactionCount },
+    { count: coOwnerCount },
   ] = await Promise.all([
     supabase
       .from("equipment_inventory")
@@ -183,6 +211,10 @@ export async function fetchStoreSetupStatus(
       .from("bank_transactions")
       .select("id", { count: "exact", head: true })
       .eq("store_id", storeId),
+    supabase
+      .from("store_members")
+      .select("id", { count: "exact", head: true })
+      .eq("store_id", storeId),
   ]);
 
   return buildStoreSetupStatus({
@@ -194,5 +226,6 @@ export async function fetchStoreSetupStatus(
     hasQuickBooks: Boolean(quickBooksConnection),
     hasPlaid: (plaidConnectionsData?.length ?? 0) > 0,
     transactionCount: transactionCount ?? 0,
+    coOwnerCount: coOwnerCount ?? 0,
   });
 }

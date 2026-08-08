@@ -29,6 +29,7 @@ function resolveInitialStoreId(
 
 function SetupSectionCard({ section }: { section: SetupSection }) {
   const complete = section.status === "complete";
+  const actionLabel = section.actionLabel ?? "Set up →";
 
   if (section.id === "financials" && section.financialOptions) {
     const connectedCount = section.financialOptions.filter((option) => option.connected).length;
@@ -54,6 +55,14 @@ function SetupSectionCard({ section }: { section: SetupSection }) {
               <h2 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>
                 {section.label}
               </h2>
+              {section.optional ? (
+                <span
+                  className="text-[11px] font-medium italic"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  (optional)
+                </span>
+              ) : null}
               <span
                 className={clsx(
                   "text-[11px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full",
@@ -143,6 +152,14 @@ function SetupSectionCard({ section }: { section: SetupSection }) {
             <h2 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>
               {section.label}
             </h2>
+            {section.optional ? (
+              <span
+                className="text-[11px] font-medium italic"
+                style={{ color: "var(--text-muted)" }}
+              >
+                (optional)
+              </span>
+            ) : null}
             <span
               className={clsx(
                 "text-[11px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full",
@@ -165,7 +182,7 @@ function SetupSectionCard({ section }: { section: SetupSection }) {
           href={section.href}
           className="btn-primary text-[13px] px-4 py-2.5 whitespace-nowrap sm:flex-shrink-0 text-center"
         >
-          Set up →
+          {actionLabel}
         </Link>
       )}
     </li>
@@ -372,6 +389,22 @@ export default function GettingStartedPage() {
               <SetupSectionCard key={section.id} section={section} />
             ))}
           </ul>
+
+          {status.optionalSections.length > 0 && (
+            <div className="mt-8">
+              <h2
+                className="text-[12px] font-semibold uppercase tracking-wide mb-3"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Optional
+              </h2>
+              <ul className="space-y-3">
+                {status.optionalSections.map((section) => (
+                  <SetupSectionCard key={section.id} section={section} />
+                ))}
+              </ul>
+            </div>
+          )}
 
           <TransactionReviewGuide />
         </>
