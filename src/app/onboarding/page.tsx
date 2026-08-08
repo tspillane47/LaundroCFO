@@ -19,11 +19,18 @@ import {
 import { getStoreValuation, invalidateValuationCache } from "@/lib/getStoreValuation";
 import { canAddStore, storeLimitUpgradeMessage } from "@/lib/access";
 import { useAccessStatus, invalidateAccessStatusCache } from "@/lib/useAccessStatus";
-import { isOnboardingComplete } from "@/lib/onboarding";
+import {
+  completeOnboarding,
+  isOnboardingComplete,
+  JOIN_STORE_SETTINGS_HINT,
+} from "@/lib/onboarding";
+import { CopyableEmail } from "@/components/onboarding/CopyableEmail";
 
 const TOTAL_STEPS = 4;
 
 const STEP_LABELS = ["Welcome", "Your Store", "Occupancy", "Financials"];
+
+type OnboardingPhase = "choice" | "wizard" | "join";
 
 const STORE_TYPES = [
   { label: "Coin Laundry", value: "Coin" },
@@ -178,8 +185,10 @@ function OnboardingContent() {
     maxStores,
   };
 
+  const [phase, setPhase] = useState<OnboardingPhase>(isAddingStore ? "wizard" : "choice");
   const [step, setStep] = useState(isAddingStore ? 2 : 1);
   const [showCompletion, setShowCompletion] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
   const [slideDirection, setSlideDirection] = useState<SlideDirection>("left");
   const [slideKey, setSlideKey] = useState(0);
   const [form, setForm] = useState<OnboardingForm>(DEFAULT_FORM);
@@ -228,6 +237,8 @@ function OnboardingContent() {
         router.replace("/login");
         return;
       }
+
+      setUserEmail(user.email ?? "");
 
       const completed = await isOnboardingComplete(supabase, user.id);
 
@@ -582,13 +593,33 @@ function OnboardingContent() {
     }
 
     if (!isAddingStore) {
-      await supabase
-        .from("profiles")
-        .update({ onboarding_completed: true })
-        .eq("id", user.id);
+      await completeOnboarding(supabase, user.id, "own");
     }
 
     router.push(isAddingStore ? "/portfolio" : "/getting-started");
+  }
+
+  async function handleJoinGoToPortfolio() {
+    if (completing) return;
+    setCompleting(true);
+    setErrorMessage("");
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+
+    try {
+      await completeOnboarding(supabase, user.id, "join");
+      router.push("/portfolio");
+    } catch (error) {
+      console.error("Failed to complete joining onboarding:", error);
+      setErrorMessage("We couldn't save your choice. Please try again.");
+      setCompleting(false);
+    }
   }
 
   if (!ready) {
@@ -602,6 +633,7 @@ function OnboardingContent() {
   const progressPct = showCompletion ? 100 : (step / TOTAL_STEPS) * 100;
   const slideClass =
     slideDirection === "left" ? "onboarding-slide-in-left" : "onboarding-slide-in-right";
+  const showWizardProgress = phase === "wizard" && !showCompletion;
 
   return (
     <>
@@ -628,14 +660,14 @@ function OnboardingContent() {
           <div className="max-w-3xl mx-auto px-4 pt-4 pb-3">
             <div className="flex items-center justify-between mb-3">
               <Logo variant="sidebar" />
-              {!showCompletion && (
+              {showWizardProgress && (
                 <span className="text-[12px] text-[var(--text-muted)]">
                   Step {step} of {TOTAL_STEPS}
                 </span>
               )}
             </div>
 
-            {!showCompletion && (
+            {showWizardProgress && (
               <>
                 <div className="h-1.5 rounded-full bg-[var(--border)]  overflow-hidden mb-2">
                   <div
@@ -679,13 +711,103 @@ function OnboardingContent() {
             )}
 
             <div
-              key={showCompletion ? "complete" : `${step}-${slideKey}`}
+              key={
+                phase === "choice"
+                  ? "choice"
+                  : phase === "join"
+                    ? "join"
+                    : showCompletion
+                      ? "complete"
+                      : `${step}-${slideKey}`
+              }
               className={clsx(
                 "card bg-[var(--bg-card)] border border-[var(--border)] shadow-sm relative z-10",
-                !showCompletion && slideClass
+                phase === "wizard" && !showCompletion && slideClass
               )}
             >
-              {showCompletion ? (
+              {phase === "choice" ? (
+                <div className="text-center">
+                  <h1 className="text-[28px] sm:text-[32px] font-bold text-[var(--text-primary)] mb-3">
+                    How are you getting started?
+                  </h1>
+                  <p className="text-[15px] text-[var(--text-secondary)] mb-8 max-w-lg mx-auto leading-relaxed">
+                    Are you setting up your own store, or joining a store someone else owns?
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl mx-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPhase("wizard");
+                        setStep(1);
+                        setErrorMessage("");
+                      }}
+                      className="rounded-xl border-2 px-4 py-6 text-left transition-colors min-h-[120px] border-[var(--border)] hover:border-blue-400/50"
+                    >
+                      <div className="text-[16px] font-semibold text-[var(--text-primary)] mb-2">
+                        Setting up my own store
+                      </div>
+                      <div className="text-[13px] text-[var(--text-muted)] leading-relaxed">
+                        Create your first store and walk through setup.
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPhase("join");
+                        setErrorMessage("");
+                      }}
+                      className="rounded-xl border-2 px-4 py-6 text-left transition-colors min-h-[120px] border-[var(--border)] hover:border-blue-400/50"
+                    >
+                      <div className="text-[16px] font-semibold text-[var(--text-primary)] mb-2">
+                        Joining a store someone else owns
+                      </div>
+                      <div className="text-[13px] text-[var(--text-muted)] leading-relaxed">
+                        Skip store setup — get access when the owner adds you.
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              ) : phase === "join" ? (
+                <div className="text-center py-2">
+                  <h1 className="text-[28px] sm:text-[32px] font-bold text-[var(--text-primary)] mb-3">
+                    You&apos;re all set!
+                  </h1>
+                  <p className="text-[15px] text-[var(--text-secondary)] mb-6 max-w-md mx-auto leading-relaxed">
+                    {JOIN_STORE_SETTINGS_HINT}
+                  </p>
+                  {userEmail ? (
+                    <div className="mb-8 max-w-md mx-auto">
+                      <CopyableEmail email={userEmail} />
+                    </div>
+                  ) : (
+                    <p className="text-[14px] text-[var(--text-muted)] mb-8">
+                      Use the same email address you signed up with.
+                    </p>
+                  )}
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPhase("choice");
+                        setErrorMessage("");
+                      }}
+                      disabled={completing}
+                      className="btn-outline px-6 py-2.5 text-[13px] order-2 sm:order-1"
+                    >
+                      ← Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleJoinGoToPortfolio()}
+                      disabled={completing}
+                      className="btn-primary px-10 py-3.5 text-[15px] font-semibold disabled:opacity-50 order-1 sm:order-2"
+                    >
+                      {completing ? "Continuing..." : "Go to Portfolio →"}
+                    </button>
+                  </div>
+                </div>
+              ) : showCompletion ? (
                 <div className="text-center py-4">
                   <h1 className="text-[28px] sm:text-[32px] font-bold text-[var(--text-primary)] mb-3">
                     {isAddingStore ? "Store added!" : "You\u2019re all set! 🎉"}
@@ -1038,13 +1160,19 @@ function OnboardingContent() {
                     </div>
                   )}
 
-                  {!showCompletion && step > 1 && (
+                  {!showCompletion && phase === "wizard" && step > 1 && (
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-8 pt-6 border-t border-[var(--border)]">
                       <button
                         type="button"
                         onClick={() => {
                           if (step === 2 && isAddingStore) {
                             router.push("/portfolio");
+                            return;
+                          }
+                          if (step === 2 && !isAddingStore) {
+                            setPhase("choice");
+                            setStep(1);
+                            setErrorMessage("");
                             return;
                           }
                           goToStep(step - 1, "right");

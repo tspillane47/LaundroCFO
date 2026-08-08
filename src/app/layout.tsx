@@ -25,7 +25,7 @@ import { useBetaMode } from "@/lib/useBetaMode";
 import { isAdminEmail } from "@/lib/admin";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { AlertNotificationProvider } from "@/components/alerts/AlertNotificationProvider";
-import { isOnboardingComplete } from "@/lib/onboarding";
+import { getOnboardingStatus } from "@/lib/onboarding";
 
 function getUserInitials(fullName: string | null, email: string | null): string {
   const name = fullName?.trim();
@@ -148,11 +148,13 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const completed = await isOnboardingComplete(supabase, user.id);
+      const { complete: onboardingComplete } = await getOnboardingStatus(supabase, user.id);
 
       if (cancelled) return;
 
-      if (completed) {
+      // Complete includes: onboarding_completed, onboarding_path='join' (no store required),
+      // or legacy users with owned stores.
+      if (onboardingComplete) {
         if (pathname === "/onboarding" && !isAddingStore) {
           router.replace("/portfolio");
           return;

@@ -44,6 +44,9 @@ import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { CopyableEmail } from "@/components/onboarding/CopyableEmail";
+import { JOIN_STORE_SETTINGS_HINT } from "@/lib/onboarding";
+import { useOnboardingStatus } from "@/lib/useOnboardingStatus";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { DSCRCard } from "@/components/ui/DSCRCard";
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
@@ -190,6 +193,7 @@ const RevenueEbitdaTooltip = ({ active, payload, label }: any) => {
 export default function DashboardPage() {
   const router = useRouter();
   const { stores, selectedStore, isAllStores, setSelectedStore, setIsAllStores, loading: storesLoading } = useStores();
+  const { isJoining, userEmail, loading: onboardingStatusLoading } = useOnboardingStatus();
   const [store, setStore] = useState<any>(null);
   const [storeData, setStoreData] = useState<any>(null);
   const [lease, setLease] = useState<any>(null);
@@ -504,6 +508,7 @@ export default function DashboardPage() {
 
   const isDashboardLoading =
     storesLoading ||
+    onboardingStatusLoading ||
     (!loadError && !!selectedStore && !isAllStores && (detailLoading || valuation === null));
 
   if (isDashboardLoading) {
@@ -549,6 +554,25 @@ export default function DashboardPage() {
   }
 
   if (!selectedStore && stores.length === 0) {
+    if (isJoining) {
+      return (
+        <div className="space-y-5">
+          <EmptyState
+            icon="Store"
+            title="Waiting for store access"
+            description={`${JOIN_STORE_SETTINGS_HINT} Once the owner adds you, their store will appear here.`}
+            ctaLabel="Go to Portfolio"
+            ctaHref="/portfolio"
+          />
+          {userEmail ? (
+            <div className="max-w-md mx-auto">
+              <CopyableEmail email={userEmail} />
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+
     return (
       <EmptyState
         icon="Store"

@@ -31,6 +31,9 @@ import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { AddStoreLink } from "@/components/ui/AddStoreLink";
+import { CopyableEmail } from "@/components/onboarding/CopyableEmail";
+import { JOIN_STORE_SETTINGS_HINT } from "@/lib/onboarding";
+import { useOnboardingStatus } from "@/lib/useOnboardingStatus";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
@@ -106,6 +109,7 @@ export default function PortfolioPage() {
     refreshStores,
   } = useStores();
   const { canWrite, blockedReason } = useWriteGuard();
+  const { isJoining, userEmail, loading: onboardingStatusLoading } = useOnboardingStatus();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [leases, setLeases] = useState<Lease[]>([]);
@@ -468,7 +472,7 @@ export default function PortfolioPage() {
     return <PageError onRetry={loadPortfolioData} />;
   }
 
-  if (storesLoading || loading) {
+  if (storesLoading || loading || onboardingStatusLoading) {
     return (
       <div className="space-y-5">
         <CardSkeleton />
@@ -487,6 +491,33 @@ export default function PortfolioPage() {
   }
 
   if (stores.length === 0) {
+    if (isJoining) {
+      return (
+        <div
+          className="flex flex-col items-center justify-center min-h-[calc(100vh-120px)] text-center px-6"
+          style={{ background: "var(--bg-page)" }}
+        >
+          <h1 className="text-[28px] sm:text-[32px] font-bold tracking-tight mb-3" style={{ color: "var(--text-primary)" }}>
+            Waiting for store access
+          </h1>
+          <p className="text-[15px] max-w-lg mb-6 leading-relaxed" style={{ color: "var(--text-muted)" }}>
+            {JOIN_STORE_SETTINGS_HINT}
+          </p>
+          {userEmail ? (
+            <div className="w-full max-w-md mb-8">
+              <CopyableEmail email={userEmail} />
+            </div>
+          ) : null}
+          <p className="text-[13px] max-w-md mb-8" style={{ color: "var(--text-secondary)" }}>
+            Once the owner adds you, refresh this page and their store will appear in your portfolio.
+          </p>
+          <AddStoreLink className="text-[13px] font-medium underline underline-offset-2">
+            Or set up your own store instead
+          </AddStoreLink>
+        </div>
+      );
+    }
+
     return (
       <div
         className="flex flex-col items-center justify-center min-h-[calc(100vh-120px)] text-center px-6"
@@ -515,7 +546,7 @@ export default function PortfolioPage() {
         </div>
 
         <Link
-          href="/onboarding"
+          href="/onboarding?add=true"
           className="inline-flex items-center gap-2 px-10 py-4 rounded-xl text-[17px] font-bold text-white transition-opacity hover:opacity-90"
           style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}
         >
