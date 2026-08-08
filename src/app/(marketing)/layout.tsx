@@ -6,15 +6,17 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/Logo";
 import { FacebookIcon, InstagramIcon, YoutubeIcon } from "@/components/ui/SocialIcons";
+import { MarketingSignupCta } from "./components/MarketingSignupCta";
+import { MARKETING_FEATURES_HREF } from "@/lib/marketingCta";
 
 const navLinks = [
-  { href: "/#features", label: "Features" },
+  { href: MARKETING_FEATURES_HREF, label: "Features" },
   { href: "/pricing", label: "Pricing" },
   { href: "/about", label: "About" },
 ];
 
 const footerLinks = [
-  { href: "/#features", label: "Product" },
+  { href: MARKETING_FEATURES_HREF, label: "Product" },
   { href: "/pricing", label: "Pricing" },
   { href: "/about", label: "About" },
   { href: "/login", label: "Login" },
@@ -103,12 +105,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             >
               Sign In
             </Link>
-            <Link
-              href="/signup"
-              className="px-4 py-2 rounded-lg text-[13px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-            >
-              Start Free Trial
-            </Link>
+            <MarketingSignupCta className="px-4 py-2 rounded-lg text-[13px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors" />
           </div>
 
           <button
@@ -150,13 +147,10 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               >
                 Sign In
               </Link>
-              <Link
-                href="/signup"
+              <MarketingSignupCta
                 className="w-full text-center py-2.5 rounded-lg text-[13px] font-semibold bg-blue-600 text-white"
                 onClick={() => setMobileOpen(false)}
-              >
-                Start Free Trial
-              </Link>
+              />
             </div>
           </div>
         )}

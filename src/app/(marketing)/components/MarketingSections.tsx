@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { MarketingSignupCta } from "./MarketingSignupCta";
 
 /* ── Shared helpers ── */
 
@@ -982,13 +983,11 @@ function FinalCTA() {
           The operating system built specifically for laundromat owners.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
-          <Link
-            href="/signup"
+          <MarketingSignupCta
+            withArrow
             className="inline-flex items-center justify-center px-6 py-3 rounded-lg text-[14px] font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors"
             style={{ boxShadow: "0 0 24px rgba(37,99,235,0.4)" }}
-          >
-            Start Free Trial →
-          </Link>
+          />
           <Link
             href="/login"
             className="inline-flex items-center justify-center px-6 py-3 rounded-lg text-[14px] font-semibold border border-white/30 text-white hover:border-white/50 hover:bg-[var(--bg-card2)] transition-colors"

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { MarketingSignupCta } from "../components/MarketingSignupCta";
 
 const beliefs = [
   {
@@ -106,12 +106,7 @@ export default function AboutPage() {
       <section className="py-24 bg-[var(--bg-card)] border-t border-[var(--border)]">
         <div className="max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-[32px] font-bold text-[var(--text-primary)] mb-8">Ready to see what your store is worth?</h2>
-          <Link
-            href="/signup"
-            className="inline-flex items-center justify-center px-10 py-4 rounded-xl text-[16px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-          >
-            Start Free Trial
-          </Link>
+          <MarketingSignupCta className="inline-flex items-center justify-center px-10 py-4 rounded-xl text-[16px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors" />
         </div>
       </section>
     </div>

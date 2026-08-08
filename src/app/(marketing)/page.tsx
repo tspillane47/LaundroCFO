@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import HeroDashboard from "./components/HeroDashboard";
+import { MarketingSignupCta } from "./components/MarketingSignupCta";
+import { MARKETING_FEATURES_HREF } from "@/lib/marketingCta";
 
 function TrustIcon({ variant }: { variant: "shield" | "chart" | "doc" }) {
   const props = {
@@ -229,19 +231,17 @@ export default function MarketingHomePage() {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                <Link
-                  href="/signup"
+                <MarketingSignupCta
+                  withArrow
                   className="inline-flex items-center justify-center px-6 py-3 rounded-lg text-[14px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                   style={{ boxShadow: "0 0 24px color-mix(in srgb, var(--accent-blue) 40%, transparent)" }}
-                >
-                  Start Free Trial →
-                </Link>
-                <a
-                  href="#features"
+                />
+                <Link
+                  href={MARKETING_FEATURES_HREF}
                   className="inline-flex items-center justify-center px-6 py-3 rounded-lg text-[14px] font-semibold border border-[var(--border2)] text-[var(--text-primary)] hover:bg-[var(--bg-card2)] transition-colors"
                 >
                   See How It Works
-                </a>
+                </Link>
               </div>
 
               <p className="text-[13px] text-[var(--text-muted)] mb-8">
@@ -309,7 +309,7 @@ export default function MarketingHomePage() {
       </section>
 
       {/* Features */}
-      <section id="features" className="py-24 bg-[var(--bg-card)] border-y border-[var(--border)]">
+      <section id="features" className="py-24 scroll-mt-24 bg-[var(--bg-card)] border-y border-[var(--border)]">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-14">
             <h2 className="text-[28px] lg:text-[36px] font-bold text-[var(--text-primary)] mb-3">
@@ -407,12 +407,7 @@ export default function MarketingHomePage() {
             Start tracking your laundromat&apos;s value today.
           </h2>
           <p className="text-[16px] text-[var(--text-secondary)] mb-8">Free during beta. No credit card required.</p>
-          <Link
-            href="/signup"
-            className="inline-flex items-center justify-center px-8 py-3 rounded-lg text-[15px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-opacity"
-          >
-            Create Free Account
-          </Link>
+          <MarketingSignupCta className="inline-flex items-center justify-center px-8 py-3 rounded-lg text-[15px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-opacity" />
           <p className="text-[13px] text-[var(--text-muted)] mt-6">
             Join laundromat owners, brokers, and lenders already using LaundroCFO
           </p>

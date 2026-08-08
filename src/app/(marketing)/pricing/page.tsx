@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PLANS } from "@/lib/config";
 import type { PlanKey } from "@/lib/beta";
+import { getMarketingSignupCtaLabel } from "@/lib/marketingCta";
 import { createClient } from "@/lib/supabase";
 import { useBetaMode } from "@/lib/useBetaMode";
 
@@ -100,7 +101,7 @@ export default function PricingPage() {
     }
   }, []);
 
-  const ctaLabel = betaMode ? "Join Beta — Free" : "Get Started";
+  const ctaLabel = getMarketingSignupCtaLabel(betaMode);
   const useCheckout = !betaMode && isLoggedIn;
 
   return (

@@ -5,7 +5,10 @@ export default function HeroIllustration() {
         viewBox="0 0 480 320"
         className="w-full h-auto"
         xmlns="http://www.w3.org/2000/svg"
+        role="img"
+        aria-label="Illustration of a LaundroCFO dashboard on a monitor, with sample store value, EBITDA, DSCR, score metrics, and revenue charts."
       >
+        <title>LaundroCFO dashboard illustration</title>
         {/* Monitor frame */}
         <rect x="40" y="20" width="400" height="260" rx="8" fill="#0a1628" stroke="#1e3a5f" strokeWidth="1.5" />
         <rect x="48" y="28" width="384" height="220" rx="4" fill="#0f1e3d" />

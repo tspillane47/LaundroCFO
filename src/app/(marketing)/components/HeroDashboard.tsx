@@ -296,7 +296,11 @@ export default function HeroDashboard() {
   ];
 
   return (
-    <div className="hero-dashboard relative w-full px-2 sm:px-6 lg:px-10">
+    <div
+      className="hero-dashboard relative w-full px-2 sm:px-6 lg:px-10"
+      role="img"
+      aria-label="Sample LaundroCFO dashboard showing store value of $374,000, EBITDA, DSCR, store score, equipment grade, lease timeline, and twelve-month revenue and utility trends for a laundromat."
+    >
       {/* Left floating cards */}
       <FloatCard
         icon={<FloatIcon type="chart" />}
