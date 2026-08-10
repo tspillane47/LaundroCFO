@@ -7,6 +7,9 @@ import {
 } from "@/lib/access";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
+/** Always evaluate access from the DB on each request — never rely on client cache or RLS alone. */
+export const dynamic = "force-dynamic";
+
 type CreateStoreBody = {
   name?: unknown;
   address?: unknown;
@@ -31,20 +34,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: CreateStoreBody;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  const name = typeof body.name === "string" ? body.name.trim() : "";
-  const address = typeof body.address === "string" ? body.address.trim() : "";
-
-  if (!name) {
-    return NextResponse.json({ error: "Store name is required" }, { status: 400 });
-  }
-
   const [access, storeCount] = await Promise.all([
     getAccessStatus(supabase, user.id),
     getUserStoreCount(supabase, user.id),
@@ -58,6 +47,20 @@ export async function POST(request: Request) {
       },
       { status: 403 }
     );
+  }
+
+  let body: CreateStoreBody;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  const address = typeof body.address === "string" ? body.address.trim() : "";
+
+  if (!name) {
+    return NextResponse.json({ error: "Store name is required" }, { status: 400 });
   }
 
   const { data: existingStores } = await supabase
