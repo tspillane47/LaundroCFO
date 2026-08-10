@@ -1,4 +1,8 @@
 import { MarketingSignupCta } from "../components/MarketingSignupCta";
+import { getPublicBetaMode } from "@/lib/beta-server";
+
+/** Revalidate beta-dependent marketing copy every 60s (see MARKETING_REVALIDATE_SECONDS). */
+export const revalidate = 60;
 
 const beliefs = [
   {
@@ -41,7 +45,9 @@ const audiences = [
   },
 ];
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const betaMode = await getPublicBetaMode();
+
   return (
     <div>
       <section className="pt-32 pb-20 bg-[var(--bg-card)] border-b border-[var(--border)]">
@@ -106,7 +112,10 @@ export default function AboutPage() {
       <section className="py-24 bg-[var(--bg-card)] border-t border-[var(--border)]">
         <div className="max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-[32px] font-bold text-[var(--text-primary)] mb-8">Ready to see what your store is worth?</h2>
-          <MarketingSignupCta className="inline-flex items-center justify-center px-10 py-4 rounded-xl text-[16px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors" />
+          <MarketingSignupCta
+            betaMode={betaMode}
+            className="inline-flex items-center justify-center px-10 py-4 rounded-xl text-[16px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          />
         </div>
       </section>
     </div>

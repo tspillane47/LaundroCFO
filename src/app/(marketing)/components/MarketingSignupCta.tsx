@@ -10,10 +10,19 @@ type MarketingSignupCtaProps = {
   style?: CSSProperties;
   withArrow?: boolean;
   onClick?: () => void;
+  /** When provided (e.g. from a server-rendered marketing page), skips waiting on client fetch. */
+  betaMode?: boolean;
 };
 
-export function MarketingSignupCta({ className, style, withArrow = false, onClick }: MarketingSignupCtaProps) {
-  const { betaMode } = useBetaMode();
+export function MarketingSignupCta({
+  className,
+  style,
+  withArrow = false,
+  onClick,
+  betaMode: betaModeProp,
+}: MarketingSignupCtaProps) {
+  const { betaMode: betaModeHook } = useBetaMode();
+  const betaMode = betaModeProp ?? betaModeHook;
 
   return (
     <Link href="/signup" className={className} style={style} onClick={onClick}>

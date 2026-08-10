@@ -1,8 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PLANS } from "@/lib/config";
 import {
-  BETA_MODE_SETTING_KEY,
-  resolveBetaModeFromQuery,
+  fetchBetaModeSetting,
   type PlanKey,
   type SubscriptionStatus,
 } from "@/lib/beta";
@@ -35,16 +34,6 @@ type SubscriptionRow = {
 function maxStoresForPlan(plan: PlanKey | null): number | null {
   if (!plan) return 0;
   return PLANS[plan]?.maxStores ?? null;
-}
-
-async function fetchBetaMode(supabase: SupabaseClient): Promise<boolean> {
-  const result = await supabase
-    .from("app_settings")
-    .select("value")
-    .eq("key", BETA_MODE_SETTING_KEY)
-    .maybeSingle();
-
-  return resolveBetaModeFromQuery(result);
 }
 
 function parseDate(value: string | null): Date | null {
@@ -130,7 +119,7 @@ export async function getAccessStatus(
   userId: string,
   now = new Date()
 ): Promise<AccessStatus> {
-  const betaMode = await fetchBetaMode(supabase);
+  const betaMode = await fetchBetaModeSetting(supabase);
 
   if (betaMode) {
     return {

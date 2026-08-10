@@ -2,7 +2,16 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import HeroDashboard from "./components/HeroDashboard";
 import { MarketingSignupCta } from "./components/MarketingSignupCta";
-import { MARKETING_FEATURES_HREF } from "@/lib/marketingCta";
+import {
+  getMarketingBottomSubcopy,
+  getMarketingHeroBadge,
+  getMarketingHeroSubcopy,
+  MARKETING_FEATURES_HREF,
+} from "@/lib/marketingCta";
+import { getPublicBetaMode } from "@/lib/beta-server";
+
+/** Revalidate beta-dependent marketing copy every 60s (see MARKETING_REVALIDATE_SECONDS). */
+export const revalidate = 60;
 
 function TrustIcon({ variant }: { variant: "shield" | "chart" | "doc" }) {
   const props = {
@@ -200,7 +209,9 @@ const valuationLines = [
   { label: "− Competition (Heavy)", value: "−0.25x", type: "negative" as const },
 ];
 
-export default function MarketingHomePage() {
+export default async function MarketingHomePage() {
+  const betaMode = await getPublicBetaMode();
+
   return (
     <>
       {/* Hero */}
@@ -217,7 +228,7 @@ export default function MarketingHomePage() {
               <div
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium mb-8 bg-[var(--bg-info-tint)] border border-[var(--border2)] text-[var(--accent-blue)]"
               >
-                Now in Beta — Free Access
+                {getMarketingHeroBadge(betaMode)}
               </div>
 
               <h1 className="text-[36px] lg:text-[56px] font-bold text-[var(--text-primary)] tracking-tight leading-[1.08] mb-6">
@@ -232,6 +243,7 @@ export default function MarketingHomePage() {
 
               <div className="flex flex-col sm:flex-row gap-3 mb-6">
                 <MarketingSignupCta
+                  betaMode={betaMode}
                   withArrow
                   className="inline-flex items-center justify-center px-6 py-3 rounded-lg text-[14px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                   style={{ boxShadow: "0 0 24px color-mix(in srgb, var(--accent-blue) 40%, transparent)" }}
@@ -245,7 +257,7 @@ export default function MarketingHomePage() {
               </div>
 
               <p className="text-[13px] text-[var(--text-muted)] mb-8">
-                No credit card required · Free during beta · Cancel anytime
+                {getMarketingHeroSubcopy(betaMode)}
               </p>
 
               <div className="flex flex-wrap gap-2">
@@ -406,8 +418,11 @@ export default function MarketingHomePage() {
           <h2 className="text-[28px] lg:text-[36px] font-bold text-[var(--text-primary)] mb-3">
             Start tracking your laundromat&apos;s value today.
           </h2>
-          <p className="text-[16px] text-[var(--text-secondary)] mb-8">Free during beta. No credit card required.</p>
-          <MarketingSignupCta className="inline-flex items-center justify-center px-8 py-3 rounded-lg text-[15px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-opacity" />
+          <p className="text-[16px] text-[var(--text-secondary)] mb-8">{getMarketingBottomSubcopy(betaMode)}</p>
+          <MarketingSignupCta
+            betaMode={betaMode}
+            className="inline-flex items-center justify-center px-8 py-3 rounded-lg text-[15px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-opacity"
+          />
           <p className="text-[13px] text-[var(--text-muted)] mt-6">
             Join laundromat owners, brokers, and lenders already using LaundroCFO
           </p>
