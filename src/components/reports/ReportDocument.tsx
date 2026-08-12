@@ -388,6 +388,7 @@ export function ReportDocument(props: ReportProps) {
     insurance,
     portfolioStores,
     store,
+    storeTtm,
     portfolioTtm,
     portfolioCashFlow,
   } = props;

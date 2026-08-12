@@ -157,7 +157,9 @@ function resolveFeedValuation(
     lease: lease ?? null,
     leaseOptions: [],
     realEstate: null,
-    resolvedFinancials: hasTtmFinancials(financials) ? financials : undefined,
+    resolvedFinancials: hasTtmFinancials(financials)
+      ? { ...financials, ttmMonthsUsed: financials.ttmMonthsUsed ?? 0 }
+      : undefined,
   };
 
   const result = computeStoreValuation(ctx);

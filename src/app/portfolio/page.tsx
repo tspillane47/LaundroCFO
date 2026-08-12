@@ -34,6 +34,7 @@ import { AddStoreLink } from "@/components/ui/AddStoreLink";
 import { CopyableEmail } from "@/components/onboarding/CopyableEmail";
 import { FinancialDataConfidenceNote } from "@/components/ui/FinancialDataConfidenceNote";
 import { summarizePortfolioFinancialDataConfidence } from "@/lib/financialDataConfidence";
+import { JOIN_STORE_SETTINGS_HINT } from "@/lib/onboarding";
 import { useOnboardingStatus } from "@/lib/useOnboardingStatus";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";

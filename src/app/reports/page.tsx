@@ -887,7 +887,7 @@ function ReportsPageContent() {
             <PreviewRow label="Est. Store Value" value={fmtDollar(valuation.businessValue)} className="text-green-400 text-[15px] font-bold" />
           </div>
           <FinancialDataConfidenceNote
-            monthsUsed={valuation.resolvedFinancials.ttmMonthsUsed}
+            monthsUsed={storeTtm?.monthsUsed}
             variant="inline"
             className="mt-3"
           />
