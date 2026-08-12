@@ -127,7 +127,7 @@ export default function AdminPage() {
           <div className="section-title mb-1">Beta Mode</div>
           <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
             Controls beta messaging across the app (banner, sidebar badge, pricing copy).
-            Ending beta starts {TRIAL_LENGTH_DAYS}-day trials for users without a subscription.
+            Ending beta starts {TRIAL_LENGTH_DAYS}-day trials for store owners without a subscription. Users on the join-store path are skipped.
           </p>
         </div>
 
@@ -198,7 +198,7 @@ export default function AdminPage() {
       {confirmEndBetaOpen && (
         <ConfirmDialog
           title="End beta and start trials?"
-          description={`This will turn off beta messaging and create ${TRIAL_LENGTH_DAYS}-day trialing subscriptions (Starter plan) for every user who does not already have one. Existing trial countdowns cannot be silently undone.`}
+          description={`This will turn off beta messaging and create ${TRIAL_LENGTH_DAYS}-day trialing subscriptions (Starter plan) for every store owner who does not already have one. Users who chose the join-store onboarding path are excluded. Existing trial countdowns cannot be silently undone.`}
           confirmLabel="End Beta — Start Trials"
           confirming={submitting}
           onCancel={() => setConfirmEndBetaOpen(false)}

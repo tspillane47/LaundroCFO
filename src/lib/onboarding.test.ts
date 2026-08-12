@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getOnboardingStatus,
+  isEligibleForAutoTrial,
   isJoiningOnboardingPath,
   isOnboardingComplete,
   type OnboardingProfile,
@@ -91,5 +92,12 @@ describe("onboarding status", () => {
     expect(isJoiningOnboardingPath("join")).toBe(true);
     expect(isJoiningOnboardingPath("own")).toBe(false);
     expect(isJoiningOnboardingPath(null)).toBe(false);
+  });
+
+  it("excludes join-path users from automatic trial grants", () => {
+    expect(isEligibleForAutoTrial({ onboarding_path: "join" })).toBe(false);
+    expect(isEligibleForAutoTrial({ onboarding_path: "own" })).toBe(true);
+    expect(isEligibleForAutoTrial({ onboarding_path: null })).toBe(true);
+    expect(isEligibleForAutoTrial(null)).toBe(true);
   });
 });

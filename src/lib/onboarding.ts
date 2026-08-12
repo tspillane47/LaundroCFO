@@ -96,3 +96,13 @@ export async function completeOnboarding(
 export function isJoiningOnboardingPath(path: OnboardingPath | null | undefined): boolean {
   return path === "join";
 }
+
+/** Join-path users are waiting for co-owner access, not their own store subscription. */
+export function isEligibleForAutoTrial(
+  profile: Pick<OnboardingProfile, "onboarding_path"> | null | undefined
+): boolean {
+  return !isJoiningOnboardingPath(profile?.onboarding_path);
+}
+
+export const JOIN_PATH_STORE_CREATION_MESSAGE =
+  "You're set up to join a store someone else owns. Ask the store owner to add you in Settings → Manage Access, or choose \"Set up your own store\" from Portfolio to switch paths.";

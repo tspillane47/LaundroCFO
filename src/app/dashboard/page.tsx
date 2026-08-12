@@ -574,7 +574,10 @@ export default function DashboardPage() {
             </div>
           ) : null}
           <div className="text-center">
-            <AddStoreLink className="text-[13px] font-medium underline underline-offset-2">
+            <AddStoreLink
+              className="text-[13px] font-medium underline underline-offset-2"
+              href="/onboarding?add=true&switch=own"
+            >
               Or set up your own store instead
             </AddStoreLink>
           </div>

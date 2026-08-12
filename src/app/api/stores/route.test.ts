@@ -4,6 +4,7 @@ import type { AccessStatus } from "@/lib/access";
 const getUserMock = vi.fn();
 const getAccessStatusMock = vi.fn();
 const getUserStoreCountMock = vi.fn();
+const fetchOnboardingProfileMock = vi.fn();
 
 vi.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: vi.fn(async () => ({
@@ -11,6 +12,15 @@ vi.mock("@/lib/supabase-server", () => ({
     from: vi.fn(),
   })),
 }));
+
+vi.mock("@/lib/onboarding", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/onboarding")>();
+  return {
+    ...actual,
+    fetchOnboardingProfile: (...args: Parameters<typeof actual.fetchOnboardingProfile>) =>
+      fetchOnboardingProfileMock(...args),
+  };
+});
 
 vi.mock("@/lib/access", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/access")>();
@@ -63,6 +73,7 @@ describe("POST /api/stores", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getUserMock.mockResolvedValue({ data: { user: { id: USER_ID } } });
+    fetchOnboardingProfileMock.mockResolvedValue({ onboarding_completed: true, onboarding_path: "own" });
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -73,6 +84,23 @@ describe("POST /api/stores", () => {
 
     expect(response.status).toBe(401);
     expect(payload).toEqual({ error: "Unauthorized" });
+    expect(getAccessStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 with join_path for users on the join onboarding path", async () => {
+    fetchOnboardingProfileMock.mockResolvedValue({
+      onboarding_completed: true,
+      onboarding_path: "join",
+    });
+    getAccessStatusMock.mockResolvedValue(activeStarterAccess);
+    getUserStoreCountMock.mockResolvedValue(0);
+
+    const response = await POST(createPostRequest());
+    const payload = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(payload.error).toBe("join_path");
+    expect(payload.message).toContain("join a store someone else owns");
     expect(getAccessStatusMock).not.toHaveBeenCalled();
   });
 

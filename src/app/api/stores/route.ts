@@ -5,6 +5,11 @@ import {
   getUserStoreCount,
   storeCreationBlockedMessage,
 } from "@/lib/access";
+import {
+  fetchOnboardingProfile,
+  isJoiningOnboardingPath,
+  JOIN_PATH_STORE_CREATION_MESSAGE,
+} from "@/lib/onboarding";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 /** Always evaluate access from the DB on each request — never rely on client cache or RLS alone. */
@@ -32,6 +37,17 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const profile = await fetchOnboardingProfile(supabase, user.id);
+  if (isJoiningOnboardingPath(profile?.onboarding_path)) {
+    return NextResponse.json(
+      {
+        error: "join_path",
+        message: JOIN_PATH_STORE_CREATION_MESSAGE,
+      },
+      { status: 403 }
+    );
   }
 
   const [access, storeCount] = await Promise.all([

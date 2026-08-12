@@ -519,7 +519,10 @@ export default function PortfolioPage() {
           <p className="text-[13px] max-w-md mb-8" style={{ color: "var(--text-secondary)" }}>
             Once the owner adds you, refresh this page and their store will appear in your portfolio.
           </p>
-          <AddStoreLink className="text-[13px] font-medium underline underline-offset-2">
+          <AddStoreLink
+            className="text-[13px] font-medium underline underline-offset-2"
+            href="/onboarding?add=true&switch=own"
+          >
             Or set up your own store instead
           </AddStoreLink>
         </div>

@@ -13,6 +13,7 @@ type AddStoreLinkProps = {
   style?: React.CSSProperties;
   children?: React.ReactNode;
   firstStore?: boolean;
+  href?: string;
 };
 
 export function AddStoreLink({
@@ -20,12 +21,13 @@ export function AddStoreLink({
   style,
   children = "+ Add Store",
   firstStore = false,
+  href,
 }: AddStoreLinkProps) {
   const { plan, maxStores, storeCount, loading } = useAccessStatus();
   const { canWrite } = useWriteGuard();
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
 
-  const href = firstStore ? "/onboarding" : "/onboarding?add=true";
+  const linkHref = href ?? (firstStore ? "/onboarding" : "/onboarding?add=true");
   const atLimit = !loading && maxStores !== null && storeCount >= maxStores;
 
   if (loading) {
@@ -44,7 +46,7 @@ export function AddStoreLink({
   if (!canWrite) {
     return (
       <ReadOnlyGuard align="end">
-        <Link href={href} className={className} style={style}>
+        <Link href={linkHref} className={className} style={style}>
           {children}
         </Link>
       </ReadOnlyGuard>
@@ -75,7 +77,7 @@ export function AddStoreLink({
   }
 
   return (
-    <Link href={href} className={className} style={style}>
+    <Link href={linkHref} className={className} style={style}>
       {children}
     </Link>
   );

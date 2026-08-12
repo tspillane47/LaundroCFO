@@ -7,6 +7,7 @@ import {
   DEFAULT_TRIAL_PLAN,
   trialEndsAtFromNow,
 } from "@/lib/beta";
+import { isEligibleForAutoTrial } from "@/lib/onboarding";
 
 async function requireAdmin() {
   const supabase = await createServerSupabaseClient();
@@ -64,8 +65,25 @@ export async function POST() {
       (userId) => !subscribedUserIds.has(userId)
     );
 
-    if (usersWithoutSubscription.length > 0) {
-      const rows = usersWithoutSubscription.map((userId) => ({
+    const { data: onboardingProfiles, error: profilesError } = await admin
+      .from("profiles")
+      .select("id, onboarding_path")
+      .in("id", usersWithoutSubscription);
+
+    if (profilesError) {
+      throw profilesError;
+    }
+
+    const profileByUserId = new Map(
+      (onboardingProfiles ?? []).map((profile) => [profile.id, profile])
+    );
+
+    const usersEligibleForTrial = usersWithoutSubscription.filter((userId) =>
+      isEligibleForAutoTrial(profileByUserId.get(userId) ?? null)
+    );
+
+    if (usersEligibleForTrial.length > 0) {
+      const rows = usersEligibleForTrial.map((userId) => ({
         user_id: userId,
         plan: DEFAULT_TRIAL_PLAN,
         status: "trialing" as const,
@@ -86,7 +104,9 @@ export async function POST() {
     return NextResponse.json({
       ok: true,
       betaMode: false,
-      trialsCreated: usersWithoutSubscription.length,
+      trialsCreated: usersEligibleForTrial.length,
+      trialsSkippedJoinPath:
+        usersWithoutSubscription.length - usersEligibleForTrial.length,
       trialEndsAt,
     });
   } catch (error) {

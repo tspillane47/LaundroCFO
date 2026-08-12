@@ -170,6 +170,7 @@ function OnboardingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isAddingStore = searchParams.get("add") === "true";
+  const switchToOwnPath = searchParams.get("switch") === "own";
   const supabase = createClient();
   const {
     plan: accessPlan,
@@ -250,6 +251,10 @@ function OnboardingContent() {
 
       setUserEmail(user.email ?? "");
 
+      if (isAddingStore && switchToOwnPath) {
+        await completeOnboarding(supabase, user.id, "own");
+      }
+
       const completed = await isOnboardingComplete(supabase, user.id);
 
       if (cancelled) return;
@@ -276,7 +281,7 @@ function OnboardingContent() {
     return () => {
       cancelled = true;
     };
-  }, [router, supabase, isAddingStore, accessLoading, accessStatus, storeCount, canCreateStore]);
+  }, [router, supabase, isAddingStore, switchToOwnPath, accessLoading, accessStatus, storeCount, canCreateStore]);
 
   async function createStore(): Promise<string | null> {
     const {
