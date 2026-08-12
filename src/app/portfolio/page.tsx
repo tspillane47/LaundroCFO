@@ -32,7 +32,8 @@ import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { AddStoreLink } from "@/components/ui/AddStoreLink";
 import { CopyableEmail } from "@/components/onboarding/CopyableEmail";
-import { JOIN_STORE_SETTINGS_HINT } from "@/lib/onboarding";
+import { FinancialDataConfidenceNote } from "@/components/ui/FinancialDataConfidenceNote";
+import { summarizePortfolioFinancialDataConfidence } from "@/lib/financialDataConfidence";
 import { useOnboardingStatus } from "@/lib/useOnboardingStatus";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
@@ -292,6 +293,7 @@ export default function PortfolioPage() {
         hasFinancialData && storeTtm && storeTtm.monthsUsed > 0
           ? storeTtm.ttmEbitda / storeTtm.monthsUsed
           : 0;
+      const ttmMonthsUsed = storeValuation?.resolvedFinancials?.ttmMonthsUsed ?? storeTtm?.monthsUsed ?? 0;
       const annualEbitda = hasFinancialData ? (storeTtm?.ttmEbitda ?? 0) : 0;
       const debtService = hasFinancialData ? (scheduledDebtServiceByStore[store.id] ?? 0) : 0;
       const dscr = computePortfolioStoreDscr(storeTtm, debtService);
@@ -330,6 +332,7 @@ export default function PortfolioPage() {
         debtService,
         hasDscrWarning: hasFinancialData && shouldTriggerLowDscrAlert(dscr, debtService),
         hasFinancialData,
+        ttmMonthsUsed,
       };
     });
   }, [stores, leases, valuationByStoreId, scheduledDebtServiceByStore, portfolioTtmSummary]);
@@ -351,6 +354,9 @@ export default function PortfolioPage() {
     const acquisitionCapacity = (availableMonthlyCashFlow * 12) / 0.12;
     const portfolioEquity = computePortfolioEquity(totalPortfolioValue, totalDebt, totalCash);
     const hasAnyFinancialData = withFinancials.length > 0;
+    const portfolioConfidenceSummary = summarizePortfolioFinancialDataConfidence(
+      withFinancials.map((m) => m.ttmMonthsUsed)
+    );
 
     return {
       totalPortfolioValue,
@@ -369,6 +375,7 @@ export default function PortfolioPage() {
       hasDebtData,
       portfolioEquity,
       hasAnyFinancialData,
+      portfolioConfidenceSummary,
     };
   }, [storeMetrics, stores, totalDebt, buildingMortgageTotal, realEstateTotal, totalAnnualDebtServiceFromLoans, portfolioTtmSummary]);
 
@@ -657,6 +664,11 @@ export default function PortfolioPage() {
             </div>
           </div>
         </div>
+        <FinancialDataConfidenceNote
+          portfolioSummary={aggregates.portfolioConfidenceSummary}
+          variant="hero"
+          className="mt-3"
+        />
       </div>
 
       {/* KPI Row - 8 cards */}
@@ -847,6 +859,7 @@ export default function PortfolioPage() {
                   </div>
                 ))}
               </div>
+              <FinancialDataConfidenceNote monthsUsed={m.ttmMonthsUsed} variant="compact" />
 
               <div className="text-[11px] mb-4" style={{ color: "var(--text-muted)" }}>
                 Cash: {m.hasFinancialData ? fmtDollar(m.storeCash) : "—"}

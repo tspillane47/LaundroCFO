@@ -50,6 +50,7 @@ import { JOIN_STORE_SETTINGS_HINT } from "@/lib/onboarding";
 import { useOnboardingStatus } from "@/lib/useOnboardingStatus";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { DSCRCard } from "@/components/ui/DSCRCard";
+import { FinancialDataConfidenceNote } from "@/components/ui/FinancialDataConfidenceNote";
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { CashCard } from "@/components/ui/CashCard";
 import { PageError } from "@/components/ui/PageError";
@@ -350,6 +351,8 @@ export default function DashboardPage() {
   const avgEquipmentAge = store?.avg_machine_age ?? 0;
   const equipmentScore = calcEquipmentScore(avgEquipmentAge);
   const machines = (store?.washers ?? 0) + (store?.dryers ?? 0);
+
+  const ttmMonthsUsed = resolvedFinancials?.ttmMonthsUsed ?? ttm.monthsUsed;
 
   const estimatedValue =
     valuation && hasFinancialData ? Math.round(valuation.businessValue) : 0;
@@ -687,6 +690,7 @@ export default function DashboardPage() {
             </span>
           </div>
         )}
+        <FinancialDataConfidenceNote monthsUsed={ttmMonthsUsed} variant="hero" className="mt-2" />
         <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', marginTop: '12px', lineHeight: 1.6 }}>
           {hasFinancialData
             ? `Based on ${fmtMultiple(finalMultiple)} EBITDA multiple · Equipment grade B · ${leaseMetrics ? `${leaseMetrics.yearsRemaining.toFixed(1)}yr lease` : "—"} · ${sqft.toLocaleString()} SF`
@@ -702,6 +706,7 @@ export default function DashboardPage() {
           dscr={dscrNum}
           scheduledAnnualDebtService={debtService}
           hasFinancialData={hasFinancialData}
+          ttmMonthsUsed={ttmMonthsUsed}
         />
 
         <KpiCard

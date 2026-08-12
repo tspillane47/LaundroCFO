@@ -27,6 +27,7 @@ import {
   getUnderwritingFlags,
 } from "@/lib/real-estate-calculations";
 import { getStoreValuation } from "@/lib/getStoreValuation";
+import { FinancialDataConfidenceNote } from "@/components/ui/FinancialDataConfidenceNote";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { useWriteGuard } from "@/lib/useWriteGuard";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -233,6 +234,7 @@ export function RealEstateModule({ store }: Props) {
 
   const [record, setRecord] = useState<RealEstate | null>(null);
   const [businessValue, setBusinessValue] = useState<number | null>(null);
+  const [valuationDataMonths, setValuationDataMonths] = useState(0);
   const [form, setForm] = useState<RealEstateForm>(emptyForm(store.address));
 
   function setField<K extends keyof RealEstateForm>(field: K, value: RealEstateForm[K]) {
@@ -263,6 +265,7 @@ export function RealEstateModule({ store }: Props) {
     }
 
     setBusinessValue(valuation.businessValue);
+    setValuationDataMonths(valuation.resolvedFinancials.ttmMonthsUsed);
     setLoading(false);
   }
 
@@ -629,6 +632,7 @@ export function RealEstateModule({ store }: Props) {
                 color="text-blue-300"
               />
             </div>
+            <FinancialDataConfidenceNote monthsUsed={valuationDataMonths} variant="inline" className="mt-3" />
           </div>
 
           {metrics.flags.length > 0 && (

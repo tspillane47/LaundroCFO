@@ -37,6 +37,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
+import { FinancialDataConfidenceNote } from "@/components/ui/FinancialDataConfidenceNote";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { useWriteGuard } from "@/lib/useWriteGuard";
 import { findNegativeFieldError } from "@/lib/formHelpers";
@@ -765,6 +766,7 @@ export default function DebtPage() {
         >
           Store Value {fmtDollar(totals.storeValue)} − Total Debt {fmtDollar(totals.totalDebt)}
         </div>
+        <FinancialDataConfidenceNote monthsUsed={ttm.monthsUsed} variant="hero" className="mt-2" />
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
           <span
             style={{
@@ -1070,6 +1072,7 @@ export default function DebtPage() {
       {/* Section 5 — DSCR */}
       <div>
         <div className="section-title mb-4">DSCR</div>
+        <FinancialDataConfidenceNote monthsUsed={ttm.monthsUsed} variant="inline" className="mb-4" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="card">
             <div className="metric-label">

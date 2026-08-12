@@ -246,6 +246,7 @@ describe("generateStoreFeed unified evaluator", () => {
         monthlyRevenue: 50000,
         monthlyExpenses: 39000,
         annualEbitda: 132000,
+        ttmMonthsUsed: 12,
         source: "ttm",
       },
       ttmRevenue: 600000,
@@ -271,6 +272,7 @@ describe("generateStoreFeed unified evaluator", () => {
         monthlyRevenue: 50000,
         monthlyExpenses: 39000,
         annualEbitda: 132000,
+        ttmMonthsUsed: 12,
         source: "ttm",
       },
       ttmRevenue: 600000,
@@ -296,6 +298,7 @@ describe("generateStoreFeed unified evaluator", () => {
         monthlyRevenue: 50000,
         monthlyExpenses: 39000,
         annualEbitda: 132000,
+        ttmMonthsUsed: 12,
         source: "ttm",
       },
       valuation: canonical,
@@ -312,6 +315,7 @@ describe("generateStoreFeed unified evaluator", () => {
       monthlyRevenue: 50000,
       monthlyExpenses: 39000,
       annualEbitda: 132000,
+      ttmMonthsUsed: 12,
       source: "ttm" as const,
     };
 

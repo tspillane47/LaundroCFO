@@ -11,6 +11,7 @@ import {
 } from "@/lib/getStoreValuation";
 import { useStores } from "@/lib/store-context";
 import { MetricCard } from "@/components/ui/MetricCard";
+import { FinancialDataConfidenceNote } from "@/components/ui/FinancialDataConfidenceNote";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import {
   MANUFACTURERS,
@@ -104,6 +105,7 @@ export default function EquipmentPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
   const [annualEbitda, setAnnualEbitda] = useState(0);
+  const [ttmMonthsUsed, setTtmMonthsUsed] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EquipmentForm>(EMPTY_FORM);
@@ -127,6 +129,7 @@ export default function EquipmentPage() {
         setStore(null);
         setEquipment([]);
         setAnnualEbitda(0);
+        setTtmMonthsUsed(0);
         return;
       }
 
@@ -146,6 +149,7 @@ export default function EquipmentPage() {
           ? valuation.resolvedFinancials.annualEbitda
           : 0
       );
+      setTtmMonthsUsed(valuation.resolvedFinancials.ttmMonthsUsed);
 
       const { data: equipmentData, error: equipmentError } = await supabase
         .from("equipment_inventory")
@@ -711,6 +715,7 @@ export default function EquipmentPage() {
                 <div className="text-[11px] text-[var(--text-muted)] mt-1">
                   {formatAdjustment(metrics.totalEquipmentAdjustment)} × {fmtDollar(annualEbitda)} EBITDA
                 </div>
+                <FinancialDataConfidenceNote monthsUsed={ttmMonthsUsed} variant="compact" className="mt-2" />
               </div>
 
               {/* Visual indicator */}

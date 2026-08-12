@@ -4,6 +4,10 @@ import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import { DSCR_NO_DEBT_LABEL } from "@/lib/calculations";
 import type { PortfolioReportData } from "@/lib/getPortfolioReport";
 import { formatDscrDisplay } from "@/lib/financials";
+import {
+  getPortfolioFinancialDataConfidenceMessage,
+  summarizePortfolioFinancialDataConfidence,
+} from "@/lib/financialDataConfidence";
 import { PdfPageChrome } from "@/components/reports/PdfPageChrome";
 import { PdfMetricGrid, PdfMetricTile } from "@/components/reports/PdfMetricGrid";
 
@@ -231,6 +235,9 @@ function CoverInfoCol({ label, value }: { label: string; value: string }) {
 
 export function PortfolioReportDocument({ data, generatedDate, userEmail }: PortfolioReportProps) {
   const { totals, cashFlow, storeDetails } = data;
+  const portfolioConfidenceSummary = summarizePortfolioFinancialDataConfidence(
+    storeDetails.map((detail) => detail.valuation.resolvedFinancials?.ttmMonthsUsed ?? 0)
+  );
 
   return (
     <Document
@@ -267,6 +274,12 @@ export function PortfolioReportDocument({ data, generatedDate, userEmail }: Port
           <Text style={styles.coverHeroLabel}>Portfolio Net Worth</Text>
           <Text style={styles.coverHeroValue}>{fmtCurrency(totals.portfolioNetWorth)}</Text>
         </View>
+
+        {portfolioConfidenceSummary ? (
+          <Text style={[styles.coverFooter, { marginBottom: 12, color: "#cbd5e1" }]}>
+            {getPortfolioFinancialDataConfidenceMessage(portfolioConfidenceSummary)}
+          </Text>
+        ) : null}
 
         <Text style={styles.coverFooter}>
           CONFIDENTIAL — Prepared for lender review. Not for public distribution.

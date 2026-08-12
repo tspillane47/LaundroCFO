@@ -15,6 +15,8 @@ export type ResolvedStoreFinancials = {
   monthlyRevenue: number;
   monthlyExpenses: number;
   annualEbitda: number;
+  /** Count of monthly_financials rows used for TTM (0 when source is none). */
+  ttmMonthsUsed: number;
   source: "ttm" | "none";
 };
 
@@ -87,6 +89,7 @@ export function resolveStoreFinancials(
       monthlyRevenue: Number.isFinite(monthlyRevenue) ? monthlyRevenue : 0,
       monthlyExpenses: Number.isFinite(monthlyExpenses) ? monthlyExpenses : 0,
       annualEbitda: Number.isFinite(ttm.ttmEbitda) ? ttm.ttmEbitda : 0,
+      ttmMonthsUsed: ttm.monthsUsed,
       source: "ttm",
     };
   }
@@ -95,6 +98,7 @@ export function resolveStoreFinancials(
     monthlyRevenue: 0,
     monthlyExpenses: 0,
     annualEbitda: 0,
+    ttmMonthsUsed: 0,
     source: "none",
   };
 }

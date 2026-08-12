@@ -32,6 +32,7 @@ import {
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageError } from "@/components/ui/PageError";
+import { FinancialDataConfidenceNote } from "@/components/ui/FinancialDataConfidenceNote";
 import { DesktopOnlyGate } from "@/components/ui/DesktopOnlyGate";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
@@ -505,6 +506,11 @@ function ScenariosPageContent() {
           <div className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider mb-2">
             Key Metrics
           </div>
+          <FinancialDataConfidenceNote
+            monthsUsed={ctx.resolvedFinancials?.ttmMonthsUsed}
+            variant="inline"
+            className="mb-3"
+          />
           <div className="grid grid-cols-2 gap-2 mb-4">
             <MetricTile label="Current Value" value={fmtDollar(liveScenario.currentValue)} />
             <MetricTile

@@ -18,6 +18,7 @@ import {
   fmtPct,
 } from "@/lib/calculations";
 import { formatDscrDisplay, type PortfolioTtmCashFlow, type PortfolioTtmSummary, type TtmMetrics } from "@/lib/financials";
+import { getFinancialDataConfidenceMessage, needsFinancialDataConfidenceNote } from "@/lib/financialDataConfidence";
 import type { ValuationResult } from "@/lib/valuation";
 import { PdfPageChrome } from "@/components/reports/PdfPageChrome";
 import { PdfMetricGrid, PdfMetricTile, PdfScorecard, PdfScorecardRow } from "@/components/reports/PdfMetricGrid";
@@ -408,6 +409,11 @@ export function ReportDocument(props: ReportProps) {
         {m.address ? <Text style={styles.coverMeta}>{m.address}</Text> : null}
         <Text style={styles.coverValue}>{fmtDollar(m.valuation.businessValue)}</Text>
         <Text style={{ color: '#374151', fontSize: 14 }}>Estimated Business Value</Text>
+        {needsFinancialDataConfidenceNote(storeTtm?.monthsUsed) ? (
+          <Text style={[styles.coverMeta, { marginTop: 8, maxWidth: 420 }]}>
+            {getFinancialDataConfidenceMessage(storeTtm!.monthsUsed)}
+          </Text>
+        ) : null}
         <View style={styles.coverBadge}>
           <Text>{fmtMultiple(m.valuation.finalMultiple)} EBITDA Multiple</Text>
         </View>
@@ -702,6 +708,11 @@ export function ReportDocument(props: ReportProps) {
       <Page size="LETTER" style={styles.page}>
         <Text style={styles.sectionTitle}>Valuation Analysis</Text>
         <Text style={styles.bodyText}>EBITDA multiple model with equipment, lease, market, and operations adjustments.</Text>
+        {needsFinancialDataConfidenceNote(storeTtm?.monthsUsed) ? (
+          <Text style={[styles.bodyText, { color: "#64748b" }]}>
+            {getFinancialDataConfidenceMessage(storeTtm!.monthsUsed)}
+          </Text>
+        ) : null}
         <SectionHeader>Multiple Build-Up</SectionHeader>
         <DataRow label="Base Multiple" value={fmtMultiple(m.valuation.baseMultiple)} />
         {m.valuation.adjustments.map((adj) => (

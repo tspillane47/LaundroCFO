@@ -25,6 +25,7 @@ import {
 } from "@/lib/calculations";
 import type { ReportProps } from "@/components/reports/ReportDocument";
 import { generateExecutiveSummary } from "@/components/reports/generateExecutiveSummary";
+import { FinancialDataConfidenceNote } from "@/components/ui/FinancialDataConfidenceNote";
 import { getPortfolioReport, type PortfolioReportData } from "@/lib/getPortfolioReport";
 import {
   buildPortfolioTtmCashFlow,
@@ -885,6 +886,11 @@ function ReportsPageContent() {
             <PreviewRow label="Multiple Applied" value={fmtMultiple(valuation.finalMultiple)} className="text-blue-300" />
             <PreviewRow label="Est. Store Value" value={fmtDollar(valuation.businessValue)} className="text-green-400 text-[15px] font-bold" />
           </div>
+          <FinancialDataConfidenceNote
+            monthsUsed={valuation.resolvedFinancials.ttmMonthsUsed}
+            variant="inline"
+            className="mt-3"
+          />
         </div>
         <div className="card">
           <SectionHeading>Financeability</SectionHeading>

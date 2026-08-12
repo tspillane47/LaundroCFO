@@ -2,12 +2,14 @@
 
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
+import { FinancialDataConfidenceNote } from "@/components/ui/FinancialDataConfidenceNote";
 import { DSCR_NO_DEBT_LABEL, getDscrSubtext, getDscrValueColor } from "@/lib/dscr";
 
 type DSCRCardProps = {
   dscr: number | null;
   scheduledAnnualDebtService: number;
   hasFinancialData?: boolean;
+  ttmMonthsUsed?: number | null;
   className?: string;
   style?: React.CSSProperties;
   /** Financials metric row uses plain `.card` without KPI padding. */
@@ -19,6 +21,7 @@ export function DSCRCard({
   dscr,
   scheduledAnnualDebtService,
   hasFinancialData = true,
+  ttmMonthsUsed,
   className,
   style,
   compact = false,
@@ -83,6 +86,7 @@ export function DSCRCard({
           {sub}
         </div>
       ) : null}
+      <FinancialDataConfidenceNote monthsUsed={ttmMonthsUsed} variant="compact" className="mt-1" />
     </div>
   );
 }

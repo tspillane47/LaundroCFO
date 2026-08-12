@@ -35,6 +35,7 @@ import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
 import { Disclaimer, DisclaimerLabel } from "@/components/ui/Disclaimer";
+import { FinancialDataConfidenceNote } from "@/components/ui/FinancialDataConfidenceNote";
 
 type MarketDensity = "urban" | "suburban" | "average" | "rural";
 type RevenueTrend = "growing" | "stable" | "declining";
@@ -531,6 +532,8 @@ export default function ValuationPage() {
   const equipmentValAdj = sumCategoryAdj(valuation, "equipment");
   const leaseValAdj = sumCategoryAdj(valuation, "lease");
 
+  const ttmMonthsUsed = valuationContext?.resolvedFinancials?.ttmMonthsUsed ?? 0;
+
   const ebitdaMargin = useMemo(() => {
     const annualRevenue = monthlyRevenue * 12;
     return annualRevenue > 0 ? (annualEbitda / annualRevenue) * 100 : 0;
@@ -661,6 +664,7 @@ export default function ValuationPage() {
           <ValueChangeIndicator value={valuation.businessValue} />
         </div>
         <Disclaimer variant="valuation" className="!text-[var(--text-secondary)] max-w-xl" />
+        <FinancialDataConfidenceNote monthsUsed={ttmMonthsUsed} variant="hero" className="mt-2" />
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
           <span style={{ background: 'rgba(59,130,246,0.15)', color: '#93c5fd', padding: '4px 12px', borderRadius: '20px', fontSize: '14px', fontWeight: 600 }}>
             <AnimatedNumber value={valuation.finalMultiple} decimals={2} suffix="x" duration={1000} /> EBITDA Multiple
@@ -865,6 +869,11 @@ export default function ValuationPage() {
               <div className="text-[11px] text-[var(--text-muted)] tabular-nums">
                 × Annual EBITDA: {fmtDollar(annualEbitda)}
               </div>
+              <FinancialDataConfidenceNote
+                monthsUsed={ttmMonthsUsed}
+                variant="inline"
+                className="text-right"
+              />
               <div className="text-[17px] font-bold text-green-400 tabular-nums">
                 = Business Value: {fmtDollar(valuation.businessValue)}
               </div>
@@ -906,6 +915,7 @@ export default function ValuationPage() {
                   {fmtDollar(annualEbitda)}
                 </span>
               </div>
+              <FinancialDataConfidenceNote monthsUsed={ttmMonthsUsed} variant="compact" />
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[10px] text-[var(--text-muted)]">
                   <DisclaimerLabel>EBITDA Margin</DisclaimerLabel>

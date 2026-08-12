@@ -1,6 +1,7 @@
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import { calcEbitdaMargin, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import type { TtmMetrics } from "@/lib/financials";
+import { getFinancialDataConfidenceMessage, needsFinancialDataConfidenceNote } from "@/lib/financialDataConfidence";
 import type { ValuationResult } from "@/lib/valuation";
 
 function parseDate(value: string | null | undefined): Date | null {
@@ -122,6 +123,10 @@ export function generateExecutiveSummary({
 
   if (valuation.valueRisks.length > 0) {
     parts.push(`Key underwriting consideration: ${valuation.valueRisks[0]}.`);
+  }
+
+  if (needsFinancialDataConfidenceNote(storeTtm?.monthsUsed)) {
+    parts.push(getFinancialDataConfidenceMessage(storeTtm!.monthsUsed));
   }
 
   return parts.join(" ");

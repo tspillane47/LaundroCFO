@@ -5,6 +5,7 @@ import {
   getNextRentEscalation,
 } from "@/lib/rent-escalation";
 import { computeStoreDscr, hasScheduledDebtService, shouldTriggerLowDscrAlert } from "@/lib/dscr";
+import { appendFinancialDataConfidenceNote } from "@/lib/financialDataConfidence";
 import {
   computeStoreValuation,
   resolveStoreFinancials,
@@ -29,6 +30,7 @@ export type StoreFeedFinancials = {
   monthlyRevenue: number;
   monthlyExpenses: number;
   annualEbitda: number;
+  ttmMonthsUsed?: number;
   source: 'ttm' | 'none';
 };
 
@@ -287,7 +289,10 @@ export function generateStoreFeed(
       category: 'valuation',
       icon: '💎',
       headline: `Store valuation: $${Math.round(feedValuation.businessValue).toLocaleString()}`,
-      description: `Based on ${feedValuation.finalMultiple.toFixed(2)}x EBITDA multiple. Update equipment and lease data to refine this estimate.`,
+      description: appendFinancialDataConfidenceNote(
+        `Based on ${feedValuation.finalMultiple.toFixed(2)}x EBITDA multiple. Update equipment and lease data to refine this estimate.`,
+        financials?.ttmMonthsUsed
+      ),
       severity: 'info',
       storeName: store.name,
     });

@@ -17,6 +17,7 @@ import {
   type TransactionType,
 } from "@/lib/financials";
 import { getStoreValuation, invalidateValuationCache } from "@/lib/getStoreValuation";
+import { getFinancialDataConfidenceMessage, needsFinancialDataConfidenceNote } from "@/lib/financialDataConfidence";
 import { canAddStore, storeCreationBlockedMessage } from "@/lib/access";
 import { useAccessStatus, invalidateAccessStatusCache } from "@/lib/useAccessStatus";
 import {
@@ -217,6 +218,7 @@ function OnboardingContent() {
   >([]);
   const [hasValuationEstimate, setHasValuationEstimate] = useState(false);
   const [estimatedValue, setEstimatedValue] = useState(0);
+  const [valuationDataMonths, setValuationDataMonths] = useState(0);
   const [ready, setReady] = useState(false);
   const [completing, setCompleting] = useState(false);
 
@@ -560,6 +562,7 @@ function OnboardingContent() {
 
     let nextHasEstimate = hasValuationEstimate;
     let nextEstimate = estimatedValue;
+    let nextValuationDataMonths = valuationDataMonths;
 
     if (!skip && form.financialMode) {
       const ok = await saveFinancials(storeId);
@@ -575,7 +578,15 @@ function OnboardingContent() {
           if (valuation.businessValue > 0) {
             nextEstimate = valuation.businessValue;
             nextHasEstimate = true;
+            nextValuationDataMonths = valuation.resolvedFinancials.ttmMonthsUsed;
           }
+        }
+      } else {
+        const valuation = await getStoreValuation(storeId);
+        nextValuationDataMonths = valuation.resolvedFinancials.ttmMonthsUsed;
+        if (valuation.businessValue > 0) {
+          nextEstimate = valuation.businessValue;
+          nextHasEstimate = true;
         }
       }
     }
@@ -583,6 +594,7 @@ function OnboardingContent() {
     setBusy(false);
     setEstimatedValue(nextEstimate);
     setHasValuationEstimate(nextHasEstimate);
+    setValuationDataMonths(nextValuationDataMonths);
     setSlideDirection("left");
     setSlideKey((k) => k + 1);
     setShowCompletion(true);
@@ -851,7 +863,11 @@ function OnboardingContent() {
                   </h1>
                   <p className="text-[15px] text-[var(--text-secondary)] mb-8 max-w-md mx-auto">
                     {hasValuationEstimate
-                      ? `Based on what you've shared so far, your preliminary business value estimate is ${fmtDollar(estimatedValue)}. Finish setup to refine this on the Valuation page.`
+                      ? `Based on what you've shared so far, your preliminary business value estimate is ${fmtDollar(estimatedValue)}. Finish setup to refine this on the Valuation page.${
+                          needsFinancialDataConfidenceNote(valuationDataMonths)
+                            ? ` ${getFinancialDataConfidenceMessage(valuationDataMonths)}`
+                            : ""
+                        }`
                       : isAddingStore
                         ? "Your new store is in your portfolio — add more data anytime to unlock its full valuation."
                         : "Great start — we'll walk you through a few optional steps to unlock your full dashboard."}
