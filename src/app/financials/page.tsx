@@ -1507,6 +1507,7 @@ export default function FinancialsPage() {
                 <div>
                   <div className="metric-label mb-1.5">Year</div>
                   <select
+                    id="financials-selectedyear"
                     value={selectedYear}
                     onChange={(e) => {
                       setSelectedYear(Number(e.target.value));
@@ -1571,6 +1572,7 @@ export default function FinancialsPage() {
                   <div key={key}>
                     <div className="metric-label mb-1.5">{label}</div>
                     <input
+                      id="financials-formfield"
                       type="number"
                       value={form[key] === 0 && key !== "revenue" ? "" : form[key]}
                       onChange={(e) => setFormField(key, e.target.value)}
@@ -2321,6 +2323,7 @@ export default function FinancialsPage() {
               <label className="btn-outline cursor-pointer">
                 Upload CSV
                 <input
+                  id="financials-input"
                   type="file"
                   accept=".csv"
                   className="hidden"
@@ -2612,6 +2615,7 @@ export default function FinancialsPage() {
                     <tr key={idx} className="border-b border-[var(--border)]">
                       <td className="py-2.5 pr-4">
                         <input
+                          id="financials-qbmappings"
                           type="text"
                           value={row.qb_account_name}
                           onChange={(e) =>
@@ -2625,6 +2629,7 @@ export default function FinancialsPage() {
                       </td>
                       <td className="py-2.5">
                         <select
+                          id="financials-qbmappings-2"
                           value={row.laundrocfo_field}
                           onChange={(e) =>
                             setQbMappings((prev) =>

@@ -672,6 +672,7 @@ export default function UtilitiesPage() {
             <div>
               <div className="metric-label mb-1.5">Year</div>
               <select
+                id="utilities-selectedyear"
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
                 className={clsx(INPUT_CLASS, "w-32")}
@@ -745,6 +746,7 @@ export default function UtilitiesPage() {
               <div key={key}>
                 <div className="metric-label mb-1.5">{label}</div>
                 <input
+                  id="utilities-formfield"
                   type="number"
                   value={form[key] === 0 ? "" : form[key]}
                   onChange={(e) => setFormField(key, e.target.value)}
@@ -758,6 +760,7 @@ export default function UtilitiesPage() {
           <div className="mt-4">
             <div className="metric-label mb-1.5">Notes</div>
             <textarea
+              id="utilities-notes"
               value={form.notes}
               onChange={(e) => setFormField("notes", e.target.value)}
               maxLength={TEXT_LIMITS.notesField}

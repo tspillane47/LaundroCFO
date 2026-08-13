@@ -1158,6 +1158,7 @@ export default function DebtPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <FormField label="Lender Name">
               <input
+                id="debt-lender-name"
                 type="text"
                 value={form.lender_name}
                 onChange={(e) => updateForm("lender_name", e.target.value)}
@@ -1168,6 +1169,7 @@ export default function DebtPage() {
             </FormField>
             <FormField label="Loan Type">
               <select
+                id="debt-loan-type"
                 value={form.loan_type}
                 onChange={(e) => updateForm("loan_type", e.target.value)}
                 className={INPUT_CLASS}
@@ -1181,6 +1183,7 @@ export default function DebtPage() {
             </FormField>
             <FormField label="Original Balance">
               <input
+                id="debt-original-balance"
                 type="text"
                 inputMode="decimal"
                 value={form.original_balance}
@@ -1192,6 +1195,7 @@ export default function DebtPage() {
             </FormField>
             <FormField label="Current Balance">
               <input
+                id="debt-current-balance"
                 type="text"
                 inputMode="decimal"
                 value={form.current_balance}
@@ -1203,6 +1207,7 @@ export default function DebtPage() {
             </FormField>
             <FormField label="Interest Rate (%)">
               <input
+                id="debt-interest-rate"
                 type="text"
                 inputMode="decimal"
                 value={form.interest_rate}
@@ -1214,6 +1219,7 @@ export default function DebtPage() {
             </FormField>
             <FormField label="Monthly Payment">
               <input
+                id="debt-monthly-payment"
                 type="text"
                 inputMode="decimal"
                 value={form.monthly_payment}
@@ -1225,6 +1231,7 @@ export default function DebtPage() {
             </FormField>
             <FormField label="Loan Start Date">
               <input
+                id="debt-loan-start-date"
                 type="date"
                 value={form.loan_start_date}
                 onChange={(e) => updateForm("loan_start_date", e.target.value)}
@@ -1233,6 +1240,7 @@ export default function DebtPage() {
             </FormField>
             <FormField label="Loan End Date">
               <input
+                id="debt-loan-end-date"
                 type="date"
                 value={form.loan_end_date}
                 onChange={(e) => updateForm("loan_end_date", e.target.value)}
@@ -1241,6 +1249,7 @@ export default function DebtPage() {
             </FormField>
             <FormField label="Amortization Term (months)">
               <input
+                id="debt-amortization-term-months"
                 type="text"
                 inputMode="numeric"
                 value={form.amortization_term_months}
@@ -1262,6 +1271,7 @@ export default function DebtPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField label="Balloon Date">
                   <input
+                    id="debt-balloon-date"
                     type="date"
                     value={form.balloon_date}
                     onChange={(e) => updateForm("balloon_date", e.target.value)}
@@ -1270,6 +1280,7 @@ export default function DebtPage() {
                 </FormField>
                 <FormField label="Balloon Amount">
                   <input
+                    id="debt-balloon-amount"
                     type="text"
                     inputMode="decimal"
                     value={form.balloon_amount}
@@ -1285,6 +1296,7 @@ export default function DebtPage() {
 
           <FormField label="Notes" className="mt-4">
             <textarea
+              id="debt-notes"
               value={form.notes}
               onChange={(e) => updateForm("notes", e.target.value)}
               rows={3}

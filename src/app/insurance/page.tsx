@@ -977,6 +977,7 @@ export default function InsurancePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <FormField label="Policy Type" className="col-span-2">
                     <select
+                      id="insurance-select"
                       className={INPUT_CLASS}
                       value={policyForm.policy_type}
                       onChange={(e) => updatePolicyForm("policy_type", e.target.value)}
@@ -990,6 +991,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Carrier">
                     <input
+                      id="insurance-input"
                       className={INPUT_CLASS}
                       value={policyForm.carrier}
                       onChange={(e) => updatePolicyForm("carrier", e.target.value)}
@@ -997,6 +999,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Policy Number">
                     <input
+                      id="insurance-input-2"
                       className={INPUT_CLASS}
                       value={policyForm.policy_number}
                       onChange={(e) => updatePolicyForm("policy_number", e.target.value)}
@@ -1004,6 +1007,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Agent Name">
                     <input
+                      id="insurance-input-3"
                       className={INPUT_CLASS}
                       value={policyForm.agent_name}
                       onChange={(e) => updatePolicyForm("agent_name", e.target.value)}
@@ -1011,6 +1015,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Agency Name">
                     <input
+                      id="insurance-input-4"
                       className={INPUT_CLASS}
                       value={policyForm.agency_name}
                       onChange={(e) => updatePolicyForm("agency_name", e.target.value)}
@@ -1018,6 +1023,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Agent Email">
                     <input
+                      id="insurance-input-5"
                       type="email"
                       className={INPUT_CLASS}
                       value={policyForm.agent_email}
@@ -1026,6 +1032,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Agent Phone">
                     <input
+                      id="insurance-input-6"
                       type="tel"
                       className={INPUT_CLASS}
                       value={policyForm.agent_phone}
@@ -1039,6 +1046,7 @@ export default function InsurancePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <FormField label="Effective Date">
                     <input
+                      id="insurance-input-7"
                       type="date"
                       className={INPUT_CLASS}
                       value={policyForm.effective_date}
@@ -1047,6 +1055,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Expiration Date">
                     <input
+                      id="insurance-input-8"
                       type="date"
                       className={INPUT_CLASS}
                       value={policyForm.expiration_date}
@@ -1067,6 +1076,7 @@ export default function InsurancePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <FormField label="Annual Premium">
                     <input
+                      id="insurance-input-9"
                       className={INPUT_CLASS}
                       value={policyForm.annual_premium}
                       onChange={(e) => updatePolicyForm("annual_premium", e.target.value)}
@@ -1075,6 +1085,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Monthly Premium">
                     <input
+                      id="insurance-input-10"
                       className={INPUT_CLASS}
                       value={policyForm.monthly_premium}
                       onChange={(e) => updatePolicyForm("monthly_premium", e.target.value)}
@@ -1083,6 +1094,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Payment Frequency">
                     <select
+                      id="insurance-select-2"
                       className={INPUT_CLASS}
                       value={policyForm.payment_frequency}
                       onChange={(e) => updatePolicyForm("payment_frequency", e.target.value)}
@@ -1101,6 +1113,7 @@ export default function InsurancePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <FormField label="Building Coverage">
                     <input
+                      id="insurance-input-11"
                       className={INPUT_CLASS}
                       value={policyForm.building_coverage}
                       onChange={(e) => updatePolicyForm("building_coverage", e.target.value)}
@@ -1108,6 +1121,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Contents Coverage">
                     <input
+                      id="insurance-input-12"
                       className={INPUT_CLASS}
                       value={policyForm.contents_coverage}
                       onChange={(e) => updatePolicyForm("contents_coverage", e.target.value)}
@@ -1115,6 +1129,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Equipment Coverage">
                     <input
+                      id="insurance-input-13"
                       className={INPUT_CLASS}
                       value={policyForm.equipment_coverage}
                       onChange={(e) => updatePolicyForm("equipment_coverage", e.target.value)}
@@ -1122,6 +1137,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Liability Per Occurrence">
                     <input
+                      id="insurance-input-14"
                       className={INPUT_CLASS}
                       value={policyForm.liability_per_occurrence}
                       onChange={(e) => updatePolicyForm("liability_per_occurrence", e.target.value)}
@@ -1129,6 +1145,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Liability Aggregate">
                     <input
+                      id="insurance-input-15"
                       className={INPUT_CLASS}
                       value={policyForm.liability_aggregate}
                       onChange={(e) => updatePolicyForm("liability_aggregate", e.target.value)}
@@ -1152,6 +1169,7 @@ export default function InsurancePage() {
                     {policyForm.business_interruption && (
                       <FormField label="BI Amount">
                         <input
+                          id="insurance-input-16"
                           className={INPUT_CLASS}
                           value={policyForm.business_interruption_amount}
                           onChange={(e) =>
@@ -1170,6 +1188,7 @@ export default function InsurancePage() {
                     {policyForm.flood_coverage && (
                       <FormField label="Flood Amount">
                         <input
+                          id="insurance-input-17"
                           className={INPUT_CLASS}
                           value={policyForm.flood_amount}
                           onChange={(e) => updatePolicyForm("flood_amount", e.target.value)}
@@ -1186,6 +1205,7 @@ export default function InsurancePage() {
                     {policyForm.equipment_breakdown && (
                       <FormField label="EB Amount">
                         <input
+                          id="insurance-input-18"
                           className={INPUT_CLASS}
                           value={policyForm.equipment_breakdown_amount}
                           onChange={(e) =>
@@ -1206,6 +1226,7 @@ export default function InsurancePage() {
                       className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)] cursor-pointer"
                     >
                       <input
+                        id="insurance-input-19"
                         type="checkbox"
                         checked={policyForm[key] as boolean}
                         onChange={(e) => updatePolicyForm(key, e.target.checked as PolicyForm[typeof key])}
@@ -1221,6 +1242,7 @@ export default function InsurancePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <FormField label="Property Deductible">
                     <input
+                      id="insurance-input-20"
                       className={INPUT_CLASS}
                       value={policyForm.property_deductible}
                       onChange={(e) => updatePolicyForm("property_deductible", e.target.value)}
@@ -1228,6 +1250,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Wind Deductible">
                     <input
+                      id="insurance-input-21"
                       className={INPUT_CLASS}
                       value={policyForm.wind_deductible}
                       onChange={(e) => updatePolicyForm("wind_deductible", e.target.value)}
@@ -1235,6 +1258,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Flood Deductible">
                     <input
+                      id="insurance-input-22"
                       className={INPUT_CLASS}
                       value={policyForm.flood_deductible}
                       onChange={(e) => updatePolicyForm("flood_deductible", e.target.value)}
@@ -1242,6 +1266,7 @@ export default function InsurancePage() {
                   </FormField>
                   <FormField label="Equipment Deductible">
                     <input
+                      id="insurance-input-23"
                       className={INPUT_CLASS}
                       value={policyForm.equipment_deductible}
                       onChange={(e) => updatePolicyForm("equipment_deductible", e.target.value)}
@@ -1252,6 +1277,7 @@ export default function InsurancePage() {
 
               <FormSection title="Notes">
                 <textarea
+                  id="insurance-textarea"
                   className={clsx(INPUT_CLASS, "min-h-[80px] resize-y")}
                   value={policyForm.notes}
                   onChange={(e) => updatePolicyForm("notes", e.target.value)}
@@ -1419,6 +1445,7 @@ export default function InsurancePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <FormField label="Policy">
                 <select
+                  id="insurance-claimform"
                   className={INPUT_CLASS}
                   value={claimForm.policy_id}
                   onChange={(e) => setClaimForm((f) => ({ ...f, policy_id: e.target.value }))}
@@ -1433,6 +1460,7 @@ export default function InsurancePage() {
               </FormField>
               <FormField label="Claim Date">
                 <input
+                  id="insurance-claimform-2"
                   type="date"
                   className={INPUT_CLASS}
                   value={claimForm.claim_date}
@@ -1441,6 +1469,7 @@ export default function InsurancePage() {
               </FormField>
               <FormField label="Claim Type">
                 <select
+                  id="insurance-claimform-3"
                   className={INPUT_CLASS}
                   value={claimForm.claim_type}
                   onChange={(e) => setClaimForm((f) => ({ ...f, claim_type: e.target.value }))}
@@ -1454,6 +1483,7 @@ export default function InsurancePage() {
               </FormField>
               <FormField label="Amount">
                 <input
+                  id="insurance-claimform-4"
                   className={INPUT_CLASS}
                   value={claimForm.amount}
                   onChange={(e) => setClaimForm((f) => ({ ...f, amount: e.target.value }))}
@@ -1461,6 +1491,7 @@ export default function InsurancePage() {
               </FormField>
               <FormField label="Status">
                 <select
+                  id="insurance-claimform-5"
                   className={INPUT_CLASS}
                   value={claimForm.status}
                   onChange={(e) => setClaimForm((f) => ({ ...f, status: e.target.value }))}
@@ -1474,6 +1505,7 @@ export default function InsurancePage() {
               </FormField>
               <FormField label="Description" className="col-span-2 lg:col-span-3">
                 <input
+                  id="insurance-claimform-6"
                   className={INPUT_CLASS}
                   value={claimForm.description}
                   onChange={(e) => setClaimForm((f) => ({ ...f, description: e.target.value }))}

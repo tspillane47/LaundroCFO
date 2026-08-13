@@ -296,6 +296,7 @@ export default function AdminFeedbackPage() {
                   </td>
                   <td className="py-3 pr-3">
                     <select
+                      id="feedback-select"
                       value={row.status ?? "new"}
                       onChange={(e) =>
                         void updateRow(row.id, {
@@ -314,6 +315,7 @@ export default function AdminFeedbackPage() {
                   </td>
                   <td className="py-3 pr-3">
                     <select
+                      id="feedback-select-2"
                       value={row.priority ?? "normal"}
                       onChange={(e) =>
                         void updateRow(row.id, {

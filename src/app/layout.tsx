@@ -382,6 +382,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         {showSearch && (
           <div className="px-3 py-2 border-b" style={{ borderColor: "var(--border)" }}>
             <input
+              id="layout-storesearch"
               type="text"
               value={storeSearch}
               onChange={(e) => setStoreSearch(e.target.value)}

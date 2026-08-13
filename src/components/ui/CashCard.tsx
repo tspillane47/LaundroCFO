@@ -118,6 +118,7 @@ export function CashCard({ store, hasFinancialData = true, onUpdate }: CashCardP
           <div>
             <div className="metric-label" style={{ marginBottom: "4px" }}>Operating Account</div>
             <input
+              id="cashcard-operating"
               type="number"
               className={inputClass}
               value={operating}
@@ -128,6 +129,7 @@ export function CashCard({ store, hasFinancialData = true, onUpdate }: CashCardP
           <div>
             <div className="metric-label" style={{ marginBottom: "4px" }}>Reserve Account</div>
             <input
+              id="cashcard-reserve"
               type="number"
               className={inputClass}
               value={reserve}
@@ -138,6 +140,7 @@ export function CashCard({ store, hasFinancialData = true, onUpdate }: CashCardP
           <div>
             <div className="metric-label" style={{ marginBottom: "4px" }}>Petty Cash (optional)</div>
             <input
+              id="cashcard-petty"
               type="number"
               className={inputClass}
               value={petty}

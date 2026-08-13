@@ -60,6 +60,7 @@ export default function ResetPasswordPage() {
               <div>
                 <div className="metric-label mb-1.5">New Password</div>
                 <input
+                  id="reset-password-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -70,6 +71,7 @@ export default function ResetPasswordPage() {
               <div>
                 <div className="metric-label mb-1.5">Confirm Password</div>
                 <input
+                  id="reset-password-confirm"
                   type="password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}

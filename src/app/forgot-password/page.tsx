@@ -36,6 +36,7 @@ export default function ForgotPasswordPage() {
               <div>
                 <div className="metric-label mb-1.5">Email</div>
                 <input
+                  id="forgot-password-email"
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}

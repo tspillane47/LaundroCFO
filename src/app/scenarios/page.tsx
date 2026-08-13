@@ -723,6 +723,7 @@ function ComparePanel({
       </div>
       <div className="grid grid-cols-2 gap-3 mb-4">
         <select
+          id="scenarios-comparea"
           value={compareA}
           onChange={(e) => onCompareAChange(e.target.value)}
           className="text-[12px] bg-[var(--bg-card2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-[var(--text-primary)]"
@@ -734,6 +735,7 @@ function ComparePanel({
           ))}
         </select>
         <select
+          id="scenarios-compareb"
           value={compareB}
           onChange={(e) => onCompareBChange(e.target.value)}
           className="text-[12px] bg-[var(--bg-card2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-[var(--text-primary)]"
@@ -854,6 +856,7 @@ function ScenarioSlider({
         </span>
       </div>
       <input
+        id="scenarios-value"
         type="range"
         min={min}
         max={max}

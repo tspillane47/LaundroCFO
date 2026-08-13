@@ -1030,6 +1030,7 @@ export default function ValuationPage() {
             <div key={field.label}>
               <label className="block text-[11px] text-[var(--text-muted)] mb-1.5">{field.label}</label>
               <input
+                id="valuation-input"
                 type="number"
                 min={0}
                 max={100}
@@ -1044,6 +1045,7 @@ export default function ValuationPage() {
           <div>
             <label className="block text-[11px] text-[var(--text-muted)] mb-1.5">Last Retool Year</label>
             <input
+              id="valuation-lastretoolyear"
               type="number"
               min={1990}
               max={new Date().getFullYear()}
@@ -1056,6 +1058,7 @@ export default function ValuationPage() {
           <div>
             <label className="block text-[11px] text-[var(--text-muted)] mb-1.5">Investment Amount</label>
             <input
+              id="valuation-retoolinvestment"
               type="number"
               min={0}
               placeholder="e.g. 395000"
@@ -1067,6 +1070,7 @@ export default function ValuationPage() {
           <div>
             <label className="block text-[11px] text-[var(--text-muted)] mb-1.5">Retool Type</label>
             <select
+              id="valuation-retooltype"
               value={retoolType}
               onChange={(e) => setRetoolType(e.target.value)}
               className={INPUT_CLASS}

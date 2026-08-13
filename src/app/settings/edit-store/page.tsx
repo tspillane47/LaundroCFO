@@ -160,6 +160,7 @@ function EditStoreForm() {
         <div>
           <div className="metric-label mb-1.5">Store Name</div>
           <input
+            id="edit-store-name"
             type="text"
             value={form.name}
             onChange={(e) => set("name", e.target.value)}
@@ -171,6 +172,7 @@ function EditStoreForm() {
         <div>
           <div className="metric-label mb-1.5">Address</div>
           <input
+            id="edit-store-address"
             type="text"
             value={form.address}
             onChange={(e) => set("address", e.target.value)}
@@ -183,6 +185,7 @@ function EditStoreForm() {
           <div>
             <div className="metric-label mb-1.5">Square Footage</div>
             <input
+              id="edit-store-square-footage"
               type="number"
               value={form.square_footage}
               onChange={(e) => set("square_footage", e.target.value)}
@@ -194,6 +197,7 @@ function EditStoreForm() {
           <div>
             <div className="metric-label mb-1.5">Lease Expiration</div>
             <input
+              id="edit-store-lease-expiration"
               type="date"
               value={form.lease_expiration}
               onChange={(e) => set("lease_expiration", e.target.value)}
@@ -206,6 +210,7 @@ function EditStoreForm() {
           <div>
             <div className="metric-label mb-1.5">Monthly Revenue</div>
             <input
+              id="edit-store-monthly-revenue"
               type="number"
               value={form.monthly_revenue}
               onChange={(e) => set("monthly_revenue", e.target.value)}
@@ -217,6 +222,7 @@ function EditStoreForm() {
           <div>
             <div className="metric-label mb-1.5">Monthly Expenses</div>
             <input
+              id="edit-store-monthly-expenses"
               type="number"
               value={form.monthly_expenses}
               onChange={(e) => set("monthly_expenses", e.target.value)}
@@ -230,6 +236,7 @@ function EditStoreForm() {
           <div>
             <div className="metric-label mb-1.5">Monthly Rent</div>
             <input
+              id="edit-store-monthly-rent"
               type="number"
               value={form.monthly_rent}
               onChange={(e) => set("monthly_rent", e.target.value)}
@@ -241,6 +248,7 @@ function EditStoreForm() {
           <div>
             <div className="metric-label mb-1.5">Annual Debt Service</div>
             <input
+              id="edit-store-annual-debt-service"
               type="number"
               value={form.annual_debt_service}
               onChange={(e) => set("annual_debt_service", e.target.value)}
@@ -253,6 +261,7 @@ function EditStoreForm() {
         <div>
           <div className="metric-label mb-1.5">Loan Balance</div>
           <input
+            id="edit-store-loan-balance"
             type="number"
             value={form.loan_balance}
             onChange={(e) => set("loan_balance", e.target.value)}
@@ -265,6 +274,7 @@ function EditStoreForm() {
           <div>
             <div className="metric-label mb-1.5">Washers</div>
             <input
+              id="edit-store-washers"
               type="number"
               value={form.washers}
               onChange={(e) => set("washers", e.target.value)}
@@ -276,6 +286,7 @@ function EditStoreForm() {
           <div>
             <div className="metric-label mb-1.5">Dryers</div>
             <input
+              id="edit-store-dryers"
               type="number"
               value={form.dryers}
               onChange={(e) => set("dryers", e.target.value)}
@@ -287,6 +298,7 @@ function EditStoreForm() {
           <div>
             <div className="metric-label mb-1.5">Avg Machine Age</div>
             <input
+              id="edit-store-avg-machine-age"
               type="number"
               value={form.avg_machine_age}
               onChange={(e) => set("avg_machine_age", e.target.value)}

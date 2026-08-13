@@ -408,6 +408,7 @@ export default function AccountPage() {
         <div>
           <div className="metric-label mb-1.5">Full Name</div>
           <input
+            id="account-fullname"
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
@@ -419,6 +420,7 @@ export default function AccountPage() {
         <div>
           <div className="metric-label mb-1.5">Email</div>
           <input
+            id="account-emailinput"
             type="email"
             value={emailInput}
             onChange={(e) => {
@@ -452,6 +454,7 @@ export default function AccountPage() {
         <div>
           <div className="metric-label mb-1.5">Phone Number</div>
           <input
+            id="account-phone"
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
@@ -463,6 +466,7 @@ export default function AccountPage() {
         <div>
           <div className="metric-label mb-1.5">Company / Business Name</div>
           <input
+            id="account-companyname"
             type="text"
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
@@ -473,7 +477,7 @@ export default function AccountPage() {
 
         <div>
           <div className="metric-label mb-1.5">Role</div>
-          <select value={role} onChange={(e) => setRole(e.target.value)} className={INPUT_CLASS}>
+          <select id="account-role" value={role} onChange={(e) => setRole(e.target.value)} className={INPUT_CLASS}>
             {ROLE_OPTIONS.map((option) => (
               <option key={option} value={option}>
                 {option}

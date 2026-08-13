@@ -274,6 +274,7 @@ function RuleFormPanel({
             <span className="font-mono text-adaptive-primary">{vendorPattern}</span> as:
           </span>
           <select
+            id="transactions-category"
             value={category}
             onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
             className={clsx("select-tan", "w-44 text-[12px]")}
@@ -292,6 +293,7 @@ function RuleFormPanel({
           </span>
           <span className="text-adaptive-muted">$</span>
           <input
+            id="transactions-ruleamount"
             type="number"
             step="0.01"
             min="0"
@@ -301,6 +303,7 @@ function RuleFormPanel({
           />
           <span className="text-adaptive-muted">within $</span>
           <input
+            id="transactions-ruletolerance"
             type="number"
             step="0.01"
             min="0"
@@ -310,6 +313,7 @@ function RuleFormPanel({
           />
           <span className="text-adaptive-secondary">as:</span>
           <select
+            id="transactions-category-2"
             value={category}
             onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
             className={clsx("select-tan", "w-44 text-[12px]")}
@@ -1868,6 +1872,7 @@ function TransactionsPageContent() {
       )}>
         <td className="py-2 pr-2 pl-2">
           <input
+            id="transactions-input"
             type="checkbox"
             checked={selectedIds.has(item.id)}
             onChange={(e) => toggleSelectId(item.id, e.target.checked)}
@@ -1893,6 +1898,7 @@ function TransactionsPageContent() {
         <td className="py-2 pr-3 text-right font-semibold tabular-nums text-[11px] text-[var(--text-primary)]">{fmtDollar(item.amount)}</td>
         <td className="py-2 pr-3">
           <select
+            id="transactions-select"
             value={item.category}
             onChange={(e) => void updateCategory(item.id, e.target.value as BankImportCategory, storedCategory, true)}
             disabled={!canWrite}
@@ -1943,6 +1949,7 @@ function TransactionsPageContent() {
   function renderNotesInput(row: ReviewRow, readOnly = false) {
     return (
       <input
+        id="transactions-notesdraft"
         type="text"
         value={notesDraft.get(row.id) ?? ""}
         onChange={(e) => setNotesDraft((prev) => new Map(prev).set(row.id, e.target.value))}
@@ -2041,6 +2048,7 @@ function TransactionsPageContent() {
             <label className={clsx("btn-outline", canWrite ? "cursor-pointer" : "cursor-not-allowed opacity-60")}>
               Upload CSV
               <input
+                id="transactions-input-2"
                 type="file"
                 accept=".csv"
                 className="hidden"
@@ -2166,6 +2174,7 @@ function TransactionsPageContent() {
             <>
               <label className="flex items-center gap-2 text-[12px] text-adaptive-muted cursor-pointer">
                 <input
+                  id="transactions-expandedgroups"
                   type="checkbox"
                   checked={groupByVendor}
                   onChange={(e) => {
@@ -2321,6 +2330,7 @@ function TransactionsPageContent() {
             <div>
               <div className="metric-label mb-1.5">Vendor</div>
               <select
+                id="transactions-filtervendor"
                 value={filterVendor}
                 onChange={(e) => setFilterVendor(e.target.value)}
                 className={clsx("select-tan", "w-44 text-[12px]")}
@@ -2337,6 +2347,7 @@ function TransactionsPageContent() {
             <div>
               <div className="metric-label mb-1.5">Name</div>
               <select
+                id="transactions-filtername"
                 value={filterName}
                 onChange={(e) => setFilterName(e.target.value)}
                 className={clsx("select-tan", "w-52 text-[12px]")}
@@ -2353,6 +2364,7 @@ function TransactionsPageContent() {
             <div>
               <div className="metric-label mb-1.5">Category</div>
               <select
+                id="transactions-filtercategory"
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
                 className={clsx("select-tan", "w-44 text-[12px]")}
@@ -2398,6 +2410,7 @@ function TransactionsPageContent() {
                 <tr className="text-left text-[var(--text-secondary)] review-table-header">
                   <th className="pb-3 pr-2 font-medium w-8">
                     <input
+                      id="transactions-input-3"
                       type="checkbox"
                       checked={allSelected}
                       onChange={(e) => toggleSelectAll(e.target.checked)}
@@ -2423,6 +2436,7 @@ function TransactionsPageContent() {
                     <tr className={reviewRowClass(groupIndex, needsCategorySelection(group.category))}>
                       <td className="py-3 pr-2">
                         <input
+                          id="transactions-input-4"
                           type="checkbox"
                           checked={isGroupFullySelected(group)}
                           onChange={(e) => toggleSelectGroup(group, e.target.checked)}
@@ -2458,6 +2472,7 @@ function TransactionsPageContent() {
                       <td className="py-3 pr-3 text-right font-semibold tabular-nums text-[var(--text-primary)]">{fmtDollar(group.totalAmount)}</td>
                       <td className="py-3 pr-3">
                         <select
+                          id="transactions-select-2"
                           value={group.category}
                           onChange={(e) =>
                             updateGroupCategory(group.groupKey, e.target.value as BankImportCategory)
@@ -2556,6 +2571,7 @@ function TransactionsPageContent() {
                 <tr className="text-left text-[var(--text-secondary)] review-table-header">
                   <th className="pb-3 pr-2 font-medium w-8">
                     <input
+                      id="transactions-input-5"
                       type="checkbox"
                       checked={allSelected}
                       onChange={(e) => toggleSelectAll(e.target.checked)}
@@ -2586,6 +2602,7 @@ function TransactionsPageContent() {
                       <tr className={reviewRowClass(rowIndex, needsCategorySelection(row.category))}>
                         <td className="py-3 pr-2">
                           <input
+                            id="transactions-input-6"
                             type="checkbox"
                             checked={selectedIds.has(row.id)}
                             onChange={(e) => toggleSelectId(row.id, e.target.checked)}
@@ -2627,6 +2644,7 @@ function TransactionsPageContent() {
                           ) : (
                             <div className="space-y-1">
                               <select
+                                id="transactions-select-3"
                                 value={row.category}
                                 onChange={(e) => {
                                   const newCategory = e.target.value as BankImportCategory;
@@ -2797,6 +2815,7 @@ function TransactionsPageContent() {
             <div>
               <label className="text-[12px] text-adaptive-muted block mb-1">Reason (required)</label>
               <input
+                id="transactions-excludemodal"
                 type="text"
                 value={excludeModal.reason}
                 onChange={(e) => setExcludeModal({ ...excludeModal, reason: e.target.value })}
@@ -2865,6 +2884,7 @@ function TransactionsPageContent() {
             <div>
               <label className="text-[12px] text-adaptive-muted block mb-1">New category</label>
               <select
+                id="transactions-bulkreclassifymodal"
                 value={bulkReclassifyModal.category}
                 onChange={(e) =>
                   setBulkReclassifyModal({
@@ -2948,6 +2968,7 @@ function TransactionsPageContent() {
               <div>
                 <label className="text-[12px] text-adaptive-muted block mb-1">Date</label>
                 <input
+                  id="transactions-manualdraft"
                   type="date"
                   value={manualDraft.date}
                   onChange={(e) => setManualDraft((prev) => ({ ...prev, date: e.target.value }))}
@@ -2957,6 +2978,7 @@ function TransactionsPageContent() {
               <div>
                 <label className="text-[12px] text-adaptive-muted block mb-1">Description</label>
                 <input
+                  id="transactions-manualdraft-2"
                   type="text"
                   value={manualDraft.description}
                   onChange={(e) => setManualDraft((prev) => ({ ...prev, description: e.target.value }))}
@@ -2969,6 +2991,7 @@ function TransactionsPageContent() {
               <div>
                 <label className="text-[12px] text-adaptive-muted block mb-1">Amount</label>
                 <input
+                  id="transactions-manualdraft-3"
                   type="number"
                   step="0.01"
                   min="0.01"
@@ -3022,6 +3045,7 @@ function TransactionsPageContent() {
               <div>
                 <label className="text-[12px] text-adaptive-muted block mb-1">Category</label>
                 <select
+                  id="transactions-manualdraft-4"
                   value={manualDraft.category}
                   onChange={(e) =>
                     setManualDraft((prev) => ({ ...prev, category: e.target.value as BankImportCategory }))
@@ -3038,6 +3062,7 @@ function TransactionsPageContent() {
               <div>
                 <label className="text-[12px] text-adaptive-muted block mb-1">Note (optional)</label>
                 <input
+                  id="transactions-manualdraft-5"
                   type="text"
                   value={manualDraft.note}
                   onChange={(e) => setManualDraft((prev) => ({ ...prev, note: e.target.value }))}

@@ -191,6 +191,7 @@ export function SavedLoanCalculationsSection({
             Name this calculation
           </label>
           <input
+            id="savedloancalculations-savename"
             type="text"
             value={saveName}
             onChange={(e) => setSaveName(e.target.value)}

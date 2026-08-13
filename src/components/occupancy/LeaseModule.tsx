@@ -767,6 +767,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               <div>
                 <div className="metric-label mb-1.5">Landlord</div>
                 <input
+                  id="lease-leasefield"
                   type="text"
                   value={leaseForm.landlord}
                   onChange={(e) => setLeaseField("landlord", e.target.value)}
@@ -778,6 +779,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               <div>
                 <div className="metric-label mb-1.5">Tenant Entity</div>
                 <input
+                  id="lease-leasefield-2"
                   type="text"
                   value={leaseForm.tenant_entity}
                   onChange={(e) => setLeaseField("tenant_entity", e.target.value)}
@@ -791,6 +793,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             <div>
               <div className="metric-label mb-1.5">Store Address</div>
               <input
+                id="lease-store-address"
                 type="text"
                 value={store.address ?? ""}
                 disabled
@@ -803,6 +806,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               <div>
                 <div className="metric-label mb-1.5">Lease Start Date</div>
                 <input
+                  id="lease-leasefield-3"
                   type="date"
                   value={leaseForm.lease_start_date}
                   onChange={(e) => setLeaseField("lease_start_date", e.target.value)}
@@ -813,6 +817,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               <div>
                 <div className="metric-label mb-1.5">Lease End Date</div>
                 <input
+                  id="lease-leasefield-4"
                   type="date"
                   value={leaseForm.lease_end_date}
                   onChange={(e) => setLeaseField("lease_end_date", e.target.value)}
@@ -826,6 +831,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               <div>
                 <div className="metric-label mb-1.5">Monthly Rent</div>
                 <input
+                  id="lease-leasefield-5"
                   type="number"
                   value={leaseForm.monthly_rent}
                   onChange={(e) => setLeaseField("monthly_rent", e.target.value)}
@@ -837,6 +843,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               <div>
                 <div className="metric-label mb-1.5">Annual Escalation %</div>
                 <input
+                  id="lease-leasefield-6"
                   type="number"
                   step="0.1"
                   value={leaseForm.annual_escalation_pct}
@@ -849,6 +856,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               <div>
                 <div className="metric-label mb-1.5">CAM Charges</div>
                 <input
+                  id="lease-leasefield-7"
                   type="number"
                   value={leaseForm.cam_charges}
                   onChange={(e) => setLeaseField("cam_charges", e.target.value)}
@@ -863,6 +871,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               <div>
                 <div className="metric-label mb-1.5">Square Footage</div>
                 <input
+                  id="lease-leasefield-8"
                   type="number"
                   value={leaseForm.square_footage}
                   onChange={(e) => setLeaseField("square_footage", e.target.value)}
@@ -874,6 +883,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               <div>
                 <div className="metric-label mb-1.5">Security Deposit</div>
                 <input
+                  id="lease-leasefield-9"
                   type="number"
                   value={leaseForm.security_deposit}
                   onChange={(e) => setLeaseField("security_deposit", e.target.value)}
@@ -888,6 +898,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               <div>
                 <div className="metric-label mb-1.5">Assignment Rights</div>
                 <select
+                  id="lease-leasefield-10"
                   value={leaseForm.assignment_rights}
                   onChange={(e) => setLeaseField("assignment_rights", e.target.value)}
                   className={INPUT_CLASS}
@@ -904,6 +915,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             <div className="flex flex-wrap gap-6">
               <label className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)] cursor-pointer">
                 <input
+                  id="lease-leasefield-11"
                   type="checkbox"
                   checked={leaseForm.sublease_rights}
                   onChange={(e) => setLeaseField("sublease_rights", e.target.checked)}
@@ -913,6 +925,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               </label>
               <label className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)] cursor-pointer">
                 <input
+                  id="lease-leasefield-12"
                   type="checkbox"
                   checked={leaseForm.personal_guaranty}
                   onChange={(e) => setLeaseField("personal_guaranty", e.target.checked)}
@@ -922,6 +935,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
               </label>
               <label className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)] cursor-pointer">
                 <input
+                  id="lease-leasefield-13"
                   type="checkbox"
                   checked={leaseForm.exclusivity_clause}
                   onChange={(e) => setLeaseField("exclusivity_clause", e.target.checked)}
@@ -934,6 +948,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
             <div>
               <div className="metric-label mb-1.5">Use Restrictions</div>
               <textarea
+                id="lease-leasefield-14"
                 value={leaseForm.use_restrictions}
                 onChange={(e) => setLeaseField("use_restrictions", e.target.value)}
                 onKeyDown={preventEnterSubmit}
@@ -961,6 +976,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                 <div>
                   <div className="metric-label mb-1.5">Option #</div>
                   <input
+                    id="lease-option-number"
                     type="number"
                     value={form.option_number}
                     onChange={(e) => setOptionField(i, "option_number", e.target.value)}
@@ -971,6 +987,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                 <div>
                   <div className="metric-label mb-1.5">Term (Years)</div>
                   <input
+                    id="lease-option-years"
                     type="number"
                     value={form.option_years}
                     onChange={(e) => setOptionField(i, "option_years", e.target.value)}
@@ -982,6 +999,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                 <div>
                   <div className="metric-label mb-1.5">Status</div>
                   <select
+                    id="lease-status"
                     value={form.status}
                     onChange={(e) => setOptionField(i, "status", e.target.value)}
                     className={INPUT_CLASS}
@@ -996,6 +1014,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
                 <div>
                   <div className="metric-label mb-1.5">Notice Days</div>
                   <input
+                    id="lease-notice-days"
                     type="number"
                     value={form.notice_days}
                     onChange={(e) => setOptionField(i, "notice_days", e.target.value)}

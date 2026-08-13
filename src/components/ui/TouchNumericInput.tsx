@@ -134,6 +134,7 @@ export function TouchNumericInput({
         >
           {editing ? (
             <input
+              id="touchnumericinput-draft"
               ref={inputRef}
               type="text"
               inputMode="decimal"

@@ -308,56 +308,56 @@ export default function SettingsPage() {
               <div className="space-y-3">
                 <div>
                   <div className="metric-label mb-1.5">Store Name</div>
-                  <input value={form.name} onChange={(e) => setField("name", e.target.value)} className={inputClass} />
+                  <input id="settings-name" value={form.name} onChange={(e) => setField("name", e.target.value)} className={inputClass} />
                 </div>
                 <div>
                   <div className="metric-label mb-1.5">Address</div>
-                  <input value={form.address} onChange={(e) => setField("address", e.target.value)} className={inputClass} />
+                  <input id="settings-address" value={form.address} onChange={(e) => setField("address", e.target.value)} className={inputClass} />
                 </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 form-grid-mobile-stack">
                   <div>
                     <div className="metric-label mb-1.5">Square Footage</div>
-                    <input type="number" value={form.square_footage} onChange={(e) => setField("square_footage", e.target.value)} className={inputClass} />
+                    <input id="settings-square-footage" type="number" value={form.square_footage} onChange={(e) => setField("square_footage", e.target.value)} className={inputClass} />
                   </div>
                   <div>
                     <div className="metric-label mb-1.5">Store Type</div>
-                    <select value={form.store_type} onChange={(e) => setField("store_type", e.target.value)} className={inputClass}>
+                    <select id="settings-store-type" value={form.store_type} onChange={(e) => setField("store_type", e.target.value)} className={inputClass}>
                       {STORE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <div>
                     <div className="metric-label mb-1.5">Year Opened</div>
-                    <input type="number" value={form.year_opened} onChange={(e) => setField("year_opened", e.target.value)} className={inputClass} />
+                    <input id="settings-year-opened" type="number" value={form.year_opened} onChange={(e) => setField("year_opened", e.target.value)} className={inputClass} />
                   </div>
                   <div>
                     <div className="metric-label mb-1.5">Market Density</div>
-                    <select value={form.market_density} onChange={(e) => setField("market_density", e.target.value)} className={inputClass}>
+                    <select id="settings-market-density" value={form.market_density} onChange={(e) => setField("market_density", e.target.value)} className={inputClass}>
                       {MARKET_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   </div>
                   <div>
                     <div className="metric-label mb-1.5">Washers</div>
-                    <input type="number" value={form.washers} onChange={(e) => setField("washers", e.target.value)} className={inputClass} />
+                    <input id="settings-washers" type="number" value={form.washers} onChange={(e) => setField("washers", e.target.value)} className={inputClass} />
                   </div>
                   <div>
                     <div className="metric-label mb-1.5">Dryers</div>
-                    <input type="number" value={form.dryers} onChange={(e) => setField("dryers", e.target.value)} className={inputClass} />
+                    <input id="settings-dryers" type="number" value={form.dryers} onChange={(e) => setField("dryers", e.target.value)} className={inputClass} />
                   </div>
                   <div>
                     <div className="metric-label mb-1.5">Store Condition</div>
-                    <select value={form.store_condition} onChange={(e) => setField("store_condition", e.target.value)} className={inputClass}>
+                    <select id="settings-store-condition" value={form.store_condition} onChange={(e) => setField("store_condition", e.target.value)} className={inputClass}>
                       {CONDITION_OPTIONS.map((c) => <option key={c} value={c}>{labelize(c)}</option>)}
                     </select>
                   </div>
                   <div>
                     <div className="metric-label mb-1.5">Revenue Trend</div>
-                    <select value={form.revenue_trend} onChange={(e) => setField("revenue_trend", e.target.value)} className={inputClass}>
+                    <select id="settings-revenue-trend" value={form.revenue_trend} onChange={(e) => setField("revenue_trend", e.target.value)} className={inputClass}>
                       {TREND_OPTIONS.map((t) => <option key={t} value={t}>{labelize(t)}</option>)}
                     </select>
                   </div>
                   <div>
                     <div className="metric-label mb-1.5">Competition Level</div>
-                    <select value={form.competition_level} onChange={(e) => setField("competition_level", e.target.value)} className={inputClass}>
+                    <select id="settings-competition-level" value={form.competition_level} onChange={(e) => setField("competition_level", e.target.value)} className={inputClass}>
                       {COMPETITION_OPTIONS.map((c) => <option key={c} value={c}>{labelize(c)}</option>)}
                     </select>
                   </div>
@@ -365,15 +365,15 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 form-grid-mobile-stack">
                   <div>
                     <div className="metric-label mb-1.5">Self-Service %</div>
-                    <input type="number" value={form.self_service_pct} onChange={(e) => setField("self_service_pct", e.target.value)} className={inputClass} />
+                    <input id="settings-self-service-pct" type="number" value={form.self_service_pct} onChange={(e) => setField("self_service_pct", e.target.value)} className={inputClass} />
                   </div>
                   <div>
                     <div className="metric-label mb-1.5">WDF %</div>
-                    <input type="number" value={form.wdf_pct} onChange={(e) => setField("wdf_pct", e.target.value)} className={inputClass} />
+                    <input id="settings-wdf-pct" type="number" value={form.wdf_pct} onChange={(e) => setField("wdf_pct", e.target.value)} className={inputClass} />
                   </div>
                   <div>
                     <div className="metric-label mb-1.5">Commercial %</div>
-                    <input type="number" value={form.commercial_pct} onChange={(e) => setField("commercial_pct", e.target.value)} className={inputClass} />
+                    <input id="settings-commercial-pct" type="number" value={form.commercial_pct} onChange={(e) => setField("commercial_pct", e.target.value)} className={inputClass} />
                   </div>
                 </div>
                 <div className="flex gap-2 pt-2">
@@ -436,6 +436,7 @@ export default function SettingsPage() {
                 <div>
                   <div className="metric-label mb-1.5">Operating Account Balance</div>
                   <input
+                    id="settings-cashform"
                     type="number"
                     value={cashForm.operating_account_balance}
                     onChange={(e) =>
@@ -448,6 +449,7 @@ export default function SettingsPage() {
                 <div>
                   <div className="metric-label mb-1.5">Reserve Account Balance</div>
                   <input
+                    id="settings-cashform-2"
                     type="number"
                     value={cashForm.reserve_account_balance}
                     onChange={(e) =>
@@ -460,6 +462,7 @@ export default function SettingsPage() {
                 <div>
                   <div className="metric-label mb-1.5">Petty Cash</div>
                   <input
+                    id="settings-cashform-3"
                     type="number"
                     value={cashForm.petty_cash}
                     onChange={(e) => setCashForm((c) => ({ ...c, petty_cash: e.target.value }))}
@@ -555,6 +558,7 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <input
+                    id="settings-input"
                     type="checkbox"
                     checked={false}
                     disabled
@@ -590,6 +594,7 @@ export default function SettingsPage() {
                   <div key={key}>
                     <div className="metric-label mb-1.5">{label}</div>
                     <input
+                      id="settings-valuationsettings"
                       value={valuationSettings[key]}
                       onChange={(e) => setValuationSettings((v) => ({ ...v, [key]: e.target.value }))}
                       className={inputClass}

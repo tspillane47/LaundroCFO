@@ -66,6 +66,7 @@ function LoginForm() {
           <div>
             <div className="metric-label mb-1.5">Email</div>
             <input
+              id="login-email"
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
@@ -76,6 +77,7 @@ function LoginForm() {
           <div>
             <div className="metric-label mb-1.5">Password</div>
             <input
+              id="login-password"
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}

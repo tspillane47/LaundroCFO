@@ -78,7 +78,7 @@ function SelectField({
   return (
     <div>
       <label className="block text-[11px] text-[var(--text-muted)] mb-1.5">{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={INPUT_CLASS}>
+      <select id="equipment-value" value={value} onChange={(e) => onChange(e.target.value)} className={INPUT_CLASS}>
         {options.map((opt) => (
           <option key={opt} value={opt}>
             {opt}
@@ -598,6 +598,7 @@ export default function EquipmentPage() {
                   <div>
                     <label className="block text-[11px] text-[var(--text-muted)] mb-1.5">Quantity</label>
                     <input
+                      id="equipment-quantity"
                       type="number"
                       min={1}
                       value={form.quantity}
@@ -609,6 +610,7 @@ export default function EquipmentPage() {
                   <div>
                     <label className="block text-[11px] text-[var(--text-muted)] mb-1.5">Installation Year</label>
                     <input
+                      id="equipment-installation-year"
                       type="number"
                       min={1980}
                       max={currentYear}
@@ -641,6 +643,7 @@ export default function EquipmentPage() {
                   <div className="md:col-span-2">
                     <label className="block text-[11px] text-[var(--text-muted)] mb-1.5">Notes</label>
                     <textarea
+                      id="equipment-notes"
                       value={form.notes}
                       onChange={(e) => updateForm("notes", e.target.value)}
                       onKeyDown={preventEnterSubmit}

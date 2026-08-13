@@ -942,6 +942,7 @@ function OnboardingContent() {
                       <div className="space-y-4">
                         <Field label="Store Name *" error={storeNameError}>
                           <input
+                            id="onboarding-storename"
                             type="text"
                             value={form.storeName}
                             onChange={(e) => {
@@ -956,6 +957,7 @@ function OnboardingContent() {
 
                         <Field label="Street Address">
                           <input
+                            id="onboarding-streetaddress"
                             type="text"
                             value={form.streetAddress}
                             onChange={(e) => setField("streetAddress", e.target.value)}
@@ -968,6 +970,7 @@ function OnboardingContent() {
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                           <Field label="City">
                             <input
+                              id="onboarding-city"
                               type="text"
                               value={form.city}
                               onChange={(e) => setField("city", e.target.value)}
@@ -978,6 +981,7 @@ function OnboardingContent() {
                           </Field>
                           <Field label="State">
                             <input
+                              id="onboarding-state"
                               type="text"
                               value={form.state}
                               onChange={(e) => setField("state", e.target.value)}
@@ -988,6 +992,7 @@ function OnboardingContent() {
                           </Field>
                           <Field label="ZIP" className="col-span-2 sm:col-span-1">
                             <input
+                              id="onboarding-zip"
                               type="text"
                               value={form.zip}
                               onChange={(e) => setField("zip", e.target.value)}
@@ -1001,6 +1006,7 @@ function OnboardingContent() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <Field label="Square Footage">
                             <input
+                              id="onboarding-squarefootage"
                               type="number"
                               value={form.squareFootage}
                               onChange={(e) => setField("squareFootage", e.target.value)}
@@ -1011,6 +1017,7 @@ function OnboardingContent() {
                           </Field>
                           <Field label="Store Type">
                             <select
+                              id="onboarding-storetype"
                               value={form.storeType}
                               onChange={(e) => setField("storeType", e.target.value)}
                               className={INPUT_CLASS}
@@ -1024,6 +1031,7 @@ function OnboardingContent() {
                           </Field>
                           <Field label="Year Opened">
                             <input
+                              id="onboarding-yearopened"
                               type="number"
                               value={form.yearOpened}
                               onChange={(e) => setField("yearOpened", e.target.value)}
@@ -1073,6 +1081,7 @@ function OnboardingContent() {
                         <div className="space-y-4 border-t border-[var(--border)] pt-5">
                           <Field label="Monthly Rent">
                             <input
+                              id="onboarding-monthlyrent"
                               type="number"
                               value={form.monthlyRent}
                               onChange={(e) => setField("monthlyRent", e.target.value)}
@@ -1084,6 +1093,7 @@ function OnboardingContent() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <Field label="Lease End Date">
                               <input
+                                id="onboarding-leaseenddate"
                                 type="date"
                                 value={form.leaseEndDate}
                                 onChange={(e) => setField("leaseEndDate", e.target.value)}
@@ -1093,6 +1103,7 @@ function OnboardingContent() {
                             </Field>
                             <Field label="Annual Escalation %">
                               <input
+                                id="onboarding-annualescalation"
                                 type="number"
                                 value={form.annualEscalation}
                                 onChange={(e) => setField("annualEscalation", e.target.value)}
@@ -1109,6 +1120,7 @@ function OnboardingContent() {
                         <div className="space-y-4 border-t border-[var(--border)] pt-5">
                           <Field label="Monthly Mortgage Payment">
                             <input
+                              id="onboarding-monthlymortgage"
                               type="number"
                               value={form.monthlyMortgage}
                               onChange={(e) => setField("monthlyMortgage", e.target.value)}
@@ -1119,6 +1131,7 @@ function OnboardingContent() {
                           </Field>
                           <Field label="Estimated Building Value">
                             <input
+                              id="onboarding-buildingvalue"
                               type="number"
                               value={form.buildingValue}
                               onChange={(e) => setField("buildingValue", e.target.value)}
@@ -1171,6 +1184,7 @@ function OnboardingContent() {
                         <div className="rounded-lg border border-dashed border-[var(--border)] p-5">
                           <label className="block cursor-pointer">
                             <input
+                              id="onboarding-input"
                               type="file"
                               accept=".csv,text/csv"
                               className="sr-only"
@@ -1195,6 +1209,7 @@ function OnboardingContent() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <Field label="Monthly Revenue">
                             <input
+                              id="onboarding-monthlyrevenue"
                               type="number"
                               value={form.monthlyRevenue}
                               onChange={(e) => setField("monthlyRevenue", e.target.value)}
@@ -1205,6 +1220,7 @@ function OnboardingContent() {
                           </Field>
                           <Field label="Monthly Expenses">
                             <input
+                              id="onboarding-monthlyexpenses"
                               type="number"
                               value={form.monthlyExpenses}
                               onChange={(e) => setField("monthlyExpenses", e.target.value)}

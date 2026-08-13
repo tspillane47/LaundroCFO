@@ -118,6 +118,7 @@ export default function SignupPage() {
           <div>
             <div className="metric-label mb-1.5">Email</div>
             <input
+              id="signup-email"
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
@@ -128,6 +129,7 @@ export default function SignupPage() {
           <div>
             <div className="metric-label mb-1.5">Password</div>
             <input
+              id="signup-password"
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -138,6 +140,7 @@ export default function SignupPage() {
           </div>
           <label className="flex items-start gap-2.5 cursor-pointer group">
             <input
+              id="signup-termsaccepted"
               type="checkbox"
               checked={termsAccepted}
               onChange={(e) => setTermsAccepted(e.target.checked)}

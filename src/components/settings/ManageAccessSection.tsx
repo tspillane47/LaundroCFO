@@ -210,6 +210,7 @@ export function ManageAccessSection({ storeId }: ManageAccessSectionProps) {
           <div>
             <div className="metric-label mb-1.5">Add Co-Owner</div>
             <input
+              id="manageaccess-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}

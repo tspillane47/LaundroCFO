@@ -764,6 +764,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Property Owner Entity</div>
                 <input
+                  id="realestate-property-owner-entity"
                   type="text"
                   value={form.property_owner_entity}
                   onChange={(e) => setField("property_owner_entity", e.target.value)}
@@ -784,6 +785,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Related Landlord Entity</div>
                 <input
+                  id="realestate-related-landlord-entity"
                   type="text"
                   value={form.related_landlord_entity}
                   onChange={(e) => setField("related_landlord_entity", e.target.value)}
@@ -797,6 +799,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Ownership Percentage</div>
                 <input
+                  id="realestate-ownership-percentage"
                   type="number"
                   min="0"
                   max="100"
@@ -809,6 +812,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Date Purchased</div>
                 <input
+                  id="realestate-date-purchased"
                   type="date"
                   value={form.date_purchased}
                   onChange={(e) => setField("date_purchased", e.target.value)}
@@ -818,6 +822,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Parcel ID</div>
                 <input
+                  id="realestate-parcel-id"
                   type="text"
                   value={form.parcel_id}
                   onChange={(e) => setField("parcel_id", e.target.value)}
@@ -831,6 +836,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Purchase Price</div>
                 <input
+                  id="realestate-purchase-price"
                   type="number"
                   value={form.purchase_price}
                   onChange={(e) => setField("purchase_price", e.target.value)}
@@ -841,6 +847,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Estimated Value</div>
                 <input
+                  id="realestate-estimated-value"
                   type="number"
                   value={form.estimated_value}
                   onChange={(e) => setField("estimated_value", e.target.value)}
@@ -853,6 +860,7 @@ export function RealEstateModule({ store }: Props) {
             <div>
               <div className="metric-label mb-1.5">Property Address</div>
               <input
+                id="realestate-property-address"
                 type="text"
                 value={form.property_address}
                 onChange={(e) => setField("property_address", e.target.value)}
@@ -865,6 +873,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Total Square Footage</div>
                 <input
+                  id="realestate-total-square-footage"
                   type="number"
                   value={form.total_square_footage}
                   onChange={(e) => setField("total_square_footage", e.target.value)}
@@ -875,6 +884,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Laundromat Square Footage</div>
                 <input
+                  id="realestate-laundromat-square-footage"
                   type="number"
                   value={form.laundromat_square_footage}
                   onChange={(e) => setField("laundromat_square_footage", e.target.value)}
@@ -894,6 +904,7 @@ export function RealEstateModule({ store }: Props) {
             <div>
               <div className="metric-label mb-1.5">Ownership Notes</div>
               <textarea
+                id="realestate-ownership-notes"
                 value={form.ownership_notes}
                 onChange={(e) => setField("ownership_notes", e.target.value)}
                 maxLength={TEXT_LIMITS.notesField}
@@ -910,6 +921,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Mortgage Lender</div>
                 <input
+                  id="realestate-mortgage-lender"
                   type="text"
                   value={form.mortgage_lender}
                   onChange={(e) => setField("mortgage_lender", e.target.value)}
@@ -920,6 +932,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Interest Rate (%)</div>
                 <input
+                  id="realestate-interest-rate"
                   type="number"
                   step="0.01"
                   value={form.interest_rate}
@@ -934,6 +947,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Original Loan Amount</div>
                 <input
+                  id="realestate-original-loan-amount"
                   type="number"
                   value={form.original_loan_amount}
                   onChange={(e) => setField("original_loan_amount", e.target.value)}
@@ -944,6 +958,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Current Loan Balance</div>
                 <input
+                  id="realestate-current-loan-balance"
                   type="number"
                   value={form.current_loan_balance}
                   onChange={(e) => setField("current_loan_balance", e.target.value)}
@@ -957,6 +972,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Monthly Mortgage Payment</div>
                 <input
+                  id="realestate-monthly-mortgage-payment"
                   type="number"
                   value={form.monthly_mortgage_payment}
                   onChange={(e) => setField("monthly_mortgage_payment", e.target.value)}
@@ -967,6 +983,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Annual Debt Service</div>
                 <input
+                  id="realestate-annual-debt-service"
                   type="number"
                   value={form.annual_debt_service}
                   onChange={(e) => setField("annual_debt_service", e.target.value)}
@@ -977,6 +994,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Amortization Term (Years)</div>
                 <input
+                  id="realestate-amortization-term"
                   type="number"
                   value={form.amortization_term}
                   onChange={(e) => setField("amortization_term", e.target.value)}
@@ -990,6 +1008,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Maturity Date</div>
                 <input
+                  id="realestate-maturity-date"
                   type="date"
                   value={form.maturity_date}
                   onChange={(e) => setField("maturity_date", e.target.value)}
@@ -1009,6 +1028,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Balloon Date</div>
                 <input
+                  id="realestate-balloon-date"
                   type="date"
                   value={form.balloon_date}
                   onChange={(e) => setField("balloon_date", e.target.value)}
@@ -1020,6 +1040,7 @@ export function RealEstateModule({ store }: Props) {
             <div>
               <div className="metric-label mb-1.5">Mortgage Notes</div>
               <textarea
+                id="realestate-mortgage-notes"
                 value={form.mortgage_notes}
                 onChange={(e) => setField("mortgage_notes", e.target.value)}
                 maxLength={TEXT_LIMITS.notesField}
@@ -1035,6 +1056,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Monthly Rent Charged</div>
                 <input
+                  id="realestate-monthly-rent-charged"
                   type="number"
                   value={form.monthly_rent_charged}
                   onChange={(e) => setField("monthly_rent_charged", e.target.value)}
@@ -1045,6 +1067,7 @@ export function RealEstateModule({ store }: Props) {
               <div>
                 <div className="metric-label mb-1.5">Market Rent Estimate</div>
                 <input
+                  id="realestate-market-rent-estimate"
                   type="number"
                   value={form.market_rent_estimate}
                   onChange={(e) => setField("market_rent_estimate", e.target.value)}
