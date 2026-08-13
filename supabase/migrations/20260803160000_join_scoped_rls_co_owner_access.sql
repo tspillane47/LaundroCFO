@@ -14,6 +14,12 @@ DROP POLICY IF EXISTS "Users can delete pl links for their stores" ON transactio
 -- Legacy single-policy name.
 DROP POLICY IF EXISTS "Users access pl links for their stores" ON transaction_pl_links;
 
+-- Idempotent re-run (manual fix / partial apply).
+DROP POLICY IF EXISTS "Users can select accessible pl links" ON transaction_pl_links;
+DROP POLICY IF EXISTS "Users can insert accessible pl links" ON transaction_pl_links;
+DROP POLICY IF EXISTS "Users can update accessible pl links" ON transaction_pl_links;
+DROP POLICY IF EXISTS "Users can delete accessible pl links" ON transaction_pl_links;
+
 CREATE POLICY "Users can select accessible pl links"
   ON transaction_pl_links
   FOR SELECT
@@ -49,6 +55,12 @@ DROP POLICY IF EXISTS "Users can delete audit logs for their stores" ON transact
 -- Legacy single-policy name.
 DROP POLICY IF EXISTS "Users access audit logs for their stores" ON transaction_audit_log;
 
+-- Idempotent re-run (manual fix / partial apply).
+DROP POLICY IF EXISTS "Users can select accessible audit logs" ON transaction_audit_log;
+DROP POLICY IF EXISTS "Users can insert accessible audit logs" ON transaction_audit_log;
+DROP POLICY IF EXISTS "Users can update accessible audit logs" ON transaction_audit_log;
+DROP POLICY IF EXISTS "Users can delete accessible audit logs" ON transaction_audit_log;
+
 CREATE POLICY "Users can select accessible audit logs"
   ON transaction_audit_log
   FOR SELECT
@@ -80,6 +92,12 @@ CREATE POLICY "Users can delete accessible audit logs"
 -- ---------------------------------------------------------------------------
 
 DROP POLICY IF EXISTS "Users access alerts for their stores" ON store_alerts;
+
+-- Idempotent re-run (manual fix / partial apply).
+DROP POLICY IF EXISTS "Users can select accessible store alerts" ON store_alerts;
+DROP POLICY IF EXISTS "Users can insert accessible store alerts" ON store_alerts;
+DROP POLICY IF EXISTS "Users can update accessible store alerts" ON store_alerts;
+DROP POLICY IF EXISTS "Users can delete accessible store alerts" ON store_alerts;
 
 CREATE POLICY "Users can select accessible store alerts"
   ON store_alerts
