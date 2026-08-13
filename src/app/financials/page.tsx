@@ -42,7 +42,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { useWriteGuard } from "@/lib/useWriteGuard";
 import {
-  type BankTransaction,
+  type BankImportCategory,
   type CalculatedMonthly,
   type FinancialDataSource,
   FINANCIAL_DATA_SOURCE_LABELS,
@@ -51,14 +51,14 @@ import {
   type PlCategoryField,
   type RatioBenchmark,
   type StoreFinancialProfile,
+  type TransactionStatus,
+  type TransactionType,
   MONTH_NAMES,
   MONTH_SHORT,
   PL_CATEGORY_FIELDS,
-  BANK_IMPORT_CATEGORY_LABELS,
   applyLoanDebtServiceToTtm,
   buildRatioBenchmarks,
   fetchAnnualDebtServiceByStore,
-  mapBankCategoryToPlField,
   calcMonthly,
   calcRatios,
   calcTtmMetrics,
@@ -68,6 +68,7 @@ import {
   emptyMonthlyForm,
   enrichMonthlyRecords,
   getChartRecords,
+  inferTransactionType,
   monthChartLabel,
   monthKey,
   ratioStatusColor,
@@ -98,8 +99,8 @@ type StagedTransaction = {
   transaction_date: string;
   description: string | null;
   amount: number;
-  category: PlCategoryField;
-  suggested: PlCategoryField;
+  type: TransactionType;
+  category: BankImportCategory;
 };
 
 type QBMappingRow = {
@@ -349,22 +350,17 @@ function parseCSVTransactions(text: string): StagedTransaction[] {
       ? new Date().toISOString().slice(0, 10)
       : parsed.toISOString().slice(0, 10);
 
-    const suggestedRaw = suggestTransactionCategory(description);
-    const suggested = mapBankCategoryToPlField(suggestedRaw) ?? "other_expenses";
+    const type = inferTransactionType(amount, null);
+    const category = suggestTransactionCategory(description, type);
     return {
       tempId: `csv-${i}-${Date.now()}`,
       transaction_date,
       description,
       amount,
-      category: suggested,
-      suggested,
+      type,
+      category,
     };
   });
-}
-
-function normalizeTransactionAmount(amount: number, field: PlCategoryField): number {
-  const abs = Math.abs(amount);
-  return field === "revenue" ? abs : abs;
 }
 
 export default function FinancialsPage() {
@@ -388,7 +384,6 @@ export default function FinancialsPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [records, setRecords] = useState<CalculatedMonthly[]>([]);
   const [scheduledAnnualDebtService, setScheduledAnnualDebtService] = useState(0);
-  const [bankTransactions, setBankTransactions] = useState<BankTransaction[]>([]);
   const [stagedTransactions, setStagedTransactions] = useState<StagedTransaction[]>([]);
   const [qbMappings, setQbMappings] = useState<QBMappingRow[]>(DEFAULT_QB_MAPPINGS);
   const [qbConnection, setQbConnection] = useState<QBConnection | null>(null);
@@ -433,7 +428,6 @@ export default function FinancialsPage() {
     if (!storeId) {
       setStore(null);
       setRecords([]);
-      setBankTransactions([]);
       setLoading(false);
       return;
     }
@@ -455,7 +449,6 @@ export default function FinancialsPage() {
     const [
       { data: storeData, error: storeError },
       { data: financialsData, error: financialsError },
-      { data: bankData, error: bankError },
       { data: mappingData, error: mappingError },
       { data: connectionData, error: connectionError },
       { data: plaidConnectionsData, error: plaidConnectionsError },
@@ -469,12 +462,6 @@ export default function FinancialsPage() {
         .eq("store_id", storeId)
         .order("year", { ascending: false })
         .order("month", { ascending: false }),
-      supabase
-        .from("bank_transactions")
-        .select("*")
-        .eq("store_id", storeId)
-        .eq("is_reviewed", false)
-        .order("transaction_date", { ascending: false }),
       supabase.from("quickbooks_mapping").select("*").eq("store_id", storeId),
       supabase
         .from("quickbooks_connections")
@@ -500,7 +487,6 @@ export default function FinancialsPage() {
     const errors = [
       storeError,
       financialsError,
-      bankError,
       mappingError,
       connectionError,
       plaidConnectionsError,
@@ -529,7 +515,6 @@ export default function FinancialsPage() {
       utilitiesLookup
     );
     setRecords(sorted);
-    setBankTransactions((bankData ?? []) as BankTransaction[]);
 
     if ((mappingData ?? []).length > 0) {
       setQbMappings(
@@ -866,12 +851,18 @@ export default function FinancialsPage() {
         return;
       }
       setStagedTransactions((prev) => [...parsed, ...prev]);
-      setSuccess(`Parsed ${parsed.length} transaction${parsed.length === 1 ? "" : "s"} from CSV.`);
+      setSuccess(
+        `Parsed ${parsed.length} transaction${parsed.length === 1 ? "" : "s"} from CSV. Save to queue, then review on the Transactions page.`
+      );
     };
     reader.readAsText(file);
   }
 
   async function saveStagedToBank() {
+    if (!canWrite) {
+      setError(blockedReason ?? "Subscribe to make changes.");
+      return;
+    }
     if (!store?.id || !userId || stagedTransactions.length === 0) return;
     if (saving) return;
     setSaving(true);
@@ -882,7 +873,11 @@ export default function FinancialsPage() {
       description: t.description,
       amount: t.amount,
       category: t.category,
+      transaction_type: t.type,
+      original_category: t.category,
+      status: "needs_review" as TransactionStatus,
       is_reviewed: false,
+      excluded: false,
     }));
     const { error: insertError } = await supabase.from("bank_transactions").insert(rows);
     if (insertError) {
@@ -891,78 +886,11 @@ export default function FinancialsPage() {
       return;
     }
     setStagedTransactions([]);
-    setSuccess(`Saved ${rows.length} transactions to review queue.`);
     setSaving(false);
-    await loadData(store.id);
-  }
-
-  async function postTransactionToPL(
-    txn: BankTransaction | StagedTransaction,
-    isStaged: boolean
-  ) {
-    if (!store?.id || !userId) return;
-    const category = (txn.category ?? "other_expenses") as PlCategoryField;
-    const date = new Date(txn.transaction_date.split("T")[0] + "T12:00:00");
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const amount = normalizeTransactionAmount(txn.amount, category);
-
-    const existing = records.find((r) => r.year === year && r.month === month);
-    const base = existing
-      ? recordToForm(existing)
-      : { ...emptyMonthlyForm(store), year, month };
-
-    const currentFieldValue = (base[category as NumericFormField] as number) ?? 0;
-    const updated = {
-      ...base,
-      [category]: currentFieldValue + amount,
-    };
-
-    const payload = {
-      store_id: store.id,
-      user_id: userId,
-      year,
-      month,
-      revenue: updated.revenue,
-      utilities: updated.utilities,
-      rent: updated.rent,
-      payroll: updated.payroll,
-      repairs_maintenance: updated.repairs_maintenance,
-      insurance_expense: updated.insurance_expense,
-      supplies: updated.supplies,
-      marketing: updated.marketing,
-      professional_fees: updated.professional_fees,
-      other_expenses: updated.other_expenses,
-      debt_service: updated.debt_service,
-      notes: updated.notes,
-    };
-
-    if (existing?.id) {
-      await supabase.from("monthly_financials").update(payload).eq("id", existing.id);
-    } else {
-      await supabase.from("monthly_financials").insert(payload);
-    }
-
-    if (isStaged) {
-      setStagedTransactions((prev) => prev.filter((t) => t.tempId !== (txn as StagedTransaction).tempId));
-    } else {
-      await supabase.from("bank_transactions").update({ is_reviewed: true }).eq("id", (txn as BankTransaction).id);
-    }
-
-    setSuccess(`Posted to ${MONTH_NAMES[month - 1]} ${year} P&L (${CATEGORY_LABELS[category]}).`);
-    await loadData(store.id);
     if (store?.id) {
       void evaluateAlerts({ storeIds: [store.id] });
     }
-  }
-
-  async function ignoreTransaction(txn: BankTransaction | StagedTransaction, isStaged: boolean) {
-    if (isStaged) {
-      setStagedTransactions((prev) => prev.filter((t) => t.tempId !== (txn as StagedTransaction).tempId));
-      return;
-    }
-    await supabase.from("bank_transactions").update({ is_reviewed: true }).eq("id", (txn as BankTransaction).id);
-    setBankTransactions((prev) => prev.filter((t) => t.id !== (txn as BankTransaction).id));
+    router.push("/transactions?tab=needs_review");
   }
 
   async function saveQBMappings() {
@@ -1481,7 +1409,6 @@ export default function FinancialsPage() {
   }
 
   const occupancyPct = ratios && ttm.ttmRevenue > 0 ? (ratios.annualRent / ttm.ttmRevenue) * 100 : 0;
-  const reviewCount = bankTransactions.length + stagedTransactions.length;
   return (
     <div className="space-y-5">
       <div>
@@ -1515,9 +1442,6 @@ export default function FinancialsPage() {
               )}
             >
               {tab.label}
-              {tab.id === "bank" && reviewCount > 0 && (
-                <span className="ml-2 badge badge-amber text-[10px]">{reviewCount}</span>
-              )}
             </button>
           ))}
         </div>
@@ -2381,8 +2305,17 @@ export default function FinancialsPage() {
             <div>
               <div className="text-[14px] font-semibold text-slate-100">Import Bank Transactions</div>
               <div className="text-[12px] text-[var(--text-muted)] mt-1">
-                Upload a CSV with Date, Description, and Amount columns. Transactions are parsed client-side.
+                Upload a CSV with Date, Description, and Amount columns. After saving, review and categorize on the{" "}
+                <Link href="/transactions?tab=needs_review" className="text-[var(--accent)] hover:underline">
+                  Transactions page
+                </Link>
+                .
               </div>
+              {stagedTransactions.length > 0 && (
+                <div className="text-[12px] text-emerald-200/90 mt-2">
+                  {stagedTransactions.length} transaction{stagedTransactions.length === 1 ? "" : "s"} ready to import.
+                </div>
+              )}
             </div>
             <div className="flex gap-2">
               <label className="btn-outline cursor-pointer">
@@ -2399,144 +2332,21 @@ export default function FinancialsPage() {
                 />
               </label>
               {stagedTransactions.length > 0 && (
-                <button type="button" className="btn-primary" onClick={saveStagedToBank} disabled={saving}>
-                  Save {stagedTransactions.length} to Queue
+                <button type="button" className="btn-primary" onClick={() => void saveStagedToBank()} disabled={saving}>
+                  {saving ? "Saving…" : `Save ${stagedTransactions.length} to Queue`}
                 </button>
               )}
             </div>
           </div>
 
           <div className="card">
-            <div className="section-title">
-              Transaction Review
-              <span className="text-[11px] text-[var(--text-muted)] font-normal ml-auto">
-                {reviewCount} pending
-              </span>
-            </div>
-            {reviewCount === 0 ? (
-              <p className="text-[13px] text-[var(--text-muted)] py-6 text-center">
-                No transactions to review. Upload a CSV to get started.
-              </p>
-            ) : (
-              <div className="table-scroll">
-              <table className="w-full text-[12px]">
-                <thead>
-                  <tr className="text-left text-[var(--text-secondary)]border-b border-[var(--border)]">
-                    <th className="pb-3 pr-3 font-medium">Date</th>
-                    <th className="pb-3 pr-3 font-medium">Description</th>
-                    <th className="pb-3 pr-3 font-medium text-right">Amount</th>
-                    <th className="pb-3 pr-3 font-medium">Category</th>
-                    <th className="pb-3 pr-3 font-medium">Suggestion</th>
-                    <th className="pb-3 font-medium text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stagedTransactions.map((txn) => (
-                    <tr key={txn.tempId} className="border-b border-[var(--border)]">
-                      <td className="py-3 pr-3 text-[var(--text-primary)] whitespace-nowrap">
-                        {new Date(txn.transaction_date + "T12:00:00").toLocaleDateString()}
-                      </td>
-                      <td className="py-3 pr-3 text-[var(--text-primary)] max-w-[200px] truncate">{txn.description ?? "—"}</td>
-                      <td className={clsx("py-3 pr-3 text-right font-semibold tabular-nums", txn.amount < 0 ? "text-[var(--text-danger)]" : "text-[var(--text-success)]")}>
-                        {fmtDollar(txn.amount)}
-                      </td>
-                      <td className="py-3 pr-3">
-                        <select
-                          value={txn.category}
-                          onChange={(e) =>
-                            setStagedTransactions((prev) =>
-                              prev.map((t) =>
-                                t.tempId === txn.tempId
-                                  ? { ...t, category: e.target.value as PlCategoryField }
-                                  : t
-                              )
-                            )
-                          }
-                          className={clsx(INPUT_CLASS, "w-40 py-1.5 text-[12px]")}
-                        >
-                          {PL_CATEGORY_FIELDS.map((f) => (
-                            <option key={f} value={f}>
-                              {CATEGORY_LABELS[f]}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-3 pr-3">
-                        <span className="badge badge-blue text-[10px]">{CATEGORY_LABELS[txn.suggested]}</span>
-                      </td>
-                      <td className="py-3 text-right whitespace-nowrap">
-                        <button type="button" className="btn-primary text-[11px] mr-1.5" onClick={() => postTransactionToPL(txn, true)}>
-                          Post to P&L
-                        </button>
-                        <button type="button" className="btn-outline text-[11px]" onClick={() => ignoreTransaction(txn, true)}>
-                          Ignore
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {bankTransactions.map((txn) => {
-                    const suggested = suggestTransactionCategory(txn.description);
-                    return (
-                      <tr key={txn.id} className="border-b border-[var(--border)]">
-                        <td className="py-3 pr-3 text-[var(--text-primary)] whitespace-nowrap">
-                          {new Date(txn.transaction_date.split("T")[0] + "T12:00:00").toLocaleDateString()}
-                        </td>
-                        <td className="py-3 pr-3 text-[var(--text-primary)] max-w-[200px] truncate">{txn.description ?? "—"}</td>
-                        <td className={clsx("py-3 pr-3 text-right font-semibold tabular-nums", txn.amount < 0 ? "text-[var(--text-danger)]" : "text-[var(--text-success)]")}>
-                          {fmtDollar(txn.amount)}
-                        </td>
-                        <td className="py-3 pr-3">
-                          <select
-                            value={txn.category ?? suggested}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setBankTransactions((prev) =>
-                                prev.map((t) => (t.id === txn.id ? { ...t, category: val } : t))
-                              );
-                              supabase.from("bank_transactions").update({ category: val }).eq("id", txn.id);
-                            }}
-                            className={clsx(INPUT_CLASS, "w-40 py-1.5 text-[12px]")}
-                          >
-                            {PL_CATEGORY_FIELDS.map((f) => (
-                              <option key={f} value={f}>
-                                {CATEGORY_LABELS[f]}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-3 pr-3">
-                          <span className="badge badge-blue text-[10px]">{BANK_IMPORT_CATEGORY_LABELS[suggested]}</span>
-                        </td>
-                        <td className="py-3 text-right whitespace-nowrap">
-                          <button
-                            type="button"
-                            className="btn-primary text-[11px] mr-1.5"
-                            onClick={() =>
-                              postTransactionToPL(
-                                {
-                                  ...txn,
-                                  category:
-                                    (txn.category as PlCategoryField | null) ??
-                                    mapBankCategoryToPlField(suggested) ??
-                                    "other_expenses",
-                                },
-                                false
-                              )
-                            }
-                          >
-                            Post to P&L
-                          </button>
-                          <button type="button" className="btn-outline text-[11px]" onClick={() => ignoreTransaction(txn, false)}>
-                            Ignore
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              </div>
-            )}
+            <p className="text-[13px] text-[var(--text-secondary)]">
+              Review and categorize your transactions on the{" "}
+              <Link href="/transactions?tab=needs_review" className="text-[var(--accent)] hover:underline font-medium">
+                Transactions page
+              </Link>
+              .
+            </p>
           </div>
         </div>
       )}
