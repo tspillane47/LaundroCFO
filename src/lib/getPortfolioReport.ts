@@ -149,10 +149,14 @@ export async function getPortfolioReport(
         .select("*")
         .eq("store_id", store.id)
         .maybeSingle();
-      const { data: leaseOptions } = await supabase
-        .from("lease_options")
-        .select("*")
-        .eq("lease_id", lease?.id ?? "");
+      let leaseOptions: Record<string, unknown>[] = [];
+      if (lease?.id) {
+        const { data } = await supabase
+          .from("lease_options")
+          .select("*")
+          .eq("lease_id", lease.id);
+        leaseOptions = data ?? [];
+      }
       const { data: equipment } = await supabase
         .from("equipment_inventory")
         .select("*")

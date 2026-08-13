@@ -388,7 +388,8 @@ export async function syncPositiveEvents(
       user_id: params.userId,
       store_id: params.storeId,
       alert_key: event.alert_key,
-      severity: event.severity,
+      // DB check constraint allows danger|warning|info only; UI treats these keys as success.
+      severity: "info" as const,
       title: event.title,
       body: event.body,
       resolved_at: nowIso,
@@ -451,12 +452,15 @@ function storedAlertToAlertItem(
           ? "valuation"
           : "financial";
   const actionMeta = CATEGORY_ACTION[categoryTag] ?? null;
-  const isResolved =
-    row.severity === "success" || row.resolved_at != null;
+  const isPositiveEvent = isPositiveEventAlertKey(row.alert_key);
+  const isResolved = row.severity === "success" || row.resolved_at != null;
+  const displaySeverity: AlertItem["severity"] = isPositiveEvent
+    ? "success"
+    : (row.severity as AlertItem["severity"]);
 
   return {
     id: row.alert_key,
-    severity: row.severity as AlertItem["severity"],
+    severity: displaySeverity,
     title: row.title,
     body: row.body,
     tags: [categoryTag, row.severity],

@@ -97,6 +97,42 @@ describe("positive event detection", () => {
     expect(positive[0].alert_key).toBe(`revenue-up-${STORE_ID}-2026-06`);
     expect(positive[0].severity).toBe("success");
   });
+
+  it("persists positive events with info severity for DB constraint", () => {
+    const items = generateStoreFeed(makeStore(), undefined, [], [], {
+      positiveEvents: {
+        revenueUp: {
+          currentRevenue: 55000,
+          priorRevenue: 50000,
+          periodKey: "2026-06",
+        },
+      },
+    });
+
+    const persistable = feedItemsToPersistableAlerts(items);
+    expect(persistable.every((alert) => alert.severity !== "success")).toBe(true);
+
+    const positive = feedItemsToPositiveEvents(items);
+    expect(positive[0]?.severity).toBe("success");
+    // syncPositiveEvents persists these with severity "info" (not "success") for DB constraint.
+  });
+
+  it("omits lease alerts for owner-occupied stores even with a stale lease row", () => {
+    const store = makeStore({ occupancy_type: "owner_occupied" });
+    const staleLease = {
+      id: "lease-stale",
+      lease_end_date: "2026-12-31",
+      monthly_rent: 5000,
+      annual_escalation_pct: 3,
+      lease_start_date: "2020-01-01",
+    };
+
+    const items = generateStoreFeed(store, staleLease, [], [], {
+      isOwnerOccupied: true,
+    });
+
+    expect(items.some((item) => item.category === "lease")).toBe(false);
+  });
 });
 
 describe("toast mapping and shown tracking", () => {

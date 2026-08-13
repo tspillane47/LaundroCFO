@@ -424,7 +424,7 @@ export default function ValuationPage() {
           .limit(1)
           .maybeSingle();
 
-        if (leaseData) {
+        if (leaseData?.id) {
           setHasLease(true);
           const remaining = calcYearsRemaining(leaseData.lease_end_date);
           setYearsRemaining(remaining);
@@ -458,14 +458,13 @@ export default function ValuationPage() {
         setRealEstateValue(0);
       }
 
-      const { data: leaseRow } = await supabase
-        .from("leases")
-        .select("*")
-        .eq("store_id", store.id)
-        .maybeSingle();
-      const { data: leaseOpts } = leaseRow
-        ? await supabase.from("lease_options").select("*").eq("lease_id", leaseRow.id)
-        : { data: [] };
+      const { data: leaseRow } = ownerOccupied
+        ? { data: null }
+        : await supabase.from("leases").select("*").eq("store_id", store.id).maybeSingle();
+      const { data: leaseOpts } =
+        leaseRow?.id != null
+          ? await supabase.from("lease_options").select("*").eq("lease_id", leaseRow.id)
+          : { data: [] };
       const { data: reRow } = ownerOccupied
         ? await supabase.from("real_estate").select("*").eq("store_id", store.id).maybeSingle()
         : { data: null };

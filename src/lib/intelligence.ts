@@ -353,8 +353,8 @@ export function generateStoreFeed(
     }
   }
 
-  // Lease items
-  if (lease?.lease_end_date) {
+  // Lease items — skip for owner-occupied stores (no third-party lease)
+  if (!options?.isOwnerOccupied && lease?.lease_end_date) {
     const yearsRemaining = calcYearsRemaining(lease.lease_end_date, now);
     const endDate = new Date(lease.lease_end_date);
     items.push({
@@ -393,7 +393,7 @@ export function generateStoreFeed(
     }
   }
 
-  if (lease) {
+  if (!options?.isOwnerOccupied && lease) {
     const escalation = getNextRentEscalation(
       lease.lease_start_date,
       lease.annual_escalation_pct,

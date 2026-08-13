@@ -265,10 +265,14 @@ export async function getStoreValuation(
       fetchStoreTtmMetrics(supabase, storeId),
     ]);
 
-  const { data: leaseOptions } = await supabase
-    .from("lease_options")
-    .select("*")
-    .eq("lease_id", lease?.id ?? "");
+  let leaseOptions: Record<string, unknown>[] = [];
+  if (lease?.id) {
+    const { data } = await supabase
+      .from("lease_options")
+      .select("*")
+      .eq("lease_id", lease.id);
+    leaseOptions = data ?? [];
+  }
 
   const storeRecord = store ?? {};
   const resolvedFinancials = resolveStoreFinancials(storeRecord, ttmMetrics);
@@ -277,7 +281,7 @@ export async function getStoreValuation(
     store: storeRecord,
     equipment: (equipment ?? []) as EquipmentRecord[],
     lease: lease ?? null,
-    leaseOptions: leaseOptions ?? [],
+    leaseOptions: leaseOptions,
     realEstate: realEstate ?? null,
     resolvedFinancials,
   };

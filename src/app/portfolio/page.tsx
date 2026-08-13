@@ -308,7 +308,10 @@ export default function PortfolioPage() {
       const avgMachineAge = store.avg_machine_age ?? 0;
 
       const isOwnerOccupied = store.occupancy_type === "owner_occupied";
-      const storeLease = leases.find((l) => l.store_id === store.id);
+      const storeLease =
+        store.occupancy_type === "owner_occupied"
+          ? undefined
+          : leases.find((l) => l.store_id === store.id);
       const leaseYearsRemaining = isOwnerOccupied
         ? null
         : storeLease
@@ -382,7 +385,10 @@ export default function PortfolioPage() {
 
   const allFeedItems = useMemo(() => {
     const items = (stores as Store[]).flatMap((store) => {
-      const storeLease = leases.find((l) => l.store_id === store.id);
+      const storeLease =
+        store.occupancy_type === "owner_occupied"
+          ? undefined
+          : leases.find((l) => l.store_id === store.id);
       const equipment = equipmentByStore[store.id] ?? [];
       const insurance = insuranceByStore[store.id] ?? [];
       const valuation = valuationByStoreId.get(store.id);

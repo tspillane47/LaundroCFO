@@ -286,9 +286,12 @@ export async function buildPortfolioFeedItems(
       uncategorizedTransactionCount: uncategorizedCounts[storeId] ?? 0,
     };
 
+    const storeLease =
+      store.occupancy_type === "owner_occupied" ? undefined : leasesByStore[storeId];
+
     const feedItems = generateStoreFeed(
       store,
-      leasesByStore[storeId],
+      storeLease,
       equipmentByStore[storeId],
       insuranceByStore[storeId],
       feedOptions
