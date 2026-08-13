@@ -14,6 +14,7 @@ const REVALIDATE_MS = 60_000;
 
 type AccessCache = {
   userId: string;
+  storeId: string | null;
   status: AccessStatus;
   storeCount: number;
   fetchedAt: number;
@@ -22,13 +23,16 @@ type AccessCache = {
 
 let accessCache: AccessCache | null = null;
 
-async function fetchAccessFromDb(userId: string): Promise<{
+async function fetchAccessFromDb(
+  userId: string,
+  storeId: string | null
+): Promise<{
   status: AccessStatus;
   storeCount: number;
 }> {
   const supabase = createClient();
   const [status, storeCount] = await Promise.all([
-    getAccessStatus(supabase, userId),
+    getAccessStatus(supabase, userId, new Date(), storeId),
     getUserStoreCount(supabase, userId),
   ]);
   return { status, storeCount };
@@ -47,12 +51,16 @@ const DEFAULT_STATUS: AccessStatus = {
   maxStores: 0,
 };
 
-export function useAccessStatus() {
+export function useAccessStatus(storeId?: string | null) {
+  const scopedStoreId = storeId ?? null;
   const [status, setStatus] = useState<AccessStatus>(
     accessCache?.status ?? DEFAULT_STATUS
   );
   const [storeCount, setStoreCount] = useState(accessCache?.storeCount ?? 0);
-  const [loading, setLoading] = useState(accessCache === null);
+  const [loading, setLoading] = useState(
+    accessCache === null ||
+      accessCache.storeId !== scopedStoreId
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +85,7 @@ export function useAccessStatus() {
         !force &&
         accessCache &&
         accessCache.userId === user.id &&
+        accessCache.storeId === scopedStoreId &&
         !accessCache.promise &&
         now - accessCache.fetchedAt < REVALIDATE_MS
       ) {
@@ -86,7 +95,12 @@ export function useAccessStatus() {
         return;
       }
 
-      if (!force && accessCache?.userId === user.id && accessCache.promise) {
+      if (
+        !force &&
+        accessCache?.userId === user.id &&
+        accessCache.storeId === scopedStoreId &&
+        accessCache.promise
+      ) {
         const result = await accessCache.promise;
         if (!cancelled) {
           setStatus(result.status);
@@ -97,9 +111,10 @@ export function useAccessStatus() {
       }
 
       setLoading(true);
-      const promise = fetchAccessFromDb(user.id);
+      const promise = fetchAccessFromDb(user.id, scopedStoreId);
       accessCache = {
         userId: user.id,
+        storeId: scopedStoreId,
         status: DEFAULT_STATUS,
         storeCount: 0,
         fetchedAt: now,
@@ -109,6 +124,7 @@ export function useAccessStatus() {
       const result = await promise;
       accessCache = {
         userId: user.id,
+        storeId: scopedStoreId,
         status: result.status,
         storeCount: result.storeCount,
         fetchedAt: Date.now(),
@@ -126,7 +142,7 @@ export function useAccessStatus() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [scopedStoreId]);
 
   const refresh = useCallback(async () => {
     invalidateAccessStatusCache();
@@ -143,9 +159,10 @@ export function useAccessStatus() {
     }
 
     setLoading(true);
-    const result = await fetchAccessFromDb(user.id);
+    const result = await fetchAccessFromDb(user.id, scopedStoreId);
     accessCache = {
       userId: user.id,
+      storeId: scopedStoreId,
       status: result.status,
       storeCount: result.storeCount,
       fetchedAt: Date.now(),
@@ -153,7 +170,7 @@ export function useAccessStatus() {
     setStatus(result.status);
     setStoreCount(result.storeCount);
     setLoading(false);
-  }, []);
+  }, [scopedStoreId]);
 
   return {
     isReadOnly: status.isReadOnly,

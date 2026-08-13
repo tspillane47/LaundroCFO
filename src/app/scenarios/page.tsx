@@ -69,7 +69,7 @@ function ScenariosPageContent() {
   const supabase = createClient();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
   const toast = useToast();
-  const { canWrite, blockedReason } = useWriteGuard();
+  const { canWrite, blockedReason } = useWriteGuard(selectedStore?.id);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [ctx, setCtx] = useState<StoreScenarioContext | null>(null);

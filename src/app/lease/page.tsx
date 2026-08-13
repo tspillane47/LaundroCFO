@@ -32,7 +32,7 @@ export default function OccupancyPage() {
   const router = useRouter();
   const supabase = createClient();
   const { selectedStore } = useStores();
-  const { canWrite, blockedReason } = useWriteGuard();
+  const { canWrite, blockedReason } = useWriteGuard(selectedStore?.id);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);

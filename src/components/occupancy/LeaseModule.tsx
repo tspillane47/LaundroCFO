@@ -216,7 +216,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
   const supabase = createClient();
   const toast = useToast();
   const { evaluateAlerts } = useAlertEvaluation();
-  const { canWrite, blockedReason } = useWriteGuard();
+  const { canWrite, blockedReason } = useWriteGuard(store.id);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

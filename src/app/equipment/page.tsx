@@ -94,7 +94,7 @@ export default function EquipmentPage() {
   const supabase = createClient();
   const { selectedStore } = useStores();
   const toast = useToast();
-  const { canWrite, blockedReason } = useWriteGuard();
+  const { canWrite, blockedReason } = useWriteGuard(selectedStore?.id);
   const currentYear = new Date().getFullYear();
 
   const [loading, setLoading] = useState(true);

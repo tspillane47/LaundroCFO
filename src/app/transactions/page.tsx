@@ -394,7 +394,7 @@ function TransactionsPageContent() {
   const { selectedStore, loading: storesLoading } = useStores();
   const toast = useToast();
   const { evaluateAlerts } = useAlertEvaluation();
-  const { canWrite, blockedReason } = useWriteGuard();
+  const { canWrite, blockedReason } = useWriteGuard(selectedStore?.id);
   const { visible: reviewTipsVisible, dismiss: dismissReviewTips, show: showReviewTips } =
     useTransactionReviewTips();
 

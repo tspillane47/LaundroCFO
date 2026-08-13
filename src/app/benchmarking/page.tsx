@@ -407,7 +407,7 @@ function BenchmarkingPageContent() {
   const supabase = createClient();
   const toast = useToast();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
-  const { canWrite, blockedReason } = useWriteGuard();
+  const { canWrite, blockedReason } = useWriteGuard(selectedStore?.id);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [store, setStore] = useState<StoreFinancialProfile | null>(null);

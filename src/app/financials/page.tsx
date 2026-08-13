@@ -371,7 +371,7 @@ export default function FinancialsPage() {
   const selectedStoreIdRef = useRef<string | undefined>(selectedStore?.id);
   selectedStoreIdRef.current = selectedStore?.id;
   const { evaluateAlerts } = useAlertEvaluation();
-  const { canWrite, blockedReason } = useWriteGuard();
+  const { canWrite, blockedReason } = useWriteGuard(selectedStore?.id);
 
   const [activeTab, setActiveTab] = useState<TabId>("pl");
   const [loading, setLoading] = useState(true);

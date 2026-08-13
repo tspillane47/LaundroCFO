@@ -160,7 +160,7 @@ function ChartTooltip({
 export default function UtilitiesPage() {
   const supabase = createClient();
   const { selectedStore, loading: storesLoading } = useStores();
-  const { canWrite, blockedReason } = useWriteGuard();
+  const { canWrite, blockedReason } = useWriteGuard(selectedStore?.id);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);

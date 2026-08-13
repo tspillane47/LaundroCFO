@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { cloneElement, isValidElement, useState, type ReactElement } from "react";
 import clsx from "clsx";
+import { useStores } from "@/lib/store-context";
 import { useWriteGuard } from "@/lib/useWriteGuard";
 
 type GuardedElementProps = {
@@ -15,10 +16,13 @@ type GuardedElementProps = {
 type ReadOnlyGuardProps = {
   children: ReactElement<GuardedElementProps>;
   align?: "start" | "end" | "stretch";
+  storeId?: string | null;
 };
 
-export function ReadOnlyGuard({ children, align = "end" }: ReadOnlyGuardProps) {
-  const { canWrite, blockedReason, actionLabel } = useWriteGuard();
+export function ReadOnlyGuard({ children, align = "end", storeId }: ReadOnlyGuardProps) {
+  const { selectedStore } = useStores();
+  const effectiveStoreId = storeId ?? selectedStore?.id ?? null;
+  const { canWrite, blockedReason, actionLabel } = useWriteGuard(effectiveStoreId);
   const [messageVisible, setMessageVisible] = useState(false);
 
   if (canWrite) {

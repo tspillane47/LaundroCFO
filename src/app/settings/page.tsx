@@ -72,7 +72,7 @@ export default function SettingsPage() {
   const toast = useToast();
   const { betaMode, loading: betaLoading } = useBetaMode();
   const { plan, reason, trialEndsAt, loading: accessLoading } = useAccessStatus();
-  const { canWrite, blockedReason } = useWriteGuard();
+  const { canWrite, blockedReason } = useWriteGuard(selectedStore?.id);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

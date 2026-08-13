@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { readOnlyActionCopy } from "@/lib/access";
+import { useStores } from "@/lib/store-context";
 import { useAccessStatus } from "@/lib/useAccessStatus";
 import { useBetaMode } from "@/lib/useBetaMode";
 
 export function ReadOnlyBanner() {
+  const { selectedStore } = useStores();
   const { betaMode, loading: betaLoading } = useBetaMode();
-  const { isReadOnly, reason, loading: accessLoading } = useAccessStatus();
+  const { isReadOnly, reason, loading: accessLoading } = useAccessStatus(selectedStore?.id ?? null);
 
   if (betaLoading || accessLoading || betaMode || !isReadOnly) {
     return null;

@@ -13,8 +13,8 @@ function EditStoreForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
-  const { canWrite, blockedReason } = useWriteGuard();
-  const [storeId, setStoreId] = useState<string | null>(null);
+  const [storeId, setStoreId] = useState<string | null>(searchParams.get("store"));
+  const { canWrite, blockedReason } = useWriteGuard(storeId);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [fetching, setFetching] = useState(true);

@@ -114,11 +114,68 @@ function resolveSubscriptionAccess(
   };
 }
 
+const NO_SUBSCRIPTION_ACCESS: AccessStatus = {
+  plan: null,
+  isReadOnly: true,
+  reason: "no_subscription",
+  trialEndsAt: null,
+  currentPeriodEnd: null,
+  maxStores: 0,
+};
+
+const CO_OWNER_WRITE_ACCESS: AccessStatus = {
+  plan: null,
+  isReadOnly: false,
+  reason: "active",
+  trialEndsAt: null,
+  currentPeriodEnd: null,
+  maxStores: null,
+};
+
+async function getCoOwnerStoreWriteAccess(
+  supabase: SupabaseClient,
+  userId: string,
+  storeId: string,
+  now: Date
+): Promise<AccessStatus> {
+  const { data: store, error: storeError } = await supabase
+    .from("stores")
+    .select("user_id")
+    .eq("id", storeId)
+    .maybeSingle();
+
+  if (storeError || !store) {
+    return NO_SUBSCRIPTION_ACCESS;
+  }
+
+  if (store.user_id === userId) {
+    return getAccessStatus(supabase, userId, now, null);
+  }
+
+  // Co-owners cannot read the owner's subscriptions row (RLS). Use the same
+  // SECURITY DEFINER check that RLS uses for writes.
+  const { data: canWrite, error: rpcError } = await supabase.rpc("user_can_write_store", {
+    check_user_id: userId,
+    check_store_id: storeId,
+  });
+
+  if (rpcError || !canWrite) {
+    return NO_SUBSCRIPTION_ACCESS;
+  }
+
+  return CO_OWNER_WRITE_ACCESS;
+}
+
 export async function getAccessStatus(
   supabase: SupabaseClient,
   userId: string,
-  now = new Date()
+  now = new Date(),
+  storeId?: string | null
 ): Promise<AccessStatus> {
+  if (storeId) {
+    return getCoOwnerStoreWriteAccess(supabase, userId, storeId, now);
+  }
+
   const betaMode = await fetchBetaModeSetting(supabase);
 
   if (betaMode) {
@@ -139,14 +196,7 @@ export async function getAccessStatus(
     .maybeSingle();
 
   if (error) {
-    return {
-      plan: null,
-      isReadOnly: true,
-      reason: "no_subscription",
-      trialEndsAt: null,
-      currentPeriodEnd: null,
-      maxStores: 0,
-    };
+    return NO_SUBSCRIPTION_ACCESS;
   }
 
   return resolveSubscriptionAccess(subscription as SubscriptionRow | null, now);

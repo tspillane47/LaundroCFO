@@ -293,7 +293,7 @@ export default function DebtPage() {
   const { selectedStore, isAllStores, stores } = useStores();
   const toast = useToast();
   const { evaluateAlerts } = useAlertEvaluation();
-  const { canWrite, blockedReason } = useWriteGuard();
+  const { canWrite, blockedReason } = useWriteGuard(selectedStore?.id);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);

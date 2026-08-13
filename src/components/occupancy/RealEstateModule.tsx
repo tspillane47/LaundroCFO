@@ -224,7 +224,7 @@ type Props = {
 export function RealEstateModule({ store }: Props) {
   const supabase = createClient();
   const toast = useToast();
-  const { canWrite, blockedReason } = useWriteGuard();
+  const { canWrite, blockedReason } = useWriteGuard(store.id);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

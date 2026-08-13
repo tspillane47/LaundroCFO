@@ -32,7 +32,7 @@ export function SavedLoanCalculationsSection({
 }: SavedLoanCalculationsSectionProps) {
   const supabase = createClient();
   const toast = useToast();
-  const { canWrite, blockedReason } = useWriteGuard();
+  const { canWrite, blockedReason } = useWriteGuard(storeId);
   const [userId, setUserId] = useState<string | null>(null);
   const [savedItems, setSavedItems] = useState<SavedLoanCalculationRow[]>([]);
   const [expanded, setExpanded] = useState(false);

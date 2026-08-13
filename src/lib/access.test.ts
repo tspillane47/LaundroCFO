@@ -16,6 +16,10 @@ type MockSupabaseOptions = {
   } | null;
   subscriptionError?: boolean;
   betaError?: boolean;
+  store?: { user_id: string } | null;
+  storeError?: boolean;
+  userCanWriteStore?: boolean;
+  rpcError?: boolean;
 };
 
 function createMockSupabase(options: MockSupabaseOptions = {}) {
@@ -32,6 +36,21 @@ function createMockSupabase(options: MockSupabaseOptions = {}) {
                   return { data: null, error: { message: "beta read failed" } };
                 }
                 return { data: { value: betaMode }, error: null };
+              },
+            }),
+          }),
+        };
+      }
+
+      if (table === "stores") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => {
+                if (options.storeError) {
+                  return { data: null, error: { message: "store read failed" } };
+                }
+                return { data: options.store ?? null, error: null };
               },
             }),
           }),
@@ -55,10 +74,21 @@ function createMockSupabase(options: MockSupabaseOptions = {}) {
 
       throw new Error(`Unexpected table: ${table}`);
     },
+    rpc(fn: string) {
+      if (fn !== "user_can_write_store") {
+        throw new Error(`Unexpected rpc: ${fn}`);
+      }
+      return Promise.resolve({
+        data: options.rpcError ? null : (options.userCanWriteStore ?? false),
+        error: options.rpcError ? { message: "rpc failed" } : null,
+      });
+    },
   } as never;
 }
 
 const USER_ID = "user-123";
+const OWNER_ID = "owner-456";
+const STORE_ID = "store-789";
 const NOW = new Date("2026-07-05T12:00:00.000Z");
 
 describe("getAccessStatus", () => {
@@ -216,6 +246,66 @@ describe("getAccessStatus", () => {
       currentPeriodEnd: null,
       maxStores: 0,
     });
+  });
+
+  it("checks the caller subscription when storeId belongs to the caller", async () => {
+    const result = await getAccessStatus(
+      createMockSupabase({
+        betaMode: false,
+        store: { user_id: USER_ID },
+        subscription: {
+          plan: "pro",
+          status: "active",
+          trial_ends_at: null,
+        },
+      }),
+      USER_ID,
+      NOW,
+      STORE_ID
+    );
+
+    expect(result.isReadOnly).toBe(false);
+    expect(result.reason).toBe("active");
+    expect(result.plan).toBe("pro");
+  });
+
+  it("grants write access to co-owners via user_can_write_store when owner is subscribed", async () => {
+    const result = await getAccessStatus(
+      createMockSupabase({
+        betaMode: false,
+        store: { user_id: OWNER_ID },
+        subscription: null,
+        userCanWriteStore: true,
+      }),
+      USER_ID,
+      NOW,
+      STORE_ID
+    );
+
+    expect(result).toEqual({
+      plan: null,
+      isReadOnly: false,
+      reason: "active",
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      maxStores: null,
+    });
+  });
+
+  it("blocks co-owners when user_can_write_store returns false", async () => {
+    const result = await getAccessStatus(
+      createMockSupabase({
+        betaMode: false,
+        store: { user_id: OWNER_ID },
+        userCanWriteStore: false,
+      }),
+      USER_ID,
+      NOW,
+      STORE_ID
+    );
+
+    expect(result.isReadOnly).toBe(true);
+    expect(result.reason).toBe("no_subscription");
   });
 });
 
