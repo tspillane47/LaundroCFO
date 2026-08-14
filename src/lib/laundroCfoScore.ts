@@ -3,7 +3,7 @@ import { benchmarks } from "@/lib/data";
 import { computeStoreDscr } from "@/lib/dscr";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import { resolveStoreFinancials } from "@/lib/getStoreValuation";
-import { utilityRecordTotal, type MonthlyUtilityRecord } from "@/lib/financials";
+import { utilityRecordTotal, annualizeTtmTotal, type MonthlyUtilityRecord } from "@/lib/financials";
 
 const NETWORK_BENCHMARK_THRESHOLD = 15;
 
@@ -396,7 +396,9 @@ export function computeLaundroCfoScore(
   const resolved = resolveStoreFinancials(store as Record<string, unknown>, ttm);
   const hasFinancials = resolved.source === "ttm";
   const monthlyRevenue = hasFinancials ? resolved.monthlyRevenue : store.monthly_revenue;
-  const annualRevenue = hasFinancials ? financials.ttmRevenue : null;
+  const annualRevenue = hasFinancials
+    ? annualizeTtmTotal(financials.ttmRevenue, financials.ttmMonthsUsed)
+    : null;
   const annualEbitda = hasFinancials ? resolved.annualEbitda : null;
 
   const ebitdaMargin =

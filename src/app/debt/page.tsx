@@ -25,6 +25,7 @@ import {
 import { calcDSCR, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { computeStoreDscr } from "@/lib/dscr";
 import {
+  annualizeTtmTotal,
   calcStoreTtmFromFinancials,
   type MonthlyFinancialRecord,
 } from "@/lib/financials";
@@ -371,6 +372,11 @@ export default function DebtPage() {
 
   const ttm = useMemo(() => calcStoreTtmFromFinancials(financialRecords), [financialRecords]);
 
+  const annualEbitda = useMemo(
+    () => annualizeTtmTotal(ttm.ttmEbitda, ttm.monthsUsed),
+    [ttm.ttmEbitda, ttm.monthsUsed]
+  );
+
   const debtServiceAnalysis = useMemo(() => {
     const scheduledMonthly = enrichedLoans.reduce((s, l) => s + (l.monthly_payment ?? 0), 0);
     const scheduledAnnual = scheduledMonthly * 12;
@@ -384,8 +390,8 @@ export default function DebtPage() {
     const monthlyVariancePct =
       monthlyVariance != null ? variancePct(monthlyVariance, scheduledMonthly) : null;
 
-    const scheduledDscr = computeStoreDscr(ttm.ttmEbitda, scheduledAnnual);
-    const actualDscr = calcDSCR(ttm.ttmEbitda, actualAnnualTotal ?? 0);
+    const scheduledDscr = computeStoreDscr(annualEbitda, scheduledAnnual);
+    const actualDscr = calcDSCR(annualEbitda, actualAnnualTotal ?? 0);
 
     return {
       scheduledMonthly,
@@ -399,7 +405,7 @@ export default function DebtPage() {
       actualDscr,
       hasActualData,
     };
-  }, [enrichedLoans, ttm]);
+  }, [enrichedLoans, ttm, annualEbitda]);
 
   const totals = useMemo(() => {
     const totalDebt = enrichedLoans.reduce((s, l) => s + l.estimatedCurrentBalance, 0);
@@ -671,7 +677,7 @@ export default function DebtPage() {
     const hasFinancialData = ttm.monthsUsed > 0;
     const calculatorProps = {
       storeId: selectedStore.id,
-      annualEbitda: ttm.ttmEbitda,
+      annualEbitda,
       businessValue: valuation?.businessValue ?? 0,
       realEstateValue: valuation?.realEstateValue ?? 0,
       isOwnerOccupied,
@@ -715,7 +721,7 @@ export default function DebtPage() {
 
   const calculatorProps = {
     storeId: selectedStore.id,
-    annualEbitda: ttm.ttmEbitda,
+    annualEbitda,
     businessValue: valuation?.businessValue ?? 0,
     realEstateValue: valuation?.realEstateValue ?? 0,
     isOwnerOccupied: valuation?.store?.occupancy_type === "owner_occupied",
@@ -1091,7 +1097,7 @@ export default function DebtPage() {
                 : DSCR_NO_DEBT_LABEL}
             </div>
             <div className="text-[12px] mt-2" style={{ color: "var(--text-muted)" }}>
-              TTM EBITDA {fmtDollar(ttm.ttmEbitda)} ÷ scheduled annual debt service
+              Annual EBITDA {fmtDollar(annualEbitda)} ÷ scheduled annual debt service
             </div>
           </div>
           <div className="card">
@@ -1111,7 +1117,7 @@ export default function DebtPage() {
                 : "N/A"}
             </div>
             <div className="text-[12px] mt-2" style={{ color: "var(--text-muted)" }}>
-              TTM EBITDA {fmtDollar(ttm.ttmEbitda)} ÷ actual TTM debt service
+              Annual EBITDA {fmtDollar(annualEbitda)} ÷ actual TTM debt service
             </div>
           </div>
         </div>

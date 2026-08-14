@@ -19,6 +19,7 @@ import {
   sumPortfolioCash,
 } from "@/lib/portfolioMetrics";
 import {
+  annualizeTtmTotal,
   buildPortfolioTtmCashFlow,
   fetchAnnualDebtServiceByStore,
   fetchMonthlyFinancialsForStores,
@@ -169,8 +170,8 @@ export async function getPortfolioReport(
 
       const ttm = portfolioFinancials.summary.byStoreId[store.id];
       const hasTtm = (ttm?.monthsUsed ?? 0) > 0;
-      const annualRevenue = hasTtm ? ttm.ttmRevenue : 0;
-      const annualEbitda = hasTtm ? ttm.ttmEbitda : 0;
+      const annualRevenue = hasTtm ? annualizeTtmTotal(ttm.ttmRevenue, ttm.monthsUsed) : 0;
+      const annualEbitda = hasTtm ? annualizeTtmTotal(ttm.ttmEbitda, ttm.monthsUsed) : 0;
       const annualDebtService = annualDebtByStore[store.id] ?? 0;
       const dscr = computePortfolioStoreDscr(ttm, annualDebtService);
 

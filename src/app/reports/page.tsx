@@ -28,6 +28,7 @@ import { generateExecutiveSummary } from "@/components/reports/generateExecutive
 import { FinancialDataConfidenceNote } from "@/components/ui/FinancialDataConfidenceNote";
 import { getPortfolioReport, type PortfolioReportData } from "@/lib/getPortfolioReport";
 import {
+  annualizeTtmTotal,
   buildPortfolioTtmCashFlow,
   buildPortfolioTtmSummary,
   EMPTY_PORTFOLIO_TTM_CASH_FLOW,
@@ -371,9 +372,13 @@ function ReportsPageContent() {
     const monthlyExpenses = store.monthly_expenses ?? 0;
     const monthlyEbitda = monthlyRevenue - monthlyExpenses;
     const annualRevenue =
-      storeTtm && storeTtm.monthsUsed > 0 ? storeTtm.ttmRevenue : monthlyRevenue * 12;
+      storeTtm && storeTtm.monthsUsed > 0
+        ? annualizeTtmTotal(storeTtm.ttmRevenue, storeTtm.monthsUsed)
+        : monthlyRevenue * 12;
     const annualEbitda =
-      storeTtm && storeTtm.monthsUsed > 0 ? storeTtm.ttmEbitda : monthlyEbitda * 12;
+      storeTtm && storeTtm.monthsUsed > 0
+        ? annualizeTtmTotal(storeTtm.ttmEbitda, storeTtm.monthsUsed)
+        : monthlyEbitda * 12;
     const ttmDebtService = storeTtm?.ttmDebtService ?? 0;
     const loanBalance = store.loan_balance ?? 0;
     const sqft = store.square_footage ?? 3500;
@@ -399,7 +404,7 @@ function ReportsPageContent() {
           : calcEbitdaMargin(annualEbitda, annualRevenue)
         : 0;
     const utilityRatio = calcUtilityRatio(
-      hasTtm ? storeTtm.ttmUtilities : 0,
+      hasTtm ? annualizeTtmTotal(storeTtm.ttmUtilities, storeTtm.monthsUsed) : 0,
       annualRevenue
     );
     const rentToRevenue = calcRentToRevenue((lease?.monthly_rent ?? 0) * 12, annualRevenue);

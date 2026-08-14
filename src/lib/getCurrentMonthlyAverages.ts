@@ -6,6 +6,7 @@ import {
   BANK_IMPORT_CATEGORY_LABELS,
   REVENUE_BREAKDOWN_FIELDS,
   UTILITY_IMPORT_FIELDS,
+  annualizeTtmTotal,
   buildUtilitiesLookup,
   calcTtmMetrics,
   enrichMonthlyRecords,
@@ -334,7 +335,10 @@ function buildCurrentMonthlyAveragesFromContext(
       totalOutstandingBalance,
     },
     surplusCashFlow: ebitdaMonthly - totalMonthlyDebtService,
-    dscr: computeStoreDscr(ttm.ttmEbitda, totalMonthlyDebtService * 12),
+    dscr: computeStoreDscr(
+      annualizeTtmTotal(ttm.ttmEbitda, monthsUsed),
+      totalMonthlyDebtService * 12
+    ),
     equity,
     waterKPI,
     monthsUsed,

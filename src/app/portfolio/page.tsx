@@ -8,6 +8,7 @@ import { useStores } from "@/lib/store-context";
 import { DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { shouldTriggerLowDscrAlert } from "@/lib/dscr";
 import {
+  annualizeTtmTotal,
   fetchMonthlyFinancialsForStores,
   fetchMonthlyUtilitiesForStores,
   fetchUncategorizedReviewCountsByStore,
@@ -295,7 +296,9 @@ export default function PortfolioPage() {
           ? storeTtm.ttmEbitda / storeTtm.monthsUsed
           : 0;
       const ttmMonthsUsed = storeValuation?.resolvedFinancials?.ttmMonthsUsed ?? storeTtm?.monthsUsed ?? 0;
-      const annualEbitda = hasFinancialData ? (storeTtm?.ttmEbitda ?? 0) : 0;
+      const annualEbitda = hasFinancialData
+        ? annualizeTtmTotal(storeTtm!.ttmEbitda, storeTtm!.monthsUsed)
+        : 0;
       const debtService = hasFinancialData ? (scheduledDebtServiceByStore[store.id] ?? 0) : 0;
       const dscr = computePortfolioStoreDscr(storeTtm, debtService);
       const estimatedValue = hasFinancialData ? (storeValuation?.businessValue ?? 0) : 0;

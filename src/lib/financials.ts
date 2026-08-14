@@ -406,11 +406,12 @@ export function applyLoanDebtServiceToTtm(
   scheduledAnnualDebtService: number
 ): TtmMetrics {
   const scheduled = scheduledAnnualDebtService > 0 ? scheduledAnnualDebtService : 0;
+  const annualEbitda = annualizeTtmTotal(ttm.ttmEbitda, ttm.monthsUsed);
   return {
     ...ttm,
     ttmDebtService: scheduled,
-    dscr: calcDSCR(ttm.ttmEbitda, scheduled),
-    ttmNoi: ttm.ttmEbitda - scheduled,
+    dscr: calcDSCR(annualEbitda, scheduled),
+    ttmNoi: annualEbitda - scheduled,
   };
 }
 
@@ -432,7 +433,7 @@ export function buildPortfolioTtmSummary(
     const baseTtm = calcTtmMetrics(records);
     const ttm = applyLoanDebtServiceToTtm(baseTtm, annualDebtServiceByStore?.[id] ?? 0);
     byStoreId[id] = ttm;
-    ttmEbitda += ttm.ttmEbitda;
+    ttmEbitda += annualizeTtmTotal(ttm.ttmEbitda, ttm.monthsUsed);
     ttmDebtService += ttm.ttmDebtService;
   }
 
@@ -630,11 +631,20 @@ export async function fetchAnnualDebtServiceByStore(
   return byStore;
 }
 
+/** Scale a trailing-period total to an annual figure (monthly average × 12). */
+export function annualizeTtmTotal(ttmTotal: number, monthsUsed: number): number {
+  if (!Number.isFinite(ttmTotal) || monthsUsed <= 0) return 0;
+  return (ttmTotal / monthsUsed) * 12;
+}
+
 export function resolveAnnualEbitda(
   ttm: TtmMetrics | null
 ): { annualEbitda: number; ttmMonthsUsed: number } {
   if (ttm && ttm.monthsUsed > 0) {
-    return { annualEbitda: ttm.ttmEbitda, ttmMonthsUsed: ttm.monthsUsed };
+    return {
+      annualEbitda: annualizeTtmTotal(ttm.ttmEbitda, ttm.monthsUsed),
+      ttmMonthsUsed: ttm.monthsUsed,
+    };
   }
   return { annualEbitda: 0, ttmMonthsUsed: 0 };
 }
@@ -669,18 +679,19 @@ export function calcRatios(
   const annualUtilities = annualizeExpense(records, "utilities");
   const annualPayroll = annualizeExpense(records, "payroll");
 
-  const ttmRevenue = ttm.ttmRevenue;
+  const annualRevenue = annualizeTtmTotal(ttm.ttmRevenue, ttm.monthsUsed);
+  const annualEbitda = annualizeTtmTotal(ttm.ttmEbitda, ttm.monthsUsed);
 
   return {
-    rentPct: ttmRevenue > 0 ? (annualRent / ttmRevenue) * 100 : 0,
-    utilityPct: ttmRevenue > 0 ? (annualUtilities / ttmRevenue) * 100 : 0,
-    payrollPct: ttmRevenue > 0 ? (annualPayroll / ttmRevenue) * 100 : 0,
-    revenuePerSF: sqft > 0 ? ttmRevenue / sqft : 0,
-    ebitdaPerSF: sqft > 0 ? ttm.ttmEbitda / sqft : 0,
+    rentPct: annualRevenue > 0 ? (annualRent / annualRevenue) * 100 : 0,
+    utilityPct: annualRevenue > 0 ? (annualUtilities / annualRevenue) * 100 : 0,
+    payrollPct: annualRevenue > 0 ? (annualPayroll / annualRevenue) * 100 : 0,
+    revenuePerSF: sqft > 0 ? annualRevenue / sqft : 0,
+    ebitdaPerSF: sqft > 0 ? annualEbitda / sqft : 0,
     totalMachines,
-    revenuePerMachine: totalMachines > 0 ? ttmRevenue / totalMachines : 0,
-    revenuePerWasher: washers > 0 ? ttmRevenue / washers : 0,
-    revenuePerDryer: dryers > 0 ? ttmRevenue / dryers : 0,
+    revenuePerMachine: totalMachines > 0 ? annualRevenue / totalMachines : 0,
+    revenuePerWasher: washers > 0 ? annualRevenue / washers : 0,
+    revenuePerDryer: dryers > 0 ? annualRevenue / dryers : 0,
     annualRent,
     annualUtilities,
     annualPayroll,

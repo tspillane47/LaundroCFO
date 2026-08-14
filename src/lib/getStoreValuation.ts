@@ -3,6 +3,7 @@ import { fetchAccessibleStores } from "@/lib/store-access";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import {
   buildUtilitiesLookup,
+  annualizeTtmTotal,
   calcTtmMetrics,
   enrichMonthlyRecords,
   sortRecordsDesc,
@@ -88,7 +89,10 @@ export function resolveStoreFinancials(
     return {
       monthlyRevenue: Number.isFinite(monthlyRevenue) ? monthlyRevenue : 0,
       monthlyExpenses: Number.isFinite(monthlyExpenses) ? monthlyExpenses : 0,
-      annualEbitda: Number.isFinite(ttm.ttmEbitda) ? ttm.ttmEbitda : 0,
+      annualEbitda:
+        Number.isFinite(ttm.ttmEbitda) && ttm.monthsUsed > 0
+          ? annualizeTtmTotal(ttm.ttmEbitda, ttm.monthsUsed)
+          : 0,
       ttmMonthsUsed: ttm.monthsUsed,
       source: "ttm",
     };

@@ -1,6 +1,6 @@
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import { calcEbitdaMargin, fmtDollar, fmtMultiple } from "@/lib/calculations";
-import type { TtmMetrics } from "@/lib/financials";
+import { annualizeTtmTotal, type TtmMetrics } from "@/lib/financials";
 import { getFinancialDataConfidenceMessage, needsFinancialDataConfidenceNote } from "@/lib/financialDataConfidence";
 import type { ValuationResult } from "@/lib/valuation";
 
@@ -52,8 +52,12 @@ export function generateExecutiveSummary({
   const monthlyRevenue = store?.monthly_revenue ?? 0;
   const monthlyExpenses = store?.monthly_expenses ?? 0;
   const hasTtm = (storeTtm?.monthsUsed ?? 0) > 0;
-  const annualRevenue = hasTtm ? storeTtm!.ttmRevenue : monthlyRevenue * 12;
-  const annualEbitda = hasTtm ? storeTtm!.ttmEbitda : (monthlyRevenue - monthlyExpenses) * 12;
+  const annualRevenue = hasTtm
+    ? annualizeTtmTotal(storeTtm!.ttmRevenue, storeTtm!.monthsUsed)
+    : monthlyRevenue * 12;
+  const annualEbitda = hasTtm
+    ? annualizeTtmTotal(storeTtm!.ttmEbitda, storeTtm!.monthsUsed)
+    : (monthlyRevenue - monthlyExpenses) * 12;
   const ebitdaMargin =
     annualRevenue > 0
       ? hasTtm

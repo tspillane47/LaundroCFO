@@ -17,7 +17,7 @@ import {
   fmtMultiple,
   fmtPct,
 } from "@/lib/calculations";
-import { formatDscrDisplay, type PortfolioTtmCashFlow, type PortfolioTtmSummary, type TtmMetrics } from "@/lib/financials";
+import { formatDscrDisplay, annualizeTtmTotal, type PortfolioTtmCashFlow, type PortfolioTtmSummary, type TtmMetrics } from "@/lib/financials";
 import { getFinancialDataConfidenceMessage, needsFinancialDataConfidenceNote } from "@/lib/financialDataConfidence";
 import type { ValuationResult } from "@/lib/valuation";
 import { PdfPageChrome } from "@/components/reports/PdfPageChrome";
@@ -272,8 +272,12 @@ function computeReportMetrics(props: ReportProps) {
   const monthlyEbitda = hasTtm
     ? storeTtm!.ttmEbitda / storeTtm!.monthsUsed
     : monthlyRevenue - monthlyExpenses;
-  const annualRevenue = hasTtm ? storeTtm!.ttmRevenue : monthlyRevenue * 12;
-  const annualEbitda = hasTtm ? storeTtm!.ttmEbitda : monthlyEbitda * 12;
+  const annualRevenue = hasTtm
+    ? annualizeTtmTotal(storeTtm!.ttmRevenue, storeTtm!.monthsUsed)
+    : monthlyRevenue * 12;
+  const annualEbitda = hasTtm
+    ? annualizeTtmTotal(storeTtm!.ttmEbitda, storeTtm!.monthsUsed)
+    : monthlyEbitda * 12;
   const annualOperatingExpenses = hasTtm ? annualRevenue - annualEbitda : monthlyExpenses * 12;
   const ttmDebtService = storeTtm?.ttmDebtService ?? 0;
   const loanBalance = store?.loan_balance ?? 0;
@@ -296,7 +300,9 @@ function computeReportMetrics(props: ReportProps) {
       : 0;
   const revenuePerSF = calcRevenuePerSF(annualRevenue, sqft);
   const ebitdaPerSF = calcEbitdaPerSF(annualEbitda, sqft);
-  const ttmUtilities = hasTtm ? storeTtm!.ttmUtilities : 0;
+  const ttmUtilities = hasTtm
+    ? annualizeTtmTotal(storeTtm!.ttmUtilities, storeTtm!.monthsUsed)
+    : 0;
   const utilityRatio = calcUtilityRatio(ttmUtilities, annualRevenue);
   const debtYield = loanBalance > 0 ? calcDebtYield(annualNoi, loanBalance) : 0;
 
@@ -844,7 +850,9 @@ export function ReportDocument(props: ReportProps) {
             </View>
             {portfolioStores.map((ps: any) => {
               const psTtm = portfolioTtm.byStoreId[ps.id];
-              const psEbitda = psTtm?.ttmEbitda ?? 0;
+              const psEbitda = psTtm
+                ? annualizeTtmTotal(psTtm.ttmEbitda, psTtm.monthsUsed)
+                : 0;
               const psDebtService = psTtm?.ttmDebtService ?? 0;
               const psDscr = psDebtService > 0 ? (psTtm?.dscr ?? null) : null;
               return (
@@ -867,7 +875,11 @@ export function ReportDocument(props: ReportProps) {
         <DataRow label="Portfolio EBITDA" value={fmtDollar(m.portfolioEbitda)} />
         <DataRow label="Portfolio Debt Service" value={m.portfolioDebtService > 0 ? fmtDollar(m.portfolioDebtService) : "—"} />
         <DataRow label="Global DSCR" value={m.portfolioDebtService > 0 && m.globalDscr != null ? fmtMultiple(m.globalDscr) : "N/A"} valueColor={m.globalDscr != null ? ratioColor(m.globalDscr, 1.5, 1.25) : undefined} />
-        <DataRow label="Combined Est. Value" value={fmtDollar(portfolioStores.reduce((s, ps) => s + (portfolioTtm.byStoreId[ps.id]?.ttmEbitda ?? 0) * m.valuation.finalMultiple, 0))} positive />
+        <DataRow label="Combined Est. Value" value={fmtDollar(portfolioStores.reduce((s, ps) => {
+          const psTtm = portfolioTtm.byStoreId[ps.id];
+          const psEbitda = psTtm ? annualizeTtmTotal(psTtm.ttmEbitda, psTtm.monthsUsed) : 0;
+          return s + psEbitda * m.valuation.finalMultiple;
+        }, 0))} positive />
         <SectionHeader>Global Cash Flow</SectionHeader>
         <Text style={styles.bodyText}>Trailing twelve-month portfolio cash flow from monthly_financials.</Text>
         <DataRow label="Revenue" value={fmtDollar(portfolioCashFlow.revenue)} />

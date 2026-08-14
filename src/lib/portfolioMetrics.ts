@@ -1,6 +1,7 @@
 import { calcGlobalDSCR } from "@/lib/calculations";
 import { computeStoreDscr } from "@/lib/dscr";
 import {
+  annualizeTtmTotal,
   buildPortfolioTtmSummary,
   type MonthlyFinancialRecord,
   type MonthlyUtilityRecordWithStore,
@@ -43,7 +44,10 @@ export function computePortfolioStoreDscr(
   scheduledAnnualDebtService: number
 ): number | null {
   if (!storeTtm || storeTtm.monthsUsed <= 0) return null;
-  return computeStoreDscr(storeTtm.ttmEbitda, scheduledAnnualDebtService);
+  return computeStoreDscr(
+    annualizeTtmTotal(storeTtm.ttmEbitda, storeTtm.monthsUsed),
+    scheduledAnnualDebtService
+  );
 }
 
 export function sumPortfolioCash(
