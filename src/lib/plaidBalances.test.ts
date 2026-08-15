@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPlaidBalanceSnapshot,
+  buildPortfolioPlaidBalanceSnapshot,
+  groupPlaidBalanceSnapshotsByStore,
   sumPlaidCashOnHand,
   sumPlaidCreditCardDebt,
   type PlaidAccountBalanceRow,
+  type PlaidAccountBalanceRowWithStore,
 } from "@/lib/plaid-shared";
 
 const sampleAccounts: PlaidAccountBalanceRow[] = [
@@ -75,6 +78,65 @@ describe("Plaid balance aggregation", () => {
       depositoryAccountCount: 0,
       creditAccountCount: 0,
       lastSyncedAt: null,
+    });
+  });
+});
+
+describe("Portfolio Plaid balance aggregation", () => {
+  const multiStoreAccounts: PlaidAccountBalanceRowWithStore[] = [
+    {
+      store_id: "store-a",
+      account_type: "depository",
+      current_balance: 10_000,
+      last_synced_at: "2026-08-15T10:00:00.000Z",
+    },
+    {
+      store_id: "store-a",
+      account_type: "credit",
+      current_balance: 500,
+      last_synced_at: "2026-08-15T10:30:00.000Z",
+    },
+    {
+      store_id: "store-b",
+      account_type: "depository",
+      current_balance: 7_500,
+      last_synced_at: "2026-08-15T11:00:00.000Z",
+    },
+    {
+      store_id: "store-b",
+      account_type: "credit",
+      current_balance: -200,
+      last_synced_at: "2026-08-15T09:00:00.000Z",
+    },
+  ];
+
+  it("sums cash and credit across multiple stores for the portfolio snapshot", () => {
+    expect(buildPortfolioPlaidBalanceSnapshot(multiStoreAccounts, 2)).toEqual({
+      cashOnHand: 17_500,
+      creditCardDebt: 300,
+      depositoryAccountCount: 2,
+      creditAccountCount: 2,
+      lastSyncedAt: "2026-08-15T11:00:00.000Z",
+      connectedStoreCount: 2,
+    });
+  });
+
+  it("groups per-store snapshots for store cards", () => {
+    expect(groupPlaidBalanceSnapshotsByStore(multiStoreAccounts)).toEqual({
+      "store-a": {
+        cashOnHand: 10_000,
+        creditCardDebt: 500,
+        depositoryAccountCount: 1,
+        creditAccountCount: 1,
+        lastSyncedAt: "2026-08-15T10:30:00.000Z",
+      },
+      "store-b": {
+        cashOnHand: 7_500,
+        creditCardDebt: -200,
+        depositoryAccountCount: 1,
+        creditAccountCount: 1,
+        lastSyncedAt: "2026-08-15T11:00:00.000Z",
+      },
     });
   });
 });

@@ -41,6 +41,11 @@ import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
 import { useWriteGuard } from "@/lib/useWriteGuard";
+import {
+  loadPortfolioPlaidBalanceData,
+  type PortfolioPlaidBalanceData,
+  type PortfolioPlaidBalanceSnapshot,
+} from "@/lib/plaidBalances";
 
 type Store = {
   id: string;
@@ -100,6 +105,26 @@ function dscrColorClass(dscr: number): string {
   return "text-red-500";
 }
 
+function formatPlaidLastSynced(iso: string | null): string {
+  if (!iso) return "Not synced yet";
+  return new Date(iso).toLocaleString("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function formatPlaidAccountCount(count: number, label: string): string {
+  return `${count} ${label}${count === 1 ? "" : "s"}`;
+}
+
+function formatPortfolioPlaidCashSubtext(snapshot: PortfolioPlaidBalanceSnapshot): string {
+  return `${formatPlaidAccountCount(snapshot.depositoryAccountCount, "depository account")} across ${snapshot.connectedStoreCount} store${snapshot.connectedStoreCount === 1 ? "" : "s"} · Last synced ${formatPlaidLastSynced(snapshot.lastSyncedAt)} · Live bank balances, not Portfolio Cash above`;
+}
+
+function formatPortfolioPlaidCreditSubtext(snapshot: PortfolioPlaidBalanceSnapshot): string {
+  return `${formatPlaidAccountCount(snapshot.creditAccountCount, "credit account")} across ${snapshot.connectedStoreCount} store${snapshot.connectedStoreCount === 1 ? "" : "s"} · Last synced ${formatPlaidLastSynced(snapshot.lastSyncedAt)} · Credit card balances from connected banks`;
+}
+
 export default function PortfolioPage() {
   const supabase = createClient();
   const router = useRouter();
@@ -133,6 +158,17 @@ export default function PortfolioPage() {
   const [scheduledDebtServiceByStore, setScheduledDebtServiceByStore] = useState<Record<string, number>>({});
   const [portfolioTtmSummary, setPortfolioTtmSummary] = useState<PortfolioTtmSummary | null>(null);
   const [uncategorizedCountsByStore, setUncategorizedCountsByStore] = useState<Record<string, number>>({});
+  const [portfolioPlaidData, setPortfolioPlaidData] = useState<PortfolioPlaidBalanceData>({
+    hasAnyPlaidConnections: false,
+    portfolioSnapshot: null,
+    snapshotsByStoreId: {},
+    connectedStoreIds: [],
+  });
+
+  const plaidConnectedStoreIdSet = useMemo(
+    () => new Set(portfolioPlaidData.connectedStoreIds),
+    [portfolioPlaidData.connectedStoreIds]
+  );
 
   useEffect(() => {
     if (localStorage.getItem("laundrocfo_show_welcome") === "true") {
@@ -165,6 +201,12 @@ export default function PortfolioPage() {
     if (stores.length === 0) {
       setLoading(false);
       setLoadError(false);
+      setPortfolioPlaidData({
+        hasAnyPlaidConnections: false,
+        portfolioSnapshot: null,
+        snapshotsByStoreId: {},
+        connectedStoreIds: [],
+      });
       return;
     }
 
@@ -182,6 +224,7 @@ export default function PortfolioPage() {
         financialsData,
         utilitiesData,
         uncategorizedCounts,
+        plaidBalanceData,
       ] = await Promise.all([
         supabase.from("leases").select("id, store_id, lease_end_date, monthly_rent").in("store_id", storeIds),
         supabase.from("real_estate").select("store_id, estimated_value").in("store_id", storeIds),
@@ -191,6 +234,7 @@ export default function PortfolioPage() {
         fetchMonthlyFinancialsForStores(supabase, storeIds),
         fetchMonthlyUtilitiesForStores(supabase, storeIds),
         fetchUncategorizedReviewCountsByStore(supabase, storeIds),
+        loadPortfolioPlaidBalanceData(storeIds),
       ]);
 
       const errors = [leasesError, reError, equipmentError, insuranceError, loansError].filter(Boolean);
@@ -213,6 +257,7 @@ export default function PortfolioPage() {
       }
       setInsuranceByStore(insMap);
       setUncategorizedCountsByStore(uncategorizedCounts);
+      setPortfolioPlaidData(plaidBalanceData);
 
       const valuations = await Promise.all(
         (stores as Store[]).map(async (store) => {
@@ -805,6 +850,41 @@ export default function PortfolioPage() {
         />
       </div>
 
+      {portfolioPlaidData.hasAnyPlaidConnections && portfolioPlaidData.portfolioSnapshot && (
+        <>
+          <div className="section-title mt-2">Bank Balances</div>
+          <div className="metric-grid">
+            <KpiCard
+              className="kpi-fade-in kpi-glow-card"
+              style={{ animationDelay: "0.4s" }}
+              label="Cash on Hand"
+              value={
+                <AnimatedNumber
+                  value={portfolioPlaidData.portfolioSnapshot.cashOnHand}
+                  prefix="$"
+                  duration={1000}
+                />
+              }
+              sub={formatPortfolioPlaidCashSubtext(portfolioPlaidData.portfolioSnapshot)}
+            />
+
+            <KpiCard
+              className="kpi-fade-in kpi-glow-card"
+              style={{ animationDelay: "0.45s" }}
+              label="Credit Card Debt"
+              value={
+                <AnimatedNumber
+                  value={portfolioPlaidData.portfolioSnapshot.creditCardDebt}
+                  prefix="$"
+                  duration={1000}
+                />
+              }
+              sub={formatPortfolioPlaidCreditSubtext(portfolioPlaidData.portfolioSnapshot)}
+            />
+          </div>
+        </>
+      )}
+
       {/* Store Cards */}
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -874,8 +954,14 @@ export default function PortfolioPage() {
               </div>
               <FinancialDataConfidenceNote monthsUsed={m.ttmMonthsUsed} variant="compact" />
 
-              <div className="text-[11px] mb-4" style={{ color: "var(--text-muted)" }}>
-                Cash: {m.hasFinancialData ? fmtDollar(m.storeCash) : "—"}
+              <div className="text-[11px] mb-4 space-y-1" style={{ color: "var(--text-muted)" }}>
+                <div>Cash: {m.hasFinancialData ? fmtDollar(m.storeCash) : "—"}</div>
+                {plaidConnectedStoreIdSet.has(m.store.id) && (
+                  <div>
+                    Bank cash: {fmtDollar(portfolioPlaidData.snapshotsByStoreId[m.store.id]?.cashOnHand ?? 0)} · CC
+                    debt: {fmtDollar(portfolioPlaidData.snapshotsByStoreId[m.store.id]?.creditCardDebt ?? 0)}
+                  </div>
+                )}
               </div>
 
               <div

@@ -81,6 +81,10 @@ export type PlaidAccountBalanceRow = {
   last_synced_at?: string | null;
 };
 
+export type PlaidAccountBalanceRowWithStore = PlaidAccountBalanceRow & {
+  store_id: string;
+};
+
 /** Sum depository account balances for a store's synced Plaid accounts. */
 export function sumPlaidCashOnHand(accounts: PlaidAccountBalanceRow[]): number {
   return accounts
@@ -129,6 +133,40 @@ export function buildPlaidBalanceSnapshot(accounts: PlaidAccountBalanceRow[]): P
     creditAccountCount: countPlaidAccountsByType(accounts, "credit"),
     lastSyncedAt: getLatestPlaidAccountSyncAt(accounts),
   };
+}
+
+export type PortfolioPlaidBalanceSnapshot = PlaidBalanceSnapshot & {
+  connectedStoreCount: number;
+};
+
+export function buildPortfolioPlaidBalanceSnapshot(
+  accounts: PlaidAccountBalanceRowWithStore[],
+  connectedStoreCount: number
+): PortfolioPlaidBalanceSnapshot {
+  return {
+    ...buildPlaidBalanceSnapshot(accounts),
+    connectedStoreCount,
+  };
+}
+
+export function groupPlaidBalanceSnapshotsByStore(
+  accounts: PlaidAccountBalanceRowWithStore[]
+): Record<string, PlaidBalanceSnapshot> {
+  const accountsByStore: Record<string, PlaidAccountBalanceRow[]> = {};
+
+  for (const account of accounts) {
+    if (!accountsByStore[account.store_id]) {
+      accountsByStore[account.store_id] = [];
+    }
+    accountsByStore[account.store_id].push(account);
+  }
+
+  const snapshotsByStoreId: Record<string, PlaidBalanceSnapshot> = {};
+  for (const [storeId, storeAccounts] of Object.entries(accountsByStore)) {
+    snapshotsByStoreId[storeId] = buildPlaidBalanceSnapshot(storeAccounts);
+  }
+
+  return snapshotsByStoreId;
 }
 
 /** Minimal Plaid transaction fields used for normalization (testable without server imports). */
