@@ -27,6 +27,8 @@ import {
   DEFAULT_PLAID_WEBHOOK_URL,
   normalizePlaidTransaction,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
+  EMPTY_PLAID_BALANCE_SYNC_RESULT,
+  type PlaidBalanceSyncResult,
   type PlaidSyncResult,
 } from "@/lib/plaid-shared";
 
@@ -1140,6 +1142,79 @@ async function persistPlaidSyncCursor(connectionId: string, syncCursor: string):
   }
 }
 
+export async function syncPlaidAccountBalances(
+  connectionId: string,
+  connection?: PlaidConnectionRow
+): Promise<PlaidBalanceSyncResult> {
+  const resolvedConnection = connection ?? (await loadPlaidConnection(connectionId));
+  const client = getPlaidClient();
+
+  let accounts;
+  try {
+    const response = await client.accountsGet({
+      access_token: resolvedConnection.plaid_access_token,
+    });
+    accounts = response.data.accounts;
+  } catch (error) {
+    logPlaidApiError("accountsGet failed", error, { connectionId, storeId: resolvedConnection.store_id });
+    throw error;
+  }
+
+  const admin = createAdminSupabaseClient();
+  const syncedAt = new Date().toISOString();
+  const returnedAccountIds = accounts.map((account) => account.account_id);
+
+  if (accounts.length > 0) {
+    const rows = accounts.map((account) => ({
+      plaid_connection_id: connectionId,
+      store_id: resolvedConnection.store_id,
+      plaid_account_id: account.account_id,
+      account_name: account.name,
+      account_type: account.type,
+      account_subtype: account.subtype ?? null,
+      current_balance: account.balances.current ?? 0,
+      available_balance: account.balances.available ?? null,
+      last_synced_at: syncedAt,
+    }));
+
+    const { error: upsertError } = await admin
+      .from("plaid_accounts")
+      .upsert(rows, { onConflict: "plaid_account_id" });
+
+    if (upsertError) {
+      throw new Error(`Failed to upsert Plaid accounts: ${upsertError.message}`);
+    }
+  }
+
+  const { data: existingRows, error: existingError } = await admin
+    .from("plaid_accounts")
+    .select("id, plaid_account_id")
+    .eq("plaid_connection_id", connectionId);
+
+  if (existingError) {
+    throw new Error(`Failed to load existing Plaid accounts: ${existingError.message}`);
+  }
+
+  const staleIds = (existingRows ?? [])
+    .filter((row) => !returnedAccountIds.includes(row.plaid_account_id))
+    .map((row) => row.id);
+
+  let accountsRemoved = 0;
+  if (staleIds.length > 0) {
+    const { error: deleteError } = await admin.from("plaid_accounts").delete().in("id", staleIds);
+    if (deleteError) {
+      throw new Error(`Failed to delete stale Plaid accounts: ${deleteError.message}`);
+    }
+    accountsRemoved = staleIds.length;
+  }
+
+  return {
+    accountsSynced: accounts.length,
+    accountsRemoved,
+    ok: true,
+  };
+}
+
 export async function syncPlaidTransactions(connectionId: string): Promise<PlaidSyncResult> {
   const connection = await loadPlaidConnection(connectionId);
   const storeId = connection.store_id;
@@ -1183,7 +1258,26 @@ export async function syncPlaidTransactions(connectionId: string): Promise<Plaid
 
     await persistPlaidSyncCursor(connectionId, batch.nextCursor);
 
-    return { added, modified, removed, skippedRemovedPosted };
+    let balances: PlaidBalanceSyncResult = EMPTY_PLAID_BALANCE_SYNC_RESULT;
+    try {
+      balances = await syncPlaidAccountBalances(connectionId, connection);
+    } catch (balanceError) {
+      const message =
+        balanceError instanceof Error ? balanceError.message : "Unknown Plaid balance sync error";
+      console.error("[plaid/sync] account balance sync failed after transaction sync succeeded", {
+        connectionId,
+        storeId,
+        error: message,
+      });
+      balances = {
+        accountsSynced: 0,
+        accountsRemoved: 0,
+        ok: false,
+        error: message,
+      };
+    }
+
+    return { added, modified, removed, skippedRemovedPosted, balances };
   } catch (error) {
     try {
       await persistPlaidSyncItemErrorIfApplicable(connection.plaid_item_id, error);

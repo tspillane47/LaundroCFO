@@ -22,6 +22,11 @@ import {
 } from "@/lib/financials";
 import { computeLaundroCfoScoreFromRaw, type LaundroCfoScoreResult } from "@/lib/laundroCfoScore";
 import {
+  getStorePlaidBalanceSnapshot,
+  storeHasPlaidConnections,
+  type PlaidBalanceSnapshot,
+} from "@/lib/plaidBalances";
+import {
   calcBuildingEquity,
   calcOccupancyCostRatioFromRent,
   calcRealEstateLTV,
@@ -71,6 +76,18 @@ function calcYearsRemaining(endDate: string | null): number {
   const now = new Date();
   const ms = end.getTime() - now.getTime();
   return Math.max(0, ms / (365.25 * 24 * 60 * 60 * 1000));
+}
+
+function formatPlaidLastSynced(iso: string | null): string {
+  if (!iso) return "Not synced yet";
+  return new Date(iso).toLocaleString("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function formatPlaidAccountCount(count: number, label: string): string {
+  return `${count} ${label}${count === 1 ? "" : "s"}`;
 }
 
 function generateValuationTrend(estimatedValue: number) {
@@ -212,6 +229,8 @@ export default function DashboardPage() {
   const [monthlyFinancials, setMonthlyFinancials] = useState<CalculatedMonthly[]>([]);
   const [monthlyUtilities, setMonthlyUtilities] = useState<MonthlyUtilityRecord[]>([]);
   const [uncategorizedTransactionCount, setUncategorizedTransactionCount] = useState(0);
+  const [hasPlaidConnections, setHasPlaidConnections] = useState(false);
+  const [plaidBalanceSnapshot, setPlaidBalanceSnapshot] = useState<PlaidBalanceSnapshot | null>(null);
   const supabase = createClient();
 
   const loadDashboardData = useCallback(async () => {
@@ -223,6 +242,8 @@ export default function DashboardPage() {
       setMonthlyFinancials([]);
       setMonthlyUtilities([]);
       setUncategorizedTransactionCount(0);
+      setHasPlaidConnections(false);
+      setPlaidBalanceSnapshot(null);
       setLoadError(false);
       setDetailLoading(false);
       return;
@@ -238,17 +259,21 @@ export default function DashboardPage() {
       const storeValuation = await getStoreValuation(loadedStore.id);
       setValuation(storeValuation);
 
-      const [debt, scheduledAnnual, financialsData, { data: utilitiesData, error: utilitiesError }, uncategorizedCounts] =
+      const [debt, scheduledAnnual, financialsData, { data: utilitiesData, error: utilitiesError }, uncategorizedCounts, plaidConnected, plaidBalances] =
         await Promise.all([
         getStoreDebt(loadedStore.id),
         getStoreScheduledDebtService(loadedStore.id),
         fetchStoreMonthlyFinancials(supabase, loadedStore.id),
         supabase.from("monthly_utilities").select("*").eq("store_id", loadedStore.id),
         fetchUncategorizedReviewCountsByStore(supabase, [loadedStore.id]),
+        storeHasPlaidConnections(loadedStore.id),
+        getStorePlaidBalanceSnapshot(loadedStore.id),
       ]);
       setTotalDebt(debt);
       setScheduledDebtService(scheduledAnnual);
       setUncategorizedTransactionCount(uncategorizedCounts[loadedStore.id] ?? 0);
+      setHasPlaidConnections(plaidConnected);
+      setPlaidBalanceSnapshot(plaidBalances);
       if (utilitiesError) throw utilitiesError;
       const utilitiesLookup = buildUtilitiesLookup((utilitiesData ?? []) as MonthlyUtilityRecord[]);
       setMonthlyUtilities((utilitiesData ?? []) as MonthlyUtilityRecord[]);
@@ -830,6 +855,29 @@ export default function DashboardPage() {
           }
         />
       </div>
+
+      {hasPlaidConnections && plaidBalanceSnapshot && (
+        <>
+          <div className="section-title mt-2">Bank Balances</div>
+          <div className="metric-grid">
+            <KpiCard
+              className="kpi-fade-in kpi-glow-card"
+              style={{ animationDelay: "0.4s" }}
+              label="Cash on Hand"
+              value={<AnimatedNumber value={plaidBalanceSnapshot.cashOnHand} prefix="$" duration={1000} />}
+              sub={`${formatPlaidAccountCount(plaidBalanceSnapshot.depositoryAccountCount, "depository account")} · Last synced ${formatPlaidLastSynced(plaidBalanceSnapshot.lastSyncedAt)} · Live bank balances, not the manual Cash field above`}
+            />
+
+            <KpiCard
+              className="kpi-fade-in kpi-glow-card"
+              style={{ animationDelay: "0.45s" }}
+              label="Credit Card Debt"
+              value={<AnimatedNumber value={plaidBalanceSnapshot.creditCardDebt} prefix="$" duration={1000} />}
+              sub={`${formatPlaidAccountCount(plaidBalanceSnapshot.creditAccountCount, "credit account")} · Last synced ${formatPlaidLastSynced(plaidBalanceSnapshot.lastSyncedAt)} · Credit card balances from connected banks`}
+            />
+          </div>
+        </>
+      )}
 
       {/* Section 3: Two Column Layout */}
       <div className="grid-3 grid grid-cols-1 xl:grid-cols-3 gap-4">

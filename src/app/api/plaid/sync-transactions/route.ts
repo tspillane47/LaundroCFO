@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { PlaidSyncResult } from "@/lib/plaid-shared";
+import { EMPTY_PLAID_BALANCE_SYNC_RESULT, type PlaidSyncResult } from "@/lib/plaid-shared";
 import {
   getPlaidConnectionById,
   getPlaidConnectionsForStore,
@@ -23,8 +23,20 @@ function aggregateSyncResults(results: PlaidConnectionSyncResult[]): PlaidSyncRe
       modified: totals.modified + result.modified,
       removed: totals.removed + result.removed,
       skippedRemovedPosted: totals.skippedRemovedPosted + result.skippedRemovedPosted,
+      balances: {
+        accountsSynced: totals.balances.accountsSynced + result.balances.accountsSynced,
+        accountsRemoved: totals.balances.accountsRemoved + result.balances.accountsRemoved,
+        ok: totals.balances.ok && result.balances.ok,
+        error: [totals.balances.error, result.balances.error].filter(Boolean).join("; ") || undefined,
+      },
     }),
-    { added: 0, modified: 0, removed: 0, skippedRemovedPosted: 0 }
+    {
+      added: 0,
+      modified: 0,
+      removed: 0,
+      skippedRemovedPosted: 0,
+      balances: { ...EMPTY_PLAID_BALANCE_SYNC_RESULT },
+    }
   );
 }
 
@@ -94,6 +106,7 @@ export async function POST(request: Request) {
           modified: 0,
           removed: 0,
           skippedRemovedPosted: 0,
+          balances: { ...EMPTY_PLAID_BALANCE_SYNC_RESULT, ok: false, error: message },
         });
       }
     }

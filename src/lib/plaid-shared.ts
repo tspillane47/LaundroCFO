@@ -54,12 +54,82 @@ export function formatPlaidItemErrorMessage(
   }
 }
 
+export type PlaidBalanceSyncResult = {
+  accountsSynced: number;
+  accountsRemoved: number;
+  ok: boolean;
+  error?: string;
+};
+
+export const EMPTY_PLAID_BALANCE_SYNC_RESULT: PlaidBalanceSyncResult = {
+  accountsSynced: 0,
+  accountsRemoved: 0,
+  ok: true,
+};
+
 export type PlaidSyncResult = {
   added: number;
   modified: number;
   removed: number;
   skippedRemovedPosted: number;
+  balances: PlaidBalanceSyncResult;
 };
+
+export type PlaidAccountBalanceRow = {
+  account_type: string;
+  current_balance: number | string;
+  last_synced_at?: string | null;
+};
+
+/** Sum depository account balances for a store's synced Plaid accounts. */
+export function sumPlaidCashOnHand(accounts: PlaidAccountBalanceRow[]): number {
+  return accounts
+    .filter((account) => account.account_type === "depository")
+    .reduce((sum, account) => sum + Number(account.current_balance ?? 0), 0);
+}
+
+/** Sum credit account balances for a store's synced Plaid accounts (net debt, not clamped). */
+export function sumPlaidCreditCardDebt(accounts: PlaidAccountBalanceRow[]): number {
+  return accounts
+    .filter((account) => account.account_type === "credit")
+    .reduce((sum, account) => sum + Number(account.current_balance ?? 0), 0);
+}
+
+export function countPlaidAccountsByType(accounts: PlaidAccountBalanceRow[], accountType: string): number {
+  return accounts.filter((account) => account.account_type === accountType).length;
+}
+
+export function getLatestPlaidAccountSyncAt(accounts: PlaidAccountBalanceRow[]): string | null {
+  let latest: string | null = null;
+
+  for (const account of accounts) {
+    const syncedAt = account.last_synced_at;
+    if (!syncedAt) continue;
+    if (!latest || syncedAt > latest) {
+      latest = syncedAt;
+    }
+  }
+
+  return latest;
+}
+
+export type PlaidBalanceSnapshot = {
+  cashOnHand: number;
+  creditCardDebt: number;
+  depositoryAccountCount: number;
+  creditAccountCount: number;
+  lastSyncedAt: string | null;
+};
+
+export function buildPlaidBalanceSnapshot(accounts: PlaidAccountBalanceRow[]): PlaidBalanceSnapshot {
+  return {
+    cashOnHand: sumPlaidCashOnHand(accounts),
+    creditCardDebt: sumPlaidCreditCardDebt(accounts),
+    depositoryAccountCount: countPlaidAccountsByType(accounts, "depository"),
+    creditAccountCount: countPlaidAccountsByType(accounts, "credit"),
+    lastSyncedAt: getLatestPlaidAccountSyncAt(accounts),
+  };
+}
 
 /** Minimal Plaid transaction fields used for normalization (testable without server imports). */
 export type PlaidTransactionLike = {

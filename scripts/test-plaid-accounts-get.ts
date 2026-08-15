@@ -10,8 +10,8 @@
  *   PLAID_CLIENT_ID, PLAID_SECRET
  *   TOKEN_ENCRYPTION_KEY (if tokens are encrypted at rest)
  *
- * Note: This store is connected via Plaid Sandbox (Platypus), so this script
- * always calls the Sandbox Plaid API, even when PLAID_ENV=production.
+ * Note: Uses PLAID_ENV (default sandbox). Sandbox tokens require sandbox keys;
+ * production tokens require production keys.
  */
 
 import { Configuration, PlaidApi, PlaidEnvironments } from "plaid";
@@ -29,15 +29,17 @@ type PlaidConnectionSnapshot = {
   updated_at: string;
 };
 
-function getSandboxPlaidClient(): PlaidApi {
+function getPlaidClientForScript(): PlaidApi {
   const clientId = process.env.PLAID_CLIENT_ID;
   const clientSecret = process.env.PLAID_SECRET;
   if (!clientId || !clientSecret) {
     throw new Error("Missing PLAID_CLIENT_ID or PLAID_SECRET");
   }
 
+  const env = process.env.PLAID_ENV === "production" ? "production" : "sandbox";
+
   const configuration = new Configuration({
-    basePath: PlaidEnvironments.sandbox,
+    basePath: PlaidEnvironments[env],
     baseOptions: {
       headers: {
         "PLAID-CLIENT-ID": clientId,
@@ -55,18 +57,19 @@ async function fetchConnection(storeId: string): Promise<PlaidConnectionSnapshot
     .from("plaid_connections")
     .select("id, store_id, plaid_item_id, plaid_access_token, institution_name, updated_at")
     .eq("store_id", storeId)
-    .maybeSingle();
+    .order("connected_at", { ascending: true })
+    .limit(1);
 
   if (error) {
     throw new Error(`Failed to load plaid_connections for store ${storeId}: ${error.message}`);
   }
-  if (!data?.plaid_access_token) {
+  if (!data?.[0]?.plaid_access_token) {
     throw new Error(`No Plaid connection found for store ${storeId}`);
   }
 
   return {
-    ...data,
-    plaid_access_token: decryptTokenIfEncrypted(data.plaid_access_token),
+    ...data[0],
+    plaid_access_token: decryptTokenIfEncrypted(data[0].plaid_access_token),
   } as PlaidConnectionSnapshot;
 }
 
@@ -85,7 +88,7 @@ async function main() {
   const connection = await fetchConnection(STORE_ID);
   logConnection(connection);
 
-  const plaid = getSandboxPlaidClient();
+  const plaid = getPlaidClientForScript();
   console.log("\nCalling Plaid accountsGet...");
 
   const response = await plaid.accountsGet({

@@ -83,6 +83,7 @@ import {
   type QuickBooksSyncSkippedMonth,
 } from "@/lib/quickbooks-shared";
 import {
+  EMPTY_PLAID_BALANCE_SYNC_RESULT,
   formatPlaidConnectionLabel,
   formatPlaidItemErrorMessage,
   isPlaidUpdateModeEligible,
@@ -166,6 +167,14 @@ function formatPlaidSyncSummary(result: PlaidSyncResult): string {
     parts.push(
       `${result.skippedRemovedPosted} posted removal${result.skippedRemovedPosted === 1 ? "" : "s"} skipped`
     );
+  }
+  if (result.balances.accountsSynced > 0) {
+    parts.push(
+      `${result.balances.accountsSynced} account balance${result.balances.accountsSynced === 1 ? "" : "s"} refreshed`
+    );
+  }
+  if (!result.balances.ok && result.balances.error) {
+    parts.push(`balance sync failed: ${result.balances.error}`);
   }
 
   return parts.length > 0
@@ -1256,6 +1265,7 @@ export default function FinancialsPage() {
         modified: payload?.modified ?? 0,
         removed: payload?.removed ?? 0,
         skippedRemovedPosted: payload?.skippedRemovedPosted ?? 0,
+        balances: payload?.balances ?? { ...EMPTY_PLAID_BALANCE_SYNC_RESULT },
       };
       setPlaidSyncResults((prev) => ({ ...prev, [connectionId]: result }));
       setSuccess(formatPlaidSyncSummary(result));
@@ -1291,6 +1301,7 @@ export default function FinancialsPage() {
         modified: payload?.modified ?? 0,
         removed: payload?.removed ?? 0,
         skippedRemovedPosted: payload?.skippedRemovedPosted ?? 0,
+        balances: payload?.balances ?? { ...EMPTY_PLAID_BALANCE_SYNC_RESULT },
       };
 
       setPlaidSyncAllResult(totals);
@@ -1303,6 +1314,7 @@ export default function FinancialsPage() {
           modified: connectionResult.modified,
           removed: connectionResult.removed,
           skippedRemovedPosted: connectionResult.skippedRemovedPosted,
+          balances: connectionResult.balances ?? { ...EMPTY_PLAID_BALANCE_SYNC_RESULT },
         };
       }
       setPlaidSyncResults((prev) => ({ ...prev, ...nextResults }));
