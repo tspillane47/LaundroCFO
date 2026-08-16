@@ -61,7 +61,12 @@ import { CashCard } from "@/components/ui/CashCard";
 import { PageError } from "@/components/ui/PageError";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
-import { BankBalancesPanel, MANUAL_CASH_SUBTEXT } from "@/components/ui/BankBalancesPanel";
+import { BankBalancesPanel } from "@/components/ui/BankBalancesPanel";
+import {
+  formatCashPositionSubtext,
+  LiveFromBankBadge,
+} from "@/components/ui/CashPositionIndicator";
+import { computeStoreCashPosition } from "@/lib/cashPosition";
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -384,11 +389,21 @@ export default function DashboardPage() {
     valuation && hasFinancialData ? Math.round(valuation.businessValue) : 0;
   const finalMultiple = valuation && hasFinancialData ? valuation.finalMultiple : 0;
 
-  const totalCash = hasFinancialData
-    ? (storeData?.operating_account_balance ?? 0) +
-      (storeData?.reserve_account_balance ?? 0) +
-      (storeData?.petty_cash ?? 0)
-    : 0;
+  const cashPosition = useMemo(
+    () =>
+      computeStoreCashPosition(
+        {
+          operating_account_balance: storeData?.operating_account_balance,
+          reserve_account_balance: storeData?.reserve_account_balance,
+          petty_cash: storeData?.petty_cash,
+        },
+        hasPlaidConnections,
+        plaidBalanceSnapshot ?? undefined
+      ),
+    [storeData, hasPlaidConnections, plaidBalanceSnapshot]
+  );
+  const totalCash = hasFinancialData ? cashPosition.amount : 0;
+  const cashPositionComposition = cashPosition.source === "plaid" ? "all_live" : "all_manual";
   const businessValue = estimatedValue;
   const equity = hasFinancialData ? businessValue + totalCash - totalDebt : 0;
 
@@ -825,7 +840,12 @@ export default function DashboardPage() {
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.25s" }}
-          label="Manual Cash"
+          label={
+            <span className="inline-flex flex-wrap items-center gap-2">
+              Cash Position
+              {hasFinancialData && cashPositionComposition === "all_live" && <LiveFromBankBadge />}
+            </span>
+          }
           value={
             hasFinancialData ? (
               <AnimatedNumber value={totalCash} prefix="$" duration={1000} />
@@ -833,7 +853,12 @@ export default function DashboardPage() {
               "—"
             )
           }
-          sub={hasFinancialData ? MANUAL_CASH_SUBTEXT : "Add monthly financials"}
+          sub={
+            hasFinancialData
+              ? formatCashPositionSubtext(cashPositionComposition, cashPositionComposition === "all_live" ? 1 : 0, 1) ??
+                undefined
+              : "Add monthly financials"
+          }
         />
 
         <KpiCard
@@ -1230,6 +1255,8 @@ export default function DashboardPage() {
         <CashCard
           store={storeData}
           hasFinancialData={hasFinancialData}
+          hasPlaidConnection={hasPlaidConnections}
+          plaidSnapshot={plaidBalanceSnapshot}
           onUpdate={(data) => {
             setStoreData(data);
             setStore(data);

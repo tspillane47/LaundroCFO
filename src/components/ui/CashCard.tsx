@@ -2,14 +2,26 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
+import { computeStoreCashPosition } from "@/lib/cashPosition";
+import type { PlaidBalanceSnapshot } from "@/lib/plaid-shared";
+import { LiveFromBankBadge } from "@/components/ui/CashPositionIndicator";
+import { MANUAL_CASH_SUBTEXT } from "@/components/ui/BankBalancesPanel";
 
 interface CashCardProps {
   store: any;
   hasFinancialData?: boolean;
+  hasPlaidConnection?: boolean;
+  plaidSnapshot?: PlaidBalanceSnapshot | null;
   onUpdate?: (updatedStore: any) => void;
 }
 
-export function CashCard({ store, hasFinancialData = true, onUpdate }: CashCardProps) {
+export function CashCard({
+  store,
+  hasFinancialData = true,
+  hasPlaidConnection = false,
+  plaidSnapshot = null,
+  onUpdate,
+}: CashCardProps) {
   const supabase = createClient();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -18,7 +30,18 @@ export function CashCard({ store, hasFinancialData = true, onUpdate }: CashCardP
   const [reserve, setReserve] = useState(store?.reserve_account_balance ?? 0);
   const [petty, setPetty] = useState(store?.petty_cash ?? 0);
 
-  const totalCash = Number(operating) + Number(reserve) + Number(petty);
+  const manualCash = Number(operating) + Number(reserve) + Number(petty);
+  const cashPosition = computeStoreCashPosition(
+    {
+      operating_account_balance: Number(operating),
+      reserve_account_balance: Number(reserve),
+      petty_cash: Number(petty),
+    },
+    hasPlaidConnection,
+    plaidSnapshot ?? undefined
+  );
+  const displayCash = cashPosition.amount;
+  const isLiveFromBank = cashPosition.source === "plaid";
 
   async function handleSave() {
     setSaving(true);
@@ -74,11 +97,21 @@ export function CashCard({ store, hasFinancialData = true, onUpdate }: CashCardP
       {!editing ? (
         <div>
           <div className="metric-value" style={{ color: "var(--text-primary)" }}>
-            {hasFinancialData ? `$${totalCash.toLocaleString()}` : "—"}
+            {hasFinancialData ? `$${displayCash.toLocaleString()}` : "—"}
           </div>
-          {hasFinancialData && lastUpdated && (
+          {hasFinancialData && isLiveFromBank && (
+            <div style={{ marginTop: "6px" }}>
+              <LiveFromBankBadge />
+            </div>
+          )}
+          {hasFinancialData && !isLiveFromBank && lastUpdated && (
             <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
-              Updated {lastUpdated} · Manual entry
+              Updated {lastUpdated} · {MANUAL_CASH_SUBTEXT}
+            </div>
+          )}
+          {hasFinancialData && !isLiveFromBank && !lastUpdated && (
+            <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+              {MANUAL_CASH_SUBTEXT}
             </div>
           )}
           {!hasFinancialData && (
@@ -86,7 +119,7 @@ export function CashCard({ store, hasFinancialData = true, onUpdate }: CashCardP
               Add monthly financials to track cash position.
             </div>
           )}
-          {hasFinancialData && (
+          {hasFinancialData && !isLiveFromBank && (
           <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
               <span style={{ color: "var(--text-muted)" }}>Operating Account</span>
@@ -104,9 +137,12 @@ export function CashCard({ store, hasFinancialData = true, onUpdate }: CashCardP
             )}
           </div>
           )}
-          <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--border)", fontSize: "11px", color: "var(--text-muted)" }}>
-            QuickBooks sync · Plaid integration coming soon
-          </div>
+          {hasFinancialData && isLiveFromBank && (
+            <div style={{ marginTop: "12px", fontSize: "11px", color: "var(--text-muted)", lineHeight: 1.5 }}>
+              Synced from connected bank accounts
+              {manualCash > 0 ? ` · Manual entry ($${manualCash.toLocaleString()}) not included while bank data is live` : ""}
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>

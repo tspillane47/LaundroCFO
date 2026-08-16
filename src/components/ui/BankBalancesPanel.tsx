@@ -2,24 +2,10 @@
 
 import { Landmark } from "lucide-react";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { LiveFromBankBadge } from "@/components/ui/CashPositionIndicator";
 import { KpiCard } from "@/components/ui/KpiCard";
 
 export const MANUAL_CASH_SUBTEXT = "Operating + reserve + petty (entered)";
-
-function LiveFromBankBadge() {
-  return (
-    <span
-      className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-      style={{
-        background: "rgba(56, 189, 248, 0.18)",
-        color: "#38bdf8",
-        border: "1px solid rgba(56, 189, 248, 0.35)",
-      }}
-    >
-      Live from Bank
-    </span>
-  );
-}
 
 type BankBalancesPanelProps = {
   cashOnHand: number;

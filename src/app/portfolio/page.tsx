@@ -18,8 +18,12 @@ import {
   computePortfolioEquity,
   computePortfolioFinancialTotals,
   computePortfolioStoreDscr,
-  sumPortfolioCash,
 } from "@/lib/portfolioMetrics";
+import {
+  computePortfolioCashPosition,
+  computeStoreCashPosition,
+  type PortfolioCashPositionSummary,
+} from "@/lib/cashPosition";
 import { formatDscrDisplay } from "@/lib/financials";
 import { getStoreValuation, getStoreBusinessDebt, getStoreBuildingMortgage, type StoreValuationResult } from "@/lib/getStoreValuation";
 import clsx from "clsx";
@@ -41,7 +45,13 @@ import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
 import { useWriteGuard } from "@/lib/useWriteGuard";
-import { BankBalancesPanel, MANUAL_CASH_SUBTEXT } from "@/components/ui/BankBalancesPanel";
+import { BankBalancesPanel } from "@/components/ui/BankBalancesPanel";
+import {
+  CashPositionIndicator,
+  formatCashPositionSubtext,
+  LiveFromBankBadge,
+  StoreCashSourceIndicator,
+} from "@/components/ui/CashPositionIndicator";
 import {
   loadPortfolioPlaidBalanceData,
   type PortfolioPlaidBalanceData,
@@ -349,11 +359,15 @@ export default function PortfolioPage() {
       const dscr = computePortfolioStoreDscr(storeTtm, debtService);
       const estimatedValue = hasFinancialData ? (storeValuation?.businessValue ?? 0) : 0;
       const loanBalance = store.loan_balance ?? 0;
-      const storeCash = hasFinancialData
-        ? (store.operating_account_balance ?? 0) +
-          (store.reserve_account_balance ?? 0) +
-          (store.petty_cash ?? 0)
-        : 0;
+      const hasPlaidConnection = plaidConnectedStoreIdSet.has(store.id);
+      const plaidSnapshot = portfolioPlaidData.snapshotsByStoreId[store.id];
+      const cashPosition = computeStoreCashPosition(
+        store,
+        hasPlaidConnection,
+        plaidSnapshot
+      );
+      const storeCash = hasFinancialData ? cashPosition.amount : 0;
+      const cashSource = cashPosition.source;
       const avgMachineAge = store.avg_machine_age ?? 0;
 
       const isOwnerOccupied = store.occupancy_type === "owner_occupied";
@@ -382,13 +396,22 @@ export default function PortfolioPage() {
         leaseYearsRemaining,
         avgMachineAge,
         storeCash,
+        cashSource,
         debtService,
         hasDscrWarning: hasFinancialData && shouldTriggerLowDscrAlert(dscr, debtService),
         hasFinancialData,
         ttmMonthsUsed,
       };
     });
-  }, [stores, leases, valuationByStoreId, scheduledDebtServiceByStore, portfolioTtmSummary]);
+  }, [stores, leases, valuationByStoreId, scheduledDebtServiceByStore, portfolioTtmSummary, plaidConnectedStoreIdSet, portfolioPlaidData.snapshotsByStoreId]);
+
+  const cashPositionSummary = useMemo((): PortfolioCashPositionSummary => {
+    return computePortfolioCashPosition(
+      stores as Store[],
+      portfolioPlaidData.connectedStoreIds,
+      portfolioPlaidData.snapshotsByStoreId
+    );
+  }, [stores, portfolioPlaidData.connectedStoreIds, portfolioPlaidData.snapshotsByStoreId]);
 
   const aggregates = useMemo(() => {
     const withFinancials = storeMetrics.filter((m) => m.hasFinancialData);
@@ -396,7 +419,7 @@ export default function PortfolioPage() {
     const totalAnnualRevenue = withFinancials.reduce((s, m) => s + m.monthlyRevenue * 12, 0);
     const totalAnnualEbitda = portfolioTtmSummary?.ttmEbitda ?? 0;
     const totalMonthlyEbitda = withFinancials.length > 0 ? totalAnnualEbitda / 12 : 0;
-    const totalCash = sumPortfolioCash(stores as Store[]);
+    const totalCash = cashPositionSummary.total;
     const totalAnnualDebtService = totalAnnualDebtServiceFromLoans;
     const hasDebtData = totalAnnualDebtServiceFromLoans > 0 && withFinancials.length > 0;
     const globalDSCR = hasDebtData ? (portfolioTtmSummary?.globalDscr ?? null) : null;
@@ -419,6 +442,7 @@ export default function PortfolioPage() {
       totalDebt,
       buildingMortgageTotal,
       totalCash,
+      cashPositionSummary,
       totalAnnualDebtService,
       globalDSCR,
       portfolioNetWorth,
@@ -430,7 +454,7 @@ export default function PortfolioPage() {
       hasAnyFinancialData,
       portfolioConfidenceSummary,
     };
-  }, [storeMetrics, stores, totalDebt, buildingMortgageTotal, realEstateTotal, totalAnnualDebtServiceFromLoans, portfolioTtmSummary]);
+  }, [storeMetrics, cashPositionSummary, totalDebt, buildingMortgageTotal, realEstateTotal, totalAnnualDebtServiceFromLoans, portfolioTtmSummary]);
 
   const allFeedItems = useMemo(() => {
     const items = (stores as Store[]).flatMap((store) => {
@@ -685,7 +709,7 @@ export default function PortfolioPage() {
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Manual Cash</div>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Cash Position</div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: '#4ade80' }}>
               {aggregates.hasAnyFinancialData ? (
                 <>$<AnimatedNumber value={aggregates.totalCash} duration={1000} /></>
@@ -694,9 +718,12 @@ export default function PortfolioPage() {
               )}
             </div>
             {aggregates.hasAnyFinancialData && (
-              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.55)', marginTop: '4px', lineHeight: 1.4 }}>
-                {MANUAL_CASH_SUBTEXT}
-              </div>
+              <CashPositionIndicator
+                composition={aggregates.cashPositionSummary.composition}
+                liveStoreCount={aggregates.cashPositionSummary.liveStoreCount}
+                storeCount={aggregates.cashPositionSummary.storeCount}
+                className="mt-1"
+              />
             )}
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
@@ -789,7 +816,20 @@ export default function PortfolioPage() {
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.15s" }}
-          label="Manual Cash (Entered)"
+          label={
+            <span className="inline-flex flex-wrap items-center gap-2">
+              Cash Position
+              {aggregates.hasAnyFinancialData && aggregates.cashPositionSummary.composition === "all_live" && (
+                <LiveFromBankBadge />
+              )}
+              {aggregates.hasAnyFinancialData && aggregates.cashPositionSummary.composition === "mixed" && (
+                <CashPositionIndicator
+                  composition="mixed"
+                  variant="badge"
+                />
+              )}
+            </span>
+          }
           value={
             aggregates.hasAnyFinancialData ? (
               <AnimatedNumber value={aggregates.totalCash} prefix="$" duration={1000} />
@@ -797,7 +837,15 @@ export default function PortfolioPage() {
               "—"
             )
           }
-          sub={aggregates.hasAnyFinancialData ? MANUAL_CASH_SUBTEXT : "Add monthly financials"}
+          sub={
+            aggregates.hasAnyFinancialData
+              ? formatCashPositionSubtext(
+                  aggregates.cashPositionSummary.composition,
+                  aggregates.cashPositionSummary.liveStoreCount,
+                  aggregates.cashPositionSummary.storeCount
+                ) ?? undefined
+              : "Add monthly financials"
+          }
         />
 
         <KpiCard
@@ -935,11 +983,15 @@ export default function PortfolioPage() {
               <FinancialDataConfidenceNote monthsUsed={m.ttmMonthsUsed} variant="compact" />
 
               <div className="text-[11px] mb-4 space-y-1" style={{ color: "var(--text-muted)" }}>
-                <div>Manual: {m.hasFinancialData ? fmtDollar(m.storeCash) : "—"}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>Cash: {m.hasFinancialData ? fmtDollar(m.storeCash) : "—"}</span>
+                  {m.hasFinancialData && (
+                    <StoreCashSourceIndicator source={m.cashSource} />
+                  )}
+                </div>
                 {plaidConnectedStoreIdSet.has(m.store.id) && (
                   <div>
-                    Bank (Plaid): cash {fmtDollar(portfolioPlaidData.snapshotsByStoreId[m.store.id]?.cashOnHand ?? 0)} · CC
-                    debt {fmtDollar(portfolioPlaidData.snapshotsByStoreId[m.store.id]?.creditCardDebt ?? 0)}
+                    CC debt {fmtDollar(portfolioPlaidData.snapshotsByStoreId[m.store.id]?.creditCardDebt ?? 0)}
                   </div>
                 )}
               </div>
