@@ -61,6 +61,7 @@ import { CashCard } from "@/components/ui/CashCard";
 import { PageError } from "@/components/ui/PageError";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
+import { BankBalancesPanel, MANUAL_CASH_SUBTEXT } from "@/components/ui/BankBalancesPanel";
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -726,6 +727,15 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {hasPlaidConnections && plaidBalanceSnapshot && (
+        <BankBalancesPanel
+          cashOnHand={plaidBalanceSnapshot.cashOnHand}
+          creditCardDebt={plaidBalanceSnapshot.creditCardDebt}
+          cashSub={`${formatPlaidAccountCount(plaidBalanceSnapshot.depositoryAccountCount, "depository account")} · Last synced ${formatPlaidLastSynced(plaidBalanceSnapshot.lastSyncedAt)} · Synced from connected bank accounts`}
+          creditSub={`${formatPlaidAccountCount(plaidBalanceSnapshot.creditAccountCount, "credit account")} · Last synced ${formatPlaidLastSynced(plaidBalanceSnapshot.lastSyncedAt)} · Credit card balances from connected banks`}
+        />
+      )}
+
       {/* Section 2: KPI Cards */}
       <div className="metric-grid">
         <DSCRCard
@@ -815,7 +825,7 @@ export default function DashboardPage() {
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.25s" }}
-          label="Cash"
+          label="Manual Cash"
           value={
             hasFinancialData ? (
               <AnimatedNumber value={totalCash} prefix="$" duration={1000} />
@@ -823,7 +833,7 @@ export default function DashboardPage() {
               "—"
             )
           }
-          sub={hasFinancialData ? "Operating + reserves" : "Add monthly financials"}
+          sub={hasFinancialData ? MANUAL_CASH_SUBTEXT : "Add monthly financials"}
         />
 
         <KpiCard
@@ -855,29 +865,6 @@ export default function DashboardPage() {
           }
         />
       </div>
-
-      {hasPlaidConnections && plaidBalanceSnapshot && (
-        <>
-          <div className="section-title mt-2">Bank Balances</div>
-          <div className="metric-grid">
-            <KpiCard
-              className="kpi-fade-in kpi-glow-card"
-              style={{ animationDelay: "0.4s" }}
-              label="Cash on Hand"
-              value={<AnimatedNumber value={plaidBalanceSnapshot.cashOnHand} prefix="$" duration={1000} />}
-              sub={`${formatPlaidAccountCount(plaidBalanceSnapshot.depositoryAccountCount, "depository account")} · Last synced ${formatPlaidLastSynced(plaidBalanceSnapshot.lastSyncedAt)} · Live bank balances, not the manual Cash field above`}
-            />
-
-            <KpiCard
-              className="kpi-fade-in kpi-glow-card"
-              style={{ animationDelay: "0.45s" }}
-              label="Credit Card Debt"
-              value={<AnimatedNumber value={plaidBalanceSnapshot.creditCardDebt} prefix="$" duration={1000} />}
-              sub={`${formatPlaidAccountCount(plaidBalanceSnapshot.creditAccountCount, "credit account")} · Last synced ${formatPlaidLastSynced(plaidBalanceSnapshot.lastSyncedAt)} · Credit card balances from connected banks`}
-            />
-          </div>
-        </>
-      )}
 
       {/* Section 3: Two Column Layout */}
       <div className="grid-3 grid grid-cols-1 xl:grid-cols-3 gap-4">

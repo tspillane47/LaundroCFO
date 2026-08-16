@@ -41,6 +41,7 @@ import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
 import { useWriteGuard } from "@/lib/useWriteGuard";
+import { BankBalancesPanel, MANUAL_CASH_SUBTEXT } from "@/components/ui/BankBalancesPanel";
 import {
   loadPortfolioPlaidBalanceData,
   type PortfolioPlaidBalanceData,
@@ -118,7 +119,7 @@ function formatPlaidAccountCount(count: number, label: string): string {
 }
 
 function formatPortfolioPlaidCashSubtext(snapshot: PortfolioPlaidBalanceSnapshot): string {
-  return `${formatPlaidAccountCount(snapshot.depositoryAccountCount, "depository account")} across ${snapshot.connectedStoreCount} store${snapshot.connectedStoreCount === 1 ? "" : "s"} · Last synced ${formatPlaidLastSynced(snapshot.lastSyncedAt)} · Live bank balances, not Portfolio Cash above`;
+  return `${formatPlaidAccountCount(snapshot.depositoryAccountCount, "depository account")} across ${snapshot.connectedStoreCount} store${snapshot.connectedStoreCount === 1 ? "" : "s"} · Last synced ${formatPlaidLastSynced(snapshot.lastSyncedAt)} · Synced from connected bank accounts`;
 }
 
 function formatPortfolioPlaidCreditSubtext(snapshot: PortfolioPlaidBalanceSnapshot): string {
@@ -684,7 +685,7 @@ export default function PortfolioPage() {
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Cash</div>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Manual Cash</div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: '#4ade80' }}>
               {aggregates.hasAnyFinancialData ? (
                 <>$<AnimatedNumber value={aggregates.totalCash} duration={1000} /></>
@@ -692,6 +693,11 @@ export default function PortfolioPage() {
                 "—"
               )}
             </div>
+            {aggregates.hasAnyFinancialData && (
+              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.55)', marginTop: '4px', lineHeight: 1.4 }}>
+                {MANUAL_CASH_SUBTEXT}
+              </div>
+            )}
           </div>
           <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
@@ -728,6 +734,15 @@ export default function PortfolioPage() {
           className="mt-3"
         />
       </div>
+
+      {portfolioPlaidData.hasAnyPlaidConnections && portfolioPlaidData.portfolioSnapshot && (
+        <BankBalancesPanel
+          cashOnHand={portfolioPlaidData.portfolioSnapshot.cashOnHand}
+          creditCardDebt={portfolioPlaidData.portfolioSnapshot.creditCardDebt}
+          cashSub={formatPortfolioPlaidCashSubtext(portfolioPlaidData.portfolioSnapshot)}
+          creditSub={formatPortfolioPlaidCreditSubtext(portfolioPlaidData.portfolioSnapshot)}
+        />
+      )}
 
       {/* KPI Row - 8 cards */}
       <div className="metric-grid">
@@ -774,7 +789,7 @@ export default function PortfolioPage() {
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.15s" }}
-          label="Portfolio Cash"
+          label="Manual Cash (Entered)"
           value={
             aggregates.hasAnyFinancialData ? (
               <AnimatedNumber value={aggregates.totalCash} prefix="$" duration={1000} />
@@ -782,7 +797,7 @@ export default function PortfolioPage() {
               "—"
             )
           }
-          sub={aggregates.hasAnyFinancialData ? "stores with P&L data" : "Add monthly financials"}
+          sub={aggregates.hasAnyFinancialData ? MANUAL_CASH_SUBTEXT : "Add monthly financials"}
         />
 
         <KpiCard
@@ -849,41 +864,6 @@ export default function PortfolioPage() {
           }
         />
       </div>
-
-      {portfolioPlaidData.hasAnyPlaidConnections && portfolioPlaidData.portfolioSnapshot && (
-        <>
-          <div className="section-title mt-2">Bank Balances</div>
-          <div className="metric-grid">
-            <KpiCard
-              className="kpi-fade-in kpi-glow-card"
-              style={{ animationDelay: "0.4s" }}
-              label="Cash on Hand"
-              value={
-                <AnimatedNumber
-                  value={portfolioPlaidData.portfolioSnapshot.cashOnHand}
-                  prefix="$"
-                  duration={1000}
-                />
-              }
-              sub={formatPortfolioPlaidCashSubtext(portfolioPlaidData.portfolioSnapshot)}
-            />
-
-            <KpiCard
-              className="kpi-fade-in kpi-glow-card"
-              style={{ animationDelay: "0.45s" }}
-              label="Credit Card Debt"
-              value={
-                <AnimatedNumber
-                  value={portfolioPlaidData.portfolioSnapshot.creditCardDebt}
-                  prefix="$"
-                  duration={1000}
-                />
-              }
-              sub={formatPortfolioPlaidCreditSubtext(portfolioPlaidData.portfolioSnapshot)}
-            />
-          </div>
-        </>
-      )}
 
       {/* Store Cards */}
       <div>
@@ -955,11 +935,11 @@ export default function PortfolioPage() {
               <FinancialDataConfidenceNote monthsUsed={m.ttmMonthsUsed} variant="compact" />
 
               <div className="text-[11px] mb-4 space-y-1" style={{ color: "var(--text-muted)" }}>
-                <div>Cash: {m.hasFinancialData ? fmtDollar(m.storeCash) : "—"}</div>
+                <div>Manual: {m.hasFinancialData ? fmtDollar(m.storeCash) : "—"}</div>
                 {plaidConnectedStoreIdSet.has(m.store.id) && (
                   <div>
-                    Bank cash: {fmtDollar(portfolioPlaidData.snapshotsByStoreId[m.store.id]?.cashOnHand ?? 0)} · CC
-                    debt: {fmtDollar(portfolioPlaidData.snapshotsByStoreId[m.store.id]?.creditCardDebt ?? 0)}
+                    Bank (Plaid): cash {fmtDollar(portfolioPlaidData.snapshotsByStoreId[m.store.id]?.cashOnHand ?? 0)} · CC
+                    debt {fmtDollar(portfolioPlaidData.snapshotsByStoreId[m.store.id]?.creditCardDebt ?? 0)}
                   </div>
                 )}
               </div>
