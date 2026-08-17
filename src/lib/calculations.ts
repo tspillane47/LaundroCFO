@@ -7,6 +7,7 @@ function safeDivide(numerator: number, denominator: number, fallback = 0): numbe
 }
 
 export const DSCR_NO_DEBT_LABEL = "N/A — No Debt";
+export const LEASE_OWNED_LABEL = "N/A — Owned";
 
 export function calcDSCR(
   cashFlow: number,

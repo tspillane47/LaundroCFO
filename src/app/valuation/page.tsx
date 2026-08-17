@@ -20,7 +20,19 @@ import {
   gradeColor,
   type EquipmentRecord,
 } from "@/lib/equipment";
-import { calcLeaseScore, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import {
+  calcLeaseScore,
+  DSCR_NO_DEBT_LABEL,
+  fmtDollar,
+  fmtMultiple,
+  LEASE_OWNED_LABEL,
+} from "@/lib/calculations";
+import { computeStoreCashPosition } from "@/lib/cashPosition";
+import {
+  getStorePlaidBalanceSnapshot,
+  storeHasPlaidConnections,
+  type PlaidBalanceSnapshot,
+} from "@/lib/plaidBalances";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 import {
   AreaChart,
@@ -313,7 +325,11 @@ export default function ValuationPage() {
   const [store, setStore] = useState<StoreRow | null>(null);
   const [insuranceCount, setInsuranceCount] = useState(0);
   const [hasLease, setHasLease] = useState(false);
-  const [leaseScore, setLeaseScore] = useState(50);
+  const [leaseScore, setLeaseScore] = useState<number | null>(null);
+  const [hasPlaidConnection, setHasPlaidConnection] = useState(false);
+  const [plaidBalanceSnapshot, setPlaidBalanceSnapshot] = useState<PlaidBalanceSnapshot | null>(
+    null
+  );
   const [historyPeriod, setHistoryPeriod] = useState<HistoryPeriod>("1y");
 
   const [marketDensity, setMarketDensity] = useState<MarketDensity>("suburban");
@@ -347,6 +363,8 @@ export default function ValuationPage() {
     if (!selectedStore?.id) {
       setLoading(false);
       setLoadError(false);
+      setHasPlaidConnection(false);
+      setPlaidBalanceSnapshot(null);
       return;
     }
 
@@ -354,10 +372,15 @@ export default function ValuationPage() {
     setLoadError(false);
 
     try {
-      const [valuationResult, scheduledAnnualDebtService] = await Promise.all([
-        getStoreValuation(selectedStore.id),
-        getStoreScheduledDebtService(selectedStore.id),
-      ]);
+      const [valuationResult, scheduledAnnualDebtService, plaidConnected, plaidBalances] =
+        await Promise.all([
+          getStoreValuation(selectedStore.id),
+          getStoreScheduledDebtService(selectedStore.id),
+          storeHasPlaidConnections(selectedStore.id),
+          getStorePlaidBalanceSnapshot(selectedStore.id),
+        ]);
+      setHasPlaidConnection(plaidConnected);
+      setPlaidBalanceSnapshot(plaidBalances);
       setScheduledDebtService(scheduledAnnualDebtService);
       const store = valuationResult.store as StoreRow;
       if (!store?.id) throw new Error("Store not found");
@@ -415,7 +438,7 @@ export default function ValuationPage() {
         setTotalLeaseControl(15);
         setYearsRemaining(15);
         setHasLease(false);
-        setLeaseScore(85);
+        setLeaseScore(null);
       } else {
         const { data: leaseData } = await supabase
           .from("leases")
@@ -540,10 +563,20 @@ export default function ValuationPage() {
 
   const equipmentGrade = equipMetrics.grade;
   const dscrNum = computeStoreDscr(annualEbitda, scheduledDebtService);
-  const totalCash =
-    (store?.operating_account_balance ?? 0) +
-    (store?.reserve_account_balance ?? 0) +
-    (store?.petty_cash ?? 0);
+  const cashPosition = useMemo(
+    () =>
+      computeStoreCashPosition(
+        {
+          operating_account_balance: store?.operating_account_balance,
+          reserve_account_balance: store?.reserve_account_balance,
+          petty_cash: store?.petty_cash,
+        },
+        hasPlaidConnection,
+        plaidBalanceSnapshot ?? undefined
+      ),
+    [store, hasPlaidConnection, plaidBalanceSnapshot]
+  );
+  const totalCash = cashPosition.amount;
   const marketDensityLabel = MARKET_DENSITY_LABELS[marketDensity];
   const dataCompleteness = calcDataCompleteness(
     store,
@@ -676,8 +709,14 @@ export default function ValuationPage() {
           </div>
           <div className="min-w-0">
             <div className="text-[11px] text-white/75 uppercase tracking-wider mb-1">Lease Score</div>
-            <div className="text-[20px] font-bold text-white">
-              <AnimatedNumber value={leaseScore} duration={1000} />
+            <div className="text-[20px] font-bold text-white break-words">
+              {isOwnerOccupied ? (
+                <span className="text-[14px] sm:text-[20px]">{LEASE_OWNED_LABEL}</span>
+              ) : leaseScore != null ? (
+                <AnimatedNumber value={leaseScore} duration={1000} />
+              ) : (
+                <span className="text-[14px] sm:text-[20px]">—</span>
+              )}
             </div>
           </div>
           <div className="min-w-0">
