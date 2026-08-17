@@ -655,67 +655,72 @@ export default function ValuationPage() {
 
       {/* Section 1 — Hero banner */}
       <div className="hero-value-card">
-        <div style={{ fontSize: '12px', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>
-          {store?.name ?? storeName ?? 'Your Store'} — Estimated Value
+        <div className="text-[12px] text-sky-300 uppercase tracking-widest mb-2">
+          {store?.name ?? storeName ?? "Your Store"} — Estimated Value
         </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
+        <div className="flex items-baseline gap-3 flex-wrap">
           <AnimatedNumber value={valuation.businessValue} prefix="$" className="hero-value-text" duration={1200} />
           <ValueChangeIndicator value={valuation.businessValue} />
         </div>
-        <Disclaimer variant="valuation" className="!text-[var(--text-secondary)] max-w-xl" />
-        <FinancialDataConfidenceNote monthsUsed={ttmMonthsUsed} variant="hero" className="mt-2" />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-          <span style={{ background: 'rgba(59,130,246,0.15)', color: '#93c5fd', padding: '4px 12px', borderRadius: '20px', fontSize: '14px', fontWeight: 600 }}>
+        <div className="flex flex-wrap gap-2 mt-3">
+          <span className="inline-flex items-center bg-blue-500/15 text-sky-300 px-3 py-1 rounded-full text-[14px] font-semibold">
             <AnimatedNumber value={valuation.finalMultiple} decimals={2} suffix="x" duration={1000} /> EBITDA Multiple
           </span>
         </div>
-        <Disclaimer variant="valuation" className="!text-[var(--text-secondary)] mt-1" />
+        <Disclaimer variant="valuation" className="!text-[var(--text-secondary)] max-w-xl mt-2" />
 
-        <div style={{ display: 'flex', gap: '24px', marginTop: '28px', flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Equipment Grade</div>
-            <div style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>{equipmentGrade}</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-5 mt-7">
+          <div className="min-w-0">
+            <div className="text-[11px] text-white/75 uppercase tracking-wider mb-1">Equipment Grade</div>
+            <div className="text-[20px] font-bold text-white">{equipmentGrade}</div>
           </div>
-          <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
-          <div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Lease Score</div>
-            <div style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>
+          <div className="min-w-0">
+            <div className="text-[11px] text-white/75 uppercase tracking-wider mb-1">Lease Score</div>
+            <div className="text-[20px] font-bold text-white">
               <AnimatedNumber value={leaseScore} duration={1000} />
             </div>
           </div>
-          <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
-          <div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+          <div className="min-w-0">
+            <div className="text-[11px] text-white/75 uppercase tracking-wider mb-1">
               <DisclaimerLabel className="!text-[var(--text-secondary)]">DSCR</DisclaimerLabel>
             </div>
-            <div style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>
+            <div className="text-[20px] font-bold text-white break-words">
               {dscrNum != null ? (
                 <AnimatedNumber value={dscrNum} decimals={2} suffix="x" duration={1000} />
               ) : (
-                DSCR_NO_DEBT_LABEL
+                <span className="text-[14px] sm:text-[20px]">{DSCR_NO_DEBT_LABEL}</span>
               )}
             </div>
           </div>
-          <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
-          <div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Cash</div>
-            <div style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>
+          <div className="min-w-0">
+            <div className="text-[11px] text-white/75 uppercase tracking-wider mb-1">Cash</div>
+            <div className="text-[20px] font-bold text-white">
               $<AnimatedNumber value={totalCash} duration={1000} />
+            </div>
+          </div>
+          <div className="min-w-0">
+            <div className="text-[11px] text-white/75 uppercase tracking-wider mb-1">Data Completeness</div>
+            <div
+              className={clsx(
+                "text-[20px] font-bold",
+                dataCompleteness >= 80
+                  ? "text-green-400"
+                  : dataCompleteness >= 50
+                    ? "text-amber-400"
+                    : "text-red-400"
+              )}
+            >
+              <AnimatedNumber value={dataCompleteness} suffix="%" duration={1000} />
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '20px', marginTop: '20px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.08)', flexWrap: 'wrap', fontSize: '12px', color: 'rgba(255,255,255,0.75)' }}>
+        <FinancialDataConfidenceNote monthsUsed={ttmMonthsUsed} variant="hero" className="mt-4" />
+
+        <div className="flex flex-wrap gap-x-5 gap-y-1 mt-5 pt-5 border-t border-white/10 text-[12px] text-white/75">
           <span>Market: {marketDensityLabel}</span>
           <span>Store Size: {store?.square_footage?.toLocaleString()} SF</span>
-          <span>Vintage: {store?.year_opened ?? '—'}</span>
-        </div>
-
-        <div style={{ position: 'absolute', top: '32px', right: '40px', textAlign: 'right' }}>
-          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Data Completeness</div>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: dataCompleteness >= 80 ? '#4ade80' : dataCompleteness >= 50 ? '#fbbf24' : '#f87171' }}>
-            <AnimatedNumber value={dataCompleteness} suffix="%" duration={1000} />
-          </div>
+          <span>Vintage: {store?.year_opened ?? "—"}</span>
         </div>
       </div>
 
@@ -821,8 +826,8 @@ export default function ValuationPage() {
               How We Arrived At This Value
             </div>
 
-            <div className="flex items-center h-9 text-[11px]border-b border-[var(--border)]">
-              <span className="text-[var(--text-secondary)] flex-shrink-0">Base Multiple</span>
+            <div className="flex items-center h-9 text-[11px] border-b border-[var(--border)]">
+              <span className="text-[var(--text-secondary)] min-w-0">Base Multiple</span>
               <span className="ml-auto font-semibold text-slate-100 tabular-nums">
                 {fmtMultiple(valuation.baseMultiple)}
               </span>
@@ -831,10 +836,10 @@ export default function ValuationPage() {
             {valuation.adjustments.map((adj) => (
               <div
                 key={`${adj.label}-${adj.category}`}
-                className="flex flex-col justify-center min-h-9 py-1 text-[11px]border-b border-[var(--border)] min-w-0"
+                className="flex flex-col justify-center min-h-9 py-1 text-[11px] border-b border-[var(--border)] min-w-0"
               >
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-[var(--text-secondary)] font-medium flex-shrink-0">{adj.label}</span>
+                  <span className="text-[var(--text-secondary)] font-medium min-w-0 flex-1 truncate">{adj.label}</span>
                   <span
                     className={clsx(
                       "text-[9px] px-1 py-px rounded border uppercase tracking-wide flex-shrink-0",
@@ -1109,9 +1114,9 @@ export default function ValuationPage() {
               {valuation.improvements.map((item) => (
                 <li
                   key={item.action}
-                  className="flex items-start justify-between gap-3 text-[12px] border-b border-[var(--border)] pb-3 last:border-0 last:pb-0"
+                  className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3 text-[12px] border-b border-[var(--border)] pb-3 last:border-0 last:pb-0"
                 >
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="text-[var(--text-primary)] font-medium">{item.action}</div>
                     <div className="text-green-400 font-semibold mt-0.5">
                       +{fmtDollar(item.estimatedGain)} potential
@@ -1119,7 +1124,7 @@ export default function ValuationPage() {
                   </div>
                   <Link
                     href="/scenarios"
-                    className="text-[11px] text-blue-400 hover:text-blue-300 whitespace-nowrap flex-shrink-0"
+                    className="text-[11px] text-blue-400 hover:text-blue-300 sm:whitespace-nowrap sm:flex-shrink-0 self-start"
                   >
                     Model This →
                   </Link>
@@ -1159,8 +1164,8 @@ export default function ValuationPage() {
               </div>
             </div>
           </div>
-          <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center justify-between">
-            <span className="text-[13px] text-[var(--text-secondary)]">Equipment Valuation Adjustment</span>
+          <div className="mt-4 pt-4 border-t border-[var(--border)] flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <span className="text-[13px] text-[var(--text-secondary)] min-w-0">Equipment Valuation Adjustment</span>
             <span
               className={clsx(
                 "text-[16px] font-bold",
@@ -1194,8 +1199,8 @@ export default function ValuationPage() {
               </div>
             </div>
           )}
-          <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center justify-between">
-            <span className="text-[13px] text-[var(--text-secondary)]">Lease Valuation Adjustment</span>
+          <div className="mt-4 pt-4 border-t border-[var(--border)] flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <span className="text-[13px] text-[var(--text-secondary)] min-w-0">Lease Valuation Adjustment</span>
             <span
               className={clsx(
                 "text-[16px] font-bold",
