@@ -13,6 +13,7 @@ import {
   type StoreValuationContext,
 } from "@/lib/getStoreValuation";
 import { computeStoreDscr } from "@/lib/dscr";
+import { validateServiceMixSum } from "@/lib/formHelpers";
 import type { ValuationResult } from "@/lib/valuation";
 import {
   computeEquipmentMetrics,
@@ -337,13 +338,12 @@ export default function ValuationPage() {
   const [storeCondition, setStoreCondition] = useState<StoreCondition>("fair");
   const [competitionLevel, setCompetitionLevel] = useState<CompetitionLevel>("normal");
 
-  const [selfServicePct, setSelfServicePct] = useState(70);
-  const [wdfPct, setWdfPct] = useState(18);
-  const [commercialPct, setCommercialPct] = useState(12);
+  const [selfServicePct, setSelfServicePct] = useState(0);
+  const [wdfPct, setWdfPct] = useState(0);
+  const [commercialPct, setCommercialPct] = useState(0);
   const [pickupDeliveryPct, setPickupDeliveryPct] = useState(0);
 
   const [lastRetoolYear, setLastRetoolYear] = useState("");
-  const [retoolInvestment, setRetoolInvestment] = useState("");
   const [retoolType, setRetoolType] = useState("");
 
   const [annualEbitda, setAnnualEbitda] = useState(0);
@@ -396,13 +396,12 @@ export default function ValuationPage() {
       setStoreCondition(normalizeStoreCondition(store.store_condition));
       setCompetitionLevel((store.competition_level as CompetitionLevel) ?? "normal");
 
-      setSelfServicePct(store.self_service_pct ?? 70);
-      setWdfPct(store.wdf_pct ?? 18);
-      setCommercialPct(store.commercial_pct ?? 12);
+      setSelfServicePct(store.self_service_pct ?? 0);
+      setWdfPct(store.wdf_pct ?? 0);
+      setCommercialPct(store.commercial_pct ?? 0);
       setPickupDeliveryPct(store.pickup_delivery_pct ?? 0);
 
       if (store.last_retool_year) setLastRetoolYear(String(store.last_retool_year));
-      if (store.retool_investment) setRetoolInvestment(String(store.retool_investment));
       if (store.retool_type) setRetoolType(store.retool_type);
 
       const { monthlyRevenue, monthlyExpenses, annualEbitda } = valuationResult.resolvedFinancials;
@@ -530,7 +529,6 @@ export default function ValuationPage() {
       commercialPct,
       pickupDeliveryPct,
       lastRetoolYear: lastRetoolYear ? parseInt(lastRetoolYear, 10) : undefined,
-      retoolInvestment: retoolInvestment ? parseFloat(retoolInvestment) : undefined,
       retoolType: retoolType || undefined,
       realEstateValue: isOwnerOccupied ? realEstateValue : undefined,
     });
@@ -545,7 +543,6 @@ export default function ValuationPage() {
     commercialPct,
     pickupDeliveryPct,
     lastRetoolYear,
-    retoolInvestment,
     retoolType,
     isOwnerOccupied,
     realEstateValue,
@@ -592,6 +589,18 @@ export default function ValuationPage() {
 
   async function handleSave() {
     if (!storeId) return;
+
+    const mixError = validateServiceMixSum(
+      selfServicePct,
+      wdfPct,
+      commercialPct,
+      pickupDeliveryPct
+    );
+    if (mixError) {
+      setError(mixError);
+      return;
+    }
+
     setSaving(true);
     setError("");
     setSaveSuccess(false);
@@ -608,7 +617,6 @@ export default function ValuationPage() {
         commercial_pct: commercialPct,
         pickup_delivery_pct: pickupDeliveryPct,
         last_retool_year: lastRetoolYear ? parseInt(lastRetoolYear, 10) : null,
-        retool_investment: retoolInvestment ? parseFloat(retoolInvestment) : null,
         retool_type: retoolType || null,
       })
       .eq("id", storeId);
@@ -632,7 +640,6 @@ export default function ValuationPage() {
                 commercial_pct: commercialPct,
                 pickup_delivery_pct: pickupDeliveryPct,
                 last_retool_year: lastRetoolYear ? parseInt(lastRetoolYear, 10) : null,
-                retool_investment: retoolInvestment ? parseFloat(retoolInvestment) : null,
                 retool_type: retoolType || null,
               },
             }
@@ -1085,7 +1092,7 @@ export default function ValuationPage() {
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div>
             <label className="block text-[11px] text-[var(--text-muted)] mb-1.5">Last Retool Year</label>
             <input
@@ -1096,18 +1103,6 @@ export default function ValuationPage() {
               placeholder="e.g. 2023"
               value={lastRetoolYear}
               onChange={(e) => setLastRetoolYear(e.target.value)}
-              className={INPUT_CLASS}
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] text-[var(--text-muted)] mb-1.5">Investment Amount</label>
-            <input
-              id="valuation-retoolinvestment"
-              type="number"
-              min={0}
-              placeholder="e.g. 395000"
-              value={retoolInvestment}
-              onChange={(e) => setRetoolInvestment(e.target.value)}
               className={INPUT_CLASS}
             />
           </div>

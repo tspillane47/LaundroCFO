@@ -14,6 +14,7 @@ import { useAccessStatus } from "@/lib/useAccessStatus";
 import { useBetaMode } from "@/lib/useBetaMode";
 import { useWriteGuard } from "@/lib/useWriteGuard";
 import { ManageAccessSection } from "@/components/settings/ManageAccessSection";
+import { toNum, validateServiceMixSum } from "@/lib/formHelpers";
 
 const inputClass = INPUT_CLASS;
 
@@ -100,9 +101,9 @@ export default function SettingsPage() {
     store_condition: "fair",
     revenue_trend: "stable",
     competition_level: "normal",
-    self_service_pct: "70",
-    wdf_pct: "18",
-    commercial_pct: "12",
+    self_service_pct: "0",
+    wdf_pct: "0",
+    commercial_pct: "0",
   });
 
   const [cashForm, setCashForm] = useState({
@@ -150,9 +151,9 @@ export default function SettingsPage() {
           store_condition: selectedStore.store_condition ?? "fair",
           revenue_trend: selectedStore.revenue_trend ?? "stable",
           competition_level: selectedStore.competition_level ?? "normal",
-          self_service_pct: selectedStore.self_service_pct != null ? String(selectedStore.self_service_pct) : "70",
-          wdf_pct: selectedStore.wdf_pct != null ? String(selectedStore.wdf_pct) : "18",
-          commercial_pct: selectedStore.commercial_pct != null ? String(selectedStore.commercial_pct) : "12",
+          self_service_pct: selectedStore.self_service_pct != null ? String(selectedStore.self_service_pct) : "0",
+          wdf_pct: selectedStore.wdf_pct != null ? String(selectedStore.wdf_pct) : "0",
+          commercial_pct: selectedStore.commercial_pct != null ? String(selectedStore.commercial_pct) : "0",
         });
         setCashForm({
           operating_account_balance:
@@ -182,6 +183,22 @@ export default function SettingsPage() {
       toast.error("Store name is required.");
       return;
     }
+
+    const selfServicePct = toNum(form.self_service_pct, 0);
+    const wdfPct = toNum(form.wdf_pct, 0);
+    const commercialPct = toNum(form.commercial_pct, 0);
+    const pickupDeliveryPct = toNum(selectedStore.pickup_delivery_pct, 0);
+    const mixError = validateServiceMixSum(
+      selfServicePct,
+      wdfPct,
+      commercialPct,
+      pickupDeliveryPct
+    );
+    if (mixError) {
+      toast.error(mixError);
+      return;
+    }
+
     setSaving(true);
     setError("");
 
@@ -199,9 +216,9 @@ export default function SettingsPage() {
         store_condition: form.store_condition,
         revenue_trend: form.revenue_trend,
         competition_level: form.competition_level,
-        self_service_pct: form.self_service_pct ? Number(form.self_service_pct) : null,
-        wdf_pct: form.wdf_pct ? Number(form.wdf_pct) : null,
-        commercial_pct: form.commercial_pct ? Number(form.commercial_pct) : null,
+        self_service_pct: selfServicePct,
+        wdf_pct: wdfPct,
+        commercial_pct: commercialPct,
       })
       .eq("id", selectedStore.id);
 

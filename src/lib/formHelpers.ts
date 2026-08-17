@@ -44,3 +44,20 @@ export function findNegativeFieldError(
   }
   return null;
 }
+
+const SERVICE_MIX_SUM_TOLERANCE = 5;
+
+/** Returns an error message when service mix percentages don't sum to ~100%, or null if valid. */
+export function validateServiceMixSum(
+  selfServicePct: number,
+  wdfPct: number,
+  commercialPct: number,
+  pickupDeliveryPct: number,
+  tolerance = SERVICE_MIX_SUM_TOLERANCE
+): string | null {
+  const sum = selfServicePct + wdfPct + commercialPct + pickupDeliveryPct;
+  if (sum < 100 - tolerance || sum > 100 + tolerance) {
+    return `Service mix must sum to approximately 100% (currently ${sum}%). Adjust Self Service, WDF, Commercial, and Pickup & Delivery.`;
+  }
+  return null;
+}
