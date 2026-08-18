@@ -710,8 +710,13 @@ export default function DebtPage() {
             icon="Landmark"
             title="No loans added yet"
             description="Add your loans to track debt service and DSCR"
-            ctaLabel="Add Loan"
-            ctaHref="/debt"
+            cta={
+              <ReadOnlyGuard align="stretch">
+                <button type="button" onClick={openAddLoan} className="btn-primary inline-flex text-[13px]">
+                  Add Loan →
+                </button>
+              </ReadOnlyGuard>
+            }
           />
           <LoanCalculatorPanel {...calculatorProps} />
         </div>

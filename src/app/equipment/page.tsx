@@ -369,8 +369,13 @@ export default function EquipmentPage() {
           icon="WashingMachine"
           title="No equipment added yet"
           description="Add your machines to track turns and revenue"
-          ctaLabel="Add Equipment"
-          ctaHref="/equipment"
+          cta={
+            <ReadOnlyGuard align="stretch">
+              <button type="button" onClick={openAddForm} className="btn-primary inline-flex text-[13px]">
+                Add Equipment →
+              </button>
+            </ReadOnlyGuard>
+          }
         />
       </div>
     );

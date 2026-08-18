@@ -440,6 +440,7 @@ function TransactionsPageContent() {
   const [posting, setPosting] = useState(false);
   const [postingCount, setPostingCount] = useState(0);
   const postingRef = useRef(false);
+  const csvUploadInputRef = useRef<HTMLInputElement>(null);
   const [duplicateImportCount, setDuplicateImportCount] = useState(0);
 
   const [expandedHistory, setExpandedHistory] = useState<Set<string>>(new Set());
@@ -1425,6 +1426,11 @@ function TransactionsPageContent() {
     await loadData();
   }
 
+  function openCsvImport() {
+    if (!requireWrite()) return;
+    csvUploadInputRef.current?.click();
+  }
+
   function handleCSVUpload(file: File) {
     if (!requireWrite()) return;
     const reader = new FileReader();
@@ -2048,6 +2054,7 @@ function TransactionsPageContent() {
             <label className={clsx("btn-outline", canWrite ? "cursor-pointer" : "cursor-not-allowed opacity-60")}>
               Upload CSV
               <input
+                ref={csvUploadInputRef}
                 id="transactions-input-2"
                 type="file"
                 accept=".csv"
@@ -2081,8 +2088,13 @@ function TransactionsPageContent() {
           icon="Receipt"
           title="No transactions yet"
           description="Import your bank CSV to get started"
-          ctaLabel="Import CSV"
-          ctaHref="/transactions"
+          cta={
+            <ReadOnlyGuard align="stretch">
+              <button type="button" onClick={openCsvImport} className="btn-primary inline-flex text-[13px]">
+                Import CSV →
+              </button>
+            </ReadOnlyGuard>
+          }
         />
       ) : (
         <>

@@ -855,8 +855,13 @@ export default function InsurancePage() {
           icon="Shield"
           title="No insurance policies yet"
           description="Add your policies to track coverage and renewals"
-          ctaLabel="Add Policy"
-          ctaHref="/insurance"
+          cta={
+            <ReadOnlyGuard align="stretch">
+              <button type="button" onClick={openAddPolicy} className="btn-primary inline-flex text-[13px]">
+                Add Policy →
+              </button>
+            </ReadOnlyGuard>
+          }
         />
       </div>
     );
