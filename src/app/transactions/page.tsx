@@ -15,8 +15,9 @@ import { KpiCard } from "@/components/ui/KpiCard";
 import { PageError } from "@/components/ui/PageError";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { DesktopOnlyGate } from "@/components/ui/DesktopOnlyGate";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
+import { TransactionReviewCard } from "@/components/transactions/TransactionReviewCard";
+import { TransactionReviewMobileBulkBar } from "@/components/transactions/TransactionReviewMobileBulkBar";
 import { useWriteGuard } from "@/lib/useWriteGuard";
 import { TEXT_LIMITS, trimToMaxLength, validateMaxLength } from "@/lib/textLimits";
 import { RuleApplyPrompt } from "@/components/financials/RuleApplyPrompt";
@@ -385,11 +386,7 @@ function AuditHistoryPanel({
 }
 
 export default function TransactionsPage() {
-  return (
-    <DesktopOnlyGate featureName="Transactions">
-      <TransactionsPageContent />
-    </DesktopOnlyGate>
-  );
+  return <TransactionsPageContent />;
 }
 
 function TransactionsPageContent() {
@@ -2184,7 +2181,7 @@ function TransactionsPageContent() {
           </button>
           {activeTab === "needs_review" && (
             <>
-              <label className="flex items-center gap-2 text-[12px] text-adaptive-muted cursor-pointer">
+              <label className="hidden md:flex items-center gap-2 text-[12px] text-adaptive-muted cursor-pointer">
                 <input
                   id="transactions-expandedgroups"
                   type="checkbox"
@@ -2200,7 +2197,7 @@ function TransactionsPageContent() {
               {groupByVendor && transactionGroups.some((g) => g.count > 1) && (
                 <button
                   type="button"
-                  className="text-[12px] text-adaptive-info hover:text-adaptive-info"
+                  className="hidden md:inline text-[12px] text-adaptive-info hover:text-adaptive-info"
                   onClick={() => {
                     const multiGroups = transactionGroups.filter((g) => g.count > 1);
                     const allExpanded = multiGroups.every((g) => expandedGroups.has(g.groupKey));
@@ -2285,7 +2282,7 @@ function TransactionsPageContent() {
         />
 
         {someSelected && (
-          <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+          <div className="hidden md:flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
             <span className="text-[12px] text-adaptive-info font-medium">{selectedIds.size} selected</span>
             {activeTab === "excluded" ? (
               <ReadOnlyGuard>
@@ -2415,8 +2412,91 @@ function TransactionsPageContent() {
           <p className="text-[13px] text-adaptive-muted py-6 text-center">
             No transactions match the selected filters.
           </p>
-        ) : activeTab === "needs_review" && groupByVendor ? (
-          <div className="table-scroll">
+        ) : (
+          <>
+          <div className={clsx("md:hidden space-y-3", someSelected && "pb-28")}>
+            {filteredReviewRows.map((row) => {
+              const storedCategory = transactions.find((t) => t.id === row.id)?.category ?? null;
+              const excluded = isExcludedRow(row);
+              const posted = isPostedRow(row);
+              const needsReview = isNeedsReview(row);
+
+              return (
+                <TransactionReviewCard
+                  key={row.id}
+                  row={row}
+                  activeTab={activeTab}
+                  selected={selectedIds.has(row.id)}
+                  needsCategory={needsCategorySelection(row.category)}
+                  needsReview={needsReview}
+                  posted={posted}
+                  excluded={excluded}
+                  canWrite={canWrite}
+                  posting={posting}
+                  saving={saving}
+                  plLink={plLinksByTxn.get(row.id)}
+                  onSelect={(checked) => toggleSelectId(row.id, checked)}
+                  onCategoryChange={(newCategory) => {
+                    if (posted) {
+                      void updateCategory(row.id, newCategory, storedCategory, false);
+                      return;
+                    }
+                    void updateCategory(row.id, newCategory, storedCategory, true);
+                  }}
+                  onPost={() => void handlePostRows([row])}
+                  onExclude={() => openExcludeModal([row.id])}
+                  onSetRule={() =>
+                    openRuleForm(
+                      row.id,
+                      row.category,
+                      row.type,
+                      normalizeVendorPattern(row.description),
+                      row.amount
+                    )
+                  }
+                  onReclassify={() => {
+                    if (!requireWrite()) return;
+                    const stored = (storedCategory ?? "") as BankImportCategory;
+                    if (row.category === stored) {
+                      setMessage({ type: "error", text: "Choose a different category to reclassify." });
+                      return;
+                    }
+                    if (!isCategoryReadyToPost(row.category)) {
+                      setMessage({ type: "error", text: "Choose a postable category to reclassify." });
+                      return;
+                    }
+                    setReclassifyModal({ row, newCategory: row.category });
+                  }}
+                  onDelete={() => openDeleteModal([row.id])}
+                  ruleFormPanel={
+                    ruleFormKey === row.id && activeTab === "needs_review" ? (
+                      <RuleFormPanel
+                        type={row.type}
+                        vendorPattern={normalizeVendorPattern(row.description)}
+                        amount={row.amount}
+                        category={ruleFormCategory}
+                        ruleType={ruleFormType}
+                        ruleAmount={ruleFormAmount}
+                        ruleTolerance={ruleFormTolerance}
+                        onRuleTypeChange={setRuleFormType}
+                        onCategoryChange={setRuleFormCategory}
+                        onAmountChange={setRuleFormAmount}
+                        onToleranceChange={setRuleFormTolerance}
+                        onSave={() => void saveCategorizationRule()}
+                        onCancel={() => setRuleFormKey(null)}
+                        saving={ruleFormSaving}
+                        message={ruleFormMessage}
+                        writeDisabled={!canWrite}
+                      />
+                    ) : undefined
+                  }
+                />
+              );
+            })}
+          </div>
+
+          {activeTab === "needs_review" && groupByVendor ? (
+          <div className="hidden md:block table-scroll">
             <table className="w-full text-[12px]">
               <thead>
                 <tr className="text-left text-[var(--text-secondary)] review-table-header">
@@ -2577,7 +2657,7 @@ function TransactionsPageContent() {
             </table>
           </div>
         ) : (
-          <div className="table-scroll">
+          <div className="hidden md:block table-scroll">
             <table className="w-full text-[12px]">
               <thead>
                 <tr className="text-left text-[var(--text-secondary)] review-table-header">
@@ -2809,7 +2889,22 @@ function TransactionsPageContent() {
             </table>
           </div>
         )}
+          </>
+        )}
       </div>
+
+      <TransactionReviewMobileBulkBar
+        selectedCount={selectedIds.size}
+        activeTab={activeTab}
+        posting={posting}
+        saving={saving}
+        postDisabled={selectedPostableRows.length === 0}
+        excludeDisabled={selectedActionRows.length === 0}
+        deleteDisabled={selectedExcludedRows.length === 0}
+        onPost={handleBulkPostSelected}
+        onExclude={handleBulkExclude}
+        onDelete={handleBulkDelete}
+      />
         </>
       )}
 
