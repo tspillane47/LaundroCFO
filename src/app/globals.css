@@ -942,6 +942,21 @@ html, body {
   border-color: rgba(59, 130, 246, 0.3);
 }
 
+@keyframes formRevealHighlight {
+  0% {
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.4), 0 0 20px rgba(37, 99, 235, 0.12);
+    border-color: rgba(37, 99, 235, 0.35);
+  }
+  100% {
+    box-shadow: var(--card-shadow);
+    border-color: var(--border);
+  }
+}
+
+.form-reveal-highlight {
+  animation: formRevealHighlight 1.5s ease-out forwards;
+}
+
 /* ============ TOAST NOTIFICATIONS ============ */
 .toast-item:hover .toast-dismiss {
   opacity: 1;

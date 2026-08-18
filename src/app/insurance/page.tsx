@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFormReveal } from "@/lib/useFormReveal";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
@@ -470,6 +471,7 @@ export default function InsurancePage() {
   const [policyForm, setPolicyForm] = useState<PolicyForm>(emptyPolicyForm);
 
   const [showClaimForm, setShowClaimForm] = useState(false);
+  const claimFormRef = useFormReveal(showClaimForm);
   const [claimForm, setClaimForm] = useState<ClaimForm>({
     policy_id: "",
     claim_date: "",
@@ -1445,7 +1447,7 @@ export default function InsurancePage() {
         </div>
 
         {showClaimForm && (
-          <div className="card2 mb-4 space-y-3">
+          <div ref={claimFormRef} className="card2 mb-4 space-y-3">
             <div className="text-[13px] font-semibold text-slate-900">New Claim</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <FormField label="Policy">

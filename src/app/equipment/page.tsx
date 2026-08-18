@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFormReveal } from "@/lib/useFormReveal";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
@@ -107,6 +108,7 @@ export default function EquipmentPage() {
   const [annualEbitda, setAnnualEbitda] = useState(0);
   const [ttmMonthsUsed, setTtmMonthsUsed] = useState(0);
   const [showForm, setShowForm] = useState(false);
+  const formRef = useFormReveal(showForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EquipmentForm>(EMPTY_FORM);
 
@@ -571,7 +573,7 @@ export default function EquipmentPage() {
 
             {/* Section 3 — Add/Edit form */}
             {showForm && (
-              <div className="mt-5 pt-5 border-t border-white/[0.08]">
+              <div ref={formRef} className="mt-5 pt-5 border-t border-white/[0.08]">
                 <div className="flex items-center justify-between mb-4">
                   <div className="text-[13px] font-semibold text-slate-900">
                     {editingId ? "Edit Machine Group" : "Add Machine Group"}

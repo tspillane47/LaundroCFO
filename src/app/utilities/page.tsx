@@ -15,6 +15,7 @@ import {
   YAxis,
 } from "recharts";
 import { createClient } from "@/lib/supabase";
+import { useFormReveal } from "@/lib/useFormReveal";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtPct } from "@/lib/calculations";
 import {
@@ -176,6 +177,7 @@ export default function UtilitiesPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [showForm, setShowForm] = useState(false);
+  const formRef = useFormReveal(showForm);
   const [form, setForm] = useState<UtilityForm>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
@@ -725,7 +727,7 @@ export default function UtilitiesPage() {
       </div>
 
       {showForm && (
-        <div className="card">
+        <div ref={formRef} className="card">
           <div className="section-title">
             {selectedRecord ? "Edit" : "Add"} — {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
           </div>

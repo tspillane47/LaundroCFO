@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useFormReveal } from "@/lib/useFormReveal";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
@@ -423,6 +424,7 @@ export default function FinancialsPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [showForm, setShowForm] = useState(false);
+  const formRef = useFormReveal(showForm);
   const showFormRef = useRef(showForm);
   showFormRef.current = showForm;
   const [form, setForm] = useState<MonthlyForm>(() => emptyMonthlyForm());
@@ -1572,7 +1574,7 @@ export default function FinancialsPage() {
           </div>
 
           {showForm && (
-            <div className="card">
+            <div ref={formRef} className="card">
               <div className="section-title">
                 {selectedRecord ? "Edit" : "Add"} — {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useFormReveal } from "@/lib/useFormReveal";
 import { createClient } from "@/lib/supabase";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { ScoreRing } from "@/components/ui/ScoreRing";
@@ -223,6 +224,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"view" | "edit">("view");
+  const formRef = useFormReveal(mode === "edit");
 
   const [lease, setLease] = useState<Lease | null>(null);
   const [options, setOptions] = useState<LeaseOption[]>([]);
@@ -759,7 +761,7 @@ export function LeaseModule({ store, editTrigger, hideHeader, onLeaseStatus }: P
           </div>
         </>
       ) : (
-        <div className="space-y-5">
+        <div ref={formRef} className="space-y-5">
           <div className="card space-y-4">
             <div className="section-title mb-0">Base Lease Information</div>
 

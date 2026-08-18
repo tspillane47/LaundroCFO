@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFormReveal } from "@/lib/useFormReveal";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import {
@@ -304,6 +305,7 @@ export default function DebtPage() {
   const [loans, setLoans] = useState<StoreLoan[]>([]);
   const [valuation, setValuation] = useState<(ValuationResult & { store: Record<string, unknown> }) | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const formRef = useFormReveal(showForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<LoanForm>(emptyLoanForm());
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -1158,7 +1160,7 @@ export default function DebtPage() {
 
       {/* Section 7 — Add/Edit form */}
       {showForm && (
-        <div className="card">
+        <div ref={formRef} className="card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="section-title mb-0">{editingId ? "Edit Loan" : "Add Loan"}</h3>
             <button type="button" onClick={closeForm} className="text-[13px]" style={{ color: "var(--text-muted)" }}>
