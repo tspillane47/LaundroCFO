@@ -26,8 +26,10 @@ import {
   DEFAULT_PLAID_REDIRECT_URI,
   DEFAULT_PLAID_WEBHOOK_URL,
   normalizePlaidTransaction,
+  planPlaidAddedTransactions,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
   EMPTY_PLAID_BALANCE_SYNC_RESULT,
+  type ExistingPlaidBankRow,
   type PlaidBalanceSyncResult,
   type PlaidSyncResult,
 } from "@/lib/plaid-shared";
@@ -914,12 +916,7 @@ async function fetchAllPlaidTransactionUpdates(
   };
 }
 
-type ExistingBankTransactionRow = {
-  id: string;
-  plaid_transaction_id: string | null;
-  status: TransactionStatus | null;
-  description: string | null;
-};
+type ExistingBankTransactionRow = ExistingPlaidBankRow;
 
 async function loadExistingPlaidTransactions(
   storeId: string,
@@ -932,7 +929,7 @@ async function loadExistingPlaidTransactions(
   const admin = createAdminSupabaseClient();
   const { data, error } = await admin
     .from("bank_transactions")
-    .select("id, plaid_transaction_id, status, description")
+    .select("id, plaid_transaction_id, status, description, transaction_date, amount")
     .eq("store_id", storeId)
     .in("plaid_transaction_id", plaidTransactionIds);
 
@@ -949,58 +946,92 @@ async function loadExistingPlaidTransactions(
   return map;
 }
 
-async function insertPlaidAddedTransactions(params: {
+async function applyPlaidAddedTransactions(params: {
   storeId: string;
   userId: string;
   added: Transaction[];
+  removed: RemovedTransaction[];
   rules: CategorizationRule[];
   existingByPlaidId: Map<string, ExistingBankTransactionRow>;
-}): Promise<number> {
-  const { storeId, userId, added, rules, existingByPlaidId } = params;
+}): Promise<{ inserted: number; reconciled: number }> {
+  const { storeId, userId, added, removed, rules, existingByPlaidId } = params;
   const admin = createAdminSupabaseClient();
 
-  const rows = added
-    .filter((txn) => !existingByPlaidId.has(txn.transaction_id))
-    .map((txn) => {
-      const normalized = normalizePlaidTransaction(txn);
-      if (normalized.amount === 0) {
-        return null;
+  const plans = planPlaidAddedTransactions({
+    added,
+    removedTransactionIds: removed.map((txn) => txn.transaction_id),
+    existingByPlaidId,
+  });
+
+  let inserted = 0;
+  let reconciled = 0;
+
+  const insertRows = [];
+
+  for (const plan of plans) {
+    if (plan.action === "reconcile") {
+      const normalized = normalizePlaidTransaction(plan.txn);
+      const { error } = await admin
+        .from("bank_transactions")
+        .update({
+          plaid_transaction_id: normalized.plaid_transaction_id,
+          transaction_date: normalized.transaction_date,
+          description: normalized.description,
+          amount: normalized.amount,
+          transaction_type: normalized.transaction_type,
+          modified_at: new Date().toISOString(),
+        })
+        .eq("id", plan.existingRowId);
+
+      if (error) {
+        throw new Error(`Failed to reconcile Plaid transaction: ${error.message}`);
       }
 
-      const { category } = categorizeWithRules(
-        normalized.description,
-        normalized.transaction_type,
-        normalized.amount,
-        rules
-      );
+      console.info("[plaid/sync] reconciled added transaction to existing row", {
+        path: plan.path,
+        storeId,
+        bank_transaction_id: plan.existingRowId,
+        previous_plaid_transaction_id: plan.previousPlaidTransactionId,
+        new_plaid_transaction_id: normalized.plaid_transaction_id,
+        pending_transaction_id: normalized.pending_transaction_id,
+      });
+      reconciled += 1;
+      continue;
+    }
 
-      return {
-        store_id: storeId,
-        user_id: userId,
-        transaction_date: normalized.transaction_date,
-        description: normalized.description,
-        amount: normalized.amount,
-        category: category as BankImportCategory,
-        transaction_type: normalized.transaction_type,
-        original_category: category as BankImportCategory,
-        plaid_transaction_id: normalized.plaid_transaction_id,
-        status: "needs_review" satisfies TransactionStatus,
-        is_reviewed: false,
-        excluded: false,
-      };
-    })
-    .filter((row): row is NonNullable<typeof row> => row !== null);
+    const normalized = normalizePlaidTransaction(plan.txn);
+    const { category } = categorizeWithRules(
+      normalized.description,
+      normalized.transaction_type,
+      normalized.amount,
+      rules
+    );
 
-  if (rows.length === 0) {
-    return 0;
+    insertRows.push({
+      store_id: storeId,
+      user_id: userId,
+      transaction_date: normalized.transaction_date,
+      description: normalized.description,
+      amount: normalized.amount,
+      category: category as BankImportCategory,
+      transaction_type: normalized.transaction_type,
+      original_category: category as BankImportCategory,
+      plaid_transaction_id: normalized.plaid_transaction_id,
+      status: "needs_review" satisfies TransactionStatus,
+      is_reviewed: false,
+      excluded: false,
+    });
   }
 
-  const { error } = await admin.from("bank_transactions").insert(rows);
-  if (error) {
-    throw new Error(`Failed to insert Plaid transactions: ${error.message}`);
+  if (insertRows.length > 0) {
+    const { error } = await admin.from("bank_transactions").insert(insertRows);
+    if (error) {
+      throw new Error(`Failed to insert Plaid transactions: ${error.message}`);
+    }
+    inserted = insertRows.length;
   }
 
-  return rows.length;
+  return { inserted, reconciled };
 }
 
 async function applyPlaidModifiedTransactions(params: {
@@ -1229,16 +1260,20 @@ export async function syncPlaidTransactions(connectionId: string): Promise<Plaid
 
     const allPlaidIds = [
       ...batch.added.map((txn) => txn.transaction_id),
+      ...batch.added
+        .map((txn) => txn.pending_transaction_id)
+        .filter((id): id is string => Boolean(id?.trim())),
       ...batch.modified.map((txn) => txn.transaction_id),
       ...batch.removed.map((txn) => txn.transaction_id),
     ];
 
     const existingByPlaidId = await loadExistingPlaidTransactions(storeId, allPlaidIds);
 
-    const added = await insertPlaidAddedTransactions({
+    const { inserted, reconciled } = await applyPlaidAddedTransactions({
       storeId,
       userId: connection.user_id,
       added: batch.added,
+      removed: batch.removed,
       rules,
       existingByPlaidId,
     });
@@ -1277,7 +1312,7 @@ export async function syncPlaidTransactions(connectionId: string): Promise<Plaid
       };
     }
 
-    return { added, modified, removed, skippedRemovedPosted, balances };
+    return { added: inserted, reconciled, modified, removed, skippedRemovedPosted, balances };
   } catch (error) {
     try {
       await persistPlaidSyncItemErrorIfApplicable(connection.plaid_item_id, error);

@@ -163,6 +163,7 @@ function formatPlaidLastSynced(connection: PlaidConnection): string {
 function formatPlaidSyncSummary(result: PlaidSyncResult): string {
   const parts: string[] = [];
   if (result.added > 0) parts.push(`${result.added} added`);
+  if (result.reconciled > 0) parts.push(`${result.reconciled} reconciled`);
   if (result.modified > 0) parts.push(`${result.modified} updated`);
   if (result.removed > 0) parts.push(`${result.removed} removed`);
   if (result.skippedRemovedPosted > 0) {
@@ -1265,6 +1266,7 @@ export default function FinancialsPage() {
 
       const result: PlaidSyncResult = {
         added: payload?.added ?? 0,
+        reconciled: payload?.reconciled ?? 0,
         modified: payload?.modified ?? 0,
         removed: payload?.removed ?? 0,
         skippedRemovedPosted: payload?.skippedRemovedPosted ?? 0,
@@ -1301,6 +1303,7 @@ export default function FinancialsPage() {
 
       const totals: PlaidSyncResult = {
         added: payload?.added ?? 0,
+        reconciled: payload?.reconciled ?? 0,
         modified: payload?.modified ?? 0,
         removed: payload?.removed ?? 0,
         skippedRemovedPosted: payload?.skippedRemovedPosted ?? 0,
@@ -1314,6 +1317,7 @@ export default function FinancialsPage() {
         if (!connectionResult.ok) continue;
         nextResults[connectionResult.connectionId] = {
           added: connectionResult.added,
+          reconciled: connectionResult.reconciled ?? 0,
           modified: connectionResult.modified,
           removed: connectionResult.removed,
           skippedRemovedPosted: connectionResult.skippedRemovedPosted,

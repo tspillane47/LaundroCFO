@@ -62,6 +62,7 @@ describe("Plaid transaction normalization", () => {
       amount: 125.5,
       transaction_type: "expense",
       plaid_transaction_id: "txn-1",
+      pending_transaction_id: null,
     });
   });
 
@@ -79,6 +80,7 @@ describe("Plaid transaction normalization", () => {
       amount: 500,
       transaction_type: "income",
       plaid_transaction_id: "txn-2",
+      pending_transaction_id: null,
     });
   });
 

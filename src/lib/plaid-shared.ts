@@ -69,6 +69,7 @@ export const EMPTY_PLAID_BALANCE_SYNC_RESULT: PlaidBalanceSyncResult = {
 
 export type PlaidSyncResult = {
   added: number;
+  reconciled: number;
   modified: number;
   removed: number;
   skippedRemovedPosted: number;
@@ -176,6 +177,7 @@ export type PlaidTransactionLike = {
   name: string;
   merchant_name?: string | null;
   amount: number;
+  pending_transaction_id?: string | null;
 };
 
 export type NormalizedPlaidTransaction = {
@@ -184,7 +186,46 @@ export type NormalizedPlaidTransaction = {
   amount: number;
   transaction_type: "income" | "expense";
   plaid_transaction_id: string;
+  pending_transaction_id: string | null;
 };
+
+/** Max difference allowed when matching same-batch fallback reconciliations by amount. */
+export const PLAID_AMOUNT_MATCH_TOLERANCE = 0.01;
+
+export type ExistingPlaidBankRow = {
+  id: string;
+  plaid_transaction_id: string | null;
+  status: string | null;
+  description: string | null;
+  transaction_date?: string | null;
+  amount?: number | null;
+};
+
+export type PlaidAddedReconciliationPath = "pending_transaction_id" | "same_batch_fallback";
+
+export type PlaidAddedReconciliationPlan =
+  | { action: "insert"; txn: PlaidTransactionLike }
+  | {
+      action: "reconcile";
+      txn: PlaidTransactionLike;
+      existingRowId: string;
+      path: PlaidAddedReconciliationPath;
+      previousPlaidTransactionId: string;
+    };
+
+export function plaidAmountsMatch(
+  left: number,
+  right: number,
+  tolerance = PLAID_AMOUNT_MATCH_TOLERANCE
+): boolean {
+  return Math.abs(left - right) <= tolerance;
+}
+
+export function isPlaidPostedTransitionRemovalCandidate(
+  status: string | null | undefined
+): boolean {
+  return !isPlaidSyncRemovableStatus(status);
+}
 
 /**
  * Plaid depository convention: positive amount = money out (expense), negative = money in (income).
@@ -196,13 +237,107 @@ export function normalizePlaidTransaction(txn: PlaidTransactionLike): Normalized
   const transaction_type = txn.amount > 0 ? "expense" : txn.amount < 0 ? "income" : "expense";
   const amount = Math.abs(txn.amount);
 
+  const pendingTransactionId = txn.pending_transaction_id?.trim();
+
   return {
     transaction_date: txn.date,
     description,
     amount,
     transaction_type,
     plaid_transaction_id: txn.transaction_id,
+    pending_transaction_id: pendingTransactionId ? pendingTransactionId : null,
   };
+}
+
+/**
+ * Decide whether each added Plaid transaction should insert a new bank row or
+ * reconcile onto an existing row (pending→posted ID migration).
+ */
+export function planPlaidAddedTransactions(params: {
+  added: PlaidTransactionLike[];
+  removedTransactionIds: string[];
+  existingByPlaidId: Map<string, ExistingPlaidBankRow>;
+}): PlaidAddedReconciliationPlan[] {
+  const { added, removedTransactionIds, existingByPlaidId } = params;
+  const usedExistingRowIds = new Set<string>();
+  const usedRemovedIds = new Set<string>();
+  const plans: PlaidAddedReconciliationPlan[] = [];
+
+  for (const txn of added) {
+    if (existingByPlaidId.has(txn.transaction_id)) {
+      continue;
+    }
+
+    const normalized = normalizePlaidTransaction(txn);
+    if (normalized.amount === 0) {
+      continue;
+    }
+
+    const pendingMatch =
+      normalized.pending_transaction_id &&
+      existingByPlaidId.get(normalized.pending_transaction_id);
+
+    if (pendingMatch && !usedExistingRowIds.has(pendingMatch.id)) {
+      usedExistingRowIds.add(pendingMatch.id);
+      plans.push({
+        action: "reconcile",
+        txn,
+        existingRowId: pendingMatch.id,
+        path: "pending_transaction_id",
+        previousPlaidTransactionId: pendingMatch.plaid_transaction_id ?? normalized.pending_transaction_id,
+      });
+      continue;
+    }
+
+    let fallbackMatch: ExistingPlaidBankRow | undefined;
+    let fallbackRemovedId: string | undefined;
+
+    for (const removedId of removedTransactionIds) {
+      if (usedRemovedIds.has(removedId)) {
+        continue;
+      }
+
+      const existing = existingByPlaidId.get(removedId);
+      if (!existing || usedExistingRowIds.has(existing.id)) {
+        continue;
+      }
+
+      if (!isPlaidPostedTransitionRemovalCandidate(existing.status)) {
+        continue;
+      }
+
+      const existingDate = existing.transaction_date ?? null;
+      const existingAmount = existing.amount ?? null;
+      if (
+        existingDate !== normalized.transaction_date ||
+        existingAmount === null ||
+        !plaidAmountsMatch(existingAmount, normalized.amount)
+      ) {
+        continue;
+      }
+
+      fallbackMatch = existing;
+      fallbackRemovedId = removedId;
+      break;
+    }
+
+    if (fallbackMatch && fallbackRemovedId) {
+      usedExistingRowIds.add(fallbackMatch.id);
+      usedRemovedIds.add(fallbackRemovedId);
+      plans.push({
+        action: "reconcile",
+        txn,
+        existingRowId: fallbackMatch.id,
+        path: "same_batch_fallback",
+        previousPlaidTransactionId: fallbackMatch.plaid_transaction_id ?? fallbackRemovedId,
+      });
+      continue;
+    }
+
+    plans.push({ action: "insert", txn });
+  }
+
+  return plans;
 }
 
 /** Statuses where user review/classification should not be overwritten by Plaid sync. */

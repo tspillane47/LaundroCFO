@@ -20,6 +20,7 @@ function aggregateSyncResults(results: PlaidConnectionSyncResult[]): PlaidSyncRe
   return results.reduce(
     (totals, result) => ({
       added: totals.added + result.added,
+      reconciled: totals.reconciled + result.reconciled,
       modified: totals.modified + result.modified,
       removed: totals.removed + result.removed,
       skippedRemovedPosted: totals.skippedRemovedPosted + result.skippedRemovedPosted,
@@ -32,6 +33,7 @@ function aggregateSyncResults(results: PlaidConnectionSyncResult[]): PlaidSyncRe
     }),
     {
       added: 0,
+      reconciled: 0,
       modified: 0,
       removed: 0,
       skippedRemovedPosted: 0,
@@ -103,6 +105,7 @@ export async function POST(request: Request) {
           ok: false,
           error: message,
           added: 0,
+          reconciled: 0,
           modified: 0,
           removed: 0,
           skippedRemovedPosted: 0,

@@ -2401,6 +2401,28 @@ async function applyPostingDelta(
   return { error: error?.message ?? null };
 }
 
+export async function reverseTransactionPlLinkPosting(
+  supabase: FinancialsSupabaseClient,
+  params: {
+    storeId: string;
+    userId: string;
+    link: Pick<TransactionPlLink, "category" | "year" | "month" | "amount_applied">;
+    store?: StoreFinancialProfile | null;
+  }
+): Promise<{ error: string | null }> {
+  const target = postingTargetFromStoredCategory(params.link.category);
+  return applyPostingDelta(supabase, {
+    storeId: params.storeId,
+    userId: params.userId,
+    year: params.link.year,
+    month: params.link.month,
+    target,
+    amount: toNum(params.link.amount_applied),
+    reverse: true,
+    store: params.store,
+  });
+}
+
 export async function postTransactionsBatch(
   supabase: FinancialsSupabaseClient,
   params: PostTransactionsBatchParams
