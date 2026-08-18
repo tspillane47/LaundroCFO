@@ -746,7 +746,26 @@ export default function AccountPage() {
         ))}
       </div>
 
-      {/* Section 5 — Danger Zone */}
+      {/* Section 5 — Your Data */}
+      <div className="card space-y-4">
+        <div className="section-title mb-0">Your Data</div>
+
+        <p className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+          Download a copy of your profile, stores, financial data, and other account information
+          as a JSON file.
+        </p>
+
+        <button
+          type="button"
+          onClick={handleExportData}
+          disabled={exportLoading}
+          className="btn-outline w-full sm:w-auto"
+        >
+          {exportLoading ? "Preparing export…" : "Export My Data"}
+        </button>
+      </div>
+
+      {/* Section 6 — Danger Zone */}
       <div
         className="card space-y-4"
         style={{
@@ -759,30 +778,20 @@ export default function AccountPage() {
         </div>
 
         <p className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
-          Export your data or permanently delete your account. These actions affect all stores
-          linked to your account.
+          Permanently delete your account and all associated data, including connected QuickBooks
+          and bank accounts. This action cannot be undone.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            type="button"
-            onClick={handleExportData}
-            disabled={exportLoading}
-            className="btn-outline flex-1"
-          >
-            {exportLoading ? "Preparing export…" : "Export My Data"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setDeleteConfirmText("");
-              setDeleteModalOpen(true);
-            }}
-            className="btn-outline flex-1 text-red-400 border-red-500/30"
-          >
-            Delete Account
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setDeleteConfirmText("");
+            setDeleteModalOpen(true);
+          }}
+          className="btn-outline w-full sm:w-auto text-red-400 border-red-500/30"
+        >
+          Delete Account
+        </button>
       </div>
 
       {deleteModalOpen && (
