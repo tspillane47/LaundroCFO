@@ -13,7 +13,7 @@ const PLAID_ACCOUNT_EXPORT_COLUMNS =
   "id, store_id, plaid_connection_id, account_name, account_type, account_subtype, mask, current_balance, available_balance, last_synced_at";
 
 const SUBSCRIPTION_EXPORT_COLUMNS =
-  "id, user_id, plan, status, trial_ends_at, current_period_end, cancel_at_period_end, stripe_customer_id, stripe_subscription_id, created_at, updated_at";
+  "id, user_id, plan, status, trial_ends_at, current_period_end, stripe_customer_id, stripe_subscription_id, created_at, updated_at";
 
 export type UserDataExport = {
   exportedAt: string;
