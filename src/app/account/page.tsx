@@ -139,6 +139,7 @@ export default function AccountPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
 
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
@@ -329,8 +330,35 @@ export default function AccountPage() {
     }
   }
 
-  function handleExportData() {
-    toast.info("Data export requested — you will receive an email within 24 hours");
+  async function handleExportData() {
+    setExportLoading(true);
+
+    try {
+      const response = await fetch("/api/account/export");
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? "Failed to export data");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const disposition = response.headers.get("Content-Disposition");
+      const filenameMatch = disposition?.match(/filename="(.+)"/);
+      anchor.href = url;
+      anchor.download =
+        filenameMatch?.[1] ?? `laundrocfo-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Your data download has started");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to export data");
+    } finally {
+      setExportLoading(false);
+    }
   }
 
   async function handleManageBilling() {
@@ -736,8 +764,13 @@ export default function AccountPage() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <button type="button" onClick={handleExportData} className="btn-outline flex-1">
-            Export My Data
+          <button
+            type="button"
+            onClick={handleExportData}
+            disabled={exportLoading}
+            className="btn-outline flex-1"
+          >
+            {exportLoading ? "Preparing export…" : "Export My Data"}
           </button>
           <button
             type="button"

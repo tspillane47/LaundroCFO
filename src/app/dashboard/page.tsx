@@ -67,8 +67,13 @@ import {
   LiveFromBankBadge,
 } from "@/components/ui/CashPositionIndicator";
 import { computeStoreCashPosition } from "@/lib/cashPosition";
-
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+import {
+  buildRevenueEbitdaChartData,
+  buildValuationHistorySeries,
+  computeValuationDeltas,
+  hasEnoughChartHistory,
+  INSUFFICIENT_HISTORY_MESSAGE,
+} from "@/lib/valuationHistory";
 
 function parseDate(value: string | null): Date | null {
   if (!value) return null;
@@ -94,31 +99,6 @@ function formatPlaidLastSynced(iso: string | null): string {
 
 function formatPlaidAccountCount(count: number, label: string): string {
   return `${count} ${label}${count === 1 ? "" : "s"}`;
-}
-
-function generateValuationTrend(estimatedValue: number) {
-  const start = estimatedValue * 0.88;
-  return MONTH_LABELS.map((month, i) => {
-    const progress = i / 11;
-    const base = start + (estimatedValue - start) * progress;
-    const variation = 1 + Math.sin(i * 1.7) * 0.015 + Math.cos(i * 0.9) * 0.01;
-    return {
-      month,
-      value: Math.round(i === 11 ? estimatedValue : base * variation),
-    };
-  });
-}
-
-function generateRevenueEbitdaData(revenue: number, ebitda: number) {
-  const labels = MONTH_LABELS.slice(-6);
-  return labels.map((month, i) => {
-    const factor = 0.94 + i * 0.012 + Math.sin(i * 2.1) * 0.02;
-    return {
-      month,
-      revenue: Math.round(revenue * factor),
-      ebitda: Math.round(ebitda * factor),
-    };
-  });
 }
 
 function formatAxisValue(value: number): string {
@@ -459,23 +439,31 @@ export default function DashboardPage() {
     };
   }, [realEstate, hasFinancialData, revenue]);
 
+  const valuationHistorySeries = useMemo(() => {
+    if (!valuation?.context || !hasEnoughChartHistory(monthlyFinancials)) return [];
+    return buildValuationHistorySeries(valuation.context, monthlyFinancials);
+  }, [valuation?.context, monthlyFinancials]);
+
   const valuationTrend = useMemo(
-    () => (hasFinancialData && estimatedValue > 0 ? generateValuationTrend(estimatedValue) : []),
-    [estimatedValue, hasFinancialData]
-  );
-  const revenueEbitdaData = useMemo(
-    () => (hasFinancialData ? generateRevenueEbitdaData(revenue, ebitda) : []),
-    [hasFinancialData, revenue, ebitda]
+    () =>
+      valuationHistorySeries
+        .slice(-12)
+        .map(({ label, value }) => ({ month: label, value })),
+    [valuationHistorySeries]
   );
 
-  const monthlyChange =
-    valuationTrend.length >= 2
-      ? valuationTrend[valuationTrend.length - 1].value - valuationTrend[valuationTrend.length - 2].value
-      : 0;
-  const yearChangePct =
-    valuationTrend.length > 0 && valuationTrend[0].value > 0
-      ? ((estimatedValue - valuationTrend[0].value) / valuationTrend[0].value) * 100
-      : 0;
+  const revenueEbitdaData = useMemo(
+    () =>
+      hasEnoughChartHistory(monthlyFinancials)
+        ? buildRevenueEbitdaChartData(monthlyFinancials)
+        : [],
+    [monthlyFinancials]
+  );
+
+  const { monthlyChange, yearChangePct } = useMemo(
+    () => computeValuationDeltas(valuationHistorySeries),
+    [valuationHistorySeries]
+  );
 
   const laundroCfoScoreResult = useMemo((): LaundroCfoScoreResult | null => {
     if (!store || !hasFinancialData) return null;
@@ -523,7 +511,7 @@ export default function DashboardPage() {
                   finalMultiple: valuation.finalMultiple,
                 }
               : null,
-            valuationMonthlyChange: monthlyChange,
+            valuationMonthlyChange: monthlyChange ?? undefined,
             uncategorizedTransactionCount,
           })
         : [],
@@ -724,14 +712,36 @@ export default function DashboardPage() {
             <span className="hero-value-text">—</span>
           )}
         </div>
-        {hasFinancialData && (
+        {hasFinancialData && (monthlyChange != null || yearChangePct != null) && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
-            <span style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
-              {monthlyChange >= 0 ? "+" : ""}{fmtDollar(monthlyChange)} this month
-            </span>
-            <span style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
-              {yearChangePct >= 0 ? "+" : ""}{yearChangePct.toFixed(1)}% vs last year
-            </span>
+            {monthlyChange != null && (
+              <span
+                style={{
+                  background: monthlyChange >= 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                  color: monthlyChange >= 0 ? '#4ade80' : '#f87171',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                }}
+              >
+                {monthlyChange >= 0 ? "+" : ""}{fmtDollar(monthlyChange)} this month
+              </span>
+            )}
+            {yearChangePct != null && (
+              <span
+                style={{
+                  background: yearChangePct >= 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                  color: yearChangePct >= 0 ? '#4ade80' : '#f87171',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                }}
+              >
+                {yearChangePct >= 0 ? "+" : ""}{yearChangePct.toFixed(1)}% vs last year
+              </span>
+            )}
           </div>
         )}
         <FinancialDataConfidenceNote monthsUsed={ttmMonthsUsed} variant="hero" className="mt-2" />
@@ -939,8 +949,8 @@ export default function DashboardPage() {
                 </AreaChart>
               </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-full text-[13px]" style={{ color: "var(--text-muted)" }}>
-                  Add monthly financials to see valuation trend.
+                <div className="flex items-center justify-center h-full text-[13px] text-center px-4" style={{ color: "var(--text-muted)" }}>
+                  {hasFinancialData ? INSUFFICIENT_HISTORY_MESSAGE : "Add monthly financials to see valuation trend."}
                 </div>
               )}
             </div>
@@ -1023,8 +1033,8 @@ export default function DashboardPage() {
                 </ComposedChart>
               </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-full text-[13px]" style={{ color: "var(--text-muted)" }}>
-                  Add monthly financials to see revenue and EBITDA.
+                <div className="flex items-center justify-center h-full text-[13px] text-center px-4" style={{ color: "var(--text-muted)" }}>
+                  {hasFinancialData ? INSUFFICIENT_HISTORY_MESSAGE : "Add monthly financials to see revenue and EBITDA."}
                 </div>
               )}
             </div>

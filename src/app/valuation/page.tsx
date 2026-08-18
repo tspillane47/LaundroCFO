@@ -49,6 +49,21 @@ import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
 import { Disclaimer, DisclaimerLabel } from "@/components/ui/Disclaimer";
 import { FinancialDataConfidenceNote } from "@/components/ui/FinancialDataConfidenceNote";
+import {
+  buildUtilitiesLookup,
+  enrichMonthlyRecords,
+  fetchStoreMonthlyFinancials,
+  sortRecordsDesc,
+  type CalculatedMonthly,
+  type MonthlyUtilityRecord,
+} from "@/lib/financials";
+import {
+  buildValuationHistorySeries,
+  filterValuationHistoryByPeriod,
+  hasEnoughChartHistory,
+  INSUFFICIENT_HISTORY_MESSAGE,
+  type HistoryPeriod,
+} from "@/lib/valuationHistory";
 
 type MarketDensity = "urban" | "suburban" | "average" | "rural";
 type RevenueTrend = "growing" | "stable" | "declining";
@@ -82,8 +97,6 @@ type StoreRow = {
   petty_cash: number | null;
   annual_debt_service: number | null;
 };
-
-type HistoryPeriod = "30d" | "90d" | "1y" | "all";
 
 const MARKET_DENSITY_LABELS: Record<MarketDensity, string> = {
   urban: "Dense Urban",
@@ -215,56 +228,6 @@ function calcDataCompleteness(
   return Math.round((filled / fields.length) * 100);
 }
 
-function generateHistoryData(endValue: number, period: HistoryPeriod) {
-  const configs: Record<HistoryPeriod, { count: number; labelFn: (i: number, count: number) => string }> = {
-    "30d": {
-      count: 30,
-      labelFn: (i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (29 - i));
-        return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      },
-    },
-    "90d": {
-      count: 15,
-      labelFn: (i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (14 - i) * 6);
-        return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      },
-    },
-    "1y": {
-      count: 12,
-      labelFn: (i) => {
-        const d = new Date();
-        d.setMonth(d.getMonth() - (11 - i));
-        return d.toLocaleDateString("en-US", { month: "short" });
-      },
-    },
-    all: {
-      count: 24,
-      labelFn: (i) => {
-        const d = new Date();
-        d.setMonth(d.getMonth() - (23 - i));
-        return d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-      },
-    },
-  };
-
-  const { count, labelFn } = configs[period];
-  const start = endValue * 0.88;
-
-  return Array.from({ length: count }, (_, i) => {
-    const progress = i / Math.max(count - 1, 1);
-    const base = start + (endValue - start) * progress;
-    const variation = 1 + Math.sin(i * 1.7) * 0.015 + Math.cos(i * 0.9) * 0.01;
-    return {
-      label: labelFn(i, count),
-      value: Math.round(i === count - 1 ? endValue : base * variation),
-    };
-  });
-}
-
 function formatAxisValue(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `$${Math.round(value / 1_000)}k`;
@@ -358,6 +321,7 @@ export default function ValuationPage() {
   const [totalLeaseControl, setTotalLeaseControl] = useState(0);
   const [calcExpanded, setCalcExpanded] = useState(false);
   const [valuationContext, setValuationContext] = useState<StoreValuationContext | null>(null);
+  const [monthlyFinancials, setMonthlyFinancials] = useState<CalculatedMonthly[]>([]);
 
   const loadValuationData = useCallback(async () => {
     if (!selectedStore?.id) {
@@ -365,6 +329,7 @@ export default function ValuationPage() {
       setLoadError(false);
       setHasPlaidConnection(false);
       setPlaidBalanceSnapshot(null);
+      setMonthlyFinancials([]);
       return;
     }
 
@@ -372,13 +337,22 @@ export default function ValuationPage() {
     setLoadError(false);
 
     try {
-      const [valuationResult, scheduledAnnualDebtService, plaidConnected, plaidBalances] =
+      const [valuationResult, scheduledAnnualDebtService, plaidConnected, plaidBalances, financialsData, utilitiesResult] =
         await Promise.all([
           getStoreValuation(selectedStore.id),
           getStoreScheduledDebtService(selectedStore.id),
           storeHasPlaidConnections(selectedStore.id),
           getStorePlaidBalanceSnapshot(selectedStore.id),
+          fetchStoreMonthlyFinancials(supabase, selectedStore.id),
+          supabase.from("monthly_utilities").select("*").eq("store_id", selectedStore.id),
         ]);
+      if (utilitiesResult.error) throw utilitiesResult.error;
+      const utilitiesLookup = buildUtilitiesLookup(
+        (utilitiesResult.data ?? []) as MonthlyUtilityRecord[]
+      );
+      setMonthlyFinancials(
+        enrichMonthlyRecords(sortRecordsDesc(financialsData), utilitiesLookup)
+      );
       setHasPlaidConnection(plaidConnected);
       setPlaidBalanceSnapshot(plaidBalances);
       setScheduledDebtService(scheduledAnnualDebtService);
@@ -582,10 +556,11 @@ export default function ValuationPage() {
     isOwnerOccupied,
     insuranceCount
   );
-  const historyData = useMemo(
-    () => generateHistoryData(valuation.businessValue, historyPeriod),
-    [valuation.businessValue, historyPeriod]
-  );
+  const historyData = useMemo(() => {
+    if (!valuationContext || !hasEnoughChartHistory(monthlyFinancials)) return [];
+    const series = buildValuationHistorySeries(valuationContext, monthlyFinancials);
+    return filterValuationHistoryByPeriod(series, historyPeriod);
+  }, [valuationContext, monthlyFinancials, historyPeriod]);
 
   async function handleSave() {
     if (!storeId) return;
@@ -813,6 +788,7 @@ export default function ValuationPage() {
           </div>
         </div>
         <div className="h-[220px]">
+          {historyData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={historyData}>
               <defs>
@@ -860,6 +836,13 @@ export default function ValuationPage() {
               />
             </AreaChart>
           </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full text-[13px] text-center px-4" style={{ color: "var(--text-muted)" }}>
+              {(valuationContext?.resolvedFinancials?.ttmMonthsUsed ?? 0) >= 1
+                ? INSUFFICIENT_HISTORY_MESSAGE
+                : "Add monthly financials to see store value history."}
+            </div>
+          )}
         </div>
       </div>
 
