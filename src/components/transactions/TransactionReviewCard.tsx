@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import clsx from "clsx";
 import { fmtDollar } from "@/lib/calculations";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
+import { CategoryPickerSheet } from "@/components/transactions/CategoryPickerSheet";
 import {
   NEEDS_CATEGORY_ROW_CLASS,
   NEEDS_CATEGORY_SELECT_CLASS,
@@ -130,6 +132,7 @@ export function TransactionReviewCard({
   onDelete,
   ruleFormPanel,
 }: TransactionReviewCardProps) {
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   const vendorLabel = normalizeVendorPattern(row.description) || "—";
   const rawDescription = row.description?.trim() || "(no description)";
   const showNeedsReviewActions =
@@ -206,21 +209,45 @@ export function TransactionReviewCard({
           </div>
         ) : (
           <div className="space-y-2">
-            <select
-              value={row.category}
-              onChange={(e) => onCategoryChange(e.target.value as BankImportCategory)}
-              disabled={!canWrite}
-              className={clsx(
-                "select-tan w-full min-h-[44px] text-[13px]",
-                needsCategorySelection(row.category) && NEEDS_CATEGORY_SELECT_CLASS
-              )}
-            >
-              {getImportCategoriesForType(row.type).map((f) => (
-                <option key={f} value={f}>
-                  {importCategoryOptionLabel(f)}
-                </option>
-              ))}
-            </select>
+            {canWrite ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setCategorySheetOpen(true)}
+                  className={clsx(
+                    "select-tan flex w-full min-h-[44px] items-center justify-between gap-2 px-3 text-left text-[13px]",
+                    needsCategorySelection(row.category) && NEEDS_CATEGORY_SELECT_CLASS
+                  )}
+                >
+                  <span className="min-w-0 flex-1 truncate">{importCategoryOptionLabel(row.category)}</span>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="flex-shrink-0 text-[var(--text-muted)]"
+                    aria-hidden
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+                <CategoryPickerSheet
+                  open={categorySheetOpen}
+                  onClose={() => setCategorySheetOpen(false)}
+                  value={row.category}
+                  categories={getImportCategoriesForType(row.type)}
+                  onSelect={onCategoryChange}
+                />
+              </>
+            ) : (
+              <div className="text-[13px] text-[var(--text-secondary)] min-h-[44px] flex items-center">
+                {importCategoryOptionLabel(row.category)}
+              </div>
+            )}
             {needsReview && (
               <div className="flex flex-wrap gap-1">
                 <CategoryBadge category={row.suggested} />

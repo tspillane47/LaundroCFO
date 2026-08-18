@@ -41,6 +41,7 @@ import { PageError } from "@/components/ui/PageError";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
+import { PostSyncReviewCTA } from "@/components/transactions/PostSyncReviewCTA";
 import { useWriteGuard } from "@/lib/useWriteGuard";
 import {
   type BankImportCategory,
@@ -2132,6 +2133,7 @@ export default function FinancialsPage() {
                   <div className="font-semibold text-slate-100">{plaidSyncAllResult.skippedRemovedPosted}</div>
                 </div>
               </div>
+              <PostSyncReviewCTA count={plaidSyncAllResult.added} />
             </div>
           )}
 
@@ -2263,14 +2265,15 @@ export default function FinancialsPage() {
                       </div>
                     </div>
                     {syncResult.added > 0 && (
-                      <div className="text-[11px] text-[var(--text-secondary)] mt-3">
+                      <div className="text-[11px] text-[var(--text-secondary)] mt-3 hidden md:block">
                         New transactions are in the{" "}
-                        <Link href="/transactions" className="text-[var(--accent)] hover:underline">
+                        <Link href="/transactions?tab=needs_review" className="text-[var(--accent)] hover:underline">
                           review queue
                         </Link>
                         .
                       </div>
                     )}
+                    <PostSyncReviewCTA count={syncResult.added} />
                   </div>
                 )}
               </div>
