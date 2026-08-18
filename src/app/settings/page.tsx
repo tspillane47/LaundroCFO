@@ -46,21 +46,6 @@ const CONDITION_OPTIONS = ["excellent", "good", "fair", "poor"];
 const TREND_OPTIONS = ["growing", "stable", "declining"];
 const COMPETITION_OPTIONS = ["protected", "normal", "heavy"];
 const STORE_TYPES = ["Coin", "Card", "Hybrid"];
-const VALUATION_SETTINGS_KEY = "laundrocfo_valuation_settings";
-
-type ValuationSettings = {
-  baseMultiple: string;
-  minDscr: string;
-  utilityThreshold: string;
-  occupancyThreshold: string;
-};
-
-const DEFAULT_VALUATION_SETTINGS: ValuationSettings = {
-  baseMultiple: "4.5",
-  minDscr: "1.25",
-  utilityThreshold: "20",
-  occupancyThreshold: "20",
-};
 
 function labelize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
@@ -79,15 +64,11 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [editingStore, setEditingStore] = useState(false);
-  const [editingValuation, setEditingValuation] = useState(false);
   const [editingCash, setEditingCash] = useState(false);
   const [savingCash, setSavingCash] = useState(false);
 
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
-
-  const [valuationSettings, setValuationSettings] = useState<ValuationSettings>(DEFAULT_VALUATION_SETTINGS);
-  const [savedValuationSettings, setSavedValuationSettings] = useState<ValuationSettings>(DEFAULT_VALUATION_SETTINGS);
 
   const [form, setForm] = useState<StoreForm>({
     name: "",
@@ -125,18 +106,6 @@ export default function SettingsPage() {
       }
       setUserEmail(user.email ?? "");
       setUserName(user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "User");
-
-      try {
-        const savedValuation = localStorage.getItem(VALUATION_SETTINGS_KEY);
-        if (savedValuation) {
-          const parsed = JSON.parse(savedValuation) as Partial<ValuationSettings>;
-          const merged = { ...DEFAULT_VALUATION_SETTINGS, ...parsed };
-          setValuationSettings(merged);
-          setSavedValuationSettings(merged);
-        }
-      } catch {
-        /* ignore invalid valuation settings */
-      }
 
       if (selectedStore) {
         setForm({
@@ -266,18 +235,6 @@ export default function SettingsPage() {
       await refreshStores();
     }
     setSavingCash(false);
-  }
-
-  function handleSaveValuation() {
-    localStorage.setItem(VALUATION_SETTINGS_KEY, JSON.stringify(valuationSettings));
-    setSavedValuationSettings(valuationSettings);
-    setEditingValuation(false);
-    toast.success("Settings updated");
-  }
-
-  function handleCancelValuation() {
-    setValuationSettings(savedValuationSettings);
-    setEditingValuation(false);
   }
 
   async function handleSignOut() {
@@ -597,57 +554,6 @@ export default function SettingsPage() {
         </div>
 
         <div className="space-y-4">
-          {/* Valuation Settings */}
-          <div className="card">
-            <div className="section-title">Valuation Settings</div>
-            {editingValuation ? (
-              <div className="space-y-3">
-                {([
-                  ["baseMultiple", "Base EBITDA Multiple"],
-                  ["minDscr", "Min DSCR Threshold"],
-                  ["utilityThreshold", "Utility Alert Threshold (%)"],
-                  ["occupancyThreshold", "Occupancy Cost Alert (%)"],
-                ] as const).map(([key, label]) => (
-                  <div key={key}>
-                    <div className="metric-label mb-1.5">{label}</div>
-                    <input
-                      id="settings-valuationsettings"
-                      value={valuationSettings[key]}
-                      onChange={(e) => setValuationSettings((v) => ({ ...v, [key]: e.target.value }))}
-                      className={inputClass}
-                    />
-                  </div>
-                ))}
-                <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={handleSaveValuation} className="btn-primary flex-1">Save</button>
-                  <button type="button" onClick={handleCancelValuation} className="btn-outline flex-1">Cancel</button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="divide-y divide-white/[0.04]">
-                  {[
-                    ["Base EBITDA Multiple", `${valuationSettings.baseMultiple}x`],
-                    ["Valuation Method", "EBITDA × Multiple"],
-                    ["Min DSCR Threshold", `${valuationSettings.minDscr}x`],
-                    ["Utility Alert Threshold", `${valuationSettings.utilityThreshold}%`],
-                    ["Occupancy Cost Alert", `${valuationSettings.occupancyThreshold}%`],
-                    ["Lease Risk Threshold", "5 years remaining"],
-                    ["Equipment Age Alert", "12 years avg"],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex justify-between py-2.5 text-[13px]">
-                      <span className="text-[var(--text-secondary)]">{label}</span>
-                      <span className="font-semibold text-slate-100">{value}</span>
-                    </div>
-                  ))}
-                </div>
-                <button type="button" onClick={() => setEditingValuation(true)} className="btn-outline w-full mt-4">
-                  Edit Valuation Settings
-                </button>
-              </>
-            )}
-          </div>
-
           {/* Account */}
           <div className="card">
             <div className="section-title">Account</div>
