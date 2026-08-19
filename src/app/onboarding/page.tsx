@@ -18,7 +18,8 @@ import {
 } from "@/lib/financials";
 import { getStoreValuation, invalidateValuationCache } from "@/lib/getStoreValuation";
 import { getFinancialDataConfidenceMessage, needsFinancialDataConfidenceNote } from "@/lib/financialDataConfidence";
-import { canAddStore, storeCreationBlockedMessage } from "@/lib/access";
+import { canAddStore, getAccessStatus, getUserStoreCount, storeCreationBlockedMessage } from "@/lib/access";
+import type { AccessStatus } from "@/lib/access";
 import { useAccessStatus, invalidateAccessStatusCache } from "@/lib/useAccessStatus";
 import {
   completeOnboarding,
@@ -181,6 +182,7 @@ function OnboardingContent() {
     trialEndsAt,
     currentPeriodEnd,
     loading: accessLoading,
+    refresh: refreshAccess,
   } = useAccessStatus();
   const accessStatus = useMemo(
     () => ({
@@ -235,6 +237,64 @@ function OnboardingContent() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
+  const requestEnsureTrial = useCallback(async (): Promise<{
+    ok: boolean;
+    access: AccessStatus;
+    storeCount: number;
+  }> => {
+    const response = await fetch("/api/subscription/ensure-trial", { method: "POST" });
+    const payload = (await response.json().catch(() => null)) as {
+      reason?: string;
+    } | null;
+
+    if (!response.ok) {
+      return { ok: false, access: accessStatus, storeCount };
+    }
+
+    if (payload?.reason === "join_path" || payload?.reason === "insert_failed") {
+      return { ok: false, access: accessStatus, storeCount };
+    }
+
+    invalidateAccessStatusCache();
+    await refreshAccess();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return { ok: false, access: accessStatus, storeCount };
+    }
+
+    const [status, count] = await Promise.all([
+      getAccessStatus(supabase, user.id),
+      getUserStoreCount(supabase, user.id),
+    ]);
+
+    return { ok: true, access: status, storeCount: count };
+  }, [accessStatus, refreshAccess, storeCount, supabase]);
+
+  const beginOwnStoreSetup = useCallback(async () => {
+    setBusy(true);
+    setErrorMessage("");
+
+    const result = await requestEnsureTrial();
+    setBusy(false);
+
+    if (!result.ok) {
+      setErrorMessage("We couldn't start your free trial. Please try again.");
+      return;
+    }
+
+    if (!canAddStore(result.access, result.storeCount)) {
+      setErrorMessage(storeCreationBlockedMessage(result.access));
+      return;
+    }
+
+    setPhase("wizard");
+    setStep(1);
+    setErrorMessage("");
+  }, [requestEnsureTrial]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -253,6 +313,22 @@ function OnboardingContent() {
 
       if (isAddingStore && switchToOwnPath) {
         await completeOnboarding(supabase, user.id, "own");
+
+        const trialResult = await requestEnsureTrial();
+        if (cancelled) return;
+
+        if (!trialResult.ok || !canAddStore(trialResult.access, trialResult.storeCount)) {
+          setErrorMessage(
+            trialResult.ok
+              ? storeCreationBlockedMessage(trialResult.access)
+              : "We couldn't start your free trial. Please try again."
+          );
+          setReady(true);
+          return;
+        }
+
+        setReady(true);
+        return;
       }
 
       const completed = await isOnboardingComplete(supabase, user.id);
@@ -281,7 +357,7 @@ function OnboardingContent() {
     return () => {
       cancelled = true;
     };
-  }, [router, supabase, isAddingStore, switchToOwnPath, accessLoading, accessStatus, storeCount, canCreateStore]);
+  }, [router, supabase, isAddingStore, switchToOwnPath, accessLoading, accessStatus, storeCount, canCreateStore, requestEnsureTrial]);
 
   async function createStore(): Promise<string | null> {
     const {
@@ -762,21 +838,13 @@ function OnboardingContent() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl mx-auto">
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!canCreateStore) {
-                          setErrorMessage(storeCreationBlockedMessage(accessStatus));
-                          return;
-                        }
-                        setPhase("wizard");
-                        setStep(1);
-                        setErrorMessage("");
-                      }}
-                      disabled={!canCreateStore}
+                      onClick={() => void beginOwnStoreSetup()}
+                      disabled={accessLoading || busy}
                       className={clsx(
                         "rounded-xl border-2 px-4 py-6 text-left transition-colors min-h-[120px] border-[var(--border)]",
-                        canCreateStore
-                          ? "hover:border-blue-400/50"
-                          : "opacity-60 cursor-not-allowed"
+                        accessLoading || busy
+                          ? "opacity-60 cursor-not-allowed"
+                          : "hover:border-blue-400/50"
                       )}
                     >
                       <div className="text-[16px] font-semibold text-[var(--text-primary)] mb-2">

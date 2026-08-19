@@ -5,6 +5,7 @@ const getUserMock = vi.fn();
 const getAccessStatusMock = vi.fn();
 const getUserStoreCountMock = vi.fn();
 const fetchOnboardingProfileMock = vi.fn();
+const ensureAutoTrialSubscriptionMock = vi.fn();
 
 vi.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: vi.fn(async () => ({
@@ -32,6 +33,15 @@ vi.mock("@/lib/access", async (importOriginal) => {
       getUserStoreCountMock(...args),
   };
 });
+
+vi.mock("@/lib/supabase-admin", () => ({
+  createAdminSupabaseClient: vi.fn(() => ({})),
+}));
+
+vi.mock("@/lib/trial-grant", () => ({
+  ensureAutoTrialSubscription: (...args: unknown[]) =>
+    ensureAutoTrialSubscriptionMock(...args),
+}));
 
 import { POST } from "@/app/api/stores/route";
 
@@ -69,11 +79,24 @@ function createPostRequest(body: Record<string, unknown> = { name: "Test Store" 
   });
 }
 
+const trialingStarterAccess: AccessStatus = {
+  plan: "starter",
+  isReadOnly: false,
+  reason: "trialing",
+  trialEndsAt: new Date("2026-09-02T12:00:00.000Z"),
+  currentPeriodEnd: null,
+  maxStores: 1,
+};
+
 describe("POST /api/stores", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getUserMock.mockResolvedValue({ data: { user: { id: USER_ID } } });
     fetchOnboardingProfileMock.mockResolvedValue({ onboarding_completed: true, onboarding_path: "own" });
+    ensureAutoTrialSubscriptionMock.mockResolvedValue({
+      granted: false,
+      reason: "already_subscribed",
+    });
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -102,6 +125,7 @@ describe("POST /api/stores", () => {
     expect(payload.error).toBe("join_path");
     expect(payload.message).toContain("join a store someone else owns");
     expect(getAccessStatusMock).not.toHaveBeenCalled();
+    expect(ensureAutoTrialSubscriptionMock).not.toHaveBeenCalled();
   });
 
   it("returns 403 with subscription_required for read-only users with no subscription", async () => {
@@ -116,6 +140,32 @@ describe("POST /api/stores", () => {
     expect(payload.message).toContain("Subscribe");
     expect(getAccessStatusMock).toHaveBeenCalledWith(expect.anything(), USER_ID);
     expect(getUserStoreCountMock).toHaveBeenCalledWith(expect.anything(), USER_ID);
+    expect(ensureAutoTrialSubscriptionMock).toHaveBeenCalledWith(
+      expect.anything(),
+      USER_ID,
+      expect.objectContaining({ onboarding_path: "own" })
+    );
+  });
+
+  it("grants an auto-trial inline before checking access", async () => {
+    getAccessStatusMock.mockResolvedValue(trialingStarterAccess);
+    getUserStoreCountMock.mockResolvedValue(0);
+    ensureAutoTrialSubscriptionMock.mockResolvedValue({
+      granted: true,
+      reason: "created",
+    });
+
+    const response = await POST(createPostRequest({ name: "   " }));
+    const payload = await response.json();
+
+    expect(ensureAutoTrialSubscriptionMock).toHaveBeenCalledWith(
+      expect.anything(),
+      USER_ID,
+      expect.objectContaining({ onboarding_path: "own" })
+    );
+    expect(getAccessStatusMock).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(400);
+    expect(payload).toEqual({ error: "Store name is required" });
   });
 
   it("returns 403 with store_limit_reached when the plan store cap is met", async () => {

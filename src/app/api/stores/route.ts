@@ -10,7 +10,9 @@ import {
   isJoiningOnboardingPath,
   JOIN_PATH_STORE_CREATION_MESSAGE,
 } from "@/lib/onboarding";
+import { createAdminSupabaseClient } from "@/lib/supabase-admin";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { ensureAutoTrialSubscription } from "@/lib/trial-grant";
 
 /** Always evaluate access from the DB on each request — never rely on client cache or RLS alone. */
 export const dynamic = "force-dynamic";
@@ -49,6 +51,9 @@ export async function POST(request: Request) {
       { status: 403 }
     );
   }
+
+  const admin = createAdminSupabaseClient();
+  await ensureAutoTrialSubscription(admin, user.id, profile);
 
   const [access, storeCount] = await Promise.all([
     getAccessStatus(supabase, user.id),

@@ -2,12 +2,9 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createAdminSupabaseClient } from "@/lib/supabase-admin";
 import { isAdminEmail } from "@/lib/admin";
-import {
-  BETA_MODE_SETTING_KEY,
-  DEFAULT_TRIAL_PLAN,
-  trialEndsAtFromNow,
-} from "@/lib/beta";
+import { BETA_MODE_SETTING_KEY, trialEndsAtFromNow } from "@/lib/beta";
 import { isEligibleForAutoTrial } from "@/lib/onboarding";
+import { ensureAutoTrialSubscription } from "@/lib/trial-grant";
 
 async function requireAdmin() {
   const supabase = await createServerSupabaseClient();
@@ -82,16 +79,17 @@ export async function POST() {
       isEligibleForAutoTrial(profileByUserId.get(userId) ?? null)
     );
 
-    if (usersEligibleForTrial.length > 0) {
-      const rows = usersEligibleForTrial.map((userId) => ({
-        user_id: userId,
-        plan: DEFAULT_TRIAL_PLAN,
-        status: "trialing" as const,
-        trial_ends_at: trialEndsAt,
-      }));
-
-      const { error: insertError } = await admin.from("subscriptions").insert(rows);
-      if (insertError) throw insertError;
+    let trialsCreated = 0;
+    for (const userId of usersEligibleForTrial) {
+      const result = await ensureAutoTrialSubscription(
+        admin,
+        userId,
+        profileByUserId.get(userId) ?? null,
+        { trialEndsAt }
+      );
+      if (result.granted) {
+        trialsCreated += 1;
+      }
     }
 
     const { error: settingsError } = await admin
@@ -104,7 +102,7 @@ export async function POST() {
     return NextResponse.json({
       ok: true,
       betaMode: false,
-      trialsCreated: usersEligibleForTrial.length,
+      trialsCreated,
       trialsSkippedJoinPath:
         usersWithoutSubscription.length - usersEligibleForTrial.length,
       trialEndsAt,
