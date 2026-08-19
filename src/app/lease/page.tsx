@@ -176,8 +176,13 @@ export default function OccupancyPage() {
           icon="FileText"
           title="No lease information yet"
           description="Add your lease details to track rent and expiration dates"
-          ctaLabel="Add Lease"
-          ctaHref="/occupancy"
+          cta={
+            <ReadOnlyGuard align="stretch">
+              <button type="button" onClick={triggerLeaseEdit} className="btn-primary inline-flex text-[13px]">
+                Add Lease →
+              </button>
+            </ReadOnlyGuard>
+          }
         />
         <LeaseModule
           store={store}

@@ -284,7 +284,7 @@ export function planPlaidAddedTransactions(params: {
         txn,
         existingRowId: pendingMatch.id,
         path: "pending_transaction_id",
-        previousPlaidTransactionId: pendingMatch.plaid_transaction_id ?? normalized.pending_transaction_id,
+        previousPlaidTransactionId: pendingMatch.plaid_transaction_id ?? normalized.pending_transaction_id!,
       });
       continue;
     }

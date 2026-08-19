@@ -2073,21 +2073,23 @@ export default function FinancialsPage() {
                 <div className="text-[11px] text-amber-200 mt-1">{PLAID_QUICKBOOKS_BLOCK_MESSAGE}</div>
               )}
             </div>
-            <button
-              type="button"
-              className={clsx(
-                "btn-primary flex-shrink-0",
-                (!store?.id || plaidBlockedByQuickBooks) && "pointer-events-none opacity-50"
-              )}
-              onClick={() => void initiatePlaidConnect()}
-              disabled={!store?.id || connectingPlaid || plaidBlockedByQuickBooks}
-            >
-              {connectingPlaid && plaidLinkModeRef.current === "connect"
-                ? "Connecting…"
-                : hasPlaidConnections
-                  ? "Connect Another Account"
-                  : "Connect Bank Account"}
-            </button>
+            <ReadOnlyGuard>
+              <button
+                type="button"
+                className={clsx(
+                  "btn-primary flex-shrink-0",
+                  (!store?.id || plaidBlockedByQuickBooks) && "pointer-events-none opacity-50"
+                )}
+                onClick={() => void initiatePlaidConnect()}
+                disabled={!store?.id || connectingPlaid || plaidBlockedByQuickBooks}
+              >
+                {connectingPlaid && plaidLinkModeRef.current === "connect"
+                  ? "Connecting…"
+                  : hasPlaidConnections
+                    ? "Connect Another Account"
+                    : "Connect Bank Account"}
+              </button>
+            </ReadOnlyGuard>
           </div>
 
           {plaidConnections.length > 1 && (
@@ -2098,14 +2100,16 @@ export default function FinancialsPage() {
                   Import new transactions from all {plaidConnections.length} bank connections at once.
                 </div>
               </div>
-              <button
-                type="button"
-                className="btn-primary flex-shrink-0"
-                onClick={() => void syncAllPlaidConnections()}
-                disabled={plaidActionBusy}
-              >
-                {syncingPlaidConnectionId === "all" ? "Syncing All…" : "Sync All"}
-              </button>
+              <ReadOnlyGuard>
+                <button
+                  type="button"
+                  className="btn-primary flex-shrink-0"
+                  onClick={() => void syncAllPlaidConnections()}
+                  disabled={plaidActionBusy}
+                >
+                  {syncingPlaidConnectionId === "all" ? "Syncing All…" : "Sync All"}
+                </button>
+              </ReadOnlyGuard>
             </div>
           )}
 
@@ -2174,23 +2178,27 @@ export default function FinancialsPage() {
                     </p>
                     <div className="flex flex-shrink-0 items-center gap-4">
                       {isPlaidUpdateModeEligible(connection.item_error_code) && (
+                        <ReadOnlyGuard>
+                          <button
+                            type="button"
+                            className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
+                            onClick={() => void reconnectPlaid(connection.id)}
+                            disabled={plaidActionBusy}
+                          >
+                            {isReconnecting ? "Reconnecting…" : "Reconnect"}
+                          </button>
+                        </ReadOnlyGuard>
+                      )}
+                      <ReadOnlyGuard>
                         <button
                           type="button"
                           className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
-                          onClick={() => void reconnectPlaid(connection.id)}
+                          onClick={() => setPlaidDisconnectConfirmConnectionId(connection.id)}
                           disabled={plaidActionBusy}
                         >
-                          {isReconnecting ? "Reconnecting…" : "Reconnect"}
+                          Disconnect
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
-                        onClick={() => setPlaidDisconnectConfirmConnectionId(connection.id)}
-                        disabled={plaidActionBusy}
-                      >
-                        Disconnect
-                      </button>
+                      </ReadOnlyGuard>
                     </div>
                   </div>
                 )}
@@ -2219,22 +2227,26 @@ export default function FinancialsPage() {
                     )}
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      onClick={() => void syncPlaidConnection(connection.id)}
-                      disabled={plaidActionBusy}
-                    >
-                      {isSyncing ? "Syncing…" : "Sync Now"}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-outline"
-                      onClick={() => setPlaidDisconnectConfirmConnectionId(connection.id)}
-                      disabled={plaidActionBusy}
-                    >
-                      Disconnect
-                    </button>
+                    <ReadOnlyGuard>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={() => void syncPlaidConnection(connection.id)}
+                        disabled={plaidActionBusy}
+                      >
+                        {isSyncing ? "Syncing…" : "Sync Now"}
+                      </button>
+                    </ReadOnlyGuard>
+                    <ReadOnlyGuard>
+                      <button
+                        type="button"
+                        className="btn-outline"
+                        onClick={() => setPlaidDisconnectConfirmConnectionId(connection.id)}
+                        disabled={plaidActionBusy}
+                      >
+                        Disconnect
+                      </button>
+                    </ReadOnlyGuard>
                   </div>
                 </div>
 
@@ -2310,16 +2322,18 @@ export default function FinancialsPage() {
                 >
                   Cancel
                 </button>
-                <button
-                  type="button"
-                  className="text-[12px] px-4 py-2 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700"
-                  onClick={() => void disconnectPlaid(plaidDisconnectConfirmConnectionId)}
-                  disabled={disconnectingPlaidConnectionId !== null}
-                >
-                  {disconnectingPlaidConnectionId === plaidDisconnectConfirmConnectionId
-                    ? "Disconnecting…"
-                    : "Disconnect Bank Account"}
-                </button>
+                <ReadOnlyGuard>
+                  <button
+                    type="button"
+                    className="text-[12px] px-4 py-2 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700"
+                    onClick={() => void disconnectPlaid(plaidDisconnectConfirmConnectionId)}
+                    disabled={disconnectingPlaidConnectionId !== null}
+                  >
+                    {disconnectingPlaidConnectionId === plaidDisconnectConfirmConnectionId
+                      ? "Disconnecting…"
+                      : "Disconnect Bank Account"}
+                  </button>
+                </ReadOnlyGuard>
               </div>
             </div>
           )}
@@ -2341,24 +2355,28 @@ export default function FinancialsPage() {
               )}
             </div>
             <div className="flex gap-2">
-              <label className="btn-outline cursor-pointer">
-                Upload CSV
-                <input
-                  id="financials-input"
-                  type="file"
-                  accept=".csv"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleCSVUpload(file);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
+              <ReadOnlyGuard>
+                <label className="btn-outline cursor-pointer">
+                  Upload CSV
+                  <input
+                    id="financials-input"
+                    type="file"
+                    accept=".csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleCSVUpload(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </ReadOnlyGuard>
               {stagedTransactions.length > 0 && (
-                <button type="button" className="btn-primary" onClick={() => void saveStagedToBank()} disabled={saving}>
-                  {saving ? "Saving…" : `Save ${stagedTransactions.length} to Queue`}
-                </button>
+                <ReadOnlyGuard>
+                  <button type="button" className="btn-primary" onClick={() => void saveStagedToBank()} disabled={saving}>
+                    {saving ? "Saving…" : `Save ${stagedTransactions.length} to Queue`}
+                  </button>
+                </ReadOnlyGuard>
               )}
             </div>
           </div>
@@ -2396,22 +2414,26 @@ export default function FinancialsPage() {
                 Reconnect to keep your data up to date.
               </p>
               <div className="flex flex-shrink-0 items-center gap-4">
-                <button
-                  type="button"
-                  className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
-                  onClick={initiateQuickBooksConnect}
-                  disabled={connectingQb || disconnectingQb || syncingQb}
-                >
-                  {connectingQb ? "Reconnecting…" : "Reconnect"}
-                </button>
-                <button
-                  type="button"
-                  className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
-                  onClick={() => setShowQbDisconnectConfirm(true)}
-                  disabled={connectingQb || disconnectingQb || syncingQb}
-                >
-                  Disconnect
-                </button>
+                <ReadOnlyGuard>
+                  <button
+                    type="button"
+                    className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
+                    onClick={initiateQuickBooksConnect}
+                    disabled={connectingQb || disconnectingQb || syncingQb}
+                  >
+                    {connectingQb ? "Reconnecting…" : "Reconnect"}
+                  </button>
+                </ReadOnlyGuard>
+                <ReadOnlyGuard>
+                  <button
+                    type="button"
+                    className="text-[12px] font-semibold underline underline-offset-2 hover:opacity-80"
+                    onClick={() => setShowQbDisconnectConfirm(true)}
+                    disabled={connectingQb || disconnectingQb || syncingQb}
+                  >
+                    Disconnect
+                  </button>
+                </ReadOnlyGuard>
               </div>
             </div>
           )}
@@ -2450,35 +2472,41 @@ export default function FinancialsPage() {
             </div>
             {qbConnection ? (
               <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={() => syncQuickBooks()}
-                  disabled={syncingQb || disconnectingQb}
-                >
-                  {syncingQb ? "Syncing…" : "Sync Now"}
-                </button>
-                <button
-                  type="button"
-                  className="btn-outline"
-                  onClick={() => setShowQbDisconnectConfirm(true)}
-                  disabled={disconnectingQb || syncingQb}
-                >
-                  Disconnect
-                </button>
+                <ReadOnlyGuard>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => syncQuickBooks()}
+                    disabled={syncingQb || disconnectingQb}
+                  >
+                    {syncingQb ? "Syncing…" : "Sync Now"}
+                  </button>
+                </ReadOnlyGuard>
+                <ReadOnlyGuard>
+                  <button
+                    type="button"
+                    className="btn-outline"
+                    onClick={() => setShowQbDisconnectConfirm(true)}
+                    disabled={disconnectingQb || syncingQb}
+                  >
+                    Disconnect
+                  </button>
+                </ReadOnlyGuard>
               </div>
             ) : (
-              <button
-                type="button"
-                className={clsx(
-                  "btn-primary flex-shrink-0",
-                  (!store?.id || quickBooksBlockedByPlaid) && "pointer-events-none opacity-50"
-                )}
-                onClick={initiateQuickBooksConnect}
-                disabled={!store?.id || connectingQb || quickBooksBlockedByPlaid}
-              >
-                {connectingQb ? "Connecting…" : "Connect QuickBooks"}
-              </button>
+              <ReadOnlyGuard>
+                <button
+                  type="button"
+                  className={clsx(
+                    "btn-primary flex-shrink-0",
+                    (!store?.id || quickBooksBlockedByPlaid) && "pointer-events-none opacity-50"
+                  )}
+                  onClick={initiateQuickBooksConnect}
+                  disabled={!store?.id || connectingQb || quickBooksBlockedByPlaid}
+                >
+                  {connectingQb ? "Connecting…" : "Connect QuickBooks"}
+                </button>
+              </ReadOnlyGuard>
             )}
           </div>
 
@@ -2497,14 +2525,16 @@ export default function FinancialsPage() {
                 >
                   Cancel
                 </button>
-                <button
-                  type="button"
-                  className="text-[12px] px-4 py-2 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700"
-                  onClick={() => void disconnectQuickBooks()}
-                  disabled={disconnectingQb}
-                >
-                  {disconnectingQb ? "Disconnecting…" : "Disconnect QuickBooks"}
-                </button>
+                <ReadOnlyGuard>
+                  <button
+                    type="button"
+                    className="text-[12px] px-4 py-2 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700"
+                    onClick={() => void disconnectQuickBooks()}
+                    disabled={disconnectingQb}
+                  >
+                    {disconnectingQb ? "Disconnecting…" : "Disconnect QuickBooks"}
+                  </button>
+                </ReadOnlyGuard>
               </div>
             </div>
           )}
@@ -2526,14 +2556,16 @@ export default function FinancialsPage() {
                 >
                   Cancel
                 </button>
-                <button
-                  type="button"
-                  className="btn-primary text-[12px]"
-                  onClick={confirmQuickBooksConnect}
-                  disabled={connectingQb}
-                >
-                  {connectingQb ? "Continuing…" : "Continue with QuickBooks"}
-                </button>
+                <ReadOnlyGuard>
+                  <button
+                    type="button"
+                    className="btn-primary text-[12px]"
+                    onClick={confirmQuickBooksConnect}
+                    disabled={connectingQb}
+                  >
+                    {connectingQb ? "Continuing…" : "Continue with QuickBooks"}
+                  </button>
+                </ReadOnlyGuard>
               </div>
             </div>
           )}
@@ -2571,27 +2603,31 @@ export default function FinancialsPage() {
                       return (
                         <div key={key} className="flex items-center justify-between gap-3">
                           <span>{formatSkippedMonthLabel(month.year, month.month)}</span>
-                          <button
-                            type="button"
-                            className="btn-outline text-[11px]"
-                            onClick={() => forceResyncQuickBooks([month])}
-                            disabled={syncingQb || isResyncing}
-                          >
-                            {isResyncing ? "Resyncing…" : "Force resync"}
-                          </button>
+                          <ReadOnlyGuard>
+                            <button
+                              type="button"
+                              className="btn-outline text-[11px]"
+                              onClick={() => forceResyncQuickBooks([month])}
+                              disabled={syncingQb || isResyncing}
+                            >
+                              {isResyncing ? "Resyncing…" : "Force resync"}
+                            </button>
+                          </ReadOnlyGuard>
                         </div>
                       );
                     })}
                   </div>
                   {qbSyncResult.skippedMonths.length > 1 && (
-                    <button
-                      type="button"
-                      className="btn-outline mt-3 text-[12px]"
-                      onClick={() => forceResyncQuickBooks(qbSyncResult.skippedMonths)}
-                      disabled={syncingQb}
-                    >
-                      {syncingQb ? "Resyncing…" : "Force resync all skipped months"}
-                    </button>
+                    <ReadOnlyGuard>
+                      <button
+                        type="button"
+                        className="btn-outline mt-3 text-[12px]"
+                        onClick={() => forceResyncQuickBooks(qbSyncResult.skippedMonths)}
+                        disabled={syncingQb}
+                      >
+                        {syncingQb ? "Resyncing…" : "Force resync all skipped months"}
+                      </button>
+                    </ReadOnlyGuard>
                   )}
                 </div>
               )}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { fetchAccessibleStores } from "@/lib/store-access";
 import { useStores } from "@/lib/store-context";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { AddStoreLink } from "@/components/ui/AddStoreLink";
@@ -13,6 +14,7 @@ import { useWriteGuard } from "@/lib/useWriteGuard";
 
 type StoreRow = {
   id: string;
+  user_id: string;
   name: string | null;
   address: string | null;
   archived: boolean | null;
@@ -42,6 +44,7 @@ export default function ManageStoresPage() {
   const { canWrite, blockedReason } = useWriteGuard();
 
   const [stores, setStores] = useState<StoreRow[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StoreRow | null>(null);
@@ -58,16 +61,19 @@ export default function ManageStoresPage() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from("stores")
-      .select("id, name, address, archived, created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+    setCurrentUserId(user.id);
+
+    const { data, error } = await fetchAccessibleStores(supabase, { includeArchived: true });
 
     if (error) {
       setMessage({ type: "error", text: "We couldn't load your stores. Please try again." });
     } else {
-      setStores((data ?? []) as StoreRow[]);
+      const rows = ((data ?? []) as StoreRow[]).sort((a, b) => {
+        const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return bTime - aTime;
+      });
+      setStores(rows);
     }
     setLoading(false);
   }, [router, supabase]);
@@ -177,6 +183,7 @@ export default function ManageStoresPage() {
           {stores.map((store) => {
             const cityState = parseCityState(store.address);
             const isArchived = store.archived === true;
+            const isStoreOwner = currentUserId !== null && store.user_id === currentUserId;
 
             return (
               <div
@@ -225,29 +232,33 @@ export default function ManageStoresPage() {
                     >
                       Edit
                     </Link>
-                    <ReadOnlyGuard>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleArchive(store)}
-                        disabled={togglingId === store.id}
-                        className="btn-outline text-[12px] px-3 py-1.5 disabled:opacity-40"
-                      >
-                        {togglingId === store.id
-                          ? "Updating..."
-                          : isArchived
-                            ? "Unarchive"
-                            : "Archive"}
-                      </button>
-                    </ReadOnlyGuard>
-                    <ReadOnlyGuard>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteTarget(store)}
-                        className="btn-outline text-[12px] px-3 py-1.5 text-red-400 border-red-500/20"
-                      >
-                        Delete
-                      </button>
-                    </ReadOnlyGuard>
+                    {isStoreOwner && (
+                      <>
+                        <ReadOnlyGuard>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleArchive(store)}
+                            disabled={togglingId === store.id}
+                            className="btn-outline text-[12px] px-3 py-1.5 disabled:opacity-40"
+                          >
+                            {togglingId === store.id
+                              ? "Updating..."
+                              : isArchived
+                                ? "Unarchive"
+                                : "Archive"}
+                          </button>
+                        </ReadOnlyGuard>
+                        <ReadOnlyGuard>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(store)}
+                            className="btn-outline text-[12px] px-3 py-1.5 text-red-400 border-red-500/20"
+                          >
+                            Delete
+                          </button>
+                        </ReadOnlyGuard>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

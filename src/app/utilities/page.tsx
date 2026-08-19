@@ -440,10 +440,14 @@ export default function UtilitiesPage() {
     return "No significant correlation detected yet - add more historical data.";
   }, [latest, equipMetrics.avgEquipmentAge, latestRevenue]);
 
-  function openMonthForm(month: number) {
+  function openMonthForm(month: number, year?: number) {
     if (!canWrite) return;
+    const targetYear = year ?? selectedYear;
+    if (year !== undefined) {
+      setSelectedYear(year);
+    }
     setSelectedMonth(month);
-    const existing = records.find((r) => r.year === selectedYear && r.month === month);
+    const existing = records.find((r) => r.year === targetYear && r.month === month);
     if (existing) {
       setForm({
         water: existing.water ?? 0,
@@ -1019,7 +1023,7 @@ export default function UtilitiesPage() {
                       "border-b border-[var(--border)] hover:bg-[var(--bg-card2)]",
                       canWrite ? "cursor-pointer" : "cursor-default"
                     )}
-                    onClick={() => canWrite && openMonthForm(r.month)}
+                    onClick={() => canWrite && openMonthForm(r.month, r.year)}
                   >
                     <td className="py-2.5 pr-3 text-adaptive-secondary">
                       {MONTH_NAMES[r.month - 1]} {r.year}
