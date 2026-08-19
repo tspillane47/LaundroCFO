@@ -23,7 +23,9 @@ import type { AccessStatus } from "@/lib/access";
 import { useAccessStatus, invalidateAccessStatusCache } from "@/lib/useAccessStatus";
 import {
   completeOnboarding,
+  fetchOnboardingProfile,
   invalidateOnboardingStatusCache,
+  isOnboardingAlreadySavedForPath,
   isOnboardingComplete,
   JOIN_STORE_SETTINGS_HINT,
   type OnboardingPath,
@@ -448,18 +450,23 @@ function OnboardingContent() {
         }
 
         if (path) {
-          await completeOnboarding(supabase, user.id, path);
-          invalidateOnboardingStatusCache();
+          const profile = await fetchOnboardingProfile(supabase, user.id);
+          if (!isOnboardingAlreadySavedForPath(profile, path)) {
+            await completeOnboarding(supabase, user.id, path);
+            invalidateOnboardingStatusCache();
 
-          const verified = await isOnboardingComplete(supabase, user.id);
-          if (!verified) {
-            throw new Error("Onboarding completion could not be verified");
+            const verified = await isOnboardingComplete(supabase, user.id);
+            if (!verified) {
+              throw new Error("Onboarding completion could not be verified");
+            }
+
+            setOnboardingRecheckTick((tick) => tick + 1);
           }
-
-          setOnboardingRecheckTick((tick) => tick + 1);
         }
 
         router.replace(destination);
+        clearCompletingTimeout();
+        setCompleting(false);
       } catch (error) {
         clearCompletingTimeout();
         console.error("Failed to complete onboarding navigation:", error);

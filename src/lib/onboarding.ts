@@ -23,6 +23,15 @@ function profileIndicatesComplete(profile: OnboardingProfile | null | undefined)
   return false;
 }
 
+/** Skip redundant upsert when the profile already reflects the intended path. */
+export function isOnboardingAlreadySavedForPath(
+  profile: OnboardingProfile | null | undefined,
+  path: OnboardingPath
+): boolean {
+  if (!profileIndicatesComplete(profile)) return false;
+  return profile!.onboarding_path === path;
+}
+
 export async function fetchOnboardingProfile(
   supabase: SupabaseClient,
   userId: string

@@ -4,6 +4,7 @@ import {
   getOnboardingStatus,
   isEligibleForAutoTrial,
   isJoiningOnboardingPath,
+  isOnboardingAlreadySavedForPath,
   isOnboardingComplete,
   OnboardingCompletionError,
   type OnboardingProfile,
@@ -101,6 +102,28 @@ describe("onboarding status", () => {
     expect(isEligibleForAutoTrial({ onboarding_path: "own" })).toBe(true);
     expect(isEligibleForAutoTrial({ onboarding_path: null })).toBe(true);
     expect(isEligibleForAutoTrial(null)).toBe(true);
+  });
+
+  it("detects when onboarding is already saved for the intended path", () => {
+    expect(
+      isOnboardingAlreadySavedForPath(
+        { onboarding_completed: true, onboarding_path: "join" },
+        "join"
+      )
+    ).toBe(true);
+    expect(
+      isOnboardingAlreadySavedForPath(
+        { onboarding_completed: false, onboarding_path: "join" },
+        "join"
+      )
+    ).toBe(true);
+    expect(
+      isOnboardingAlreadySavedForPath(
+        { onboarding_completed: true, onboarding_path: "join" },
+        "own"
+      )
+    ).toBe(false);
+    expect(isOnboardingAlreadySavedForPath(null, "join")).toBe(false);
   });
 });
 

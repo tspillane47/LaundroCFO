@@ -25,7 +25,7 @@ import { useBetaMode } from "@/lib/useBetaMode";
 import { isAdminEmail } from "@/lib/admin";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { AlertNotificationProvider } from "@/components/alerts/AlertNotificationProvider";
-import { getOnboardingStatus } from "@/lib/onboarding";
+import { getOnboardingStatus, ONBOARDING_STATUS_INVALIDATED } from "@/lib/onboarding";
 
 function getUserInitials(fullName: string | null, email: string | null): string {
   const name = fullName?.trim();
@@ -130,8 +130,15 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const supabase = createClient();
   const [checked, setChecked] = useState(false);
+  const [recheckKey, setRecheckKey] = useState(0);
   const isExempt = onboardingExemptPaths.includes(pathname) || pathname.startsWith("/auth/callback") || pathname.startsWith("/auth/confirm") || pathname.startsWith("/auth/auth-code-error");
   const isAddingStore = pathname === "/onboarding" && searchParams.get("add") === "true";
+
+  useEffect(() => {
+    const handleInvalidate = () => setRecheckKey((key) => key + 1);
+    window.addEventListener(ONBOARDING_STATUS_INVALIDATED, handleInvalidate);
+    return () => window.removeEventListener(ONBOARDING_STATUS_INVALIDATED, handleInvalidate);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,7 +183,7 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [pathname, isExempt, isAddingStore, router, supabase]);
+  }, [pathname, isExempt, isAddingStore, router, supabase, recheckKey]);
 
   if (!checked && !isExempt) {
     return (
