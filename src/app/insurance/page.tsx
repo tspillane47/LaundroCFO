@@ -837,6 +837,16 @@ export default function InsurancePage() {
     );
   }
 
+  if (!selectedStore) {
+    return (
+      <div className="card text-center py-12">
+        <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
+          Select a store to view insurance.
+        </p>
+      </div>
+    );
+  }
+
   if (policies.length === 0 && !showPolicyForm) {
     return (
       <div className="space-y-5">

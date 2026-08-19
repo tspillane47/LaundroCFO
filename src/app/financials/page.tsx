@@ -255,7 +255,7 @@ const ROADMAP = [
   { feature: "Bank CSV import", status: "live" as const },
   { feature: "Auto-categorization", status: "live" as const },
   { feature: "QuickBooks Online sync", status: "live" as const },
-  { feature: "Plaid bank feed", status: "soon" as const },
+  { feature: "Plaid bank feed", status: "live" as const },
   { feature: "Utility bill OCR", status: "soon" as const },
 ];
 

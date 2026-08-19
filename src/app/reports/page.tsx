@@ -547,7 +547,8 @@ function ReportsPageContent() {
   }
 
   const storeName = store?.name ?? "Your Store";
-  const isStoreReady = Boolean(store && valuation && metrics && portfolioTtm);
+  const hasFinancialData = (storeTtm?.monthsUsed ?? 0) > 0;
+  const isStoreReady = Boolean(store && valuation && metrics && portfolioTtm && hasFinancialData);
   const portfolioReady = Boolean(portfolioData && portfolioData.totals.storeCount > 0);
   const totals = portfolioData?.totals;
   const cashFlow = portfolioCashFlow ?? portfolioData?.cashFlow;

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import clsx from "clsx";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
@@ -445,7 +446,15 @@ export default function SettingsPage() {
                   />
                 </div>
                 <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                  Connect QuickBooks or Plaid to sync automatically (coming soon)
+                  Sync cash automatically via{" "}
+                  <Link href="/financials?tab=quickbooks" className="text-[var(--accent)] hover:underline">
+                    QuickBooks
+                  </Link>{" "}
+                  or{" "}
+                  <Link href="/financials?tab=bank" className="text-[var(--accent)] hover:underline">
+                    Plaid bank import
+                  </Link>
+                  .
                 </p>
                 <div className="flex gap-2 pt-2">
                   <ReadOnlyGuard align="stretch">
@@ -496,7 +505,15 @@ export default function SettingsPage() {
                   ))}
                 </div>
                 <p className="text-[11px] mt-3" style={{ color: "var(--text-muted)" }}>
-                  Connect QuickBooks or Plaid to sync automatically (coming soon)
+                  Sync cash automatically via{" "}
+                  <Link href="/financials?tab=quickbooks" className="text-[var(--accent)] hover:underline">
+                    QuickBooks
+                  </Link>{" "}
+                  or{" "}
+                  <Link href="/financials?tab=bank" className="text-[var(--accent)] hover:underline">
+                    Plaid bank import
+                  </Link>
+                  .
                 </p>
                 <ReadOnlyGuard align="stretch">
                   <button type="button" onClick={() => setEditingCash(true)} className="btn-outline w-full mt-4">
@@ -507,25 +524,49 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {/* Notifications — delivery prefs stored locally; email/SMS not wired up yet */}
+          {/* Notifications — email digests live on Account; SMS and monthly report not wired yet */}
           <div className="card">
             <div className="section-title">Notifications</div>
             <p className="text-[12px] mb-3" style={{ color: "var(--text-muted)" }}>
-              Store alerts appear in the app today. Email and SMS delivery options below are coming
-              soon.
+              Store alerts appear in the app today. Daily email digests are live on your{" "}
+              <Link href="/account" className="text-[var(--accent)] hover:underline">
+                Account
+              </Link>{" "}
+              page. SMS delivery is not available yet.
             </p>
             <div className="divide-y divide-white/[0.04]">
               {([
-                ["Email Alerts", "Alert emails when thresholds are triggered"],
-                ["Monthly Report", "Monthly operating report by email"],
-                ["Lender Share", "Share reports with lenders automatically"],
-                ["SMS Alerts", "Text message alerts for urgent items"],
-              ] as const).map(([label, description]) => (
-                <div key={label} className="flex items-start justify-between gap-4 py-2.5 text-[13px] opacity-70">
+                {
+                  label: "Email Alerts",
+                  description: "Daily email digest when new alerts are triggered",
+                  live: true,
+                },
+                {
+                  label: "Monthly Report",
+                  description: "Monthly operating report by email",
+                  live: false,
+                },
+                {
+                  label: "SMS Alerts",
+                  description: "Text message alerts for urgent items",
+                  live: false,
+                },
+              ] as const).map(({ label, description, live }) => (
+                <div
+                  key={label}
+                  className={clsx(
+                    "flex items-start justify-between gap-4 py-2.5 text-[13px]",
+                    !live && "opacity-70"
+                  )}
+                >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap text-[var(--text-secondary)]">
                       {label}
-                      <span className="badge badge-amber text-[10px]">Coming soon</span>
+                      {live ? (
+                        <span className="badge badge-green text-[10px]">Live</span>
+                      ) : (
+                        <span className="badge badge-amber text-[10px]">Coming soon</span>
+                      )}
                     </div>
                     <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
                       {description}
@@ -534,22 +575,17 @@ export default function SettingsPage() {
                   <input
                     id="settings-input"
                     type="checkbox"
-                    checked={false}
+                    checked={live}
                     disabled
-                    aria-label={`${label} (coming soon)`}
+                    aria-label={live ? label : `${label} (coming soon)`}
                     className="rounded border-[var(--border2)] bg-[var(--bg-input)] cursor-not-allowed opacity-50 mt-0.5"
                   />
                 </div>
               ))}
             </div>
-            <button
-              type="button"
-              disabled
-              className="btn-outline w-full mt-4 opacity-50 cursor-not-allowed"
-              title="Email and SMS notification preferences are coming soon"
-            >
+            <Link href="/account" className="btn-outline w-full mt-4 inline-flex items-center justify-center">
               Manage Notifications
-            </button>
+            </Link>
           </div>
         </div>
 
