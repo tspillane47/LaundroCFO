@@ -303,6 +303,7 @@ function NetworkOptedInStatus({ saving, onOptOut }: NetworkOptedInStatusProps) {
 type NetworkBenchmarkingSectionProps = {
   optedIn: boolean;
   optInCount: number | null;
+  optInCountLoadError: boolean;
   saving: boolean;
   onOptIn: () => void;
   onOptOut: () => void;
@@ -311,6 +312,7 @@ type NetworkBenchmarkingSectionProps = {
 function NetworkBenchmarkingSection({
   optedIn,
   optInCount,
+  optInCountLoadError,
   saving,
   onOptIn,
   onOptOut,
@@ -355,18 +357,26 @@ function NetworkBenchmarkingSection({
             </div>
 
             <div>
-              <div className="flex items-center justify-between text-[12px] text-[var(--text-secondary)] mb-2">
-                <span>
-                  {count} of {NETWORK_OPT_IN_THRESHOLD} stores needed
-                </span>
-                <span className="tabular-nums">{Math.round(progressPct)}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-[var(--bg-card2)] overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-[var(--accent-blue)]/70 transition-all duration-500"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
+              {optInCountLoadError ? (
+                <p className="text-[12px] text-[var(--text-secondary)]">
+                  Couldn&apos;t load contributor count. Please refresh the page.
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between text-[12px] text-[var(--text-secondary)] mb-2">
+                    <span>
+                      {count} of {NETWORK_OPT_IN_THRESHOLD} stores needed
+                    </span>
+                    <span className="tabular-nums">{Math.round(progressPct)}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-[var(--bg-card2)] overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[var(--accent-blue)]/70 transition-all duration-500"
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             {optedIn ? (
@@ -413,6 +423,7 @@ function BenchmarkingPageContent() {
   const [store, setStore] = useState<StoreFinancialProfile | null>(null);
   const [networkOptedIn, setNetworkOptedIn] = useState(false);
   const [networkOptInCount, setNetworkOptInCount] = useState<number | null>(null);
+  const [networkOptInCountError, setNetworkOptInCountError] = useState(false);
   const [networkOptInSaving, setNetworkOptInSaving] = useState(false);
   const [equipment, setEquipment] = useState<EquipmentRecord[]>([]);
   const [records, setRecords] = useState<CalculatedMonthly[]>([]);
@@ -433,12 +444,14 @@ function BenchmarkingPageContent() {
       setLaundroScore(null);
       setNetworkOptedIn(false);
       setNetworkOptInCount(null);
+      setNetworkOptInCountError(false);
       setLoading(false);
       return;
     }
 
     setLoading(true);
     setLoadError(false);
+    setNetworkOptInCountError(false);
 
     try {
       const {
@@ -487,8 +500,13 @@ function BenchmarkingPageContent() {
       );
       if (!networkCountError && typeof networkCountData === "number") {
         setNetworkOptInCount(networkCountData);
-      } else {
+        setNetworkOptInCountError(false);
+      } else if (networkCountError) {
         setNetworkOptInCount(null);
+        setNetworkOptInCountError(true);
+      } else {
+        setNetworkOptInCount(0);
+        setNetworkOptInCountError(false);
       }
       setEquipment(equip);
       setAnnualDebtService(debt);
@@ -532,6 +550,7 @@ function BenchmarkingPageContent() {
       setLaundroScore(null);
       setNetworkOptedIn(false);
       setNetworkOptInCount(null);
+      setNetworkOptInCountError(false);
     } finally {
       setLoading(false);
     }
@@ -852,6 +871,7 @@ function BenchmarkingPageContent() {
         <NetworkBenchmarkingSection
           optedIn={networkOptedIn}
           optInCount={networkOptInCount}
+          optInCountLoadError={networkOptInCountError}
           saving={networkOptInSaving}
           onOptIn={handleNetworkOptIn}
           onOptOut={handleNetworkOptOut}

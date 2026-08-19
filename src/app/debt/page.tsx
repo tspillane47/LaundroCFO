@@ -502,7 +502,12 @@ export default function DebtPage() {
       toast.error(blockedReason ?? "Subscribe to make changes.");
       return;
     }
-    if (!selectedStore || !userId || saving || saveStatus === "success") return;
+    if (!selectedStore) return;
+    if (!userId) {
+      toast.error("Please log in again to save changes.");
+      return;
+    }
+    if (saving || saveStatus === "success") return;
 
     if (!form.lender_name.trim()) {
       toast.error("Enter a lender name before saving.");

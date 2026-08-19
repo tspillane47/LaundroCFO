@@ -316,7 +316,14 @@ function ScenariosPageContent() {
         return;
       }
       if (!selectedStore?.id || !userId) return;
-      await supabase.from("saved_scenarios").delete().eq("id", id);
+
+      const { error } = await supabase.from("saved_scenarios").delete().eq("id", id);
+      if (error) {
+        toast.error("Failed to delete — please try again");
+        return;
+      }
+
+      toast.success("Scenario deleted");
       await loadSavedScenarios(selectedStore.id);
     },
     [selectedStore?.id, userId, supabase, loadSavedScenarios, canWrite, blockedReason, toast]

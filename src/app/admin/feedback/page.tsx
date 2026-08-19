@@ -8,6 +8,7 @@ import { isAdminEmail } from "@/lib/admin";
 import { FEEDBACK_TYPES } from "@/components/ui/FeedbackModal";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageError } from "@/components/ui/PageError";
+import { useToast } from "@/components/ui/ToastProvider";
 
 const STATUS_OPTIONS = [
   { value: "new", label: "New" },
@@ -81,6 +82,7 @@ function formatPageUrl(url: string | null): string {
 export default function AdminFeedbackPage() {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
 
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -155,6 +157,7 @@ export default function AdminFeedbackPage() {
     id: string,
     patch: Partial<Pick<FeedbackRow, "status" | "priority">>
   ) {
+    const previousRow = rows.find((row) => row.id === id);
     setSavingId(id);
     setRows((current) =>
       current.map((row) => (row.id === id ? { ...row, ...patch } : row))
@@ -163,7 +166,14 @@ export default function AdminFeedbackPage() {
     const { error } = await supabase.from("feedback").update(patch).eq("id", id);
 
     if (error) {
-      await loadFeedback();
+      toast.error("Failed to update — please try again");
+      if (previousRow) {
+        setRows((current) =>
+          current.map((row) => (row.id === id ? previousRow : row))
+        );
+      } else {
+        await loadFeedback();
+      }
     }
 
     setSavingId(null);

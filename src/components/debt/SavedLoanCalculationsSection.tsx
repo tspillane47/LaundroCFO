@@ -47,7 +47,11 @@ export function SavedLoanCalculationsSection({
         .eq("store_id", storeId)
         .order("created_at", { ascending: false });
 
-      if (error || !data) return;
+      if (error) {
+        toast.error("Failed to load saved calculations — please try again");
+        return;
+      }
+      if (!data) return;
 
       const rows: SavedLoanCalculationRow[] = [];
       for (const row of data) {
@@ -62,7 +66,7 @@ export function SavedLoanCalculationsSection({
         });
       }
       setSavedItems(rows);
-  }, [storeId, supabase]);
+  }, [storeId, supabase, toast]);
 
   useEffect(() => {
     let cancelled = false;
