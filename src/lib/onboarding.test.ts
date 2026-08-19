@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  completeOnboarding,
   getOnboardingStatus,
   isEligibleForAutoTrial,
   isJoiningOnboardingPath,
   isOnboardingComplete,
+  OnboardingCompletionError,
   type OnboardingProfile,
 } from "@/lib/onboarding";
 
@@ -99,5 +101,86 @@ describe("onboarding status", () => {
     expect(isEligibleForAutoTrial({ onboarding_path: "own" })).toBe(true);
     expect(isEligibleForAutoTrial({ onboarding_path: null })).toBe(true);
     expect(isEligibleForAutoTrial(null)).toBe(true);
+  });
+});
+
+describe("completeOnboarding", () => {
+  it("upserts profile onboarding fields and returns the saved row", async () => {
+    const upsert = vi.fn(() => ({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: "user-1",
+            onboarding_completed: true,
+            onboarding_path: "join",
+          },
+          error: null,
+        }),
+      }),
+    }));
+
+    const supabase = {
+      from(table: string) {
+        if (table === "profiles") {
+          return { upsert };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    } as never;
+
+    await expect(completeOnboarding(supabase, "user-1", "join")).resolves.toBeUndefined();
+    expect(upsert).toHaveBeenCalledWith(
+      {
+        id: "user-1",
+        onboarding_completed: true,
+        onboarding_path: "join",
+      },
+      { onConflict: "id" }
+    );
+  });
+
+  it("throws when upsert returns no row", async () => {
+    const supabase = {
+      from(table: string) {
+        if (table === "profiles") {
+          return {
+            upsert: () => ({
+              select: () => ({
+                single: async () => ({ data: null, error: null }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    } as never;
+
+    await expect(completeOnboarding(supabase, "user-1", "join")).rejects.toBeInstanceOf(
+      OnboardingCompletionError
+    );
+  });
+
+  it("throws when upsert returns an error", async () => {
+    const supabase = {
+      from(table: string) {
+        if (table === "profiles") {
+          return {
+            upsert: () => ({
+              select: () => ({
+                single: async () => ({
+                  data: null,
+                  error: { message: "permission denied" },
+                }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    } as never;
+
+    await expect(completeOnboarding(supabase, "user-1", "own")).rejects.toEqual({
+      message: "permission denied",
+    });
   });
 });

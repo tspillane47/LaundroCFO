@@ -23,12 +23,15 @@ import type { AccessStatus } from "@/lib/access";
 import { useAccessStatus, invalidateAccessStatusCache } from "@/lib/useAccessStatus";
 import {
   completeOnboarding,
+  invalidateOnboardingStatusCache,
   isOnboardingComplete,
   JOIN_STORE_SETTINGS_HINT,
+  type OnboardingPath,
 } from "@/lib/onboarding";
 import { CopyableEmail } from "@/components/onboarding/CopyableEmail";
 
 const TOTAL_STEPS = 4;
+const ONBOARDING_NAV_TIMEOUT_MS = 5000;
 
 const STEP_LABELS = ["Welcome", "Your Store", "Occupancy", "Financials"];
 
@@ -172,7 +175,7 @@ function OnboardingContent() {
   const searchParams = useSearchParams();
   const isAddingStore = searchParams.get("add") === "true";
   const switchToOwnPath = searchParams.get("switch") === "own";
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const {
     plan: accessPlan,
     maxStores,
@@ -224,6 +227,20 @@ function OnboardingContent() {
   const [valuationDataMonths, setValuationDataMonths] = useState(0);
   const [ready, setReady] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [onboardingRecheckTick, setOnboardingRecheckTick] = useState(0);
+  const completingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (completingTimeoutRef.current) {
+        clearTimeout(completingTimeoutRef.current);
+        completingTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const setField = useCallback(<K extends keyof OnboardingForm>(key: K, value: OnboardingForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -387,7 +404,71 @@ function OnboardingContent() {
     return () => {
       cancelled = true;
     };
-  }, [router, supabase, isAddingStore, switchToOwnPath, accessLoading, accessStatus, storeCount]);
+  }, [
+    router,
+    supabase,
+    isAddingStore,
+    switchToOwnPath,
+    accessLoading,
+    accessStatus,
+    storeCount,
+    onboardingRecheckTick,
+  ]);
+
+  const clearCompletingTimeout = useCallback(() => {
+    if (completingTimeoutRef.current) {
+      clearTimeout(completingTimeoutRef.current);
+      completingTimeoutRef.current = null;
+    }
+  }, []);
+
+  const completeOnboardingAndNavigate = useCallback(
+    async (destination: string, path: OnboardingPath | null) => {
+      if (completing) return;
+      setCompleting(true);
+      setErrorMessage("");
+
+      clearCompletingTimeout();
+      completingTimeoutRef.current = setTimeout(() => {
+        if (!isMountedRef.current) return;
+        clearCompletingTimeout();
+        setCompleting(false);
+        setErrorMessage("Navigation took too long. Please try again.");
+      }, ONBOARDING_NAV_TIMEOUT_MS);
+
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          clearCompletingTimeout();
+          setCompleting(false);
+          router.replace("/login");
+          return;
+        }
+
+        if (path) {
+          await completeOnboarding(supabase, user.id, path);
+          invalidateOnboardingStatusCache();
+
+          const verified = await isOnboardingComplete(supabase, user.id);
+          if (!verified) {
+            throw new Error("Onboarding completion could not be verified");
+          }
+
+          setOnboardingRecheckTick((tick) => tick + 1);
+        }
+
+        router.replace(destination);
+      } catch (error) {
+        clearCompletingTimeout();
+        console.error("Failed to complete onboarding navigation:", error);
+        setErrorMessage("We couldn't save your choice. Please try again.");
+        setCompleting(false);
+      }
+    },
+    [clearCompletingTimeout, completing, router, supabase]
+  );
 
   async function createStore(): Promise<string | null> {
     const {
@@ -712,45 +793,14 @@ function OnboardingContent() {
   }
 
   async function handleGoToDashboard() {
-    if (completing) return;
-    setCompleting(true);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
-
-    if (!isAddingStore) {
-      await completeOnboarding(supabase, user.id, "own");
-    }
-
-    router.push(isAddingStore ? "/portfolio" : "/getting-started");
+    await completeOnboardingAndNavigate(
+      isAddingStore ? "/portfolio" : "/getting-started",
+      isAddingStore ? null : "own"
+    );
   }
 
   async function handleJoinGoToPortfolio() {
-    if (completing) return;
-    setCompleting(true);
-    setErrorMessage("");
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
-
-    try {
-      await completeOnboarding(supabase, user.id, "join");
-      router.push("/portfolio");
-    } catch (error) {
-      console.error("Failed to complete joining onboarding:", error);
-      setErrorMessage("We couldn't save your choice. Please try again.");
-      setCompleting(false);
-    }
+    await completeOnboardingAndNavigate("/portfolio", "join");
   }
 
   if (!ready) {

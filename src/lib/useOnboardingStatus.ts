@@ -1,23 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import {
   getOnboardingStatus,
   isJoiningOnboardingPath,
+  ONBOARDING_STATUS_INVALIDATED,
   type OnboardingStatus,
 } from "@/lib/onboarding";
 
 export function useOnboardingStatus() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    const handleInvalidate = () => setReloadKey((key) => key + 1);
+    window.addEventListener(ONBOARDING_STATUS_INVALIDATED, handleInvalidate);
+    return () => window.removeEventListener(ONBOARDING_STATUS_INVALIDATED, handleInvalidate);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
+      setLoading(true);
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -45,7 +55,7 @@ export function useOnboardingStatus() {
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, [supabase, reloadKey]);
 
   return {
     status,

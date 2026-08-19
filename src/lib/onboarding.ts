@@ -75,23 +75,52 @@ export async function isOnboardingComplete(
   return status.complete;
 }
 
+export class OnboardingCompletionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OnboardingCompletionError";
+  }
+}
+
 export async function completeOnboarding(
   supabase: SupabaseClient,
   userId: string,
   path: OnboardingPath
 ): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
-    .update({
-      onboarding_completed: true,
-      onboarding_path: path,
-    })
-    .eq("id", userId);
+    .upsert(
+      {
+        id: userId,
+        onboarding_completed: true,
+        onboarding_path: path,
+      },
+      { onConflict: "id" }
+    )
+    .select("id, onboarding_completed, onboarding_path")
+    .single();
 
   if (error) {
     throw error;
   }
+
+  if (!data?.id) {
+    throw new OnboardingCompletionError(
+      "Failed to persist onboarding completion: no profile row returned"
+    );
+  }
 }
+
+const ONBOARDING_STATUS_INVALIDATED = "laundrocfo:onboarding-status-invalidated";
+
+/** Bust client-side onboarding status reads (e.g. useOnboardingStatus) after completion. */
+export function invalidateOnboardingStatusCache(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(ONBOARDING_STATUS_INVALIDATED));
+  }
+}
+
+export { ONBOARDING_STATUS_INVALIDATED };
 
 export function isJoiningOnboardingPath(path: OnboardingPath | null | undefined): boolean {
   return path === "join";
