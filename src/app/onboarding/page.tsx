@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
@@ -295,7 +295,57 @@ function OnboardingContent() {
     setErrorMessage("");
   }, [requestEnsureTrial]);
 
+  // One-shot init for join→own switch. Must NOT depend on accessStatus/storeCount/
+  // requestEnsureTrial — requestEnsureTrial calls refreshAccess(), which updates those
+  // values and recreates the callback, re-firing this effect and cancelling setReady(true).
+  const switchOwnInitStarted = useRef(false);
+
   useEffect(() => {
+    if (!isAddingStore || !switchToOwnPath || switchOwnInitStarted.current) return;
+    switchOwnInitStarted.current = true;
+
+    let cancelled = false;
+
+    async function initSwitchToOwn() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+
+      setUserEmail(user.email ?? "");
+      await completeOnboarding(supabase, user.id, "own");
+
+      const trialResult = await requestEnsureTrial();
+      if (cancelled) return;
+
+      if (!trialResult.ok || !canAddStore(trialResult.access, trialResult.storeCount)) {
+        setErrorMessage(
+          trialResult.ok
+            ? storeCreationBlockedMessage(trialResult.access)
+            : "We couldn't start your free trial. Please try again."
+        );
+        setReady(true);
+        return;
+      }
+
+      setReady(true);
+    }
+
+    void initSwitchToOwn();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally one-shot; see comment above
+  }, [isAddingStore, switchToOwnPath, router, supabase]);
+
+  useEffect(() => {
+    if (isAddingStore && switchToOwnPath) return;
+
     let cancelled = false;
 
     async function init() {
@@ -310,26 +360,6 @@ function OnboardingContent() {
       }
 
       setUserEmail(user.email ?? "");
-
-      if (isAddingStore && switchToOwnPath) {
-        await completeOnboarding(supabase, user.id, "own");
-
-        const trialResult = await requestEnsureTrial();
-        if (cancelled) return;
-
-        if (!trialResult.ok || !canAddStore(trialResult.access, trialResult.storeCount)) {
-          setErrorMessage(
-            trialResult.ok
-              ? storeCreationBlockedMessage(trialResult.access)
-              : "We couldn't start your free trial. Please try again."
-          );
-          setReady(true);
-          return;
-        }
-
-        setReady(true);
-        return;
-      }
 
       const completed = await isOnboardingComplete(supabase, user.id);
 
@@ -357,7 +387,7 @@ function OnboardingContent() {
     return () => {
       cancelled = true;
     };
-  }, [router, supabase, isAddingStore, switchToOwnPath, accessLoading, accessStatus, storeCount, canCreateStore, requestEnsureTrial]);
+  }, [router, supabase, isAddingStore, switchToOwnPath, accessLoading, accessStatus, storeCount]);
 
   async function createStore(): Promise<string | null> {
     const {
