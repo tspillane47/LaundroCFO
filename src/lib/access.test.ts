@@ -292,6 +292,37 @@ describe("getAccessStatus", () => {
     });
   });
 
+  it("keeps unscoped subscription access distinct from co-owner store write access for the same user", async () => {
+    const supabase = createMockSupabase({
+      betaMode: false,
+      store: { user_id: OWNER_ID },
+      subscription: null,
+      userCanWriteStore: true,
+    });
+
+    const unscoped = await getAccessStatus(supabase, USER_ID, NOW, null);
+    const scoped = await getAccessStatus(supabase, USER_ID, NOW, STORE_ID);
+
+    expect(unscoped).toEqual({
+      plan: null,
+      isReadOnly: true,
+      reason: "no_subscription",
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      maxStores: 0,
+    });
+    expect(scoped).toEqual({
+      plan: null,
+      isReadOnly: false,
+      reason: "active",
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      maxStores: null,
+    });
+    expect(canAddStore(unscoped, 0)).toBe(false);
+    expect(scoped.isReadOnly).toBe(false);
+  });
+
   it("blocks co-owners when user_can_write_store returns false", async () => {
     const result = await getAccessStatus(
       createMockSupabase({

@@ -1,134 +1,52 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  getAccessStatus,
-  getUserStoreCount,
-  type AccessReason,
-  type AccessStatus,
-} from "@/lib/access";
+import type { AccessReason, AccessStatus } from "@/lib/access";
 import type { PlanKey } from "@/lib/beta";
-import { createClient } from "@/lib/supabase";
+import {
+  DEFAULT_ACCESS_STATUS,
+  getCachedAccess,
+  getCachedSessionUser,
+  invalidateAccessStatusCache,
+  peekFreshAccessCache,
+} from "@/lib/session-cache";
 
-const REVALIDATE_MS = 60_000;
-
-type AccessCache = {
-  userId: string;
-  storeId: string | null;
-  status: AccessStatus;
-  storeCount: number;
-  fetchedAt: number;
-  promise?: Promise<{ status: AccessStatus; storeCount: number }>;
-};
-
-let accessCache: AccessCache | null = null;
-
-async function fetchAccessFromDb(
-  userId: string,
-  storeId: string | null
-): Promise<{
-  status: AccessStatus;
-  storeCount: number;
-}> {
-  const supabase = createClient();
-  const [status, storeCount] = await Promise.all([
-    getAccessStatus(supabase, userId, new Date(), storeId),
-    getUserStoreCount(supabase, userId),
-  ]);
-  return { status, storeCount };
-}
-
-export function invalidateAccessStatusCache() {
-  accessCache = null;
-}
-
-const DEFAULT_STATUS: AccessStatus = {
-  plan: null,
-  isReadOnly: true,
-  reason: "no_subscription",
-  trialEndsAt: null,
-  currentPeriodEnd: null,
-  maxStores: 0,
-};
+export { invalidateAccessStatusCache };
 
 export function useAccessStatus(storeId?: string | null) {
   const scopedStoreId = storeId ?? null;
+  const initial = peekFreshAccessCache(scopedStoreId);
   const [status, setStatus] = useState<AccessStatus>(
-    accessCache?.status ?? DEFAULT_STATUS
+    initial?.status ?? DEFAULT_ACCESS_STATUS
   );
-  const [storeCount, setStoreCount] = useState(accessCache?.storeCount ?? 0);
-  const [loading, setLoading] = useState(
-    accessCache === null ||
-      accessCache.storeId !== scopedStoreId
-  );
+  const [storeCount, setStoreCount] = useState(initial?.storeCount ?? 0);
+  const [loading, setLoading] = useState(initial === null);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function load(force = false) {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+    async function load() {
+      const user = await getCachedSessionUser();
 
       if (cancelled) return;
 
       if (!user) {
-        setStatus(DEFAULT_STATUS);
+        setStatus(DEFAULT_ACCESS_STATUS);
         setStoreCount(0);
         setLoading(false);
         return;
       }
 
-      const now = Date.now();
-      if (
-        !force &&
-        accessCache &&
-        accessCache.userId === user.id &&
-        accessCache.storeId === scopedStoreId &&
-        !accessCache.promise &&
-        now - accessCache.fetchedAt < REVALIDATE_MS
-      ) {
-        setStatus(accessCache.status);
-        setStoreCount(accessCache.storeCount);
+      const cached = peekFreshAccessCache(scopedStoreId, user.id);
+      if (cached) {
+        setStatus(cached.status);
+        setStoreCount(cached.storeCount);
         setLoading(false);
         return;
       }
 
-      if (
-        !force &&
-        accessCache?.userId === user.id &&
-        accessCache.storeId === scopedStoreId &&
-        accessCache.promise
-      ) {
-        const result = await accessCache.promise;
-        if (!cancelled) {
-          setStatus(result.status);
-          setStoreCount(result.storeCount);
-          setLoading(false);
-        }
-        return;
-      }
-
       setLoading(true);
-      const promise = fetchAccessFromDb(user.id, scopedStoreId);
-      accessCache = {
-        userId: user.id,
-        storeId: scopedStoreId,
-        status: DEFAULT_STATUS,
-        storeCount: 0,
-        fetchedAt: now,
-        promise,
-      };
-
-      const result = await promise;
-      accessCache = {
-        userId: user.id,
-        storeId: scopedStoreId,
-        status: result.status,
-        storeCount: result.storeCount,
-        fetchedAt: Date.now(),
-      };
+      const result = await getCachedAccess(user.id, scopedStoreId);
 
       if (!cancelled) {
         setStatus(result.status);
@@ -146,27 +64,17 @@ export function useAccessStatus(storeId?: string | null) {
 
   const refresh = useCallback(async () => {
     invalidateAccessStatusCache();
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCachedSessionUser();
 
     if (!user) {
-      setStatus(DEFAULT_STATUS);
+      setStatus(DEFAULT_ACCESS_STATUS);
       setStoreCount(0);
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    const result = await fetchAccessFromDb(user.id, scopedStoreId);
-    accessCache = {
-      userId: user.id,
-      storeId: scopedStoreId,
-      status: result.status,
-      storeCount: result.storeCount,
-      fetchedAt: Date.now(),
-    };
+    const result = await getCachedAccess(user.id, scopedStoreId);
     setStatus(result.status);
     setStoreCount(result.storeCount);
     setLoading(false);
