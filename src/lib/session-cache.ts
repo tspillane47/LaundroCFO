@@ -85,7 +85,7 @@ function peekAccessCache(
     return accessRecords.get(accessKey(userId, storeId)) ?? null;
   }
 
-  for (const record of accessRecords.values()) {
+  for (const record of Array.from(accessRecords.values())) {
     if (record.storeId === storeId) return record;
   }
   return null;
