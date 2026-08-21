@@ -15,7 +15,7 @@ import { useAccessStatus } from "@/lib/useAccessStatus";
 import { useBetaMode } from "@/lib/useBetaMode";
 import { useWriteGuard } from "@/lib/useWriteGuard";
 import { ManageAccessSection } from "@/components/settings/ManageAccessSection";
-import { toNum, validateServiceMixSum } from "@/lib/formHelpers";
+import { toNum, validateServiceMixSum, validateStoreCondition, normalizeStoreCondition, parseCanonicalStoreCondition, STORE_CONDITION_VALUES } from "@/lib/formHelpers";
 
 const inputClass = INPUT_CLASS;
 
@@ -43,7 +43,7 @@ const MARKET_OPTIONS = [
   { value: "rural", label: "Rural" },
 ];
 
-const CONDITION_OPTIONS = ["excellent", "good", "fair", "poor"];
+const CONDITION_OPTIONS = STORE_CONDITION_VALUES;
 const TREND_OPTIONS = ["growing", "stable", "declining"];
 const COMPETITION_OPTIONS = ["protected", "normal", "heavy"];
 const STORE_TYPES = ["Coin", "Card", "Hybrid"];
@@ -118,7 +118,7 @@ export default function SettingsPage() {
           washers: selectedStore.washers != null ? String(selectedStore.washers) : "",
           dryers: selectedStore.dryers != null ? String(selectedStore.dryers) : "",
           market_density: selectedStore.market_density ?? selectedStore.location_type ?? "suburban",
-          store_condition: selectedStore.store_condition ?? "fair",
+          store_condition: normalizeStoreCondition(selectedStore.store_condition),
           revenue_trend: selectedStore.revenue_trend ?? "stable",
           competition_level: selectedStore.competition_level ?? "normal",
           self_service_pct: selectedStore.self_service_pct != null ? String(selectedStore.self_service_pct) : "0",
@@ -169,6 +169,13 @@ export default function SettingsPage() {
       return;
     }
 
+    const canonicalCondition = parseCanonicalStoreCondition(form.store_condition);
+    const conditionError = validateStoreCondition(form.store_condition);
+    if (!canonicalCondition || conditionError) {
+      toast.error(conditionError ?? "Store condition must be one of: Excellent, Good, Fair, or Poor.");
+      return;
+    }
+
     setSaving(true);
     setError("");
 
@@ -183,7 +190,7 @@ export default function SettingsPage() {
         washers: form.washers ? Number(form.washers) : null,
         dryers: form.dryers ? Number(form.dryers) : null,
         market_density: form.market_density,
-        store_condition: form.store_condition,
+        store_condition: canonicalCondition,
         revenue_trend: form.revenue_trend,
         competition_level: form.competition_level,
         self_service_pct: selfServicePct,
@@ -320,7 +327,15 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <div className="metric-label mb-1.5">Store Condition</div>
-                    <select id="settings-store-condition" value={form.store_condition} onChange={(e) => setField("store_condition", e.target.value)} className={inputClass}>
+                    <select
+                      id="settings-store-condition"
+                      value={form.store_condition}
+                      onChange={(e) => {
+                        const canonical = parseCanonicalStoreCondition(e.target.value);
+                        if (canonical) setField("store_condition", canonical);
+                      }}
+                      className={inputClass}
+                    >
                       {CONDITION_OPTIONS.map((c) => <option key={c} value={c}>{labelize(c)}</option>)}
                     </select>
                   </div>

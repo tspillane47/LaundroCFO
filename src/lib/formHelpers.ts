@@ -47,6 +47,41 @@ export function findNegativeFieldError(
 
 const SERVICE_MIX_SUM_TOLERANCE = 5;
 
+export const STORE_CONDITION_VALUES = ["excellent", "good", "fair", "poor"] as const;
+export type StoreConditionValue = (typeof STORE_CONDITION_VALUES)[number];
+
+const STORE_CONDITION_SET = new Set<string>(STORE_CONDITION_VALUES);
+
+/** Canonical value if `raw` is already one of the four allowed conditions; otherwise null. */
+export function parseCanonicalStoreCondition(
+  raw: string | null | undefined
+): StoreConditionValue | null {
+  if (raw == null) return null;
+  const v = String(raw).trim().toLowerCase();
+  return STORE_CONDITION_SET.has(v) ? (v as StoreConditionValue) : null;
+}
+
+/**
+ * Map stored/legacy condition onto the four canonical values used by calcValuation.
+ * "average" (and any other unrecognized value) maps to "fair".
+ */
+export function normalizeStoreCondition(
+  raw: string | null | undefined
+): StoreConditionValue {
+  if (raw == null || String(raw).trim() === "") return "fair";
+  const v = String(raw).trim().toLowerCase();
+  if (v === "excellent" || v === "remodeled") return "excellent";
+  if (v === "good") return "good";
+  if (v === "poor" || v === "needs_renovation") return "poor";
+  return "fair";
+}
+
+/** Rejects anything that is not already one of the four canonical store_condition values. */
+export function validateStoreCondition(raw: string | null | undefined): string | null {
+  if (parseCanonicalStoreCondition(raw)) return null;
+  return "Store condition must be one of: Excellent, Good, Fair, or Poor.";
+}
+
 /** Returns an error message when service mix percentages don't sum to ~100%, or null if valid. */
 export function validateServiceMixSum(
   selfServicePct: number,

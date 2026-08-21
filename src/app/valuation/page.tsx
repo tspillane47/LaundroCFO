@@ -13,7 +13,7 @@ import {
   type StoreValuationContext,
 } from "@/lib/getStoreValuation";
 import { computeStoreDscr } from "@/lib/dscr";
-import { validateServiceMixSum } from "@/lib/formHelpers";
+import { validateServiceMixSum, validateStoreCondition, normalizeStoreCondition, parseCanonicalStoreCondition, type StoreConditionValue } from "@/lib/formHelpers";
 import type { ValuationResult } from "@/lib/valuation";
 import {
   computeEquipmentMetrics,
@@ -67,7 +67,7 @@ import {
 
 type MarketDensity = "urban" | "suburban" | "average" | "rural";
 type RevenueTrend = "growing" | "stable" | "declining";
-type StoreCondition = "excellent" | "good" | "fair" | "poor";
+type StoreCondition = StoreConditionValue;
 type CompetitionLevel = "protected" | "normal" | "heavy";
 
 type StoreRow = {
@@ -178,14 +178,6 @@ function normalizeMarketDensity(raw: string | null): MarketDensity {
   if (v === "suburban") return "suburban";
   if (v === "rural") return "rural";
   return "average";
-}
-
-function normalizeStoreCondition(raw: string | null): StoreCondition {
-  const v = (raw ?? "fair").toLowerCase();
-  if (v === "excellent" || v === "remodeled") return "excellent";
-  if (v === "good") return "good";
-  if (v === "poor" || v === "needs_renovation") return "poor";
-  return "fair";
 }
 
 function formatAdj(value: number): string {
@@ -576,6 +568,13 @@ export default function ValuationPage() {
       return;
     }
 
+    const canonicalCondition = parseCanonicalStoreCondition(storeCondition);
+    const conditionError = validateStoreCondition(storeCondition);
+    if (!canonicalCondition || conditionError) {
+      setError(conditionError ?? "Store condition must be one of: Excellent, Good, Fair, or Poor.");
+      return;
+    }
+
     setSaving(true);
     setError("");
     setSaveSuccess(false);
@@ -585,7 +584,7 @@ export default function ValuationPage() {
       .update({
         market_density: marketDensity,
         revenue_trend: revenueTrend,
-        store_condition: storeCondition,
+        store_condition: canonicalCondition,
         competition_level: competitionLevel,
         self_service_pct: selfServicePct,
         wdf_pct: wdfPct,
@@ -608,7 +607,7 @@ export default function ValuationPage() {
                 ...prev.store,
                 market_density: marketDensity,
                 revenue_trend: revenueTrend,
-                store_condition: storeCondition,
+                store_condition: canonicalCondition,
                 competition_level: competitionLevel,
                 self_service_pct: selfServicePct,
                 wdf_pct: wdfPct,

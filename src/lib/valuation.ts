@@ -1,3 +1,5 @@
+import { normalizeStoreCondition } from "@/lib/formHelpers";
+
 export interface ValuationInputs {
   ebitda: number;
   monthlyRevenue: number;
@@ -257,20 +259,20 @@ export function calcValuation(inputs: ValuationInputs): ValuationResult {
   );
 
   // Store condition
-  const condition = inputs.storeCondition.toLowerCase();
+  const condition = normalizeStoreCondition(inputs.storeCondition);
   const condAdj =
-    condition === "excellent" || condition === "remodeled" ? 0.25 :
+    condition === "excellent" ? 0.25 :
     condition === "good" ? 0.1 :
-    condition === "poor" || condition === "needs_renovation" ? -0.5 :
-    condition === "fair" ? -0.1 : 0;
+    condition === "poor" ? -0.5 :
+    -0.1;
   pushAdj(
     adjustments,
     "Store Condition",
     condAdj,
-    condition === "excellent" || condition === "remodeled" ? "Excellent condition" :
+    condition === "excellent" ? "Excellent condition" :
     condition === "good" ? "Good condition" :
-    condition === "poor" || condition === "needs_renovation" ? "Poor condition" :
-    condition === "fair" || condition === "average" ? "Fair condition" : "Average condition",
+    condition === "poor" ? "Poor condition" :
+    "Fair condition",
     "operations"
   );
 

@@ -10,6 +10,7 @@ import {
   type MonthlyFinancialRecord,
   type MonthlyUtilityRecord,
 } from "@/lib/financials";
+import { normalizeStoreCondition } from "@/lib/formHelpers";
 import { calcValuation, type ValuationInputs, type ValuationResult } from "@/lib/valuation";
 
 export type ResolvedStoreFinancials = {
@@ -57,16 +58,6 @@ function normalizeMarketDensity(raw: string | null | undefined): string {
   if (v === "urban" || v === "dense_urban" || v === "prime_dense_urban") return "urban";
   if (v === "suburban" || v === "strong_suburban") return "suburban";
   if (v === "rural") return "rural";
-  return "";
-}
-
-function normalizeStoreCondition(raw: string | null | undefined): string {
-  if (!raw) return "";
-  const v = raw.toLowerCase();
-  if (v === "excellent" || v === "remodeled") return "excellent";
-  if (v === "good") return "good";
-  if (v === "poor" || v === "needs_renovation") return "poor";
-  if (v === "fair") return "fair";
   return "";
 }
 
