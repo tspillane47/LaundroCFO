@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   formatSkippedMonthLabel,
+  classifyQuickBooksOfferingSku,
+  extractOfferingSkuFromNameValues,
+  isQuickBooksUnsupportedProductError,
+  QUICKBOOKS_UNSUPPORTED_PRODUCT_ERROR_CODE,
+  QUICKBOOKS_UNSUPPORTED_PRODUCT_MESSAGE,
+  shouldFlagUnsupportedQuickBooksProduct,
   shouldSkipMonthForQuickBooksSync,
 } from "@/lib/quickbooks-shared";
 import {
   buildAuthorizationUrl,
+  extractOfferingSkuFromCompanyInfoPayload,
   extractProfitAndLossAccountRows,
   getIntuitTidFromResponse,
   getQuickBooksSyncDateRange,
@@ -12,6 +19,7 @@ import {
   mapProfitAndLossToMonthlyAmounts,
   parseMonthColumnTitle,
   parseProfitAndLossMonthColumns,
+  profitAndLossHasNoFinancialActivity,
   resetQuickBooksOAuthDiscoveryCacheForTests,
   type QuickBooksProfitAndLossReport,
 } from "@/lib/quickbooks";
@@ -246,6 +254,145 @@ describe("formatQuickBooksConnectionErrorMessage", () => {
     expect(formatQuickBooksConnectionErrorMessage("SYNC_FAILED", null)).toContain(
       "needs attention"
     );
+    expect(
+      formatQuickBooksConnectionErrorMessage(QUICKBOOKS_UNSUPPORTED_PRODUCT_ERROR_CODE, null)
+    ).toBe(QUICKBOOKS_UNSUPPORTED_PRODUCT_MESSAGE);
+  });
+});
+
+describe("QuickBooks Self-Employed product detection", () => {
+  it("classifies documented QBO SKUs as supported", () => {
+    expect(classifyQuickBooksOfferingSku("QuickBooks Online Plus")).toBe("supported");
+    expect(classifyQuickBooksOfferingSku("QuickBooks Online Simple Start")).toBe("supported");
+    expect(classifyQuickBooksOfferingSku("QuickBooks Online Essentials")).toBe("supported");
+    expect(classifyQuickBooksOfferingSku("QuickBooks Online Advanced")).toBe("supported");
+    expect(classifyQuickBooksOfferingSku("QuickBooks Online EasyStart")).toBe("supported");
+  });
+
+  it("classifies Self-Employed, Solopreneur, and Ecosystem SKUs as unsupported", () => {
+    expect(classifyQuickBooksOfferingSku("QuickBooks Online Ecosystem")).toBe("unsupported");
+    expect(classifyQuickBooksOfferingSku("QuickBooks Self-Employed")).toBe("unsupported");
+    expect(classifyQuickBooksOfferingSku("QuickBooks Solopreneur")).toBe("unsupported");
+  });
+
+  it("treats missing or undocumented SKUs as unknown", () => {
+    expect(classifyQuickBooksOfferingSku(null)).toBe("unknown");
+    expect(classifyQuickBooksOfferingSku("")).toBe("unknown");
+    expect(classifyQuickBooksOfferingSku("QuickBooks Online Something New")).toBe("unknown");
+  });
+
+  it("extracts OfferingSku from NameValue pairs", () => {
+    expect(
+      extractOfferingSkuFromNameValues([
+          { Name: "PayrollFeature", Value: "false" },
+        { Name: "OfferingSku", Value: "QuickBooks Online Ecosystem" },
+      ])
+    ).toBe("QuickBooks Online Ecosystem");
+    expect(extractOfferingSkuFromNameValues({ Name: "OfferingSku", Value: "QuickBooks Online Plus" })).toBe(
+      "QuickBooks Online Plus"
+    );
+    expect(extractOfferingSkuFromNameValues([])).toBeNull();
+  });
+
+  it("extracts OfferingSku from CompanyInfo payloads", () => {
+    expect(
+      extractOfferingSkuFromCompanyInfoPayload({
+        CompanyInfo: {
+          NameValue: [{ Name: "OfferingSku", Value: "QuickBooks Online Plus" }],
+        },
+      })
+    ).toBe("QuickBooks Online Plus");
+    expect(
+      extractOfferingSkuFromCompanyInfoPayload({
+        QueryResponse: {
+          CompanyInfo: [{ NameValue: [{ Name: "OfferingSku", Value: "QuickBooks Online Ecosystem" }] }],
+        },
+      })
+    ).toBe("QuickBooks Online Ecosystem");
+  });
+
+  it("flags unsupported SKUs immediately and empty first-sync P&L only when SKU is unknown", () => {
+    expect(
+      shouldFlagUnsupportedQuickBooksProduct({
+        skuClassification: "unsupported",
+        profitAndLossIsEmpty: false,
+        isFirstSync: false,
+      })
+    ).toBe(true);
+    expect(
+      shouldFlagUnsupportedQuickBooksProduct({
+        skuClassification: "supported",
+        profitAndLossIsEmpty: true,
+        isFirstSync: true,
+      })
+    ).toBe(false);
+    expect(
+      shouldFlagUnsupportedQuickBooksProduct({
+        skuClassification: "unknown",
+        profitAndLossIsEmpty: true,
+        isFirstSync: true,
+      })
+    ).toBe(true);
+    expect(
+      shouldFlagUnsupportedQuickBooksProduct({
+        skuClassification: "unknown",
+        profitAndLossIsEmpty: true,
+        isFirstSync: false,
+      })
+    ).toBe(false);
+    expect(
+      shouldFlagUnsupportedQuickBooksProduct({
+        skuClassification: "unknown",
+        profitAndLossIsEmpty: false,
+        isFirstSync: true,
+      })
+    ).toBe(false);
+  });
+
+  it("identifies the unsupported-product error code", () => {
+    expect(isQuickBooksUnsupportedProductError(QUICKBOOKS_UNSUPPORTED_PRODUCT_ERROR_CODE)).toBe(true);
+    expect(isQuickBooksUnsupportedProductError("RECONNECT_REQUIRED")).toBe(false);
+  });
+});
+
+describe("profitAndLossHasNoFinancialActivity", () => {
+  it("treats NoReportData as empty", () => {
+    expect(
+      profitAndLossHasNoFinancialActivity({
+        Header: { Option: [{ Name: "NoReportData", Value: "true" }] },
+      })
+    ).toBe(true);
+  });
+
+  it("treats reports with no account rows as empty", () => {
+    expect(profitAndLossHasNoFinancialActivity({ Rows: { Row: [] } })).toBe(true);
+  });
+
+  it("treats all-zero account rows as empty", () => {
+    expect(
+      profitAndLossHasNoFinancialActivity({
+        Rows: {
+          Row: [
+            {
+              type: "Section",
+              group: "Income",
+              Rows: {
+                Row: [
+                  {
+                    type: "Data",
+                    ColData: [{ value: "Sales" }, { value: "0.00" }, { value: "0" }],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      })
+    ).toBe(true);
+  });
+
+  it("does not treat reports with any non-zero activity as empty", () => {
+    expect(profitAndLossHasNoFinancialActivity(SAMPLE_MONTHLY_REPORT)).toBe(false);
   });
 });
 

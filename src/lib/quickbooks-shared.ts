@@ -39,6 +39,82 @@ export type QuickBooksConnectionError = {
   error_at: string | null;
 };
 
+export const QUICKBOOKS_UNSUPPORTED_PRODUCT_ERROR_CODE = "UNSUPPORTED_PRODUCT";
+
+export const QUICKBOOKS_UNSUPPORTED_PRODUCT_MESSAGE =
+  "This appears to be a QuickBooks Self-Employed account. LaundroCFO's QuickBooks integration requires QuickBooks Online — Self-Employed accounts aren't supported by Intuit's API. Please connect Plaid or import a CSV instead, or reconnect QuickBooks with the correct company if you have QuickBooks Online available.";
+
+export type QuickBooksOfferingSkuClassification = "supported" | "unsupported" | "unknown";
+
+const SUPPORTED_QBO_OFFERING_SKUS = new Set([
+  "quickbooks online plus",
+  "quickbooks online simple start",
+  "quickbooks online essentials",
+  "quickbooks online advanced",
+  "quickbooks online easystart",
+  "quickbooks online easy start",
+]);
+
+const UNSUPPORTED_OFFERING_SKU_PATTERNS = [
+  /self[-\s]?employed/i,
+  /\bqbse\b/i,
+  /solopreneur/i,
+  /quickbooks online ecosystem/i,
+];
+
+export function extractOfferingSkuFromNameValues(
+  nameValues:
+    | { Name?: string; Value?: string }[]
+    | { Name?: string; Value?: string }
+    | null
+    | undefined
+): string | null {
+  const entries = Array.isArray(nameValues) ? nameValues : nameValues ? [nameValues] : [];
+  const sku = entries.find((entry) => entry.Name === "OfferingSku")?.Value?.trim();
+  return sku || null;
+}
+
+export function classifyQuickBooksOfferingSku(
+  sku: string | null | undefined
+): QuickBooksOfferingSkuClassification {
+  const normalized = sku?.trim().toLowerCase();
+  if (!normalized) {
+    return "unknown";
+  }
+
+  if (SUPPORTED_QBO_OFFERING_SKUS.has(normalized)) {
+    return "supported";
+  }
+
+  if (UNSUPPORTED_OFFERING_SKU_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return "unsupported";
+  }
+
+  return "unknown";
+}
+
+export function shouldFlagUnsupportedQuickBooksProduct(params: {
+  skuClassification: QuickBooksOfferingSkuClassification;
+  profitAndLossIsEmpty: boolean;
+  isFirstSync: boolean;
+}): boolean {
+  if (params.skuClassification === "unsupported") {
+    return true;
+  }
+
+  if (params.skuClassification === "supported") {
+    return false;
+  }
+
+  return params.isFirstSync && params.profitAndLossIsEmpty;
+}
+
+export function isQuickBooksUnsupportedProductError(
+  errorCode: string | null | undefined
+): boolean {
+  return errorCode === QUICKBOOKS_UNSUPPORTED_PRODUCT_ERROR_CODE;
+}
+
 export function formatQuickBooksConnectionErrorMessage(
   errorCode: string | null | undefined,
   errorMessage: string | null | undefined
@@ -50,6 +126,8 @@ export function formatQuickBooksConnectionErrorMessage(
   switch (errorCode) {
     case "RECONNECT_REQUIRED":
       return "Your QuickBooks connection expired. Please reconnect to keep your data up to date.";
+    case QUICKBOOKS_UNSUPPORTED_PRODUCT_ERROR_CODE:
+      return QUICKBOOKS_UNSUPPORTED_PRODUCT_MESSAGE;
     default:
       return "Your QuickBooks connection needs attention.";
   }

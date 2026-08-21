@@ -82,6 +82,7 @@ import {
   formatQuickBooksConnectionErrorMessage,
   formatQuickBooksSyncStatus,
   formatSkippedMonthLabel,
+  isQuickBooksUnsupportedProductError,
   type QuickBooksSyncSkippedMonth,
 } from "@/lib/quickbooks-shared";
 import {
@@ -578,6 +579,10 @@ export default function FinancialsPage() {
       setActiveTab("quickbooks");
       setSuccess("QuickBooks connected successfully.");
       setError("");
+    } else if (qbStatus === "unsupported_product") {
+      setActiveTab("quickbooks");
+      setSuccess("");
+      setError("");
     } else if (qbStatus === "error") {
       setActiveTab("quickbooks");
       setError(QB_ERROR_MESSAGES[reason ?? ""] ?? "QuickBooks connection failed. Please try again.");
@@ -988,6 +993,7 @@ export default function FinancialsPage() {
             monthsSynced?: number;
             unmappedAccounts?: string[];
             skippedMonths?: QuickBooksSyncSkippedMonth[];
+            unsupportedProduct?: boolean;
             error?: string;
             reconnectRequired?: boolean;
           }
@@ -1000,7 +1006,17 @@ export default function FinancialsPage() {
       const monthsSynced = payload?.monthsSynced ?? 0;
       const unmappedAccounts = payload?.unmappedAccounts ?? [];
       const skippedMonths = payload?.skippedMonths ?? [];
-      setQbSyncResult({ monthsSynced, unmappedAccounts, skippedMonths });
+      const unsupportedProduct = Boolean(payload?.unsupportedProduct);
+      setQbSyncResult(
+        unsupportedProduct ? null : { monthsSynced, unmappedAccounts, skippedMonths }
+      );
+
+      if (unsupportedProduct) {
+        invalidateValuationCache(store.id);
+        void evaluateAlerts({ storeIds: [store.id] });
+        await loadData(store.id);
+        return;
+      }
 
       const skippedCount = skippedMonths.length;
       if (forceOverrideMonths?.length) {
@@ -2405,14 +2421,23 @@ export default function FinancialsPage() {
                 color: "var(--text-warning, var(--text-info))",
               }}
             >
-              <p className="text-[12px] leading-snug">
-                Your QuickBooks connection needs attention.{" "}
-                {formatQuickBooksConnectionErrorMessage(
-                  qbConnection.error_code,
-                  qbConnection.error_message
-                )}{" "}
-                Reconnect to keep your data up to date.
-              </p>
+              {isQuickBooksUnsupportedProductError(qbConnection.error_code) ? (
+                <p className="text-[12px] leading-snug">
+                  {formatQuickBooksConnectionErrorMessage(
+                    qbConnection.error_code,
+                    qbConnection.error_message
+                  )}
+                </p>
+              ) : (
+                <p className="text-[12px] leading-snug">
+                  Your QuickBooks connection needs attention.{" "}
+                  {formatQuickBooksConnectionErrorMessage(
+                    qbConnection.error_code,
+                    qbConnection.error_message
+                  )}{" "}
+                  Reconnect to keep your data up to date.
+                </p>
+              )}
               <div className="flex flex-shrink-0 items-center gap-4">
                 <ReadOnlyGuard>
                   <button
@@ -2421,7 +2446,11 @@ export default function FinancialsPage() {
                     onClick={initiateQuickBooksConnect}
                     disabled={connectingQb || disconnectingQb || syncingQb}
                   >
-                    {connectingQb ? "Reconnecting…" : "Reconnect"}
+                    {connectingQb
+                      ? "Reconnecting…"
+                      : isQuickBooksUnsupportedProductError(qbConnection.error_code)
+                        ? "Reconnect with QuickBooks Online"
+                        : "Reconnect"}
                   </button>
                 </ReadOnlyGuard>
                 <ReadOnlyGuard>

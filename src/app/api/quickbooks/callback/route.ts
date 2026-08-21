@@ -5,6 +5,7 @@ import {
   decodeOAuthState,
   exchangeAuthorizationCode,
   financialsRedirectUrl,
+  flagUnsupportedQuickBooksProductIfDetected,
   updateStoreFinancialDataSourceOnQuickBooksConnect,
   upsertQuickBooksConnection,
 } from "@/lib/quickbooks";
@@ -71,9 +72,25 @@ export async function GET(request: Request) {
       realmId,
       tokens,
     });
-    await updateStoreFinancialDataSourceOnQuickBooksConnect(state.storeId);
 
-    const response = NextResponse.redirect(financialsRedirectUrl(origin, "connected"));
+    let unsupportedProduct = false;
+    try {
+      unsupportedProduct = await flagUnsupportedQuickBooksProductIfDetected({
+        storeId: state.storeId,
+        realmId,
+        accessToken: tokens.access_token,
+      });
+    } catch (detectionError) {
+      console.error("[quickbooks/callback] product detection failed", detectionError);
+    }
+
+    if (!unsupportedProduct) {
+      await updateStoreFinancialDataSourceOnQuickBooksConnect(state.storeId);
+    }
+
+    const response = NextResponse.redirect(
+      financialsRedirectUrl(origin, unsupportedProduct ? "unsupported_product" : "connected")
+    );
     response.cookies.set(QB_OAUTH_CSRF_COOKIE, "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

@@ -11,6 +11,11 @@ import {
 } from "@/lib/financials";
 import { createAdminSupabaseClient } from "@/lib/supabase-admin";
 import {
+  classifyQuickBooksOfferingSku,
+  extractOfferingSkuFromNameValues,
+  QUICKBOOKS_UNSUPPORTED_PRODUCT_ERROR_CODE,
+  QUICKBOOKS_UNSUPPORTED_PRODUCT_MESSAGE,
+  shouldFlagUnsupportedQuickBooksProduct,
   shouldSkipMonthForQuickBooksSync,
   type QuickBooksSyncSkippedMonth,
 } from "@/lib/quickbooks-shared";
@@ -455,7 +460,11 @@ export async function deleteQuickBooksConnection(storeId: string): Promise<Quick
   return decryptQuickBooksConnectionRow(existing as QuickBooksConnectionRow);
 }
 
-export function financialsRedirectUrl(origin: string, status: "connected" | "error", reason?: string): string {
+export function financialsRedirectUrl(
+  origin: string,
+  status: "connected" | "error" | "unsupported_product",
+  reason?: string
+): string {
   const url = new URL("/financials", origin);
   url.searchParams.set("tab", "quickbooks");
   url.searchParams.set("qb", status);
@@ -504,9 +513,21 @@ export type QuickBooksProfitAndLossReport = {
     StartPeriod?: string;
     EndPeriod?: string;
     SummarizeColumnsBy?: string;
+    Option?: { Name?: string; Value?: string }[];
   };
   Columns?: { Column?: QuickBooksReportColumn[] };
   Rows?: { Row?: QuickBooksReportRow[] };
+};
+
+export type QuickBooksCompanyInfoPayload = {
+  CompanyInfo?: {
+    NameValue?: { Name?: string; Value?: string }[] | { Name?: string; Value?: string };
+  };
+  QueryResponse?: {
+    CompanyInfo?:
+      | { NameValue?: { Name?: string; Value?: string }[] | { Name?: string; Value?: string } }
+      | { NameValue?: { Name?: string; Value?: string }[] | { Name?: string; Value?: string } }[];
+  };
 };
 
 export type QuickBooksSyncOptions = {
@@ -517,6 +538,7 @@ export type QuickBooksSyncResult = {
   monthsSynced: number;
   unmappedAccounts: string[];
   skippedMonths: QuickBooksSyncSkippedMonth[];
+  unsupportedProduct?: boolean;
 };
 
 export type ParsedMonthColumn = {
@@ -707,6 +729,49 @@ export async function fetchProfitAndLossReport(params: {
   return (await response.json()) as QuickBooksProfitAndLossReport;
 }
 
+export function extractOfferingSkuFromCompanyInfoPayload(
+  payload: QuickBooksCompanyInfoPayload | null | undefined
+): string | null {
+  const queryCompanyInfo = payload?.QueryResponse?.CompanyInfo;
+  const fromQuery = Array.isArray(queryCompanyInfo) ? queryCompanyInfo[0] : queryCompanyInfo;
+  const companyInfo = payload?.CompanyInfo ?? fromQuery;
+  return extractOfferingSkuFromNameValues(companyInfo?.NameValue);
+}
+
+export async function fetchCompanyOfferingSku(params: {
+  realmId: string;
+  accessToken: string;
+}): Promise<string | null> {
+  const baseUrl = getQuickBooksApiBaseUrl();
+  const url = new URL(
+    `${baseUrl}/v3/company/${params.realmId}/companyinfo/${params.realmId}`
+  );
+  url.searchParams.set("minorversion", QB_API_MINOR_VERSION);
+
+  try {
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${params.accessToken}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const detail = await response.text();
+      logQuickBooksFetchFailure("CompanyInfo fetch failed", response, detail, {
+        realmId: params.realmId,
+      });
+      return null;
+    }
+
+    const payload = (await response.json()) as QuickBooksCompanyInfoPayload;
+    return extractOfferingSkuFromCompanyInfoPayload(payload);
+  } catch (error) {
+    logQuickBooksApiError("CompanyInfo fetch failed", error, { realmId: params.realmId });
+    return null;
+  }
+}
+
 function parseMoneyValue(value: string | undefined): number {
   if (!value || value.trim() === "") {
     return 0;
@@ -803,6 +868,24 @@ export function extractProfitAndLossAccountRows(
     rows.push({ accountName, amountsByColumnIndex });
   });
   return rows;
+}
+
+export function profitAndLossHasNoFinancialActivity(
+  report: QuickBooksProfitAndLossReport
+): boolean {
+  const noReportData = report.Header?.Option?.find((option) => option.Name === "NoReportData")?.Value;
+  if (noReportData?.toLowerCase() === "true") {
+    return true;
+  }
+
+  const accountRows = extractProfitAndLossAccountRows(report);
+  if (accountRows.length === 0) {
+    return true;
+  }
+
+  return accountRows.every((row) =>
+    row.amountsByColumnIndex.every((value) => parseMoneyValue(value) === 0)
+  );
 }
 
 function monthKey(year: number, month: number): string {
@@ -1107,6 +1190,17 @@ export async function persistQuickBooksSyncError(
     return;
   }
 
+  if (!(error instanceof QuickBooksReconnectRequiredError)) {
+    try {
+      const connection = await loadQuickBooksConnection(storeId);
+      if (connection.error_code === QUICKBOOKS_UNSUPPORTED_PRODUCT_ERROR_CODE) {
+        return;
+      }
+    } catch {
+      // Fall through and persist the new error.
+    }
+  }
+
   let errorCode = "SYNC_FAILED";
   let errorMessage = "Failed to sync QuickBooks data.";
 
@@ -1125,25 +1219,62 @@ async function recordQuickBooksSyncHistory(params: {
   monthsSynced: number;
   skippedCount: number;
   unmappedCount: number;
+  keepError?: boolean;
 }): Promise<void> {
   const admin = createAdminSupabaseClient();
+  const payload: Record<string, unknown> = {
+    last_synced_at: new Date().toISOString(),
+    last_sync_months_synced: params.monthsSynced,
+    last_sync_skipped_count: params.skippedCount,
+    last_sync_unmapped_count: params.unmappedCount,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (!params.keepError) {
+    payload.error_code = null;
+    payload.error_message = null;
+    payload.error_at = null;
+  }
+
   const { error } = await admin
     .from("quickbooks_connections")
-    .update({
-      last_synced_at: new Date().toISOString(),
-      last_sync_months_synced: params.monthsSynced,
-      last_sync_skipped_count: params.skippedCount,
-      last_sync_unmapped_count: params.unmappedCount,
-      error_code: null,
-      error_message: null,
-      error_at: null,
-      updated_at: new Date().toISOString(),
-    })
+    .update(payload)
     .eq("store_id", params.storeId);
 
   if (error) {
     throw new Error(`Failed to record QuickBooks sync history: ${error.message}`);
   }
+}
+
+async function markUnsupportedQuickBooksProduct(storeId: string): Promise<void> {
+  await setQuickBooksConnectionError(
+    storeId,
+    QUICKBOOKS_UNSUPPORTED_PRODUCT_ERROR_CODE,
+    QUICKBOOKS_UNSUPPORTED_PRODUCT_MESSAGE
+  );
+}
+
+export async function flagUnsupportedQuickBooksProductIfDetected(params: {
+  storeId: string;
+  realmId: string;
+  accessToken: string;
+}): Promise<boolean> {
+  const offeringSku = await fetchCompanyOfferingSku({
+    realmId: params.realmId,
+    accessToken: params.accessToken,
+  });
+
+  if (classifyQuickBooksOfferingSku(offeringSku) !== "unsupported") {
+    return false;
+  }
+
+  console.warn("[quickbooks] connected realm looks like an unsupported Self-Employed/Solopreneur product", {
+    storeId: params.storeId,
+    realmId: params.realmId,
+    offeringSku,
+  });
+  await markUnsupportedQuickBooksProduct(params.storeId);
+  return true;
 }
 
 export async function syncQuickBooksFinancials(
@@ -1156,12 +1287,67 @@ export async function syncQuickBooksFinancials(
     const isFirstSync = !(await storeHasMonthlyFinancials(storeId));
     const { startDate, endDate } = getQuickBooksSyncDateRange(isFirstSync);
 
+    const offeringSku = await fetchCompanyOfferingSku({ realmId, accessToken });
+    const skuClassification = classifyQuickBooksOfferingSku(offeringSku);
+
+    if (skuClassification === "unsupported") {
+      console.warn("[quickbooks] skipping P&L sync for unsupported QuickBooks product", {
+        storeId,
+        realmId,
+        offeringSku,
+      });
+      await recordQuickBooksSyncHistory({
+        storeId,
+        monthsSynced: 0,
+        skippedCount: 0,
+        unmappedCount: 0,
+        keepError: true,
+      });
+      await markUnsupportedQuickBooksProduct(storeId);
+      return {
+        monthsSynced: 0,
+        unmappedAccounts: [],
+        skippedMonths: [],
+        unsupportedProduct: true,
+      };
+    }
+
     const report = await fetchProfitAndLossReport({
       realmId,
       accessToken,
       startDate,
       endDate,
     });
+
+    if (
+      shouldFlagUnsupportedQuickBooksProduct({
+        skuClassification,
+        profitAndLossIsEmpty: profitAndLossHasNoFinancialActivity(report),
+        isFirstSync,
+      })
+    ) {
+      console.warn("[quickbooks] first sync found no P&L activity; treating as likely Self-Employed", {
+        storeId,
+        realmId,
+        offeringSku,
+        startDate,
+        endDate,
+      });
+      await recordQuickBooksSyncHistory({
+        storeId,
+        monthsSynced: 0,
+        skippedCount: 0,
+        unmappedCount: 0,
+        keepError: true,
+      });
+      await markUnsupportedQuickBooksProduct(storeId);
+      return {
+        monthsSynced: 0,
+        unmappedAccounts: [],
+        skippedMonths: [],
+        unsupportedProduct: true,
+      };
+    }
 
     const { monthlyAmounts, unmappedAccounts } = mapProfitAndLossToMonthlyAmounts({
       report,
