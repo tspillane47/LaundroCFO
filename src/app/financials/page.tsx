@@ -1527,6 +1527,8 @@ export default function FinancialsPage() {
             </div>
           </div>
 
+          <YearRevenueEbitdaChart year={selectedYear} data={yearChartData} />
+
           <div className="card">
             <div className="flex flex-wrap items-center gap-4 justify-between">
               <div className="flex flex-wrap items-center gap-4">
@@ -1650,8 +1652,6 @@ export default function FinancialsPage() {
               </div>
             </div>
           )}
-
-          <YearRevenueEbitdaChart year={selectedYear} data={yearChartData} />
 
           <div className="grid grid-cols-1 lg:grid-cols-[4fr_1fr] gap-4 items-start">
             <div className="card flex flex-col min-h-0 min-w-0 w-full max-h-[600px] overflow-y-auto">

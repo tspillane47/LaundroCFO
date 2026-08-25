@@ -1,13 +1,21 @@
 import { MONTH_SHORT } from "@/lib/financials";
 
-/** Same pairing as the current Financials Revenue vs EBITDA / Trends charts. */
-export const YEAR_CHART_REVENUE_COLOR = "#3b82f6";
+/** Brand pairing used by Dashboard bars and Financials area/line charts. */
+export const YEAR_CHART_REVENUE_COLOR = "#2563eb";
 export const YEAR_CHART_EBITDA_COLOR = "#22c55e";
 
-export const YEAR_CHART_HEIGHT = 360;
-export const YEAR_CHART_BAR_SIZE = 10;
-export const YEAR_CHART_BAR_GAP = 2;
+export const YEAR_CHART_REVENUE_GLOW =
+  "drop-shadow(0 0 4px rgba(37, 99, 235, 0.9)) drop-shadow(0 0 10px rgba(37, 99, 235, 0.45))";
+export const YEAR_CHART_EBITDA_GLOW =
+  "drop-shadow(0 0 4px rgba(34, 197, 94, 0.9)) drop-shadow(0 0 10px rgba(34, 197, 94, 0.45))";
+
+export const YEAR_CHART_HEIGHT = 280;
 export const YEAR_CHART_MIN_WIDTH = 680;
+
+/** Dashboard compact grouped-bar sizing — bold enough to read at a glance. */
+export const DASHBOARD_CHART_BAR_SIZE = 28;
+export const DASHBOARD_CHART_BAR_GAP = 4;
+export const DASHBOARD_CHART_CATEGORY_GAP = "8%";
 
 export type YearRevenueEbitdaPoint = {
   label: string;
@@ -56,4 +64,17 @@ export function yearChartValueDomain(data: YearRevenueEbitdaPoint[]): [number, n
 
 export function yearChartHasNegative(data: YearRevenueEbitdaPoint[]): boolean {
   return data.some((point) => (point.revenue != null && point.revenue < 0) || (point.ebitda != null && point.ebitda < 0));
+}
+
+/** Keep real zeros; omit months with no record so Recharts will not draw through them. */
+export function toYearChartPlotData(data: YearRevenueEbitdaPoint[]) {
+  return data.map((point) => ({
+    label: point.label,
+    revenue: point.revenue ?? undefined,
+    ebitda: point.ebitda ?? undefined,
+  }));
+}
+
+export function yearChartDefinedPointCount(data: YearRevenueEbitdaPoint[]): number {
+  return data.filter((point) => point.revenue != null || point.ebitda != null).length;
 }

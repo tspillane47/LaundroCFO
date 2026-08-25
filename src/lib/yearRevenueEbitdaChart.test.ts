@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildYearRevenueEbitdaChartData,
   formatCompactChartDollar,
+  toYearChartPlotData,
+  yearChartDefinedPointCount,
   yearChartHasNegative,
   yearChartValueDomain,
 } from "@/lib/yearRevenueEbitdaChart";
@@ -68,5 +70,21 @@ describe("yearChartValueDomain", () => {
     const empty = buildYearRevenueEbitdaChartData([]);
     expect(yearChartValueDomain(empty)).toEqual([0, 1]);
     expect(yearChartHasNegative(empty)).toBe(false);
+  });
+});
+
+describe("toYearChartPlotData", () => {
+  it("keeps real zeros and omits months with no record so the line cannot continue through them", () => {
+    const data = buildYearRevenueEbitdaChartData([
+      { revenue: 10000, ebitda: 2000 },
+      { revenue: 0, ebitda: 0 },
+    ]);
+    const plot = toYearChartPlotData(data);
+
+    expect(plot[0]).toEqual({ label: "Jan", revenue: 10000, ebitda: 2000 });
+    expect(plot[1]).toEqual({ label: "Feb", revenue: 0, ebitda: 0 });
+    expect(plot[2]).toEqual({ label: "Mar", revenue: undefined, ebitda: undefined });
+    expect(plot[7]).toEqual({ label: "Aug", revenue: undefined, ebitda: undefined });
+    expect(yearChartDefinedPointCount(data)).toBe(2);
   });
 });

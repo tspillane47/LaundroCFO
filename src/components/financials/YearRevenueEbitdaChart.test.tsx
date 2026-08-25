@@ -87,7 +87,7 @@ describe("YearRevenueEbitdaChart", () => {
     return mounted.host;
   }
 
-  it("uses a fixed 360px plot at a desktop width and keeps all 12 month ticks", () => {
+  it("uses a fixed plot height at a desktop width and keeps all 12 month ticks", () => {
     const host = renderAt(1280);
     const plot = host.querySelector("[style*='min-width']") as HTMLElement | null;
     expect(plot).toBeTruthy();
@@ -100,24 +100,23 @@ describe("YearRevenueEbitdaChart", () => {
     expect(ticks).toEqual(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]);
   });
 
-  it("draws bars only for months with data and keeps later months blank", () => {
+  it("draws area/line series, not bars, and only places dots on months with real data", () => {
     const host = renderAt(1280);
-    const drawn = host.querySelectorAll(".recharts-bar-rectangle path, .recharts-bar-rectangle rect");
-    const blankSlots = [...host.querySelectorAll(".recharts-bar-rectangle")].filter(
-      (node) => node.childElementCount === 0
-    );
-    expect(drawn.length).toBe(12);
-    expect(blankSlots).toHaveLength(12);
+
+    expect(host.querySelector(".recharts-bar-rectangle")).toBeNull();
+    expect(host.querySelector(".recharts-area")).toBeTruthy();
+    expect(host.querySelector(".recharts-area-curve")).toBeTruthy();
+
+    const dots = host.querySelectorAll(".recharts-dot");
+    expect(dots.length).toBe(12);
 
     const labels = [...host.querySelectorAll("text")]
       .map((node) => node.textContent ?? "")
       .filter((text) => text.includes("$") || text.includes("k"));
-    expect(labels).toContain("$18k");
-    expect(labels).toContain("-$1k");
     expect(labels.filter((label) => label === "$0")).toHaveLength(0);
   });
 
-  it("keeps the same 360px plot height at a phone-sized wrapper", () => {
+  it("keeps the same plot height at a phone-sized wrapper", () => {
     const host = renderAt(390);
     const plot = host.querySelector("[style*='min-width']") as HTMLElement | null;
     expect(plot?.style.height).toBe(`${YEAR_CHART_HEIGHT}px`);

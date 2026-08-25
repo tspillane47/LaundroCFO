@@ -34,9 +34,6 @@ import type { EquipmentRecord } from "@/lib/equipment";
 import {
   AreaChart,
   Area,
-  Bar,
-  Line,
-  ComposedChart,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -73,6 +70,7 @@ import {
   hasEnoughChartHistory,
   INSUFFICIENT_HISTORY_MESSAGE,
 } from "@/lib/valuationHistory";
+import { RevenueEbitdaBarChart } from "@/components/dashboard/RevenueEbitdaBarChart";
 
 function parseDate(value: string | null): Date | null {
   if (!value) return null;
@@ -162,11 +160,6 @@ function HowYouCompareCard({
   );
 }
 
-const REVENUE_BAR_FILL = "rgba(34, 197, 94, 0.35)";
-const REVENUE_BAR_STROKE = "rgba(34, 197, 94, 0.8)";
-const EBITDA_LINE_COLOR = "#2563eb";
-const EBITDA_GLOW = "drop-shadow(0 0 4px rgba(56, 189, 248, 0.95)) drop-shadow(0 0 10px rgba(56, 189, 248, 0.55))";
-
 const ChartTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
@@ -180,72 +173,6 @@ const ChartTooltip = ({ active, payload, label }: any) => {
           {p.name}: {typeof p.value === "number" && p.dataKey !== "month" ? fmtDollar(p.value) : p.value}
         </div>
       ))}
-    </div>
-  );
-};
-
-const RevenueEbitdaTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-
-  const revenue = payload.find((p: any) => p.dataKey === "revenue")?.value as number | undefined;
-  const ebitda = payload.find((p: any) => p.dataKey === "ebitda")?.value as number | undefined;
-  const margin = revenue && revenue > 0 && ebitda != null ? (ebitda / revenue) * 100 : null;
-
-  return (
-    <div
-      className="rounded-xl px-3.5 py-2.5 text-xs min-w-[156px]"
-      style={{
-        background: "rgba(10, 15, 28, 0.72)",
-        backdropFilter: "blur(14px)",
-        WebkitBackdropFilter: "blur(14px)",
-        border: "1px solid rgba(56, 189, 248, 0.55)",
-        boxShadow:
-          "0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(56, 189, 248, 0.12), 0 0 20px rgba(56, 189, 248, 0.18)",
-        color: "#f1f5f9",
-      }}
-    >
-      <div className="text-[11px] font-semibold mb-2 tracking-wide uppercase" style={{ color: EBITDA_LINE_COLOR }}>
-        {label}
-      </div>
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5 text-slate-300">
-            <span
-              className="w-2.5 h-2.5 rounded-[3px] shrink-0"
-              style={{
-                background: REVENUE_BAR_FILL,
-                border: `1px solid ${REVENUE_BAR_STROKE}`,
-              }}
-            />
-            Revenue
-          </span>
-          <span className="font-semibold tabular-nums text-white">{revenue != null ? fmtDollar(revenue) : "—"}</span>
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5 text-slate-300">
-            <span
-              className="w-4 h-0.5 rounded-full shrink-0"
-              style={{
-                background: EBITDA_LINE_COLOR,
-                boxShadow: "0 0 6px rgba(56, 189, 248, 0.9)",
-              }}
-            />
-            EBITDA
-          </span>
-          <span className="font-semibold tabular-nums" style={{ color: EBITDA_LINE_COLOR }}>
-            {ebitda != null ? fmtDollar(ebitda) : "—"}
-          </span>
-        </div>
-        <div
-          className="flex items-center justify-between gap-4 pt-1.5 mt-0.5 border-t"
-          style={{ borderColor: "rgba(56, 189, 248, 0.2)" }}
-        >
-          <span className="text-slate-400">EBITDA Margin</span>
-          <span className="font-semibold tabular-nums" style={{ color: EBITDA_LINE_COLOR }}>
-            {margin != null ? `${margin.toFixed(1)}%` : "—"}
-          </span>
-        </div>
-      </div>
     </div>
   );
 };
@@ -1001,110 +928,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Revenue vs EBITDA */}
-          <div className="card">
-            <div className="section-title">Revenue vs EBITDA</div>
-            <div className="h-[220px]">
-              {revenueEbitdaData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart
-                  data={revenueEbitdaData}
-                  margin={{ top: 8, right: 4, left: 0, bottom: 0 }}
-                  barCategoryGap="12%"
-                >
-                  <defs>
-                    <filter id="ebitdaLineGlow" x="-20%" y="-20%" width="140%" height="140%">
-                      <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor="#2563eb" floodOpacity="0.95" />
-                      <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#2563eb" floodOpacity="0.45" />
-                    </filter>
-                  </defs>
-                  <CartesianGrid
-                    vertical={false}
-                    stroke="var(--text-muted)"
-                    strokeOpacity={0.12}
-                    strokeDasharray="3 6"
-                  />
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fill: "var(--text-muted)", fontSize: 11, fontWeight: 500 }}
-                    axisLine={false}
-                    tickLine={false}
-                    dy={6}
-                  />
-                  <YAxis
-                    tickFormatter={formatAxisValue}
-                    tick={{ fill: "var(--text-muted)", fontSize: 11, fontWeight: 500 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={52}
-                    tickCount={5}
-                  />
-                  <Tooltip
-                    content={<RevenueEbitdaTooltip />}
-                    cursor={false}
-                    wrapperStyle={{ outline: "none" }}
-                  />
-                  <Bar
-                    dataKey="revenue"
-                    name="Revenue"
-                    fill={REVENUE_BAR_FILL}
-                    stroke={REVENUE_BAR_STROKE}
-                    strokeWidth={1.5}
-                    radius={[6, 6, 0, 0]}
-                    isAnimationActive
-                    animationDuration={900}
-                    animationEasing="ease-out"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="ebitda"
-                    name="EBITDA"
-                    stroke={EBITDA_LINE_COLOR}
-                    strokeWidth={3}
-                    dot={false}
-                    activeDot={{
-                      r: 4,
-                      fill: EBITDA_LINE_COLOR,
-                      stroke: "#0ea5e9",
-                      strokeWidth: 2,
-                      style: { filter: EBITDA_GLOW },
-                    }}
-                    style={{ filter: EBITDA_GLOW }}
-                    filter="url(#ebitdaLineGlow)"
-                    isAnimationActive
-                    animationDuration={1100}
-                    animationEasing="ease-out"
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-[13px] text-center px-4" style={{ color: "var(--text-muted)" }}>
-                  {hasFinancialData ? INSUFFICIENT_HISTORY_MESSAGE : "Add monthly financials to see revenue and EBITDA."}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center justify-center gap-6 mt-3 text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
-              <span className="flex items-center gap-2">
-                <span
-                  className="w-3 h-3 rounded-[4px] shrink-0"
-                  style={{
-                    background: REVENUE_BAR_FILL,
-                    border: `1.5px solid ${REVENUE_BAR_STROKE}`,
-                  }}
-                />
-                Revenue
-              </span>
-              <span className="flex items-center gap-2">
-                <span
-                  className="w-5 h-[3px] rounded-full shrink-0"
-                  style={{
-                    background: EBITDA_LINE_COLOR,
-                    boxShadow: "0 0 8px rgba(56, 189, 248, 0.85), 0 0 2px rgba(56, 189, 248, 1)",
-                  }}
-                />
-                EBITDA
-              </span>
-            </div>
-          </div>
+          <RevenueEbitdaBarChart data={revenueEbitdaData} hasFinancialData={hasFinancialData} />
 
           <HowYouCompareCard benchmarks={benchmarks} hasFinancialData={hasFinancialData} />
         </div>
