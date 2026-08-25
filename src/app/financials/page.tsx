@@ -9,10 +9,7 @@ import { usePlaidLink } from "react-plaid-link";
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ReferenceLine,
@@ -31,6 +28,8 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { DSCRCard } from "@/components/ui/DSCRCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { CurrentMonthlyAveragesPanel } from "@/components/financials/CurrentMonthlyAveragesPanel";
+import { YearRevenueEbitdaChart } from "@/components/financials/YearRevenueEbitdaChart";
+import { buildYearRevenueEbitdaChartData } from "@/lib/yearRevenueEbitdaChart";
 import {
   getCurrentMonthlyAverages,
   type CurrentMonthlyAverages,
@@ -672,15 +671,7 @@ export default function FinancialsPage() {
     };
   }, [records, ttm]);
 
-  const yearChartData = useMemo(
-    () =>
-      yearRecords.map((r, i) => ({
-        label: MONTH_SHORT[i],
-        revenue: r?.revenue ?? 0,
-        ebitda: r?.ebitda ?? 0,
-      })),
-    [yearRecords]
-  );
+  const yearChartData = useMemo(() => buildYearRevenueEbitdaChartData(yearRecords), [yearRecords]);
 
   const trendChartData = useMemo(() => {
     return getChartRecords(records, 24).map((r) => ({
@@ -1660,6 +1651,8 @@ export default function FinancialsPage() {
             </div>
           )}
 
+          <YearRevenueEbitdaChart year={selectedYear} data={yearChartData} />
+
           <div className="grid grid-cols-1 lg:grid-cols-[4fr_1fr] gap-4 items-start">
             <div className="card flex flex-col min-h-0 min-w-0 w-full max-h-[600px] overflow-y-auto">
               <div className="section-title">P&L — {selectedYear}</div>
@@ -1828,28 +1821,6 @@ export default function FinancialsPage() {
                 data={monthlyAverages}
                 loading={monthlyAveragesLoading}
               />
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="section-title">Revenue vs EBITDA — {selectedYear}</div>
-            <div className="h-[220px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={yearChartData} barGap={4}>
-                  <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.06)" />
-                  <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis
-                    tick={{ fill: "#64748b", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="ebitda" name="EBITDA" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
             </div>
           </div>
         </div>
