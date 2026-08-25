@@ -15,7 +15,17 @@ export const YEAR_CHART_MIN_WIDTH = 680;
 /** Dashboard compact grouped-bar sizing — bold enough to read at a glance. */
 export const DASHBOARD_CHART_BAR_SIZE = 28;
 export const DASHBOARD_CHART_BAR_GAP = 4;
-export const DASHBOARD_CHART_CATEGORY_GAP = "8%";
+/** Pixel gap between month groups. Tight enough to read as a row, not one blob. */
+export const DASHBOARD_CHART_CATEGORY_GAP = 12;
+export const DASHBOARD_CHART_Y_AXIS_WIDTH = 52;
+
+export function dashboardBarChartWidth(monthCount: number, containerWidth: number): number {
+  const months = Math.max(monthCount, 1);
+  const pair = DASHBOARD_CHART_BAR_SIZE * 2 + DASHBOARD_CHART_BAR_GAP;
+  const dense = DASHBOARD_CHART_Y_AXIS_WIDTH + 8 + months * (pair + DASHBOARD_CHART_CATEGORY_GAP);
+  if (containerWidth <= 0) return dense;
+  return Math.min(containerWidth, dense);
+}
 
 export type YearRevenueEbitdaPoint = {
   label: string;

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildYearRevenueEbitdaChartData,
+  DASHBOARD_CHART_BAR_SIZE,
+  dashboardBarChartWidth,
   formatCompactChartDollar,
   toYearChartPlotData,
   yearChartDefinedPointCount,
@@ -86,5 +88,14 @@ describe("toYearChartPlotData", () => {
     expect(plot[2]).toEqual({ label: "Mar", revenue: undefined, ebitda: undefined });
     expect(plot[7]).toEqual({ label: "Aug", revenue: undefined, ebitda: undefined });
     expect(yearChartDefinedPointCount(data)).toBe(2);
+  });
+});
+
+describe("dashboardBarChartWidth", () => {
+  it("packs month groups to a dense width instead of stretching across a wide card", () => {
+    const dense = dashboardBarChartWidth(8, 1100);
+    expect(dense).toBeLessThan(1100);
+    expect(dense).toBeGreaterThan(8 * (DASHBOARD_CHART_BAR_SIZE * 2));
+    expect(dashboardBarChartWidth(8, 400)).toBe(400);
   });
 });

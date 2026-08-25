@@ -16,6 +16,8 @@ import {
   DASHBOARD_CHART_BAR_GAP,
   DASHBOARD_CHART_BAR_SIZE,
   DASHBOARD_CHART_CATEGORY_GAP,
+  DASHBOARD_CHART_Y_AXIS_WIDTH,
+  dashboardBarChartWidth,
   YEAR_CHART_EBITDA_COLOR,
   YEAR_CHART_EBITDA_GLOW,
   YEAR_CHART_REVENUE_COLOR,
@@ -142,14 +144,15 @@ export function RevenueEbitdaBarChart({
   hasFinancialData: boolean;
 }) {
   const { ref: plotRef, width: plotWidth } = useContainerSize();
+  const chartWidth = dashboardBarChartWidth(data.length, plotWidth);
 
   return (
     <div className="card chart-neon-card" data-testid="dashboard-revenue-ebitda-chart">
       <div className="section-title">Revenue vs EBITDA</div>
-      <div ref={plotRef} className="h-[220px]">
+      <div ref={plotRef} className="h-[220px] w-full flex justify-center">
         {data.length > 0 ? (
           <BarChart
-            width={Math.max(plotWidth, 320)}
+            width={chartWidth}
             height={220}
             data={data}
             margin={{ top: 8, right: 4, left: 0, bottom: 0 }}
@@ -192,7 +195,7 @@ export function RevenueEbitdaBarChart({
                 tick={{ fill: "var(--text-muted)", fontSize: 11, fontWeight: 500 }}
                 axisLine={false}
                 tickLine={false}
-                width={52}
+                width={DASHBOARD_CHART_Y_AXIS_WIDTH}
                 tickCount={5}
               />
               <Tooltip content={<RevenueEbitdaTooltip />} cursor={false} wrapperStyle={{ outline: "none" }} />
