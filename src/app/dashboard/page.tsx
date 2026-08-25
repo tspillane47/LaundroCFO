@@ -8,7 +8,6 @@ import { useStores } from "@/lib/store-context";
 import { getStoreValuation, getStoreDebt, getStoreScheduledDebtService, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
 import { calcEquipmentScore, calcLeaseScore, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { computeStoreDscr } from "@/lib/dscr";
-import { feedItemsToActionItems } from "@/lib/alerts";
 import {
   applyLoanDebtServiceToTtm,
   buildUtilitiesLookup,
@@ -44,9 +43,9 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
-import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
+import { IntelligenceFeedMobileShell } from "@/components/ui/IntelligenceFeedMobileShell";
+import { IntelligenceFeedPanel } from "@/components/ui/IntelligenceFeedPanel";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AddStoreLink } from "@/components/ui/AddStoreLink";
@@ -105,6 +104,62 @@ function formatAxisValue(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `$${Math.round(value / 1_000)}k`;
   return `$${value}`;
+}
+
+type BenchmarkRow = {
+  label: string;
+  value: string;
+  median: number;
+  storeValue: number;
+  displayMedian: string;
+  invert: boolean;
+};
+
+function HowYouCompareCard({
+  benchmarks,
+  hasFinancialData,
+}: {
+  benchmarks: BenchmarkRow[];
+  hasFinancialData: boolean;
+}) {
+  return (
+    <div className="card">
+      <div className="section-title">How You Compare</div>
+      <div className="space-y-0">
+        {benchmarks.map((b) => {
+          const aboveMedian =
+            hasFinancialData &&
+            (b.invert ? b.storeValue < b.median : b.storeValue >= b.median);
+          return (
+            <div
+              key={b.label}
+              className="flex items-center justify-between py-2.5 text-[12px] border-b last:border-b-0"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <span style={{ color: "var(--text-secondary)" }}>{b.label}</span>
+              <div className="text-right">
+                <span
+                  className="font-semibold tabular-nums"
+                  style={{
+                    color: !hasFinancialData
+                      ? "var(--text-muted)"
+                      : aboveMedian
+                        ? "var(--text-success)"
+                        : "var(--text-warning)",
+                  }}
+                >
+                  {b.value}
+                </span>
+                <span className="text-[10px] ml-2" style={{ color: "var(--text-muted)" }}>
+                  vs {b.displayMedian} median
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 const REVENUE_BAR_FILL = "rgba(34, 197, 94, 0.35)";
@@ -490,12 +545,6 @@ export default function DashboardPage() {
 
   const laundrocfoScore = laundroCfoScoreResult?.total ?? 0;
 
-  const severityBorder = {
-    urgent: "border-l-red-500",
-    warning: "border-l-amber-500",
-    info: "border-l-blue-500",
-  };
-
   const feedItems = useMemo(
     () =>
       store
@@ -528,11 +577,6 @@ export default function DashboardPage() {
       ttm,
       uncategorizedTransactionCount,
     ]
-  );
-
-  const actions = useMemo(
-    () => feedItemsToActionItems(feedItems, { isOwnerOccupied }),
-    [feedItems, isOwnerOccupied]
   );
 
   if (loadError) {
@@ -902,7 +946,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Section 3: Two Column Layout */}
-      <div className="grid-3 grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="grid-3 grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
         {/* Left Column */}
         <div className="xl:col-span-2 space-y-4">
           {/* Valuation Trend Chart */}
@@ -1061,103 +1105,12 @@ export default function DashboardPage() {
               </span>
             </div>
           </div>
+
+          <HowYouCompareCard benchmarks={benchmarks} hasFinancialData={hasFinancialData} />
         </div>
 
-        {/* Right Column */}
-        <div className="space-y-4">
-          {/* Action Center */}
-          <div className="card">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="section-title mb-0">Action Center</div>
-              {actions.length > 0 && (
-                <span className="badge badge-red text-[10px]">{actions.length}</span>
-              )}
-            </div>
-            {actions.length === 0 ? (
-              <div className="text-center py-6">
-                <div className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>All Clear</div>
-                <div className="text-[12px] mt-1" style={{ color: "var(--text-muted)" }}>
-                  No urgent actions needed right now.
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {actions.map((action) => (
-                  <div
-                    key={action.id}
-                    className={clsx(
-                      "border-l-[3px] rounded-r-lg pl-3 py-2.5",
-                      severityBorder[action.severity]
-                    )}
-                    style={{ background: "var(--bg-card2)" }}
-                  >
-                    <div className="flex items-start gap-2">
-                      <span
-                        className="text-[9px] font-bold tracking-wider flex-shrink-0 mt-0.5"
-                        style={{ color: "var(--text-muted)" }}
-                      >
-                        {action.severityLabel}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
-                          {action.title}
-                        </div>
-                        <div className="text-[11px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
-                          {action.description}
-                        </div>
-                        <Link
-                          href={action.href}
-                          className="text-[11px] mt-1 inline-block hover:underline"
-                          style={{ color: "var(--accent)" }}
-                        >
-                          View →
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Store Benchmarks */}
-          <div className="card">
-            <div className="section-title">How You Compare</div>
-            <div className="space-y-0">
-              {benchmarks.map((b) => {
-                const aboveMedian =
-                  hasFinancialData &&
-                  (b.invert ? b.storeValue < b.median : b.storeValue >= b.median);
-                return (
-                  <div
-                    key={b.label}
-                    className="flex items-center justify-between py-2.5 text-[12px] border-b last:border-b-0"
-                    style={{ borderColor: "var(--border)" }}
-                  >
-                    <span style={{ color: "var(--text-secondary)" }}>{b.label}</span>
-                    <div className="text-right">
-                      <span
-                        className="font-semibold tabular-nums"
-                        style={{
-                          color: !hasFinancialData
-                            ? "var(--text-muted)"
-                            : aboveMedian
-                              ? "var(--text-success)"
-                              : "var(--text-warning)",
-                        }}
-                      >
-                        {b.value}
-                      </span>
-                      <span className="text-[10px] ml-2" style={{ color: "var(--text-muted)" }}>
-                        vs {b.displayMedian} median
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        <IntelligenceFeedMobileShell items={feedItems} />
+        <IntelligenceFeedPanel items={feedItems} />
       </div>
 
       {/* Section 4: Bottom Summary Row */}
@@ -1314,16 +1267,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Store Intelligence Feed */}
-      <div className="card">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="section-title mb-0">Store Intelligence Feed</div>
-          {feedItems.length > 0 && (
-            <span className="badge badge-blue text-[10px]">{feedItems.length}</span>
-          )}
-        </div>
-        <IntelligenceFeed items={feedItems} />
-      </div>
     </div>
   );
 }
