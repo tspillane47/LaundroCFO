@@ -16,7 +16,7 @@ import type {
   FinancialDataSource,
   TransactionStatus,
 } from "@/lib/financials";
-import { categorizeWithRules } from "@/lib/financials";
+import { categorizeWithRules, reverseTransactionPlLinkPosting } from "@/lib/financials";
 import { createAdminSupabaseClient } from "@/lib/supabase-admin";
 import { decryptTokenIfEncrypted, encryptToken } from "@/lib/tokenEncryption";
 import {
@@ -33,6 +33,14 @@ import {
   type PlaidBalanceSyncResult,
   type PlaidSyncResult,
 } from "@/lib/plaid-shared";
+import {
+  fetchConnectionActiveTransactionIds,
+  reconcilePostedPlaidDuplicatesForStore,
+  runDuplicateReconcileSafely,
+  shouldReconcileAfterSyncInserts,
+  type ConnectionFetchResult,
+  type PlaidConnectionForCleanup,
+} from "@/lib/plaidDuplicateCleanup";
 
 export {
   isQuickBooksDataSource,
@@ -1246,6 +1254,36 @@ export async function syncPlaidAccountBalances(
   };
 }
 
+export async function loadLivePlaidIdsForDuplicateReconcile(
+  connections: PlaidConnectionForCleanup[],
+  minDate: string,
+  maxDate: string
+): Promise<ConnectionFetchResult[]> {
+  const client = getPlaidClient();
+  const results: ConnectionFetchResult[] = [];
+  for (const connection of connections) {
+    const accessToken = decryptTokenIfEncrypted(connection.plaid_access_token);
+    results.push(
+      await fetchConnectionActiveTransactionIds(client, connection, accessToken, minDate, maxDate)
+    );
+  }
+  return results;
+}
+
+export async function runPostedPlaidDuplicateReconcileSafe(storeId: string) {
+  return runDuplicateReconcileSafely(storeId, (id) =>
+    reconcilePostedPlaidDuplicatesForStore(id, {
+      supabase: createAdminSupabaseClient(),
+      loadLivePlaidIds: loadLivePlaidIdsForDuplicateReconcile,
+      reverseTransactionPlLinkPosting: (supabase, params) =>
+        reverseTransactionPlLinkPosting(
+          supabase as Parameters<typeof reverseTransactionPlLinkPosting>[0],
+          params
+        ),
+    })
+  );
+}
+
 export async function syncPlaidTransactions(connectionId: string): Promise<PlaidSyncResult> {
   const connection = await loadPlaidConnection(connectionId);
   const storeId = connection.store_id;
@@ -1310,6 +1348,17 @@ export async function syncPlaidTransactions(connectionId: string): Promise<Plaid
         ok: false,
         error: message,
       };
+    }
+
+    if (shouldReconcileAfterSyncInserts(inserted)) {
+      const reconcileResult = await runPostedPlaidDuplicateReconcileSafe(storeId);
+      if (!reconcileResult.ok) {
+        console.error("[plaid/sync] duplicate reconcile failed after transaction sync succeeded", {
+          connectionId,
+          storeId,
+          error: reconcileResult.error,
+        });
+      }
     }
 
     return { added: inserted, reconciled, modified, removed, skippedRemovedPosted, balances };

@@ -3,8 +3,10 @@ import { verifyCronRequest } from "@/lib/cron-auth";
 import {
   logPlaidApiError,
   PlaidNotConnectedError,
+  runPostedPlaidDuplicateReconcileSafe,
   syncPlaidTransactions,
 } from "@/lib/plaid";
+import { groupPlaidConnectionsByStore } from "@/lib/plaidDuplicateCleanup";
 import {
   QuickBooksNotConnectedError,
   QuickBooksReconnectRequiredError,
@@ -26,6 +28,13 @@ type ConnectionSyncResult = {
   reconnectRequired?: boolean;
 };
 
+type DuplicateReconcileCronResult = {
+  storeId: string;
+  ok: boolean;
+  applied: number;
+  error?: string;
+};
+
 function summarizeResults(results: ConnectionSyncResult[], integration: IntegrationKind) {
   const scoped = results.filter((entry) => entry.integration === integration);
   return {
@@ -43,6 +52,7 @@ export async function GET(request: Request) {
 
   const startedAt = new Date().toISOString();
   const results: ConnectionSyncResult[] = [];
+  const duplicateReconcile: DuplicateReconcileCronResult[] = [];
   const admin = createAdminSupabaseClient();
 
   const [{ data: quickbooksConnections, error: quickbooksError }, { data: plaidConnections, error: plaidError }] =
@@ -89,28 +99,52 @@ export async function GET(request: Request) {
     }
   }
 
-  for (const connection of plaidConnections ?? []) {
-    const storeId = connection.store_id;
-    const connectionId = connection.id;
+  for (const { storeId, connectionIds } of groupPlaidConnectionsByStore(plaidConnections ?? [])) {
+    let anyPlaidSyncOk = false;
 
-    try {
-      await syncPlaidTransactions(connectionId);
-      results.push({ storeId, connectionId, integration: "plaid", ok: true });
-    } catch (error) {
-      if (error instanceof PlaidNotConnectedError) {
-        results.push({
-          storeId,
-          connectionId,
-          integration: "plaid",
-          ok: false,
-          error: error.message,
-        });
-        continue;
+    for (const connectionId of connectionIds) {
+      try {
+        await syncPlaidTransactions(connectionId);
+        anyPlaidSyncOk = true;
+        results.push({ storeId, connectionId, integration: "plaid", ok: true });
+      } catch (error) {
+        if (error instanceof PlaidNotConnectedError) {
+          results.push({
+            storeId,
+            connectionId,
+            integration: "plaid",
+            ok: false,
+            error: error.message,
+          });
+          continue;
+        }
+
+        logPlaidApiError("[cron/sync-integrations] Plaid sync failed", error, { storeId, connectionId });
+        const message = error instanceof Error ? error.message : "Unknown Plaid sync error";
+        results.push({ storeId, connectionId, integration: "plaid", ok: false, error: message });
       }
+    }
 
-      logPlaidApiError("[cron/sync-integrations] Plaid sync failed", error, { storeId, connectionId });
-      const message = error instanceof Error ? error.message : "Unknown Plaid sync error";
-      results.push({ storeId, connectionId, integration: "plaid", ok: false, error: message });
+    if (!anyPlaidSyncOk) continue;
+
+    const reconcileResult = await runPostedPlaidDuplicateReconcileSafe(storeId);
+    if (reconcileResult.ok) {
+      duplicateReconcile.push({
+        storeId,
+        ok: true,
+        applied: reconcileResult.result.applied.length,
+      });
+    } else {
+      console.error("[cron/sync-integrations] duplicate reconcile failed", {
+        storeId,
+        error: reconcileResult.error,
+      });
+      duplicateReconcile.push({
+        storeId,
+        ok: false,
+        applied: 0,
+        error: reconcileResult.error,
+      });
     }
   }
 
@@ -119,6 +153,12 @@ export async function GET(request: Request) {
     finishedAt: new Date().toISOString(),
     quickbooks: summarizeResults(results, "quickbooks"),
     plaid: summarizeResults(results, "plaid"),
+    duplicateReconcile: {
+      storesAttempted: duplicateReconcile.length,
+      storesSucceeded: duplicateReconcile.filter((entry) => entry.ok).length,
+      correctionsApplied: duplicateReconcile.reduce((sum, entry) => sum + entry.applied, 0),
+      failures: duplicateReconcile.filter((entry) => !entry.ok),
+    },
     failures: results.filter((entry) => !entry.ok),
   };
 

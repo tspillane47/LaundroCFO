@@ -440,7 +440,8 @@ function storedAlertToAlertItem(
   row: StoredStoreAlert,
   storeName?: string
 ): AlertItem {
-  const categoryTag = row.alert_key.startsWith("tx-review-")
+  const categoryTag = row.alert_key.startsWith("tx-review-") ||
+    row.alert_key.startsWith("plaid-dup-corrected-")
     ? "transactions"
     : row.alert_key.includes("lease")
     ? "lease"

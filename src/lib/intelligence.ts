@@ -67,7 +67,12 @@ export type StoreFeedOptions = {
   uncategorizedTransactionCount?: number;
 };
 
-const POSITIVE_EVENT_PREFIXES = ["revenue-up-", "dscr-improved-", "val-change-"] as const;
+const POSITIVE_EVENT_PREFIXES = [
+  "revenue-up-",
+  "dscr-improved-",
+  "val-change-",
+  "plaid-dup-corrected-",
+] as const;
 
 export function isPositiveEventAlertKey(alertKey: string): boolean {
   return POSITIVE_EVENT_PREFIXES.some((prefix) => alertKey.includes(prefix));

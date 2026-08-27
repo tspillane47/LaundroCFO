@@ -97,7 +97,7 @@ export type TransactionStatus =
   | "system_classified"
   | "user_classified";
 
-export type TransactionChangeSource = "user" | "rule" | "import";
+export type TransactionChangeSource = "user" | "rule" | "import" | "system";
 
 export type BankTransaction = {
   id: string;
