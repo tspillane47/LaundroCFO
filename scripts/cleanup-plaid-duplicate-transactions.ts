@@ -1,9 +1,14 @@
 /**
  * Cleanup duplicate Plaid bank transactions caused by pending→posted ID migrations.
  *
- * Finds posted duplicate groups (same store, date, amount, different plaid_transaction_id),
- * keeps the oldest row, reverses the newer duplicate's P&L posting, deletes the duplicate,
- * and updates the surviving row to the Plaid-recognized transaction ID.
+ * Finds posted duplicate groups (same store, connection, date, amount, transaction_type,
+ * different plaid_transaction_id), keeps the oldest row, reverses the newer duplicate's
+ * P&L posting, deletes the duplicate, and updates the surviving row to the live Plaid ID.
+ *
+ * Hard preconditions (all required):
+ *   1. Keep and remove rows share transaction_type (income/expense).
+ *   2. Live Plaid data shows exactly one ID still active and at least one ID dead.
+ *   3. Live IDs in the group all belong to the same Plaid connection/institution.
  *
  * Usage:
  *   set -a && source .env.local && set +a && \
@@ -15,6 +20,12 @@ import { Configuration, PlaidApi, PlaidEnvironments } from "plaid";
 import { createScriptSupabaseClient } from "./createScriptSupabaseClient";
 import { decryptTokenIfEncrypted } from "../src/lib/tokenEncryption";
 import { reverseTransactionPlLinkPosting } from "../src/lib/financials";
+import {
+  clusterSameTypeDuplicateCandidates,
+  matchConfirmedPlaidDuplicate,
+  type DuplicateCleanupPlaidIdSource,
+  type PlaidIdStatus,
+} from "../src/lib/plaidDuplicateCleanup";
 
 type BankTransactionRow = {
   id: string;
@@ -23,6 +34,7 @@ type BankTransactionRow = {
   plaid_transaction_id: string;
   transaction_date: string;
   amount: number;
+  transaction_type: "income" | "expense" | null;
   description: string | null;
   status: string;
   created_at: string;
@@ -48,20 +60,20 @@ type CleanupAction = {
   plaidIdSource: CleanupActionPlaidIdSource;
 };
 
-type CleanupActionPlaidIdSource =
-  | "plaid_api_newer"
-  | "plaid_api_older"
-  | "newer_row_fallback"
-  | "older_row_fallback";
+type CleanupActionPlaidIdSource = DuplicateCleanupPlaidIdSource;
 
 type CleanupGroup = {
   storeId: string;
   storeName: string;
+  connectionId: string;
+  institutionName: string;
   keep: BankTransactionRow;
   removes: BankTransactionRow[];
   plLinksByRemoveId: Map<string, TransactionPlLinkRow>;
   currentPlaidTransactionId: string;
   plaidIdSource: CleanupActionPlaidIdSource;
+  livePlaidIds: string[];
+  deadPlaidIds: string[];
 };
 
 type PlaidConnectionRow = {
@@ -70,6 +82,12 @@ type PlaidConnectionRow = {
   user_id: string;
   plaid_access_token: string;
   institution_name: string | null;
+};
+
+type ConnectionFetchResult = {
+  connection: PlaidConnectionRow;
+  ok: boolean;
+  activeIds: Set<string>;
 };
 
 function getPlaidClientForScript(): PlaidApi {
@@ -93,63 +111,65 @@ function getPlaidClientForScript(): PlaidApi {
   );
 }
 
-function groupKey(row: Pick<BankTransactionRow, "store_id" | "transaction_date" | "amount">): string {
-  return `${row.store_id}|${row.transaction_date}|${row.amount}`;
-}
-
-async function loadActivePlaidTransactionIds(
+async function loadConnectionTransactions(
   client: PlaidApi,
-  connections: PlaidConnectionRow[],
+  connection: PlaidConnectionRow,
   minDate: string,
   maxDate: string
-): Promise<Set<string>> {
+): Promise<ConnectionFetchResult> {
   const activeIds = new Set<string>();
 
-  for (const connection of connections) {
-    try {
-      const accessToken = decryptTokenIfEncrypted(connection.plaid_access_token);
+  try {
+    const accessToken = decryptTokenIfEncrypted(connection.plaid_access_token);
+    const pageSize = 500;
+    let offset = 0;
+    let total = Number.POSITIVE_INFINITY;
+
+    while (offset < total) {
       const response = await client.transactionsGet({
         access_token: accessToken,
         start_date: minDate,
         end_date: maxDate,
+        options: { count: pageSize, offset },
       });
+      total = response.data.total_transactions;
       for (const txn of response.data.transactions) {
         activeIds.add(txn.transaction_id);
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.warn(
-        `[cleanup] Plaid lookup failed for connection ${connection.id} (${connection.institution_name ?? "unknown"}): ${message}`
-      );
+      offset += response.data.transactions.length;
+      if (response.data.transactions.length === 0) break;
     }
-  }
 
-  return activeIds;
+    return { connection, ok: true, activeIds };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[cleanup] Plaid lookup failed for connection ${connection.id} (${connection.institution_name ?? "unknown"}): ${message}`
+    );
+    return { connection, ok: false, activeIds };
+  }
 }
 
-function chooseCurrentPlaidTransactionId(params: {
-  keep: BankTransactionRow;
-  candidates: BankTransactionRow[];
-  activePlaidIds: Set<string>;
-}): { id: string; source: CleanupActionPlaidIdSource } {
-  const { keep, candidates, activePlaidIds } = params;
-  const ordered = [...candidates].sort((a, b) => b.created_at.localeCompare(a.created_at));
+function resolvePlaidIdStatus(params: {
+  plaidTransactionId: string;
+  storeConnectionResults: ConnectionFetchResult[];
+  idToConnectionId: Map<string, string>;
+}): PlaidIdStatus {
+  const { plaidTransactionId, storeConnectionResults, idToConnectionId } = params;
 
-  for (const candidate of ordered) {
-    if (activePlaidIds.has(candidate.plaid_transaction_id)) {
-      return {
-        id: candidate.plaid_transaction_id,
-        source: candidate.id === keep.id ? "plaid_api_older" : "plaid_api_newer",
-      };
-    }
+  if (idToConnectionId.has(plaidTransactionId)) {
+    return "live";
   }
 
-  const newest = ordered[0];
-  if (newest && newest.id !== keep.id) {
-    return { id: newest.plaid_transaction_id, source: "newer_row_fallback" };
+  if (storeConnectionResults.length === 0) {
+    return "unknown";
   }
 
-  return { id: keep.plaid_transaction_id, source: "older_row_fallback" };
+  if (storeConnectionResults.some((result) => !result.ok)) {
+    return "unknown";
+  }
+
+  return "dead";
 }
 
 async function findDuplicateGroups(): Promise<CleanupGroup[]> {
@@ -159,44 +179,61 @@ async function findDuplicateGroups(): Promise<CleanupGroup[]> {
   if (storesError) throw new Error(storesError.message);
   const storeNameById = new Map((stores ?? []).map((store) => [store.id as string, store.name as string]));
 
-  const { data: txns, error: txnsError } = await supabase
-    .from("bank_transactions")
-    .select(
-      "id, store_id, user_id, plaid_transaction_id, transaction_date, amount, description, status, created_at"
-    )
-    .not("plaid_transaction_id", "is", null)
-    .eq("status", "posted")
-    .order("created_at", { ascending: true });
+  const txns: BankTransactionRow[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error: txnsError } = await supabase
+      .from("bank_transactions")
+      .select(
+        "id, store_id, user_id, plaid_transaction_id, transaction_date, amount, transaction_type, description, status, created_at"
+      )
+      .not("plaid_transaction_id", "is", null)
+      .eq("status", "posted")
+      .order("created_at", { ascending: true })
+      .range(from, from + pageSize - 1);
 
-  if (txnsError) throw new Error(txnsError.message);
-
-  const groups = new Map<string, BankTransactionRow[]>();
-  for (const row of (txns ?? []) as BankTransactionRow[]) {
-    const key = groupKey(row);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(row);
+    if (txnsError) throw new Error(txnsError.message);
+    const page = (data ?? []) as BankTransactionRow[];
+    txns.push(...page);
+    if (page.length < pageSize) break;
   }
 
-  const candidateGroups: Array<{ keep: BankTransactionRow; removes: BankTransactionRow[] }> = [];
+  const skippedMissingType = txns.filter(
+    (row) => row.transaction_type !== "income" && row.transaction_type !== "expense"
+  ).length;
+  const typeMatchedClusters = clusterSameTypeDuplicateCandidates(txns);
 
-  for (const rows of groups.values()) {
-    if (rows.length < 2) continue;
-
-    const uniquePlaidIds = new Set(rows.map((row) => row.plaid_transaction_id));
-    if (uniquePlaidIds.size < 2) continue;
-
-    const sorted = [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at));
-    candidateGroups.push({
-      keep: sorted[0],
-      removes: sorted.slice(1),
-    });
+  const amountOnlyGroups = new Map<string, BankTransactionRow[]>();
+  for (const row of txns) {
+    if (row.transaction_type !== "income" && row.transaction_type !== "expense") continue;
+    const key = `${row.store_id}|${row.transaction_date}|${Number(row.amount)}`;
+    if (!amountOnlyGroups.has(key)) amountOnlyGroups.set(key, []);
+    amountOnlyGroups.get(key)!.push(row);
+  }
+  const typeMismatchClusters = [...amountOnlyGroups.values()].filter((rows) => {
+    if (rows.length < 2) return false;
+    if (new Set(rows.map((row) => row.plaid_transaction_id)).size < 2) return false;
+    return new Set(rows.map((row) => row.transaction_type)).size > 1;
+  });
+  for (const rows of typeMismatchClusters) {
+    console.log(
+      `[cleanup] excluded type-mismatch ${rows[0].transaction_date} $${Number(rows[0].amount)} ` +
+        `(${rows.map((row) => `${row.transaction_type}:${(row.description ?? "").slice(0, 36)}`).join(" | ")})`
+    );
   }
 
-  if (candidateGroups.length === 0) {
+  console.log(
+    `[cleanup] Loaded ${txns.length} posted Plaid rows` +
+      (skippedMissingType ? ` (${skippedMissingType} skipped, missing income/expense type)` : "") +
+      `; ${typeMismatchClusters.length} type-mismatch cluster(s) excluded; ` +
+      `${typeMatchedClusters.length} same-type cluster(s) to verify with Plaid.`
+  );
+
+  if (typeMatchedClusters.length === 0) {
     return [];
   }
 
-  const storeIds = [...new Set(candidateGroups.map((group) => group.keep.store_id))];
+  const storeIds = [...new Set(typeMatchedClusters.map((rows) => rows[0].store_id))];
   const { data: connections, error: connectionsError } = await supabase
     .from("plaid_connections")
     .select("id, store_id, user_id, plaid_access_token, institution_name")
@@ -212,24 +249,73 @@ async function findDuplicateGroups(): Promise<CleanupGroup[]> {
     connectionsByStore.get(connection.store_id)!.push(connection);
   }
 
-  const allDates = candidateGroups.flatMap((group) => [
-    group.keep.transaction_date,
-    ...group.removes.map((row) => row.transaction_date),
-  ]);
+  const allDates = typeMatchedClusters.flatMap((rows) => rows.map((row) => row.transaction_date));
   const minDate = allDates.reduce((min, date) => (date < min ? date : min));
   const maxDate = allDates.reduce((max, date) => (date > max ? date : max));
 
   const client = getPlaidClientForScript();
-  const activePlaidIdsByStore = new Map<string, Set<string>>();
+  const connectionResultsByStore = new Map<string, ConnectionFetchResult[]>();
+  const idToConnectionId = new Map<string, string>();
+  const connectionById = new Map<string, PlaidConnectionRow>();
+
   for (const storeId of storeIds) {
     const storeConnections = connectionsByStore.get(storeId) ?? [];
-    activePlaidIdsByStore.set(
-      storeId,
-      await loadActivePlaidTransactionIds(client, storeConnections, minDate, maxDate)
+    const results: ConnectionFetchResult[] = [];
+    for (const connection of storeConnections) {
+      connectionById.set(connection.id, connection);
+      const result = await loadConnectionTransactions(client, connection, minDate, maxDate);
+      results.push(result);
+      if (result.ok) {
+        for (const txnId of result.activeIds) {
+          idToConnectionId.set(txnId, connection.id);
+        }
+      }
+    }
+    connectionResultsByStore.set(storeId, results);
+  }
+
+  const idStatus = new Map<string, PlaidIdStatus>();
+  for (const rows of typeMatchedClusters) {
+    const storeResults = connectionResultsByStore.get(rows[0].store_id) ?? [];
+    for (const row of rows) {
+      if (idStatus.has(row.plaid_transaction_id)) continue;
+      idStatus.set(
+        row.plaid_transaction_id,
+        resolvePlaidIdStatus({
+          plaidTransactionId: row.plaid_transaction_id,
+          storeConnectionResults: storeResults,
+          idToConnectionId,
+        })
+      );
+    }
+  }
+
+  const matched: Array<NonNullable<ReturnType<typeof matchConfirmedPlaidDuplicate>>> = [];
+  for (const rows of typeMatchedClusters) {
+    const result = matchConfirmedPlaidDuplicate({ rows, idStatus, idToConnectionId });
+    if (result) {
+      matched.push(result);
+      continue;
+    }
+    const ids = [...new Set(rows.map((row) => row.plaid_transaction_id))];
+    const statusSummary = ids
+      .map((id) => `${id.slice(0, 8)}…=${idStatus.get(id) ?? "unknown"}`)
+      .join(", ");
+    console.log(
+      `[cleanup] excluded same-type cluster ${rows[0].transaction_date} $${Number(rows[0].amount)} ${rows[0].transaction_type} (${statusSummary})`
     );
   }
 
-  const duplicateTxnIds = candidateGroups.flatMap((group) => [
+  console.log(
+    `[cleanup] ${typeMatchedClusters.length} same-store/date/amount/type cluster(s); ` +
+      `${matched.length} confirmed duplicate group(s) after Plaid live/dead + same-connection checks.`
+  );
+
+  if (matched.length === 0) {
+    return [];
+  }
+
+  const duplicateTxnIds = matched.flatMap((group) => [
     group.keep.id,
     ...group.removes.map((row) => row.id),
   ]);
@@ -247,28 +333,26 @@ async function findDuplicateGroups(): Promise<CleanupGroup[]> {
 
   const cleanupGroups: CleanupGroup[] = [];
 
-  for (const { keep, removes } of candidateGroups) {
-    const activePlaidIds = activePlaidIdsByStore.get(keep.store_id) ?? new Set<string>();
-    const { id: currentPlaidTransactionId, source: plaidIdSource } = chooseCurrentPlaidTransactionId({
-      keep,
-      candidates: [keep, ...removes],
-      activePlaidIds,
-    });
-
+  for (const match of matched) {
+    const connection = connectionById.get(match.connectionId);
     const plLinksByRemoveId = new Map<string, TransactionPlLinkRow>();
-    for (const remove of removes) {
+    for (const remove of match.removes) {
       const link = linksByTxnId.get(remove.id);
       if (link) plLinksByRemoveId.set(remove.id, link);
     }
 
     cleanupGroups.push({
-      storeId: keep.store_id,
-      storeName: storeNameById.get(keep.store_id) ?? keep.store_id,
-      keep,
-      removes,
+      storeId: match.keep.store_id,
+      storeName: storeNameById.get(match.keep.store_id) ?? match.keep.store_id,
+      connectionId: match.connectionId,
+      institutionName: connection?.institution_name?.trim() || match.connectionId,
+      keep: match.keep,
+      removes: match.removes,
       plLinksByRemoveId,
-      currentPlaidTransactionId,
-      plaidIdSource,
+      currentPlaidTransactionId: match.currentPlaidTransactionId,
+      plaidIdSource: match.plaidIdSource,
+      livePlaidIds: match.livePlaidIds,
+      deadPlaidIds: match.deadPlaidIds,
     });
   }
 
@@ -318,15 +402,23 @@ function printDryRun(groups: CleanupGroup[]): void {
   for (const [storeName, storeGroups] of [...byStore.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     console.log(`=== ${storeName} (${storeGroups.length} group(s)) ===`);
     for (const group of storeGroups) {
+      const keepLive = group.livePlaidIds.includes(group.keep.plaid_transaction_id);
       console.log("");
-      console.log(`  Date: ${group.keep.transaction_date}  Amount: $${group.keep.amount}`);
+      console.log(
+        `  Date: ${group.keep.transaction_date}  Amount: $${group.keep.amount}  Type: ${group.keep.transaction_type}`
+      );
+      console.log(`  Institution: ${group.institutionName} (${group.connectionId})`);
+      console.log(
+        `  Plaid verification: ${group.livePlaidIds.length} live / ${group.deadPlaidIds.length} dead`
+      );
       console.log(`  KEEP (older):   ${group.keep.id}`);
-      console.log(`    plaid_id: ${group.keep.plaid_transaction_id}`);
+      console.log(`    plaid_id: ${group.keep.plaid_transaction_id} (${keepLive ? "LIVE" : "DEAD"} in Plaid)`);
       console.log(`    created:  ${group.keep.created_at}`);
       console.log(`    desc:     ${(group.keep.description ?? "").slice(0, 70)}`);
       for (const remove of group.removes) {
+        const removeLive = group.livePlaidIds.includes(remove.plaid_transaction_id);
         console.log(`  REMOVE (newer): ${remove.id}`);
-        console.log(`    plaid_id: ${remove.plaid_transaction_id}`);
+        console.log(`    plaid_id: ${remove.plaid_transaction_id} (${removeLive ? "LIVE" : "DEAD"} in Plaid)`);
         console.log(`    created:  ${remove.created_at}`);
         console.log(`    desc:     ${(remove.description ?? "").slice(0, 70)}`);
         const plLink = group.plLinksByRemoveId.get(remove.id);
