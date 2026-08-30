@@ -25,7 +25,6 @@ import { useBetaMode } from "@/lib/useBetaMode";
 import { isAdminEmail } from "@/lib/admin";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { AlertNotificationProvider } from "@/components/alerts/AlertNotificationProvider";
-import { getOnboardingStatus, ONBOARDING_STATUS_INVALIDATED } from "@/lib/onboarding";
 import { getCachedSessionUser } from "@/lib/session-cache";
 import { SessionProvider, useSession } from "@/lib/session-context";
 
@@ -130,36 +129,22 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const supabase = createClient();
+  const session = useSession();
   const [checked, setChecked] = useState(false);
-  const [recheckKey, setRecheckKey] = useState(0);
   const isExempt = onboardingExemptPaths.includes(pathname) || pathname.startsWith("/auth/callback") || pathname.startsWith("/auth/confirm") || pathname.startsWith("/auth/auth-code-error");
   const isAddingStore = pathname === "/onboarding" && searchParams.get("add") === "true";
+  const sessionReady = session === null || !session.loading;
+  const user = session?.user ?? null;
+  const onboardingComplete = session?.onboarding.complete ?? false;
 
   useEffect(() => {
-    const handleInvalidate = () => setRecheckKey((key) => key + 1);
-    window.addEventListener(ONBOARDING_STATUS_INVALIDATED, handleInvalidate);
-    return () => window.removeEventListener(ONBOARDING_STATUS_INVALIDATED, handleInvalidate);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function checkOnboarding() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (cancelled) return;
+    function checkOnboarding() {
+      if (!sessionReady) return;
 
       if (!user) {
         setChecked(true);
         return;
       }
-
-      const { complete: onboardingComplete } = await getOnboardingStatus(supabase, user.id);
-
-      if (cancelled) return;
 
       // Complete includes: onboarding_completed, onboarding_path='join' (no store required),
       // or legacy users with owned stores.
@@ -180,14 +165,10 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
       setChecked(true);
     }
 
-    void checkOnboarding();
+    checkOnboarding();
+  }, [sessionReady, user, onboardingComplete, pathname, isExempt, isAddingStore, router]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname, isExempt, isAddingStore, router, supabase, recheckKey]);
-
-  if (!checked && !isExempt) {
+  if ((!sessionReady || !checked) && !isExempt) {
     return (
       <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center">
         <div className="text-[13px] text-[var(--text-muted)]">Loading...</div>
