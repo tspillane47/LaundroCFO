@@ -6,21 +6,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccessStatus } from "@/lib/access";
 import type { OnboardingStatus } from "@/lib/onboarding";
 
-const { getUserMock, getOnboardingStatusMock, getAccessStatusMock, getUserStoreCountMock } =
-  vi.hoisted(() => ({
-    getUserMock: vi.fn(),
-    getOnboardingStatusMock: vi.fn(),
-    getAccessStatusMock: vi.fn(),
-    getUserStoreCountMock: vi.fn(),
-  }));
+const {
+  getUserMock,
+  getOnboardingStatusMock,
+  getAccessStatusMock,
+  getUserStoreCountMock,
+  authStateListeners,
+} = vi.hoisted(() => ({
+  getUserMock: vi.fn(),
+  getOnboardingStatusMock: vi.fn(),
+  getAccessStatusMock: vi.fn(),
+  getUserStoreCountMock: vi.fn(),
+  authStateListeners: [] as Array<(event: string) => void>,
+}));
 
 vi.mock("@/lib/supabase", () => ({
   createClient: () => ({
     auth: {
       getUser: getUserMock,
-      onAuthStateChange: () => ({
-        data: { subscription: { unsubscribe: () => {} } },
-      }),
+      onAuthStateChange: (cb: (event: string) => void) => {
+        authStateListeners.push(cb);
+        return {
+          data: { subscription: { unsubscribe: () => {} } },
+        };
+      },
     },
   }),
 }));
@@ -145,6 +154,7 @@ beforeEach(() => {
   getOnboardingStatusMock.mockReset();
   getAccessStatusMock.mockReset();
   getUserStoreCountMock.mockReset();
+  authStateListeners.length = 0;
   mockSignedInUser();
   getOnboardingStatusMock.mockResolvedValue(INCOMPLETE);
   getAccessStatusMock.mockResolvedValue(NO_SUBSCRIPTION);
@@ -280,5 +290,56 @@ describe("useOnboardingStatus", () => {
     expect(latest?.second.isJoining).toBe(true);
     expect(getUserMock).toHaveBeenCalledTimes(1);
     expect(getOnboardingStatusMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("sets loading=true after invalidate so stale complete:false is not treated as settled", async () => {
+    getOnboardingStatusMock.mockResolvedValue(INCOMPLETE);
+
+    let latest: OnboardingHookValue | undefined;
+    mount(<OnboardingProbe onRender={(value) => { latest = value; }} />);
+
+    await waitFor(() => {
+      expect(latest?.loading).toBe(false);
+      expect(latest?.status).toEqual(INCOMPLETE);
+    });
+
+    let releaseRefetch: ((status: OnboardingStatus) => void) | undefined;
+    getOnboardingStatusMock.mockImplementationOnce(
+      () =>
+        new Promise<OnboardingStatus>((resolve) => {
+          releaseRefetch = resolve;
+        })
+    );
+
+    await act(async () => {
+      invalidateOnboardingStatusCache();
+    });
+
+    expect(latest?.loading).toBe(true);
+    expect(latest?.status).toEqual(INCOMPLETE);
+
+    await act(async () => {
+      releaseRefetch?.(JOIN_COMPLETE);
+    });
+
+    await waitFor(() => {
+      expect(latest?.status).toEqual(JOIN_COMPLETE);
+      expect(latest?.isJoining).toBe(true);
+      expect(latest?.loading).toBe(false);
+    });
+  });
+
+  it("does not subscribe to onAuthStateChange", async () => {
+    getOnboardingStatusMock.mockResolvedValue(JOIN_COMPLETE);
+
+    let latest: OnboardingHookValue | undefined;
+    mount(<OnboardingProbe onRender={(value) => { latest = value; }} />);
+
+    await waitFor(() => {
+      expect(latest?.loading).toBe(false);
+      expect(latest?.isJoining).toBe(true);
+    });
+
+    expect(authStateListeners).toHaveLength(0);
   });
 });

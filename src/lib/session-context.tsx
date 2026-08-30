@@ -16,16 +16,13 @@ import {
   getCachedAccess,
   getCachedOnboarding,
   getCachedSessionUser,
-  invalidateAccessStatusCache,
   invalidateCachedOnboarding,
-  invalidateSessionUser,
   peekFreshAccessCache,
   peekFreshOnboarding,
   peekSessionUser,
   subscribeAccessStatusInvalidation,
   type SessionUser,
 } from "@/lib/session-cache";
-import { createClient } from "@/lib/supabase";
 
 export type SessionValue = {
   user: SessionUser | null;
@@ -111,9 +108,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     void load();
 
+    const beginOnboardingRefetch = () => {
+      setSession((prev) => ({ ...prev, loading: true }));
+      void load();
+    };
+
     const handleOnboardingInvalidate = () => {
       invalidateCachedOnboarding();
-      void load();
+      beginOnboardingRefetch();
     };
     window.addEventListener(ONBOARDING_STATUS_INVALIDATED, handleOnboardingInvalidate);
 
@@ -121,21 +123,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       void load();
     });
 
-    const supabase = createClient();
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT") return;
-      invalidateSessionUser();
-      invalidateCachedOnboarding();
-      invalidateAccessStatusCache();
-    });
-
     return () => {
       cancelled = true;
       window.removeEventListener(ONBOARDING_STATUS_INVALIDATED, handleOnboardingInvalidate);
       unsubscribeAccess();
-      subscription.unsubscribe();
     };
   }, []);
 

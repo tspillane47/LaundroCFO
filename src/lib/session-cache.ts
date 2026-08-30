@@ -122,6 +122,8 @@ export function invalidateSessionUser() {
   userRecord = null;
 }
 
+let onboardingCacheGeneration = 0;
+
 export async function getCachedOnboarding(userId: string): Promise<OnboardingStatus> {
   const now = Date.now();
   const existing = onboardingRecords.get(userId);
@@ -131,6 +133,7 @@ export async function getCachedOnboarding(userId: string): Promise<OnboardingSta
     if (isFresh(existing.fetchedAt, now)) return existing.status;
   }
 
+  const generation = onboardingCacheGeneration;
   const promise = fetchOnboardingFromDb(userId);
   onboardingRecords.set(userId, {
     userId,
@@ -141,6 +144,9 @@ export async function getCachedOnboarding(userId: string): Promise<OnboardingSta
 
   try {
     const status = await promise;
+    if (generation !== onboardingCacheGeneration) {
+      return status;
+    }
     onboardingRecords.set(userId, {
       userId,
       status,
@@ -148,7 +154,9 @@ export async function getCachedOnboarding(userId: string): Promise<OnboardingSta
     });
     return status;
   } catch (error) {
-    onboardingRecords.delete(userId);
+    if (generation === onboardingCacheGeneration) {
+      onboardingRecords.delete(userId);
+    }
     throw error;
   }
 }
@@ -160,6 +168,7 @@ export function peekFreshOnboarding(userId: string): OnboardingRecord | null {
 }
 
 export function invalidateCachedOnboarding() {
+  onboardingCacheGeneration += 1;
   onboardingRecords.clear();
 }
 
