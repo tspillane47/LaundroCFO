@@ -157,7 +157,7 @@ describe("OnboardingGuard source lock in layout.tsx", () => {
 
   it("still redirects complete users on /onboarding only when not adding a store", () => {
     expect(layoutSource).toContain("if (pathname === \"/onboarding\" && !isAddingStore)");
-    expect(layoutSource).toContain('router.replace("/portfolio")');
+    expect(layoutSource).toContain('replaceFullDocument("/portfolio")');
   });
 
   it("still redirects incomplete users off non-exempt paths to /onboarding", () => {
@@ -172,5 +172,38 @@ describe("OnboardingGuard source lock in layout.tsx", () => {
   it("still lists /onboarding among exempt paths", () => {
     expect(layoutSource).toContain('"/onboarding"');
     expect(layoutSource).toContain("onboardingExemptPaths.includes(pathname)");
+  });
+});
+
+describe("Next.js prefetch/middleware redirect cache guards", () => {
+  const logoSource = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "../components/ui/Logo.tsx"),
+    "utf8"
+  );
+  const middlewareSource = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "../middleware.ts"),
+    "utf8"
+  );
+  const onboardingSource = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "../app/onboarding/page.tsx"),
+    "utf8"
+  );
+
+  it("Logo does not prefetch /portfolio (onboarding header would cache a stale middleware redirect)", () => {
+    expect(logoSource).toContain('href="/portfolio"');
+    expect(logoSource).toContain("prefetch={false}");
+  });
+
+  it("middleware opts auth redirects out of the Next.js prefetch cache", () => {
+    expect(middlewareSource).toContain("x-middleware-cache");
+    expect(middlewareSource).toContain("no-cache");
+    expect(middlewareSource).toContain("function redirectNoCache");
+  });
+
+  it("onboarding completion navigates with a full document replace, not router.replace", () => {
+    expect(onboardingSource).toContain("replaceFullDocument(destination)");
+    expect(onboardingSource).toContain('replaceFullDocument("/portfolio")');
+    expect(onboardingSource).not.toContain('router.replace("/portfolio")');
+    expect(onboardingSource).not.toContain("router.replace(destination)");
   });
 });

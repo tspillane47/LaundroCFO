@@ -31,6 +31,7 @@ import {
   type OnboardingPath,
 } from "@/lib/onboarding";
 import { CopyableEmail } from "@/components/onboarding/CopyableEmail";
+import { replaceFullDocument } from "@/lib/navigate-after-auth-change";
 
 const TOTAL_STEPS = 4;
 const ONBOARDING_NAV_TIMEOUT_MS = 5000;
@@ -385,7 +386,7 @@ function OnboardingContent() {
       if (cancelled) return;
 
       if (completed && !isAddingStore) {
-        router.replace("/portfolio");
+        replaceFullDocument("/portfolio");
         return;
       }
 
@@ -464,7 +465,7 @@ function OnboardingContent() {
           }
         }
 
-        router.replace(destination);
+        replaceFullDocument(destination);
         clearCompletingTimeout();
         setCompleting(false);
       } catch (error) {
@@ -1010,7 +1011,11 @@ function OnboardingContent() {
                       View plans →
                     </Link>
                     {isAddingStore ? (
-                      <Link href="/portfolio" className="btn-outline px-6 py-2.5 text-[13px]">
+                      <Link
+                        href="/portfolio"
+                        prefetch={false}
+                        className="btn-outline px-6 py-2.5 text-[13px]"
+                      >
                         Back to Portfolio
                       </Link>
                     ) : null}

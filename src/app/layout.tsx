@@ -27,6 +27,7 @@ import { ToastProvider } from "@/components/ui/ToastProvider";
 import { AlertNotificationProvider } from "@/components/alerts/AlertNotificationProvider";
 import { getCachedSessionUser, invalidateSessionUser } from "@/lib/session-cache";
 import { SessionProvider, useSession } from "@/lib/session-context";
+import { replaceFullDocument } from "@/lib/navigate-after-auth-change";
 
 function getUserInitials(fullName: string | null, email: string | null): string {
   const name = fullName?.trim();
@@ -150,7 +151,7 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
       // or legacy users with owned stores.
       if (onboardingComplete) {
         if (pathname === "/onboarding" && !isAddingStore) {
-          router.replace("/portfolio");
+          replaceFullDocument("/portfolio");
           return;
         }
         setChecked(true);

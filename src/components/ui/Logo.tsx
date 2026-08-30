@@ -63,7 +63,11 @@ export function Logo({ variant = "marketing", iconSize, className }: LogoProps) 
 
   if (isSidebar) {
     return (
-      <Link href="/portfolio" className="inline-block hover:opacity-90 transition-opacity">
+      <Link
+        href="/portfolio"
+        prefetch={false}
+        className="inline-block hover:opacity-90 transition-opacity"
+      >
         {content}
       </Link>
     );

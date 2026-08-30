@@ -61,6 +61,13 @@ function isProtectedRoute(pathname: string): boolean {
   )
 }
 
+/** Auth redirects must not be stored in the Next.js prefetch/router cache. */
+function redirectNoCache(url: URL) {
+  const response = NextResponse.redirect(url)
+  response.headers.set('x-middleware-cache', 'no-cache')
+  return response
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -73,12 +80,12 @@ export async function middleware(request: NextRequest) {
     if (tokenHash && type) {
       const url = request.nextUrl.clone()
       url.pathname = '/auth/confirm'
-      return NextResponse.redirect(url)
+      return redirectNoCache(url)
     }
     if (code) {
       const url = request.nextUrl.clone()
       url.pathname = '/auth/callback'
-      return NextResponse.redirect(url)
+      return redirectNoCache(url)
     }
   }
 
@@ -105,7 +112,7 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user && isProtectedRoute(pathname)) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    return redirectNoCache(new URL('/login', request.url))
   }
 
   if (user) {
@@ -115,18 +122,18 @@ export async function middleware(request: NextRequest) {
       pathname === '/onboarding' && request.nextUrl.searchParams.get('add') === 'true'
 
     if (onboardingCompleted && pathname === '/onboarding' && !isAddingStore) {
-      return NextResponse.redirect(new URL('/portfolio', request.url))
+      return redirectNoCache(new URL('/portfolio', request.url))
     }
 
     if (
       !onboardingCompleted &&
       !isOnboardingRedirectExempt(pathname)
     ) {
-      return NextResponse.redirect(new URL('/onboarding', request.url))
+      return redirectNoCache(new URL('/onboarding', request.url))
     }
 
     if (pathname === '/login' || pathname === '/signup') {
-      return NextResponse.redirect(
+      return redirectNoCache(
         new URL(onboardingCompleted ? '/portfolio' : '/onboarding', request.url)
       )
     }
