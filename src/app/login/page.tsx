@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 import { isOnboardingComplete } from "@/lib/onboarding";
+import { invalidateSessionUser } from "@/lib/session-cache";
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -36,6 +37,7 @@ function LoginForm() {
     }
 
     const completed = await isOnboardingComplete(supabase, userId);
+    invalidateSessionUser();
     router.push(completed ? "/portfolio" : "/onboarding");
     setLoading(false);
   }

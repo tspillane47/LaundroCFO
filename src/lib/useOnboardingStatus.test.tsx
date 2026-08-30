@@ -342,4 +342,35 @@ describe("useOnboardingStatus", () => {
 
     expect(authStateListeners).toHaveLength(0);
   });
+
+  it("recovers isJoining after a transient null user when invalidateSessionUser runs", async () => {
+    getUserMock.mockResolvedValue({ data: { user: null } });
+    getOnboardingStatusMock.mockResolvedValue(JOIN_COMPLETE);
+
+    let latest: OnboardingHookValue | undefined;
+    mount(<OnboardingProbe onRender={(value) => { latest = value; }} />);
+
+    await waitFor(() => {
+      expect(latest?.loading).toBe(false);
+      expect(latest?.isJoining).toBe(false);
+      expect(latest?.userEmail).toBeNull();
+    });
+    expect(getOnboardingStatusMock).not.toHaveBeenCalled();
+
+    getUserMock.mockResolvedValue({ data: { user: { id: USER_ID, email: JOINER_EMAIL } } });
+
+    await act(async () => {
+      invalidateSessionUser();
+    });
+
+    await waitFor(() => {
+      expect(latest?.loading).toBe(false);
+      expect(latest?.isJoining).toBe(true);
+      expect(latest?.status).toEqual(JOIN_COMPLETE);
+      expect(latest?.userEmail).toBe(JOINER_EMAIL);
+    });
+    expect(getOnboardingStatusMock).toHaveBeenCalledTimes(1);
+    expect(getOnboardingStatusMock.mock.calls[0][1]).toBe(USER_ID);
+    expect(authStateListeners).toHaveLength(0);
+  });
 });

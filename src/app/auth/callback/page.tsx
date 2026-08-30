@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { isOnboardingComplete } from "@/lib/onboarding";
+import { invalidateSessionUser } from "@/lib/session-cache";
 import {
   isEmailChangeType,
   resolvePostAuthDestination,
@@ -50,6 +51,8 @@ function AuthCallbackContent() {
         );
         return;
       }
+
+      invalidateSessionUser();
 
       const destination = await resolvePostAuthDestination({
         nextParam,

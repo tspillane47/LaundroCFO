@@ -21,6 +21,7 @@ import {
   peekFreshOnboarding,
   peekSessionUser,
   subscribeAccessStatusInvalidation,
+  subscribeSessionUserInvalidation,
   type SessionUser,
 } from "@/lib/session-cache";
 
@@ -123,10 +124,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       void load();
     });
 
+    const unsubscribeUser = subscribeSessionUserInvalidation(() => {
+      setSession((prev) => ({ ...prev, loading: true }));
+      void load();
+    });
+
     return () => {
       cancelled = true;
       window.removeEventListener(ONBOARDING_STATUS_INVALIDATED, handleOnboardingInvalidate);
       unsubscribeAccess();
+      unsubscribeUser();
     };
   }, []);
 

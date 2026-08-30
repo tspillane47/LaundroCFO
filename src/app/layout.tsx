@@ -25,7 +25,7 @@ import { useBetaMode } from "@/lib/useBetaMode";
 import { isAdminEmail } from "@/lib/admin";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { AlertNotificationProvider } from "@/components/alerts/AlertNotificationProvider";
-import { getCachedSessionUser } from "@/lib/session-cache";
+import { getCachedSessionUser, invalidateSessionUser } from "@/lib/session-cache";
 import { SessionProvider, useSession } from "@/lib/session-context";
 
 function getUserInitials(fullName: string | null, email: string | null): string {
@@ -400,6 +400,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   async function handleSignOut() {
     await supabase.auth.signOut();
+    invalidateSessionUser();
     router.push("/login");
   }
 

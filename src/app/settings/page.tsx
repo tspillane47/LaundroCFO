@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { invalidateSessionUser } from "@/lib/session-cache";
 import { useStores } from "@/lib/store-context";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
@@ -247,6 +248,7 @@ export default function SettingsPage() {
 
   async function handleSignOut() {
     await supabase.auth.signOut();
+    invalidateSessionUser();
     router.push("/login");
   }
 

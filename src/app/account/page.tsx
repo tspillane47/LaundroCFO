@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { invalidateSessionUser } from "@/lib/session-cache";
 import { INPUT_CLASS, formatDate } from "@/components/occupancy/shared";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
@@ -399,6 +400,7 @@ export default function AccountPage() {
 
       toast.success("Your account has been permanently deleted");
       await supabase.auth.signOut();
+      invalidateSessionUser();
       router.push("/login");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete account");

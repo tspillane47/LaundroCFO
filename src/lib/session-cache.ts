@@ -59,6 +59,8 @@ type OnboardingRecord = {
 };
 
 let userRecord: UserRecord | null = null;
+let userCacheGeneration = 0;
+const userInvalidationListeners = new Set<() => void>();
 const onboardingRecords = new Map<string, OnboardingRecord>();
 const accessRecords = new Map<string, AccessRecord>();
 const accessInvalidationListeners = new Set<() => void>();
@@ -98,28 +100,49 @@ async function fetchAccessFromDb(
 
 export async function getCachedSessionUser(): Promise<SessionUser | null> {
   if (userRecord?.promise) return userRecord.promise;
-  if (userRecord) return userRecord.user;
+  if (userRecord?.user) return userRecord.user;
 
+  const generation = userCacheGeneration;
   const promise = fetchSessionUser();
   userRecord = { user: null, fetchedAt: Date.now(), promise };
 
   try {
     const user = await promise;
+    if (generation !== userCacheGeneration) {
+      return user;
+    }
+    if (!user) {
+      userRecord = null;
+      return null;
+    }
     userRecord = { user, fetchedAt: Date.now() };
     return user;
   } catch (error) {
-    userRecord = null;
+    if (generation === userCacheGeneration) {
+      userRecord = null;
+    }
     throw error;
   }
 }
 
 export function peekSessionUser(): SessionUser | null | undefined {
-  if (!userRecord || userRecord.promise) return undefined;
+  if (!userRecord || userRecord.promise || !userRecord.user) return undefined;
   return userRecord.user;
 }
 
+export function subscribeSessionUserInvalidation(listener: () => void) {
+  userInvalidationListeners.add(listener);
+  return () => {
+    userInvalidationListeners.delete(listener);
+  };
+}
+
 export function invalidateSessionUser() {
+  userCacheGeneration += 1;
   userRecord = null;
+  for (const listener of Array.from(userInvalidationListeners)) {
+    listener();
+  }
 }
 
 let onboardingCacheGeneration = 0;

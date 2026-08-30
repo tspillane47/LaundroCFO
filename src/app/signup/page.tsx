@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { invalidateSessionUser } from "@/lib/session-cache";
 import Link from "next/link";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 
@@ -32,6 +33,9 @@ export default function SignupPage() {
     if (error) {
       setError(error.message);
     } else {
+      if (data.session) {
+        invalidateSessionUser();
+      }
       if (data.user?.id) {
         await supabase.from("profiles").upsert({
           id: data.user.id,
