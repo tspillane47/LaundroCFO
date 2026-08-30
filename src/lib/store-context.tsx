@@ -1,5 +1,7 @@
 "use client";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { getCachedSessionUser } from "@/lib/session-cache";
+import { useSession } from "@/lib/session-context";
 import { createClient } from "@/lib/supabase";
 import { fetchAccessibleStores } from "@/lib/store-access";
 
@@ -48,14 +50,20 @@ const StoreContext = createContext<StoreContextType>({
 });
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const session = useSession();
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
   const [stores, setStores] = useState<any[]>([]);
   const [selectedStore, setSelectedStore] = useState<any | null>(null);
   const [isAllStores, setIsAllStores] = useState(true);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+  const awaitingSessionUser = Boolean(session && session.loading && !session.user);
 
   async function loadStores() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = sessionRef.current
+      ? sessionRef.current.user
+      : await getCachedSessionUser();
     if (!user) {
       setLoading(false);
       return;
@@ -87,7 +95,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }
 
-  useEffect(() => { loadStores(); }, []);
+  useEffect(() => {
+    if (awaitingSessionUser) return;
+    void loadStores();
+  }, [awaitingSessionUser, session?.user?.id]);
 
   useEffect(() => {
     // Skip until loadStores finishes — initial isAllStores=true would wipe sessionStorage

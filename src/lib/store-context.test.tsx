@@ -4,8 +4,18 @@ import React, { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getUserMock, fetchAccessibleStoresMock, fromMock } = vi.hoisted(() => ({
+const {
+  getUserMock,
+  getOnboardingStatusMock,
+  getAccessStatusMock,
+  getUserStoreCountMock,
+  fetchAccessibleStoresMock,
+  fromMock,
+} = vi.hoisted(() => ({
   getUserMock: vi.fn(),
+  getOnboardingStatusMock: vi.fn(),
+  getAccessStatusMock: vi.fn(),
+  getUserStoreCountMock: vi.fn(),
   fetchAccessibleStoresMock: vi.fn(),
   fromMock: vi.fn(),
 }));
@@ -17,10 +27,36 @@ vi.mock("@/lib/supabase", () => ({
   }),
 }));
 
+vi.mock("@/lib/onboarding", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/onboarding")>();
+  return {
+    ...actual,
+    getOnboardingStatus: (...args: Parameters<typeof actual.getOnboardingStatus>) =>
+      getOnboardingStatusMock(...args),
+  };
+});
+
+vi.mock("@/lib/access", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/access")>();
+  return {
+    ...actual,
+    getAccessStatus: (...args: Parameters<typeof actual.getAccessStatus>) =>
+      getAccessStatusMock(...args),
+    getUserStoreCount: (...args: Parameters<typeof actual.getUserStoreCount>) =>
+      getUserStoreCountMock(...args),
+  };
+});
+
 vi.mock("@/lib/store-access", () => ({
   fetchAccessibleStores: (...args: unknown[]) => fetchAccessibleStoresMock(...args),
 }));
 
+import {
+  invalidateAccessStatusCache,
+  invalidateCachedOnboarding,
+  invalidateSessionUser,
+} from "@/lib/session-cache";
+import { SessionProvider } from "@/lib/session-context";
 import { StoreProvider, useStores } from "@/lib/store-context";
 
 const USER_ID = "user-123";
@@ -43,7 +79,7 @@ function mount(node: ReactElement) {
   document.body.appendChild(container);
   const root = createRoot(container);
   act(() => {
-    root.render(node);
+    root.render(<SessionProvider>{node}</SessionProvider>);
   });
   mounted = { root, container };
   return mounted;
@@ -81,7 +117,13 @@ function mockSignedInUser() {
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  invalidateAccessStatusCache();
+  invalidateCachedOnboarding();
+  invalidateSessionUser();
   getUserMock.mockReset();
+  getOnboardingStatusMock.mockReset();
+  getAccessStatusMock.mockReset();
+  getUserStoreCountMock.mockReset();
   fetchAccessibleStoresMock.mockReset();
   fromMock.mockReset();
   fromMock.mockImplementation(() => {
@@ -89,6 +131,16 @@ beforeEach(() => {
   });
   sessionStorage.clear();
   mockSignedInUser();
+  getOnboardingStatusMock.mockResolvedValue({ complete: false, path: null });
+  getAccessStatusMock.mockResolvedValue({
+    plan: null,
+    isReadOnly: true,
+    reason: "no_subscription",
+    trialEndsAt: null,
+    currentPeriodEnd: null,
+    maxStores: 0,
+  });
+  getUserStoreCountMock.mockResolvedValue(0);
   fetchAccessibleStoresMock.mockResolvedValue({ data: [] });
 });
 
@@ -96,6 +148,9 @@ afterEach(() => {
   unmountMounted();
   sessionStorage.clear();
   vi.restoreAllMocks();
+  invalidateAccessStatusCache();
+  invalidateCachedOnboarding();
+  invalidateSessionUser();
 });
 
 describe("StoreProvider", () => {
