@@ -9,6 +9,7 @@ import {
 } from "@/lib/equipment";
 import {
   calcYearsRemaining,
+  canShowStoreValuation,
   getStoreValuation,
   getStoreBusinessDebt,
 } from "@/lib/getStoreValuation";
@@ -138,7 +139,20 @@ export async function getPortfolioReport(
 
   const storeDetails = await Promise.all(
     stores.map(async (store) => {
-      const valuation = await getStoreValuation(store.id);
+      const rawValuation = await getStoreValuation(store.id);
+      const showValuation = canShowStoreValuation(
+        rawValuation.resolvedFinancials,
+        store,
+        rawValuation.context.realEstate
+      );
+      const valuation = showValuation
+        ? rawValuation
+        : {
+            ...rawValuation,
+            businessValue: 0,
+            combinedValue: 0,
+            realEstateValue: 0,
+          };
       const debt = await getStoreBusinessDebt(store.id);
       const cash =
         (store.operating_account_balance ?? 0) +

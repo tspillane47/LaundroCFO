@@ -25,7 +25,8 @@ import {
   type PortfolioCashPositionSummary,
 } from "@/lib/cashPosition";
 import { formatDscrDisplay } from "@/lib/financials";
-import { getStoreValuation, getStoreBusinessDebt, getStoreBuildingMortgage, type StoreValuationResult } from "@/lib/getStoreValuation";
+import { canShowStoreValuation, getStoreValuation, getStoreBusinessDebt, getStoreBuildingMortgage, type StoreValuationResult } from "@/lib/getStoreValuation";
+import { MissingMarketRentPrompt } from "@/components/valuation/MissingMarketRentPrompt";
 import clsx from "clsx";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeed } from "@/components/ui/IntelligenceFeed";
@@ -357,7 +358,12 @@ export default function PortfolioPage() {
         : 0;
       const debtService = hasFinancialData ? (scheduledDebtServiceByStore[store.id] ?? 0) : 0;
       const dscr = computePortfolioStoreDscr(storeTtm, debtService);
-      const estimatedValue = hasFinancialData ? (storeValuation?.businessValue ?? 0) : 0;
+      const canShowValuation = canShowStoreValuation(
+        storeValuation?.resolvedFinancials,
+        store,
+        storeValuation?.context.realEstate
+      );
+      const estimatedValue = canShowValuation ? (storeValuation?.businessValue ?? 0) : 0;
       const loanBalance = store.loan_balance ?? 0;
       const hasPlaidConnection = plaidConnectedStoreIdSet.has(store.id);
       const plaidSnapshot = portfolioPlaidData.snapshotsByStoreId[store.id];
@@ -400,6 +406,9 @@ export default function PortfolioPage() {
         debtService,
         hasDscrWarning: hasFinancialData && shouldTriggerLowDscrAlert(dscr, debtService),
         hasFinancialData,
+        canShowValuation,
+        missingMarketRent:
+          store.occupancy_type === "owner_occupied" && hasFinancialData && !canShowValuation,
         ttmMonthsUsed,
       };
     });
@@ -472,12 +481,14 @@ export default function PortfolioPage() {
         ttmRevenue: storeTtm?.ttmRevenue,
         ttmUtilities: storeTtm?.ttmUtilities,
         isOwnerOccupied: store.occupancy_type === "owner_occupied",
-        valuation: valuation
-          ? {
-              businessValue: valuation.businessValue,
-              finalMultiple: valuation.finalMultiple,
-            }
-          : null,
+        valuation:
+          valuation &&
+          canShowStoreValuation(valuation.resolvedFinancials, store, valuation.context.realEstate)
+            ? {
+                businessValue: valuation.businessValue,
+                finalMultiple: valuation.finalMultiple,
+              }
+            : null,
         uncategorizedTransactionCount: uncategorizedCountsByStore[store.id] ?? 0,
       });
     });
@@ -944,7 +955,7 @@ export default function PortfolioPage() {
                 {[
                   {
                     label: "Value",
-                    value: m.hasFinancialData ? fmtDollar(m.estimatedValue) : "—",
+                    value: m.canShowValuation ? fmtDollar(m.estimatedValue) : "—",
                   },
                   {
                     label: "Revenue",
@@ -981,6 +992,7 @@ export default function PortfolioPage() {
                 ))}
               </div>
               <FinancialDataConfidenceNote monthsUsed={m.ttmMonthsUsed} variant="compact" />
+              {m.missingMarketRent && <MissingMarketRentPrompt variant="inline" className="mt-2" />}
 
               <div className="text-[11px] mb-4 space-y-1" style={{ color: "var(--text-muted)" }}>
                 <div className="flex flex-wrap items-center gap-2">

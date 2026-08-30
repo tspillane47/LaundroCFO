@@ -15,8 +15,8 @@ import {
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { useAlertEvaluation } from "@/components/alerts/AlertNotificationProvider";
-import { getStoreValuation } from "@/lib/getStoreValuation";
-import type { ValuationResult } from "@/lib/valuation";
+import { canShowStoreValuation, getStoreValuation, type StoreValuationResult } from "@/lib/getStoreValuation";
+import { MissingMarketRentPrompt } from "@/components/valuation/MissingMarketRentPrompt";
 import {
   calcEstimatedBalance,
   calcRemainingMonths,
@@ -303,7 +303,7 @@ export default function DebtPage() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [userId, setUserId] = useState<string | null>(null);
   const [loans, setLoans] = useState<StoreLoan[]>([]);
-  const [valuation, setValuation] = useState<(ValuationResult & { store: Record<string, unknown> }) | null>(null);
+  const [valuation, setValuation] = useState<StoreValuationResult | null>(null);
   const [showForm, setShowForm] = useState(false);
   const formRef = useFormReveal(showForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -433,7 +433,13 @@ export default function DebtPage() {
             )
         : null;
 
-    const storeValue = valuation?.businessValue ?? 0;
+    const storeValue = canShowStoreValuation(
+      valuation?.resolvedFinancials,
+      valuation?.store,
+      valuation?.context.realEstate
+    )
+      ? (valuation?.businessValue ?? 0)
+      : 0;
     const storeEquity = storeValue - totalDebt;
 
     return {
@@ -682,11 +688,16 @@ export default function DebtPage() {
   if (loans.length === 0 && !showForm) {
     const isOwnerOccupied = valuation?.store?.occupancy_type === "owner_occupied";
     const hasFinancialData = ttm.monthsUsed > 0;
+    const showValuation = canShowStoreValuation(
+      valuation?.resolvedFinancials,
+      valuation?.store,
+      valuation?.context.realEstate
+    );
     const calculatorProps = {
       storeId: selectedStore.id,
       annualEbitda,
-      businessValue: valuation?.businessValue ?? 0,
-      realEstateValue: valuation?.realEstateValue ?? 0,
+      businessValue: showValuation ? (valuation?.businessValue ?? 0) : 0,
+      realEstateValue: showValuation ? (valuation?.realEstateValue ?? 0) : 0,
       isOwnerOccupied,
       existingAnnualDebtService: 0,
       hasFinancialData,
@@ -710,6 +721,9 @@ export default function DebtPage() {
           </ReadOnlyGuard>
         </div>
 
+        {isOwnerOccupied && !showValuation && hasFinancialData && (
+          <MissingMarketRentPrompt />
+        )}
         <LoanCalculatorMobileShell {...calculatorProps} />
 
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-5 xl:gap-6 items-start">
@@ -731,11 +745,16 @@ export default function DebtPage() {
     );
   }
 
+  const showValuation = canShowStoreValuation(
+    valuation?.resolvedFinancials,
+    valuation?.store,
+    valuation?.context.realEstate
+  );
   const calculatorProps = {
     storeId: selectedStore.id,
     annualEbitda,
-    businessValue: valuation?.businessValue ?? 0,
-    realEstateValue: valuation?.realEstateValue ?? 0,
+    businessValue: showValuation ? (valuation?.businessValue ?? 0) : 0,
+    realEstateValue: showValuation ? (valuation?.realEstateValue ?? 0) : 0,
     isOwnerOccupied: valuation?.store?.occupancy_type === "owner_occupied",
     existingAnnualDebtService: debtServiceAnalysis.scheduledAnnual,
     hasFinancialData: debtServiceAnalysis.hasActualData,
@@ -743,6 +762,9 @@ export default function DebtPage() {
 
   return (
     <div className="space-y-5">
+      {calculatorProps.isOwnerOccupied && !showValuation && calculatorProps.hasFinancialData && (
+        <MissingMarketRentPrompt />
+      )}
       <div>
         <h1 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>
           Debt Management

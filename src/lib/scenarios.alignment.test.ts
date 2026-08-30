@@ -93,4 +93,60 @@ describe("scenarios alignment with valuation and dashboard", () => {
     const dscrFeed = feed.find((item) => item.id === "dscr-test-store");
     expect(dscrFeed?.headline).toBe(`DSCR: ${dashboardDscr!.toFixed(2)}x`);
   });
+
+  it("applies owner-occupied market rent after scenario ebitda overrides", () => {
+    const store = {
+      occupancy_type: "owner_occupied",
+      square_footage: 1500,
+      store_condition: "good",
+      market_density: "rural",
+      revenue_trend: "stable",
+      competition_level: "protected",
+    };
+    const resolvedFinancials = resolveStoreFinancials(store, {
+      ttmRevenue: 159_845.55,
+      ttmEbitda: 68_079,
+      monthsUsed: 12,
+      ttmRent: 0,
+    });
+    const scenarioCtx = {
+      store,
+      equipment: [],
+      totalLeaseControl: 15,
+      leaseYearsRemaining: 15,
+      availableOptionYears: 0,
+      isOwnerOccupied: true,
+      realEstateValue: 370_000,
+      marketRentEstimate: 1500,
+      resolvedFinancials,
+      annualDebtService: 0,
+    };
+    const valuationCtx = {
+      store,
+      equipment: [] as [],
+      lease: null,
+      leaseOptions: [],
+      realEstate: { estimated_value: 370_000, market_rent_estimate: 1500 },
+      resolvedFinancials,
+    };
+
+    const valuationPage = computeStoreValuation(valuationCtx);
+    const params = buildDefaultScenarioInputs(scenarioCtx);
+    const scenarios = computeAllInteractiveScenarios(scenarioCtx, params);
+    const baseline = scenarios.find((s) => s.id === "retool");
+    const utility = scenarios.find((s) => s.id === "utility");
+    const utilityBookEbitda =
+      (resolvedFinancials.monthlyRevenue -
+        (resolvedFinancials.monthlyExpenses - resolvedFinancials.monthlyRevenue * 0.03)) *
+      12;
+    const utilityValuation = computeStoreValuation(valuationCtx, { ebitda: utilityBookEbitda });
+
+    expect(Math.round(valuationPage.businessValue)).toBe(baseline!.currentValue);
+    expect(resolvedFinancials.annualEbitda).toBe(68_079);
+    expect(valuationPage.businessValue).toBeCloseTo(
+      (68_079 - 1500 * 12) * valuationPage.finalMultiple,
+      0
+    );
+    expect(utility!.scenarioValue).toBe(Math.round(utilityValuation.businessValue));
+  });
 });

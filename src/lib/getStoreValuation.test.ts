@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { annualizeTtmTotal } from "@/lib/financials";
 import {
+  applyOwnerOccupiedMarketRentToEbitda,
   buildStoreValuationInputs,
+  canShowStoreValuation,
   computeStoreValuation,
+  hasRequiredOwnerOccupiedMarketRent,
+  resolveOwnerOccupiedMarketRentMonthly,
   resolveStoreFinancials,
   type StoreValuationContext,
 } from "@/lib/getStoreValuation";
@@ -81,5 +85,100 @@ describe("buildStoreValuationInputs store_condition", () => {
     expect(average.adjustments.find((a) => a.label === "Store Condition")?.value).toBe(-0.1);
     expect(fair.finalMultiple).toBe(average.finalMultiple);
     expect(good.finalMultiple).toBeCloseTo(average.finalMultiple + 0.2, 5);
+  });
+});
+
+function ownerOccupiedCtx(
+  realEstate: Record<string, unknown> | null,
+  resolvedOverrides: Partial<StoreValuationContext["resolvedFinancials"]> = {}
+): StoreValuationContext {
+  return {
+    store: {
+      occupancy_type: "owner_occupied",
+      store_condition: "good",
+      square_footage: 1500,
+      market_density: "rural",
+      revenue_trend: "stable",
+      competition_level: "protected",
+    },
+    equipment: [],
+    lease: null,
+    leaseOptions: [],
+    realEstate,
+    resolvedFinancials: {
+      monthlyRevenue: 13320,
+      monthlyExpenses: 7647,
+      monthlyRent: 0,
+      annualEbitda: 68_079,
+      ttmMonthsUsed: 4,
+      source: "ttm",
+      ...resolvedOverrides,
+    },
+  };
+}
+
+describe("owner-occupied market rent imputation", () => {
+  it("treats 0 and missing market_rent_estimate as absent", () => {
+    expect(resolveOwnerOccupiedMarketRentMonthly({ market_rent_estimate: 0 })).toBeNull();
+    expect(resolveOwnerOccupiedMarketRentMonthly({ market_rent_estimate: null })).toBeNull();
+    expect(resolveOwnerOccupiedMarketRentMonthly(null)).toBeNull();
+    expect(hasRequiredOwnerOccupiedMarketRent({ occupancy_type: "owner_occupied" }, { market_rent_estimate: 0 })).toBe(
+      false
+    );
+    expect(hasRequiredOwnerOccupiedMarketRent({ occupancy_type: "leased" }, null)).toBe(true);
+  });
+
+  it("does not show a valuation when owner-occupied rent is missing", () => {
+    const ctx = ownerOccupiedCtx({ estimated_value: 370_000, market_rent_estimate: 0 });
+    expect(canShowStoreValuation(ctx.resolvedFinancials, ctx.store, ctx.realEstate)).toBe(false);
+    expect(buildStoreValuationInputs(ctx).ebitda).toBe(0);
+    expect(buildStoreValuationInputs(ctx).realEstateValue).toBeUndefined();
+  });
+
+  it("deducts market rent from valuation EBITDA without changing book financials", () => {
+    const ctx = ownerOccupiedCtx({ estimated_value: 370_000, market_rent_estimate: 1500 });
+    const inputs = buildStoreValuationInputs(ctx);
+
+    expect(ctx.resolvedFinancials?.annualEbitda).toBe(68_079);
+    expect(inputs.ebitda).toBe(68_079 - 1500 * 12);
+    expect(canShowStoreValuation(ctx.resolvedFinancials, ctx.store, ctx.realEstate)).toBe(true);
+  });
+
+  it("adds back book rent so related-party rent is not stacked on market rent", () => {
+    const ctx = ownerOccupiedCtx(
+      { estimated_value: 370_000, market_rent_estimate: 1500 },
+      { monthlyRent: 3000, annualEbitda: 32_079 }
+    );
+    expect(buildStoreValuationInputs(ctx).ebitda).toBe(32_079 + 3000 * 12 - 1500 * 12);
+  });
+
+  it("applies the adjustment after an ebitda override (history / scenario path)", () => {
+    const ctx = ownerOccupiedCtx({ estimated_value: 370_000, market_rent_estimate: 1500 });
+    const inputs = buildStoreValuationInputs(ctx, { ebitda: 50_000 });
+    expect(inputs.ebitda).toBe(50_000 - 1500 * 12);
+  });
+
+  it("keeps the +0.25x Real Estate Owned bonus unchanged", () => {
+    const ctx = ownerOccupiedCtx({ estimated_value: 370_000, market_rent_estimate: 1500 });
+    const result = computeStoreValuation(ctx);
+    expect(result.adjustments.find((a) => a.label === "Real Estate Owned")?.value).toBe(0.25);
+  });
+
+  it("does not change leased-store EBITDA", () => {
+    const inputs = buildStoreValuationInputs(ttmContext("good"));
+    expect(inputs.ebitda).toBe(7200);
+    expect(inputs.occupancyType).toBe("leased");
+  });
+});
+
+describe("applyOwnerOccupiedMarketRentToEbitda", () => {
+  it("returns the book figure for leased stores", () => {
+    expect(
+      applyOwnerOccupiedMarketRentToEbitda(68_079, {
+        isOwnerOccupied: false,
+        marketRentMonthly: 1500,
+        bookRentMonthly: 0,
+      })
+    ).toBe(68_079);
   });
 });

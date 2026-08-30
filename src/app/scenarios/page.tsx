@@ -11,7 +11,11 @@ import {
   sortRecordsDesc,
   type MonthlyFinancialRecord,
 } from "@/lib/financials";
-import { resolveStoreFinancials } from "@/lib/getStoreValuation";
+import {
+  canShowStoreValuation,
+  resolveOwnerOccupiedMarketRentMonthly,
+  resolveStoreFinancials,
+} from "@/lib/getStoreValuation";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { type EquipmentRecord } from "@/lib/equipment";
@@ -146,22 +150,29 @@ function ScenariosPageContent() {
         sorted.length > 0
           ? applyLoanDebtServiceToTtm(calcTtmMetrics(sorted), scheduledAnnualDebtService)
           : null;
-      const resolvedFinancials = resolveStoreFinancials(storeData, ttmMetrics);
+      const ttmWindow = sorted.slice(0, ttmMetrics?.monthsUsed ?? 0);
+      const ttmRent = ttmWindow.reduce((sum, r) => sum + (r.rent ?? 0), 0);
+      const resolvedFinancials = resolveStoreFinancials(
+        storeData,
+        ttmMetrics ? { ...ttmMetrics, ttmRent } : null
+      );
       const ownerOccupied = storeData.occupancy_type === "owner_occupied";
       let totalLeaseControl = ownerOccupied ? 15 : 0;
       let leaseYearsRemaining = ownerOccupied ? 15 : 0;
       let availableOptionYears = 0;
       let realEstateValue = 0;
+      let marketRentEstimate: number | null = null;
 
       if (ownerOccupied) {
         const { data: reData, error: reError } = await supabase
           .from("real_estate")
-          .select("estimated_value")
+          .select("estimated_value, market_rent_estimate")
           .eq("store_id", storeData.id)
           .limit(1)
           .maybeSingle();
         if (reError) throw reError;
         realEstateValue = reData?.estimated_value ?? 0;
+        marketRentEstimate = resolveOwnerOccupiedMarketRentMonthly(reData);
       } else {
         const { data: leaseData, error: leaseError } = await supabase
           .from("leases")
@@ -195,6 +206,7 @@ function ScenariosPageContent() {
         availableOptionYears,
         isOwnerOccupied: ownerOccupied,
         realEstateValue,
+        marketRentEstimate,
         resolvedFinancials,
         annualDebtService: scheduledAnnualDebtService,
       };
@@ -370,6 +382,28 @@ function ScenariosPageContent() {
     ctx.resolvedFinancials != null &&
     ctx.resolvedFinancials.source !== "none" &&
     ctx.resolvedFinancials.monthlyRevenue > 0;
+  const canShowValuation = canShowStoreValuation(
+    ctx?.resolvedFinancials,
+    ctx?.store,
+    ctx?.isOwnerOccupied
+      ? {
+          estimated_value: ctx.realEstateValue,
+          market_rent_estimate: ctx.marketRentEstimate,
+        }
+      : null
+  );
+
+  if (hasFinancials && ctx && !canShowValuation) {
+    return (
+      <EmptyState
+        icon="LineChart"
+        title="Market rent required"
+        description="Enter an estimated market rent to get an accurate valuation"
+        ctaLabel="Add Market Rent"
+        ctaHref="/lease"
+      />
+    );
+  }
 
   if (!ctx || !liveScenario || !inputParams || !hasFinancials) {
     return (

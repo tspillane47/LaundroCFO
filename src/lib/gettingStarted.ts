@@ -47,10 +47,11 @@ export function isEquipmentComplete(equipmentCount: number): boolean {
 export function isOccupancyComplete(
   occupancyType: OccupancyType,
   hasLease: boolean,
-  hasRealEstate: boolean
+  hasRealEstate: boolean,
+  hasMarketRentEstimate = false
 ): boolean {
   if (occupancyType === "leased") return hasLease;
-  if (occupancyType === "owner_occupied") return hasRealEstate;
+  if (occupancyType === "owner_occupied") return hasRealEstate && hasMarketRentEstimate;
   return false;
 }
 
@@ -108,6 +109,7 @@ export function buildStoreSetupStatus(input: {
   occupancyType: OccupancyType;
   hasLease: boolean;
   hasRealEstate: boolean;
+  hasMarketRentEstimate?: boolean;
   loanCount: number;
   hasQuickBooks: boolean;
   hasPlaid: boolean;
@@ -133,7 +135,12 @@ export function buildStoreSetupStatus(input: {
       label: "Lease & Occupancy",
       description: "Tell us whether you lease or own — it affects your valuation and lending profile.",
       href: "/lease",
-      status: isOccupancyComplete(input.occupancyType, input.hasLease, input.hasRealEstate)
+      status: isOccupancyComplete(
+        input.occupancyType,
+        input.hasLease,
+        input.hasRealEstate,
+        input.hasMarketRentEstimate ?? false
+      )
         ? "complete"
         : "not_started",
     },
@@ -200,7 +207,7 @@ export async function fetchStoreSetupStatus(
       .eq("store_id", storeId),
     supabase.from("stores").select("occupancy_type").eq("id", storeId).maybeSingle(),
     supabase.from("leases").select("id").eq("store_id", storeId).maybeSingle(),
-    supabase.from("real_estate").select("id").eq("store_id", storeId).maybeSingle(),
+    supabase.from("real_estate").select("id, market_rent_estimate").eq("store_id", storeId).maybeSingle(),
     supabase
       .from("store_loans")
       .select("id", { count: "exact", head: true })
@@ -222,6 +229,7 @@ export async function fetchStoreSetupStatus(
     occupancyType: (store?.occupancy_type as OccupancyType) ?? null,
     hasLease: Boolean(lease),
     hasRealEstate: Boolean(realEstate),
+    hasMarketRentEstimate: Number(realEstate?.market_rent_estimate) > 0,
     loanCount: loanCount ?? 0,
     hasQuickBooks: Boolean(quickBooksConnection),
     hasPlaid: (plaidConnectionsData?.length ?? 0) > 0,

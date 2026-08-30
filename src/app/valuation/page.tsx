@@ -6,12 +6,15 @@ import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import {
+  canShowStoreValuation,
   computeStoreValuation,
   getStoreValuation,
   getStoreScheduledDebtService,
   invalidateValuationCache,
+  resolveOwnerOccupiedMarketRentMonthly,
   type StoreValuationContext,
 } from "@/lib/getStoreValuation";
+import { MissingMarketRentPrompt } from "@/components/valuation/MissingMarketRentPrompt";
 import { computeStoreDscr } from "@/lib/dscr";
 import { validateServiceMixSum, validateStoreCondition, normalizeStoreCondition, parseCanonicalStoreCondition, type StoreConditionValue } from "@/lib/formHelpers";
 import type { ValuationResult } from "@/lib/valuation";
@@ -518,11 +521,23 @@ export default function ValuationPage() {
   const leaseValAdj = sumCategoryAdj(valuation, "lease");
 
   const ttmMonthsUsed = valuationContext?.resolvedFinancials?.ttmMonthsUsed ?? 0;
+  const canShowValuation = canShowStoreValuation(
+    valuationContext?.resolvedFinancials,
+    valuationContext?.store ?? store,
+    valuationContext?.realEstate
+  );
+  const missingMarketRent = isOwnerOccupied && !canShowValuation && ttmMonthsUsed > 0;
+  const marketRentMonthly = resolveOwnerOccupiedMarketRentMonthly(valuationContext?.realEstate);
+  const valuationAnnualEbitda =
+    canShowValuation && valuation.finalMultiple > 0
+      ? valuation.businessValue / valuation.finalMultiple
+      : 0;
 
   const ebitdaMargin = useMemo(() => {
     const annualRevenue = monthlyRevenue * 12;
-    return annualRevenue > 0 ? (annualEbitda / annualRevenue) * 100 : 0;
-  }, [annualEbitda, monthlyRevenue]);
+    const ebitdaForMargin = canShowValuation ? valuationAnnualEbitda : annualEbitda;
+    return annualRevenue > 0 ? (ebitdaForMargin / annualRevenue) * 100 : 0;
+  }, [annualEbitda, monthlyRevenue, canShowValuation, valuationAnnualEbitda]);
 
   const equipmentGrade = equipMetrics.grade;
   const dscrNum = computeStoreDscr(annualEbitda, scheduledDebtService);
@@ -549,10 +564,10 @@ export default function ValuationPage() {
     insuranceCount
   );
   const historyData = useMemo(() => {
-    if (!valuationContext || !hasEnoughChartHistory(monthlyFinancials)) return [];
+    if (!valuationContext || !canShowValuation || !hasEnoughChartHistory(monthlyFinancials)) return [];
     const series = buildValuationHistorySeries(valuationContext, monthlyFinancials);
     return filterValuationHistoryByPeriod(series, historyPeriod);
-  }, [valuationContext, monthlyFinancials, historyPeriod]);
+  }, [valuationContext, monthlyFinancials, historyPeriod, canShowValuation]);
 
   async function handleSave() {
     if (!storeId) return;
@@ -673,15 +688,27 @@ export default function ValuationPage() {
           {store?.name ?? storeName ?? "Your Store"} — Estimated Value
         </div>
         <div className="flex items-baseline gap-3 flex-wrap">
-          <AnimatedNumber value={valuation.businessValue} prefix="$" className="hero-value-text" duration={1200} />
-          <ValueChangeIndicator value={valuation.businessValue} />
+          {canShowValuation ? (
+            <>
+              <AnimatedNumber value={valuation.businessValue} prefix="$" className="hero-value-text" duration={1200} />
+              <ValueChangeIndicator value={valuation.businessValue} />
+            </>
+          ) : (
+            <span className="hero-value-text">—</span>
+          )}
         </div>
-        <div className="flex flex-wrap gap-2 mt-3">
-          <span className="inline-flex items-center bg-blue-500/15 text-sky-300 px-3 py-1 rounded-full text-[14px] font-semibold">
-            <AnimatedNumber value={valuation.finalMultiple} decimals={2} suffix="x" duration={1000} /> EBITDA Multiple
-          </span>
-        </div>
-        <Disclaimer variant="valuation" className="!text-[var(--text-secondary)] max-w-xl mt-2" />
+        {missingMarketRent ? (
+          <MissingMarketRentPrompt variant="hero" className="mt-2" />
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <span className="inline-flex items-center bg-blue-500/15 text-sky-300 px-3 py-1 rounded-full text-[14px] font-semibold">
+                <AnimatedNumber value={valuation.finalMultiple} decimals={2} suffix="x" duration={1000} /> EBITDA Multiple
+              </span>
+            </div>
+            <Disclaimer variant="valuation" className="!text-[var(--text-secondary)] max-w-xl mt-2" />
+          </>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-5 mt-7">
           <div className="min-w-0">
@@ -752,10 +779,19 @@ export default function ValuationPage() {
           <div style={{ fontSize: '12px', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
             Combined Value (Business + Real Estate)
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'white' }}>
-            <AnimatedNumber value={valuation.combinedValue} prefix="$" duration={1200} />
-          </div>
-          <Disclaimer variant="valuation" className="!text-[var(--text-secondary)] mt-2" />
+          {canShowValuation ? (
+            <>
+              <div style={{ fontSize: '28px', fontWeight: 700, color: 'white' }}>
+                <AnimatedNumber value={valuation.combinedValue} prefix="$" duration={1200} />
+              </div>
+              <Disclaimer variant="valuation" className="!text-[var(--text-secondary)] mt-2" />
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: '28px', fontWeight: 700, color: 'white' }}>—</div>
+              {missingMarketRent && <MissingMarketRentPrompt variant="hero" className="mt-2" />}
+            </>
+          )}
         </div>
       )}
 
@@ -837,7 +873,9 @@ export default function ValuationPage() {
           </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-full text-[13px] text-center px-4" style={{ color: "var(--text-muted)" }}>
-              {(valuationContext?.resolvedFinancials?.ttmMonthsUsed ?? 0) >= 1
+              {missingMarketRent ? (
+                <MissingMarketRentPrompt variant="inline" />
+              ) : (valuationContext?.resolvedFinancials?.ttmMonthsUsed ?? 0) >= 1
                 ? INSUFFICIENT_HISTORY_MESSAGE
                 : "Add monthly financials to see store value history."}
             </div>
@@ -899,15 +937,21 @@ export default function ValuationPage() {
                 equipment, location, and revenue quality.
               </div>
               <div className="text-[11px] text-[var(--text-muted)] tabular-nums">
-                × Annual EBITDA: {fmtDollar(annualEbitda)}
+                × Annual EBITDA: {canShowValuation ? fmtDollar(valuationAnnualEbitda) : "—"}
               </div>
+              {canShowValuation && marketRentMonthly != null && (
+                <div className="text-[10px] text-[var(--text-muted)]">
+                  includes {fmtDollar(marketRentMonthly)}/mo estimated market rent (owner-occupied)
+                </div>
+              )}
+              {missingMarketRent && <MissingMarketRentPrompt variant="inline" className="text-right" />}
               <FinancialDataConfidenceNote
                 monthsUsed={ttmMonthsUsed}
                 variant="inline"
                 className="text-right"
               />
               <div className="text-[17px] font-bold text-green-400 tabular-nums">
-                = Business Value: {fmtDollar(valuation.businessValue)}
+                = Business Value: {canShowValuation ? fmtDollar(valuation.businessValue) : "—"}
               </div>
               <Disclaimer variant="valuation" className="text-right" />
               <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px", textAlign: "right" }}>
@@ -926,7 +970,7 @@ export default function ValuationPage() {
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[10px] text-[var(--text-muted)]">Store Value</span>
                 <span className="text-[15px] font-bold text-green-400 tabular-nums">
-                  {fmtDollar(valuation.businessValue)}
+                  {canShowValuation ? fmtDollar(valuation.businessValue) : "—"}
                 </span>
               </div>
               <Disclaimer variant="valuation" />
@@ -944,7 +988,7 @@ export default function ValuationPage() {
                   <DisclaimerLabel>Annual EBITDA</DisclaimerLabel>
                 </span>
                 <span className="text-[12px] font-semibold text-slate-900 tabular-nums">
-                  {fmtDollar(annualEbitda)}
+                  {canShowValuation ? fmtDollar(valuationAnnualEbitda) : "—"}
                 </span>
               </div>
               <FinancialDataConfidenceNote monthsUsed={ttmMonthsUsed} variant="compact" />

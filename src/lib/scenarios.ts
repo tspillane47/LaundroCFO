@@ -48,6 +48,8 @@ export type StoreScenarioContext = {
   availableOptionYears?: number;
   isOwnerOccupied: boolean;
   realEstateValue: number;
+  /** Monthly market rent used for owner-occupied valuation EBITDA. */
+  marketRentEstimate?: number | null;
   resolvedFinancials?: ResolvedStoreFinancials;
   /** Annual debt service for DSCR (TTM or loan schedule). */
   annualDebtService?: number;
@@ -254,7 +256,12 @@ function toValuationContext(ctx: StoreScenarioContext): StoreValuationContext {
     equipment: ctx.equipment,
     lease: null,
     leaseOptions: [],
-    realEstate: ctx.isOwnerOccupied ? { estimated_value: ctx.realEstateValue } : null,
+    realEstate: ctx.isOwnerOccupied
+      ? {
+          estimated_value: ctx.realEstateValue,
+          market_rent_estimate: ctx.marketRentEstimate,
+        }
+      : null,
     resolvedFinancials: ctx.resolvedFinancials,
   };
 }

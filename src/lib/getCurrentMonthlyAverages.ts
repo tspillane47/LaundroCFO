@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase";
 import { calcEstimatedBalance } from "@/lib/amortization";
 import { computeStoreDscr } from "@/lib/dscr";
-import { getStoreValuation } from "@/lib/getStoreValuation";
+import { canShowStoreValuation, getStoreValuation } from "@/lib/getStoreValuation";
 import {
   BANK_IMPORT_CATEGORY_LABELS,
   REVENUE_BREAKDOWN_FIELDS,
@@ -302,7 +302,13 @@ function buildCurrentMonthlyAveragesFromContext(
   );
   const waterKPI = computeWaterKpi(waterMonthlyAverage, selfServiceMonthlyAverage);
 
-  const storeValue = valuation.businessValue;
+  const storeValue = canShowStoreValuation(
+    valuation.resolvedFinancials,
+    valuation.store,
+    valuation.context.realEstate
+  )
+    ? valuation.businessValue
+    : 0;
   const equity =
     storeValue > 0 && totalOutstandingBalance != null
       ? {

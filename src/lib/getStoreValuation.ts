@@ -16,17 +16,73 @@ import { calcValuation, type ValuationInputs, type ValuationResult } from "@/lib
 export type ResolvedStoreFinancials = {
   monthlyRevenue: number;
   monthlyExpenses: number;
+  /** TTM-average book rent from monthly_financials (not imputed). */
+  monthlyRent?: number;
   annualEbitda: number;
   /** Count of monthly_financials rows used for TTM (0 when source is none). */
   ttmMonthsUsed: number;
   source: "ttm" | "none";
 };
 
+export const MISSING_OWNER_OCCUPIED_MARKET_RENT_PROMPT =
+  "Enter an estimated market rent to get an accurate valuation";
+
 /** True when monthly_financials rows exist and drive resolved figures. */
 export function hasMonthlyFinancialRecords(
   resolved?: ResolvedStoreFinancials | null
 ): boolean {
   return resolved?.source === "ttm";
+}
+
+export function isOwnerOccupiedStore(
+  store?: { occupancy_type?: unknown } | Record<string, unknown> | null
+): boolean {
+  return store?.occupancy_type === "owner_occupied";
+}
+
+/** `0` and non-finite values are missing — never treat them as a real estimate. */
+export function resolveOwnerOccupiedMarketRentMonthly(
+  realEstate?: Record<string, unknown> | null
+): number | null {
+  const n = Number(realEstate?.market_rent_estimate);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
+
+export function hasRequiredOwnerOccupiedMarketRent(
+  store?: { occupancy_type?: unknown } | Record<string, unknown> | null,
+  realEstate?: Record<string, unknown> | null
+): boolean {
+  if (!isOwnerOccupiedStore(store)) return true;
+  return resolveOwnerOccupiedMarketRentMonthly(realEstate) != null;
+}
+
+/** Book TTM is present and owner-occupied stores have a usable market rent. */
+export function canShowStoreValuation(
+  resolved?: ResolvedStoreFinancials | null,
+  store?: { occupancy_type?: unknown } | Record<string, unknown> | null,
+  realEstate?: Record<string, unknown> | null
+): boolean {
+  return hasMonthlyFinancialRecords(resolved) && hasRequiredOwnerOccupiedMarketRent(store, realEstate);
+}
+
+/**
+ * Valuation-only occupancy-cost adjustment. Does not write to monthly_financials.
+ * Replaces book rent with market rent so related-party book rent is not stacked.
+ */
+export function applyOwnerOccupiedMarketRentToEbitda(
+  annualEbitda: number,
+  options: {
+    isOwnerOccupied: boolean;
+    marketRentMonthly: number | null;
+    bookRentMonthly: number;
+  }
+): number {
+  if (!options.isOwnerOccupied) return annualEbitda;
+  if (options.marketRentMonthly == null) return 0;
+  const book = Number.isFinite(options.bookRentMonthly) ? options.bookRentMonthly : 0;
+  const safeEbitda = Number.isFinite(annualEbitda) ? annualEbitda : 0;
+  return safeEbitda + book * 12 - options.marketRentMonthly * 12;
 }
 
 export type StoreValuationResult = ValuationResult & {
@@ -72,14 +128,16 @@ export type StoreValuationContext = {
 
 export function resolveStoreFinancials(
   _store: Record<string, unknown>,
-  ttm: { ttmRevenue: number; ttmEbitda: number; monthsUsed: number } | null = null
+  ttm: { ttmRevenue: number; ttmEbitda: number; monthsUsed: number; ttmRent?: number } | null = null
 ): ResolvedStoreFinancials {
   if (ttm && ttm.monthsUsed > 0 && ttm.ttmRevenue > 0) {
     const monthlyRevenue = ttm.ttmRevenue / ttm.monthsUsed;
     const monthlyExpenses = (ttm.ttmRevenue - ttm.ttmEbitda) / ttm.monthsUsed;
+    const monthlyRent = (ttm.ttmRent ?? 0) / ttm.monthsUsed;
     return {
       monthlyRevenue: Number.isFinite(monthlyRevenue) ? monthlyRevenue : 0,
       monthlyExpenses: Number.isFinite(monthlyExpenses) ? monthlyExpenses : 0,
+      monthlyRent: Number.isFinite(monthlyRent) ? monthlyRent : 0,
       annualEbitda:
         Number.isFinite(ttm.ttmEbitda) && ttm.monthsUsed > 0
           ? annualizeTtmTotal(ttm.ttmEbitda, ttm.monthsUsed)
@@ -92,6 +150,7 @@ export function resolveStoreFinancials(
   return {
     monthlyRevenue: 0,
     monthlyExpenses: 0,
+    monthlyRent: 0,
     annualEbitda: 0,
     ttmMonthsUsed: 0,
     source: "none",
@@ -101,7 +160,7 @@ export function resolveStoreFinancials(
 async function fetchStoreTtmMetrics(
   supabase: ReturnType<typeof createClient>,
   storeId: string
-): Promise<{ ttmRevenue: number; ttmEbitda: number; monthsUsed: number } | null> {
+): Promise<{ ttmRevenue: number; ttmEbitda: number; monthsUsed: number; ttmRent: number } | null> {
   const [{ data: financialsData }, { data: utilitiesData }] = await Promise.all([
     supabase
       .from("monthly_financials")
@@ -126,10 +185,14 @@ async function fetchStoreTtmMetrics(
 
   if (ttm.monthsUsed === 0 || ttm.ttmRevenue <= 0) return null;
 
+  const ttmWindow = records.slice(0, ttm.monthsUsed);
+  const ttmRent = ttmWindow.reduce((sum, r) => sum + (r.rent ?? 0), 0);
+
   return {
     ttmRevenue: ttm.ttmRevenue,
     ttmEbitda: ttm.ttmEbitda,
     monthsUsed: ttm.monthsUsed,
+    ttmRent,
   };
 }
 
@@ -156,28 +219,32 @@ export function buildStoreValuationInputs(
 
   const resolved = ctx.resolvedFinancials ?? resolveStoreFinancials(store);
   if (resolved.source === "none") {
-    return {
-      ebitda: 0,
-      monthlyRevenue: 0,
-      squareFootage: Number(store.square_footage) || 0,
-      avgEquipmentAge: 0,
-      pct200G: 0,
-      equipmentScore: 0,
-      totalLeaseControl: 0,
-      availableOptionYears: 0,
-      leaseYearsRemaining: 0,
-      occupancyType: isOwnerOccupied ? "owned" : "leased",
-      marketDensity: "",
-      storeCondition: "",
-      revenueTrend: "",
-      competitionLevel: "",
-      selfServicePct: 0,
-      wdfPct: 0,
-      commercialPct: 0,
-      pickupDeliveryPct: 0,
-      realEstateValue: undefined,
-      ...overrides,
-    };
+    return applyOwnerOccupiedRentAfterOverrides(
+      {
+        ebitda: 0,
+        monthlyRevenue: 0,
+        squareFootage: Number(store.square_footage) || 0,
+        avgEquipmentAge: 0,
+        pct200G: 0,
+        equipmentScore: 0,
+        totalLeaseControl: 0,
+        availableOptionYears: 0,
+        leaseYearsRemaining: 0,
+        occupancyType: isOwnerOccupied ? "owned" : "leased",
+        marketDensity: "",
+        storeCondition: "",
+        revenueTrend: "",
+        competitionLevel: "",
+        selfServicePct: 0,
+        wdfPct: 0,
+        commercialPct: 0,
+        pickupDeliveryPct: 0,
+        realEstateValue: undefined,
+        ...overrides,
+      },
+      ctx,
+      isOwnerOccupied
+    );
   }
 
   const monthlyRevenue = resolved.monthlyRevenue;
@@ -227,7 +294,28 @@ export function buildStoreValuationInputs(
     realEstateValue: isOwnerOccupied ? Number(realEstate?.estimated_value) || 0 : undefined,
   };
 
-  return { ...base, ...overrides };
+  return applyOwnerOccupiedRentAfterOverrides({ ...base, ...overrides }, ctx, isOwnerOccupied);
+}
+
+function applyOwnerOccupiedRentAfterOverrides(
+  inputs: ValuationInputs,
+  ctx: StoreValuationContext,
+  isOwnerOccupied: boolean
+): ValuationInputs {
+  if (!isOwnerOccupied) return inputs;
+
+  const marketRentMonthly = resolveOwnerOccupiedMarketRentMonthly(ctx.realEstate);
+  const bookRentMonthly = ctx.resolvedFinancials?.monthlyRent ?? 0;
+
+  return {
+    ...inputs,
+    ebitda: applyOwnerOccupiedMarketRentToEbitda(inputs.ebitda, {
+      isOwnerOccupied: true,
+      marketRentMonthly,
+      bookRentMonthly,
+    }),
+    realEstateValue: marketRentMonthly != null ? inputs.realEstateValue : undefined,
+  };
 }
 
 export function computeStoreValuation(

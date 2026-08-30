@@ -26,8 +26,13 @@ import {
   flagStyle,
   getUnderwritingFlags,
 } from "@/lib/real-estate-calculations";
-import { getStoreValuation } from "@/lib/getStoreValuation";
+import {
+  canShowStoreValuation,
+  getStoreValuation,
+  invalidateValuationCache,
+} from "@/lib/getStoreValuation";
 import { FinancialDataConfidenceNote } from "@/components/ui/FinancialDataConfidenceNote";
+import { MissingMarketRentPrompt } from "@/components/valuation/MissingMarketRentPrompt";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { useWriteGuard } from "@/lib/useWriteGuard";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -167,7 +172,9 @@ function recordToForm(record: RealEstate): RealEstateForm {
     monthly_rent_charged:
       record.monthly_rent_charged != null ? String(record.monthly_rent_charged) : "",
     market_rent_estimate:
-      record.market_rent_estimate != null ? String(record.market_rent_estimate) : "",
+      record.market_rent_estimate != null && record.market_rent_estimate > 0
+        ? String(record.market_rent_estimate)
+        : "",
   };
 }
 
@@ -234,6 +241,7 @@ export function RealEstateModule({ store }: Props) {
 
   const [record, setRecord] = useState<RealEstate | null>(null);
   const [businessValue, setBusinessValue] = useState<number | null>(null);
+  const [valuationReady, setValuationReady] = useState(false);
   const [valuationDataMonths, setValuationDataMonths] = useState(0);
   const [form, setForm] = useState<RealEstateForm>(emptyForm(store.address));
 
@@ -264,7 +272,13 @@ export function RealEstateModule({ store }: Props) {
       setForm(emptyForm(store.address));
     }
 
-    setBusinessValue(valuation.businessValue);
+    const ready = canShowStoreValuation(
+      valuation.resolvedFinancials,
+      { occupancy_type: "owner_occupied" },
+      data
+    );
+    setValuationReady(ready);
+    setBusinessValue(ready ? valuation.businessValue : null);
     setValuationDataMonths(valuation.resolvedFinancials.ttmMonthsUsed);
     setLoading(false);
   }
@@ -403,6 +417,13 @@ export function RealEstateModule({ store }: Props) {
       return;
     }
 
+    const marketRent = form.market_rent_estimate ? Number(form.market_rent_estimate) : null;
+    if (marketRent == null || !Number.isFinite(marketRent) || marketRent <= 0) {
+      setError("Enter an estimated market rent to get an accurate valuation.");
+      setSaving(false);
+      return;
+    }
+
     const payload = {
       store_id: store.id,
       user_id: user.id,
@@ -443,9 +464,7 @@ export function RealEstateModule({ store }: Props) {
       monthly_rent_charged: form.monthly_rent_charged
         ? Number(form.monthly_rent_charged)
         : null,
-      market_rent_estimate: form.market_rent_estimate
-        ? Number(form.market_rent_estimate)
-        : null,
+      market_rent_estimate: marketRent,
     };
 
     const { error: upsertError } = await supabase
@@ -458,6 +477,7 @@ export function RealEstateModule({ store }: Props) {
       return;
     }
 
+    invalidateValuationCache(store.id);
     setSuccess("Real estate profile saved successfully.");
     setMode("view");
     setSaving(false);
@@ -627,12 +647,17 @@ export function RealEstateModule({ store }: Props) {
               <SmallMetric
                 label="Combined Value Estimate"
                 value={
-                  metrics.combinedValue != null ? formatCurrency(metrics.combinedValue) : "—"
+                  valuationReady && metrics.combinedValue != null
+                    ? formatCurrency(metrics.combinedValue)
+                    : "—"
                 }
                 color="text-blue-300"
               />
             </div>
             <FinancialDataConfidenceNote monthsUsed={valuationDataMonths} variant="inline" className="mt-3" />
+            {!valuationReady && valuationDataMonths > 0 && (
+              <MissingMarketRentPrompt variant="inline" className="mt-2" />
+            )}
           </div>
 
           {metrics.flags.length > 0 && (
@@ -742,15 +767,27 @@ export function RealEstateModule({ store }: Props) {
           </div>
 
           <div className="card">
+            <div className="section-title">Estimated Market Rent</div>
+            <p className="text-[12px] text-[var(--text-muted)] mb-3">
+              Required for valuation. Used only to normalize owner-occupied EBITDA — not written to
+              your books or transaction history.
+            </p>
+            {record.market_rent_estimate != null && record.market_rent_estimate > 0 ? (
+              <LabelValue
+                label="Estimated Market Rent"
+                value={formatCurrency(record.market_rent_estimate)}
+              />
+            ) : (
+              <MissingMarketRentPrompt variant="inline" />
+            )}
+          </div>
+
+          <div className="card">
             <div className="section-title">Related-Party Rent</div>
             <div>
               <LabelValue
                 label="Monthly Rent Charged"
                 value={formatCurrency(record.monthly_rent_charged)}
-              />
-              <LabelValue
-                label="Market Rent Estimate"
-                value={formatCurrency(record.market_rent_estimate)}
               />
             </div>
           </div>
@@ -1051,30 +1088,43 @@ export function RealEstateModule({ store }: Props) {
           </div>
 
           <div className="card space-y-4">
+            <div className="section-title mb-0">Estimated Market Rent</div>
+            <p className="text-[12px] text-[var(--text-muted)]">
+              Required. What a tenant would pay for this space each month. Used only to normalize
+              valuation EBITDA — not written to your books.
+            </p>
+            <div>
+              <div className="metric-label mb-1.5">
+                Estimated Market Rent ($/month) <span className="text-red-400">*</span>
+              </div>
+              <input
+                id="realestate-market-rent-estimate"
+                type="number"
+                min="1"
+                required
+                value={form.market_rent_estimate}
+                onChange={(e) => setField("market_rent_estimate", e.target.value)}
+                className={INPUT_CLASS}
+                placeholder="1500"
+              />
+            </div>
+          </div>
+
+          <div className="card space-y-4">
             <div className="section-title mb-0">Related-Party Rent</div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="metric-label mb-1.5">Monthly Rent Charged</div>
-                <input
-                  id="realestate-monthly-rent-charged"
-                  type="number"
-                  value={form.monthly_rent_charged}
-                  onChange={(e) => setField("monthly_rent_charged", e.target.value)}
-                  className={INPUT_CLASS}
-                  placeholder="6200"
-                />
-              </div>
-              <div>
-                <div className="metric-label mb-1.5">Market Rent Estimate</div>
-                <input
-                  id="realestate-market-rent-estimate"
-                  type="number"
-                  value={form.market_rent_estimate}
-                  onChange={(e) => setField("market_rent_estimate", e.target.value)}
-                  className={INPUT_CLASS}
-                  placeholder="7500"
-                />
-              </div>
+            <p className="text-[12px] text-[var(--text-muted)]">
+              Optional. Actual rent charged between related entities, if any.
+            </p>
+            <div>
+              <div className="metric-label mb-1.5">Monthly Rent Charged</div>
+              <input
+                id="realestate-monthly-rent-charged"
+                type="number"
+                value={form.monthly_rent_charged}
+                onChange={(e) => setField("monthly_rent_charged", e.target.value)}
+                className={INPUT_CLASS}
+                placeholder="6200"
+              />
             </div>
           </div>
         </div>

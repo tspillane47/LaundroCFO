@@ -20,7 +20,8 @@ describe("gettingStarted status helpers", () => {
     expect(isOccupancyComplete("leased", false, false)).toBe(false);
     expect(isOccupancyComplete("leased", true, false)).toBe(true);
     expect(isOccupancyComplete("owner_occupied", false, false)).toBe(false);
-    expect(isOccupancyComplete("owner_occupied", false, true)).toBe(true);
+    expect(isOccupancyComplete("owner_occupied", false, true)).toBe(false);
+    expect(isOccupancyComplete("owner_occupied", false, true, true)).toBe(true);
   });
 
   it("marks debt complete when loan rows exist", () => {

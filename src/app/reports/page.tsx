@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { fetchAccessibleStores } from "@/lib/store-access";
 import { useStores } from "@/lib/store-context";
-import { getStoreValuation } from "@/lib/getStoreValuation";
+import { getStoreValuation, hasRequiredOwnerOccupiedMarketRent } from "@/lib/getStoreValuation";
 import type { ValuationResult } from "@/lib/valuation";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import {
@@ -548,7 +548,12 @@ function ReportsPageContent() {
 
   const storeName = store?.name ?? "Your Store";
   const hasFinancialData = (storeTtm?.monthsUsed ?? 0) > 0;
-  const isStoreReady = Boolean(store && valuation && metrics && portfolioTtm && hasFinancialData);
+  const canShowValuation = hasFinancialData && hasRequiredOwnerOccupiedMarketRent(store, realEstate);
+  const missingMarketRent =
+    store?.occupancy_type === "owner_occupied" && hasFinancialData && !canShowValuation;
+  const isStoreReady = Boolean(
+    store && valuation && metrics && portfolioTtm && hasFinancialData && canShowValuation
+  );
   const portfolioReady = Boolean(portfolioData && portfolioData.totals.storeCount > 0);
   const totals = portfolioData?.totals;
   const cashFlow = portfolioCashFlow ?? portfolioData?.cashFlow;
@@ -632,6 +637,14 @@ function ReportsPageContent() {
                 : "Select a store from the dropdown above to generate an underwriting report."}
             </p>
           </div>
+        ) : missingMarketRent ? (
+          <EmptyState
+            icon="FileText"
+            title="Market rent required"
+            description="Enter an estimated market rent to get an accurate valuation"
+            ctaLabel="Add Market Rent"
+            ctaHref="/lease"
+          />
         ) : (
           <EmptyState
             icon="FileText"

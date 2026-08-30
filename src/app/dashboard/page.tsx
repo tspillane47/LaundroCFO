@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
-import { getStoreValuation, getStoreDebt, getStoreScheduledDebtService, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
+import { canShowStoreValuation, getStoreValuation, getStoreDebt, getStoreScheduledDebtService, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
+import { MissingMarketRentPrompt } from "@/components/valuation/MissingMarketRentPrompt";
 import { calcEquipmentScore, calcLeaseScore, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { computeStoreDscr } from "@/lib/dscr";
 import {
@@ -321,6 +322,13 @@ export default function DashboardPage() {
 
   const resolvedFinancials = valuation?.resolvedFinancials;
   const hasFinancialData = hasMonthlyFinancialRecords(resolvedFinancials);
+  const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
+  const canShowValuation = canShowStoreValuation(
+    resolvedFinancials,
+    store,
+    realEstate
+  );
+  const missingMarketRent = isOwnerOccupied && hasFinancialData && !canShowValuation;
 
   const revenue = hasFinancialData ? (resolvedFinancials?.monthlyRevenue ?? 0) : 0;
   const expenses = hasFinancialData ? (resolvedFinancials?.monthlyExpenses ?? 0) : 0;
@@ -336,7 +344,6 @@ export default function DashboardPage() {
   const monthlyCashFlow = hasFinancialData ? annualCashFlow / 12 : 0;
   const dscrNum = hasFinancialData ? computeStoreDscr(annualEbitda, debtService) : null;
   const ebitdaMargin = hasFinancialData && revenue > 0 ? (ebitda / revenue) * 100 : 0;
-  const isOwnerOccupied = store?.occupancy_type === "owner_occupied";
   const utilities = hasFinancialData ? (store?.monthly_utilities ?? 0) : 0;
   const utilityRatio = hasFinancialData && revenue > 0 ? (utilities / revenue) * 100 : 0;
   const sqft = store?.square_footage ?? 0;
@@ -348,8 +355,8 @@ export default function DashboardPage() {
   const ttmMonthsUsed = resolvedFinancials?.ttmMonthsUsed ?? ttm.monthsUsed;
 
   const estimatedValue =
-    valuation && hasFinancialData ? Math.round(valuation.businessValue) : 0;
-  const finalMultiple = valuation && hasFinancialData ? valuation.finalMultiple : 0;
+    valuation && canShowValuation ? Math.round(valuation.businessValue) : 0;
+  const finalMultiple = valuation && canShowValuation ? valuation.finalMultiple : 0;
 
   const cashPosition = useMemo(
     () =>
@@ -367,7 +374,7 @@ export default function DashboardPage() {
   const totalCash = hasFinancialData ? cashPosition.amount : 0;
   const cashPositionComposition = cashPosition.source === "plaid" ? "all_live" : "all_manual";
   const businessValue = estimatedValue;
-  const equity = hasFinancialData ? businessValue + totalCash - totalDebt : 0;
+  const equity = hasFinancialData && canShowValuation ? businessValue + totalCash - totalDebt : 0;
 
   const leaseMetrics = useMemo(() => {
     if (!lease) return null;
@@ -422,9 +429,9 @@ export default function DashboardPage() {
   }, [realEstate, hasFinancialData, revenue]);
 
   const valuationHistorySeries = useMemo(() => {
-    if (!valuation?.context || !hasEnoughChartHistory(monthlyFinancials)) return [];
+    if (!canShowValuation || !valuation?.context || !hasEnoughChartHistory(monthlyFinancials)) return [];
     return buildValuationHistorySeries(valuation.context, monthlyFinancials);
-  }, [valuation?.context, monthlyFinancials]);
+  }, [canShowValuation, valuation?.context, monthlyFinancials]);
 
   const valuationTrend = useMemo(
     () =>
@@ -481,12 +488,13 @@ export default function DashboardPage() {
             ttmRevenue: ttm.ttmRevenue,
             ttmUtilities: ttm.ttmUtilities,
             isOwnerOccupied,
-            valuation: valuation
-              ? {
-                  businessValue: valuation.businessValue,
-                  finalMultiple: valuation.finalMultiple,
-                }
-              : null,
+            valuation:
+              valuation && canShowValuation
+                ? {
+                    businessValue: valuation.businessValue,
+                    finalMultiple: valuation.finalMultiple,
+                  }
+                : null,
             valuationMonthlyChange: monthlyChange ?? undefined,
             uncategorizedTransactionCount,
           })
@@ -500,6 +508,7 @@ export default function DashboardPage() {
       resolvedFinancials,
       isOwnerOccupied,
       valuation,
+      canShowValuation,
       monthlyChange,
       ttm,
       uncategorizedTransactionCount,
@@ -674,7 +683,7 @@ export default function DashboardPage() {
           Estimated Store Value
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
-          {hasFinancialData ? (
+          {canShowValuation ? (
             <>
               <AnimatedNumber value={estimatedValue} prefix="$" className="hero-value-text" duration={1200} />
               <ValueChangeIndicator value={estimatedValue} />
@@ -683,7 +692,7 @@ export default function DashboardPage() {
             <span className="hero-value-text">—</span>
           )}
         </div>
-        {hasFinancialData && (monthlyChange != null || yearChangePct != null) && (
+        {canShowValuation && (monthlyChange != null || yearChangePct != null) && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
             {monthlyChange != null && (
               <span
@@ -716,10 +725,13 @@ export default function DashboardPage() {
           </div>
         )}
         <FinancialDataConfidenceNote monthsUsed={ttmMonthsUsed} variant="hero" className="mt-2" />
+        {missingMarketRent && <MissingMarketRentPrompt variant="hero" className="mt-2" />}
         <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', marginTop: '12px', lineHeight: 1.6 }}>
-          {hasFinancialData
+          {canShowValuation
             ? `Based on ${fmtMultiple(finalMultiple)} EBITDA multiple · Equipment grade B · ${leaseMetrics ? `${leaseMetrics.yearsRemaining.toFixed(1)}yr lease` : "—"} · ${sqft.toLocaleString()} SF`
-            : "Add monthly financials to estimate store value."}
+            : missingMarketRent
+              ? null
+              : "Add monthly financials to estimate store value."}
         </div>
       </div>
 
@@ -809,13 +821,19 @@ export default function DashboardPage() {
           style={{ animationDelay: "0.2s" }}
           label="Business Value"
           value={
-            hasFinancialData ? (
+            canShowValuation ? (
               <AnimatedNumber value={businessValue} prefix="$" duration={1000} />
             ) : (
               "—"
             )
           }
-          sub={hasFinancialData ? `${fmtMultiple(finalMultiple)} EBITDA multiple` : "Add monthly financials"}
+          sub={
+            canShowValuation
+              ? `${fmtMultiple(finalMultiple)} EBITDA multiple`
+              : missingMarketRent
+                ? "Enter an estimated market rent to get an accurate valuation"
+                : "Add monthly financials"
+          }
         />
 
         <KpiCard
@@ -855,15 +873,21 @@ export default function DashboardPage() {
           style={{ animationDelay: "0.35s" }}
           label="Net Equity"
           value={
-            hasFinancialData ? (
+            canShowValuation ? (
               <AnimatedNumber value={equity} prefix="$" duration={1000} />
             ) : (
               "—"
             )
           }
-          sub={hasFinancialData ? "Value + cash − debt" : "Add monthly financials"}
+          sub={
+            canShowValuation
+              ? "Value + cash − debt"
+              : missingMarketRent
+                ? "Enter an estimated market rent to get an accurate valuation"
+                : "Add monthly financials"
+          }
           valueColor={
-            hasFinancialData
+            canShowValuation
               ? equity > 0
                 ? "var(--text-success)"
                 : "var(--text-danger)"
@@ -881,7 +905,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="section-title mb-0">12-Month Valuation Trend</div>
               <div className="text-[20px] font-bold" style={{ color: "var(--accent)" }}>
-                {hasFinancialData ? fmtDollar(estimatedValue) : "—"}
+                {canShowValuation ? fmtDollar(estimatedValue) : "—"}
               </div>
             </div>
             <div className="h-[220px]">
@@ -921,7 +945,13 @@ export default function DashboardPage() {
               </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-full text-[13px] text-center px-4" style={{ color: "var(--text-muted)" }}>
-                  {hasFinancialData ? INSUFFICIENT_HISTORY_MESSAGE : "Add monthly financials to see valuation trend."}
+                  {missingMarketRent ? (
+                    <MissingMarketRentPrompt variant="inline" />
+                  ) : hasFinancialData ? (
+                    INSUFFICIENT_HISTORY_MESSAGE
+                  ) : (
+                    "Add monthly financials to see valuation trend."
+                  )}
                 </div>
               )}
             </div>
@@ -1056,10 +1086,10 @@ export default function DashboardPage() {
         <div className="section-title mb-4">Valuation Summary</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {[
-            { label: "Est. Value", value: hasFinancialData ? fmtDollar(estimatedValue) : "—" },
+            { label: "Est. Value", value: canShowValuation ? fmtDollar(estimatedValue) : "—" },
             {
               label: "Multiple",
-              value: hasFinancialData ? fmtMultiple(finalMultiple) : "—",
+              value: canShowValuation ? fmtMultiple(finalMultiple) : "—",
               tooltip: "Applied to annual EBITDA to estimate store value. Higher multiples reflect better lease, equipment, and market factors.",
             },
             { label: "Annual EBITDA", value: hasFinancialData ? fmtDollar(annualEbitda) : "—" },

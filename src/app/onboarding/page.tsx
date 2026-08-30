@@ -72,6 +72,7 @@ type OnboardingForm = {
   annualEscalation: string;
   monthlyMortgage: string;
   buildingValue: string;
+  marketRentEstimate: string;
   financialMode: FinancialMode;
   monthlyRevenue: string;
   monthlyExpenses: string;
@@ -92,6 +93,7 @@ const DEFAULT_FORM: OnboardingForm = {
   annualEscalation: "",
   monthlyMortgage: "",
   buildingValue: "",
+  marketRentEstimate: "",
   financialMode: null,
   monthlyRevenue: "",
   monthlyExpenses: "",
@@ -576,9 +578,16 @@ function OnboardingContent() {
         return false;
       }
     } else if (form.occupancy === "own") {
+      const marketRent = toNullableNum(form.marketRentEstimate);
+      if (marketRent == null || marketRent <= 0) {
+        setErrorMessage("Enter an estimated market rent to get an accurate valuation.");
+        return false;
+      }
+
       const negativeFieldError = findNegativeFieldError([
         { value: toNullableNum(form.monthlyMortgage) ?? 0, label: "Monthly mortgage" },
         { value: toNullableNum(form.buildingValue) ?? 0, label: "Building value" },
+        { value: marketRent, label: "Estimated market rent" },
       ]);
       if (negativeFieldError) {
         setErrorMessage(negativeFieldError);
@@ -593,6 +602,7 @@ function OnboardingContent() {
           user_id: user.id,
           monthly_mortgage_payment: toNullableNum(form.monthlyMortgage),
           estimated_value: toNullableNum(form.buildingValue),
+          market_rent_estimate: marketRent,
         },
         { onConflict: "store_id" }
       );
@@ -1299,6 +1309,23 @@ function OnboardingContent() {
                               className={INPUT_CLASS}
                               placeholder="850000"
                             />
+                          </Field>
+                          <Field label="Estimated Market Rent ($/month)">
+                            <input
+                              id="onboarding-marketrent"
+                              type="number"
+                              min="1"
+                              required
+                              value={form.marketRentEstimate}
+                              onChange={(e) => setField("marketRentEstimate", e.target.value)}
+                              onKeyDown={preventEnterSubmit}
+                              className={INPUT_CLASS}
+                              placeholder="1500"
+                            />
+                            <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+                              What a tenant would pay for this space. Required for an accurate
+                              owner-occupied valuation — not written to your books.
+                            </p>
                           </Field>
                         </div>
                       )}

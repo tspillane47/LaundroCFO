@@ -67,7 +67,7 @@ const minimalCtx: StoreValuationContext = {
   equipment: [],
   lease: null,
   leaseOptions: [],
-  realEstate: { estimated_value: 500_000 },
+  realEstate: { estimated_value: 500_000, market_rent_estimate: 1500 },
 };
 
 describe("valuationHistory", () => {
@@ -128,5 +128,29 @@ describe("valuationHistory", () => {
     expect(filterValuationHistoryByPeriod(series, "90d")).toHaveLength(3);
     expect(filterValuationHistoryByPeriod(series, "1y")).toHaveLength(6);
     expect(filterValuationHistoryByPeriod(series, "all")).toHaveLength(6);
+  });
+
+  it("applies owner-occupied market rent after each window ebitda override", () => {
+    const records = [
+      makeRecord(2025, 1, 10_000, 3_000),
+      makeRecord(2025, 2, 10_000, 3_000),
+    ];
+    const withRent = buildValuationHistorySeries(minimalCtx, records);
+    const withoutRent = buildValuationHistorySeries(
+      { ...minimalCtx, realEstate: { estimated_value: 500_000, market_rent_estimate: 0 } },
+      records
+    );
+    const leased = buildValuationHistorySeries(
+      {
+        ...minimalCtx,
+        store: { ...minimalCtx.store, occupancy_type: "leased" },
+        realEstate: null,
+      },
+      records
+    );
+
+    expect(withoutRent.every((p) => p.value === 0)).toBe(true);
+    expect(withRent[1].value).toBeGreaterThan(0);
+    expect(withRent[1].value).toBeLessThan(leased[1].value);
   });
 });
