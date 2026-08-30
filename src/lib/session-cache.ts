@@ -3,6 +3,11 @@ import {
   getUserStoreCount,
   type AccessStatus,
 } from "@/lib/access";
+import {
+  getOnboardingStatus,
+  registerOnboardingCacheInvalidator,
+  type OnboardingStatus,
+} from "@/lib/onboarding";
 import { createClient } from "@/lib/supabase";
 
 const REVALIDATE_MS = 60_000;
@@ -14,6 +19,16 @@ export const DEFAULT_ACCESS_STATUS: AccessStatus = {
   trialEndsAt: null,
   currentPeriodEnd: null,
   maxStores: 0,
+};
+
+export const DEFAULT_ONBOARDING_STATUS: OnboardingStatus = {
+  complete: false,
+  path: null,
+};
+
+export type SessionUser = {
+  id: string;
+  email: string | null;
 };
 
 type AccessResult = {
@@ -30,19 +45,43 @@ type AccessRecord = {
   promise?: Promise<AccessResult>;
 };
 
-type SessionUser = {
-  id: string;
+type UserRecord = {
+  user: SessionUser | null;
+  fetchedAt: number;
+  promise?: Promise<SessionUser | null>;
 };
 
-let userInFlight: Promise<SessionUser | null> | null = null;
+type OnboardingRecord = {
+  userId: string;
+  status: OnboardingStatus;
+  fetchedAt: number;
+  promise?: Promise<OnboardingStatus>;
+};
+
+let userRecord: UserRecord | null = null;
+const onboardingRecords = new Map<string, OnboardingRecord>();
 const accessRecords = new Map<string, AccessRecord>();
+const accessInvalidationListeners = new Set<() => void>();
 
 function accessKey(userId: string, storeId: string | null): string {
   return `${userId}:${storeId ?? ""}`;
 }
 
-function isFresh(record: AccessRecord, now = Date.now()): boolean {
-  return !record.promise && now - record.fetchedAt < REVALIDATE_MS;
+function isFresh(fetchedAt: number, now = Date.now()): boolean {
+  return now - fetchedAt < REVALIDATE_MS;
+}
+
+async function fetchSessionUser(): Promise<SessionUser | null> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user ? { id: user.id, email: user.email ?? null } : null;
+}
+
+async function fetchOnboardingFromDb(userId: string): Promise<OnboardingStatus> {
+  const supabase = createClient();
+  return getOnboardingStatus(supabase, userId);
 }
 
 async function fetchAccessFromDb(
@@ -57,25 +96,74 @@ async function fetchAccessFromDb(
   return { status, storeCount };
 }
 
-/** In-flight getUser() only — sequential calls still hit Auth, matching today's hook. */
 export async function getCachedSessionUser(): Promise<SessionUser | null> {
-  if (userInFlight) return userInFlight;
+  if (userRecord?.promise) return userRecord.promise;
+  if (userRecord) return userRecord.user;
 
-  const promise = (async () => {
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    return user ? { id: user.id } : null;
-  })();
+  const promise = fetchSessionUser();
+  userRecord = { user: null, fetchedAt: Date.now(), promise };
 
-  userInFlight = promise;
   try {
-    return await promise;
-  } finally {
-    if (userInFlight === promise) userInFlight = null;
+    const user = await promise;
+    userRecord = { user, fetchedAt: Date.now() };
+    return user;
+  } catch (error) {
+    userRecord = null;
+    throw error;
   }
 }
+
+export function peekSessionUser(): SessionUser | null | undefined {
+  if (!userRecord || userRecord.promise) return undefined;
+  return userRecord.user;
+}
+
+export function invalidateSessionUser() {
+  userRecord = null;
+}
+
+export async function getCachedOnboarding(userId: string): Promise<OnboardingStatus> {
+  const now = Date.now();
+  const existing = onboardingRecords.get(userId);
+
+  if (existing) {
+    if (existing.promise) return existing.promise;
+    if (isFresh(existing.fetchedAt, now)) return existing.status;
+  }
+
+  const promise = fetchOnboardingFromDb(userId);
+  onboardingRecords.set(userId, {
+    userId,
+    status: DEFAULT_ONBOARDING_STATUS,
+    fetchedAt: now,
+    promise,
+  });
+
+  try {
+    const status = await promise;
+    onboardingRecords.set(userId, {
+      userId,
+      status,
+      fetchedAt: Date.now(),
+    });
+    return status;
+  } catch (error) {
+    onboardingRecords.delete(userId);
+    throw error;
+  }
+}
+
+export function peekFreshOnboarding(userId: string): OnboardingRecord | null {
+  const record = onboardingRecords.get(userId);
+  if (!record || record.promise || !isFresh(record.fetchedAt)) return null;
+  return record;
+}
+
+export function invalidateCachedOnboarding() {
+  onboardingRecords.clear();
+}
+
+registerOnboardingCacheInvalidator(invalidateCachedOnboarding);
 
 function peekAccessCache(
   storeId: string | null,
@@ -96,7 +184,7 @@ export function peekFreshAccessCache(
   userId?: string
 ): AccessRecord | null {
   const record = peekAccessCache(storeId, userId);
-  if (!record || !isFresh(record)) return null;
+  if (!record || record.promise || !isFresh(record.fetchedAt)) return null;
   return record;
 }
 
@@ -110,7 +198,7 @@ export async function getCachedAccess(
 
   if (existing && existing.userId === userId) {
     if (existing.promise) return existing.promise;
-    if (isFresh(existing, now)) {
+    if (isFresh(existing.fetchedAt, now)) {
       return { status: existing.status, storeCount: existing.storeCount };
     }
   }
@@ -136,6 +224,16 @@ export async function getCachedAccess(
   return result;
 }
 
+export function subscribeAccessStatusInvalidation(listener: () => void) {
+  accessInvalidationListeners.add(listener);
+  return () => {
+    accessInvalidationListeners.delete(listener);
+  };
+}
+
 export function invalidateAccessStatusCache() {
   accessRecords.clear();
+  for (const listener of Array.from(accessInvalidationListeners)) {
+    listener();
+  }
 }

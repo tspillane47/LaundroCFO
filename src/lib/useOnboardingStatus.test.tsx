@@ -3,16 +3,25 @@
 import React, { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { AccessStatus } from "@/lib/access";
 import type { OnboardingStatus } from "@/lib/onboarding";
 
-const { getUserMock, getOnboardingStatusMock } = vi.hoisted(() => ({
-  getUserMock: vi.fn(),
-  getOnboardingStatusMock: vi.fn(),
-}));
+const { getUserMock, getOnboardingStatusMock, getAccessStatusMock, getUserStoreCountMock } =
+  vi.hoisted(() => ({
+    getUserMock: vi.fn(),
+    getOnboardingStatusMock: vi.fn(),
+    getAccessStatusMock: vi.fn(),
+    getUserStoreCountMock: vi.fn(),
+  }));
 
 vi.mock("@/lib/supabase", () => ({
   createClient: () => ({
-    auth: { getUser: getUserMock },
+    auth: {
+      getUser: getUserMock,
+      onAuthStateChange: () => ({
+        data: { subscription: { unsubscribe: () => {} } },
+      }),
+    },
   }),
 }));
 
@@ -25,7 +34,24 @@ vi.mock("@/lib/onboarding", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/access", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/access")>();
+  return {
+    ...actual,
+    getAccessStatus: (...args: Parameters<typeof actual.getAccessStatus>) =>
+      getAccessStatusMock(...args),
+    getUserStoreCount: (...args: Parameters<typeof actual.getUserStoreCount>) =>
+      getUserStoreCountMock(...args),
+  };
+});
+
 import { invalidateOnboardingStatusCache } from "@/lib/onboarding";
+import {
+  invalidateAccessStatusCache,
+  invalidateCachedOnboarding,
+  invalidateSessionUser,
+} from "@/lib/session-cache";
+import { SessionProvider } from "@/lib/session-context";
 import { useOnboardingStatus } from "@/lib/useOnboardingStatus";
 
 const USER_ID = "user-123";
@@ -35,6 +61,15 @@ const JOINER_EMAIL = "joiner@example.com";
 const INCOMPLETE: OnboardingStatus = { complete: false, path: null };
 const OWN_COMPLETE: OnboardingStatus = { complete: true, path: "own" };
 const JOIN_COMPLETE: OnboardingStatus = { complete: true, path: "join" };
+
+const NO_SUBSCRIPTION: AccessStatus = {
+  plan: null,
+  isReadOnly: true,
+  reason: "no_subscription",
+  trialEndsAt: null,
+  currentPeriodEnd: null,
+  maxStores: 0,
+};
 
 type OnboardingHookValue = ReturnType<typeof useOnboardingStatus>;
 
@@ -65,7 +100,7 @@ function mount(node: ReactElement) {
   document.body.appendChild(container);
   const root = createRoot(container);
   act(() => {
-    root.render(node);
+    root.render(<SessionProvider>{node}</SessionProvider>);
   });
   mounted = { root, container };
   return mounted;
@@ -103,15 +138,25 @@ function mockSignedInUser(email = OWNER_EMAIL) {
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  invalidateAccessStatusCache();
+  invalidateCachedOnboarding();
+  invalidateSessionUser();
   getUserMock.mockReset();
   getOnboardingStatusMock.mockReset();
+  getAccessStatusMock.mockReset();
+  getUserStoreCountMock.mockReset();
   mockSignedInUser();
   getOnboardingStatusMock.mockResolvedValue(INCOMPLETE);
+  getAccessStatusMock.mockResolvedValue(NO_SUBSCRIPTION);
+  getUserStoreCountMock.mockResolvedValue(0);
 });
 
 afterEach(() => {
   unmountMounted();
   vi.restoreAllMocks();
+  invalidateAccessStatusCache();
+  invalidateCachedOnboarding();
+  invalidateSessionUser();
 });
 
 describe("useOnboardingStatus", () => {
@@ -214,7 +259,7 @@ describe("useOnboardingStatus", () => {
     expect(getOnboardingStatusMock).toHaveBeenCalledTimes(2);
   });
 
-  it("fetches independently when two hooks mount on the same tree", async () => {
+  it("shares one onboarding fetch across two hooks on the same tree", async () => {
     getOnboardingStatusMock.mockResolvedValue(JOIN_COMPLETE);
 
     let latest: { first: OnboardingHookValue; second: OnboardingHookValue } | undefined;
@@ -233,7 +278,7 @@ describe("useOnboardingStatus", () => {
 
     expect(latest?.first.isJoining).toBe(true);
     expect(latest?.second.isJoining).toBe(true);
-    expect(getUserMock).toHaveBeenCalledTimes(2);
-    expect(getOnboardingStatusMock).toHaveBeenCalledTimes(2);
+    expect(getUserMock).toHaveBeenCalledTimes(1);
+    expect(getOnboardingStatusMock).toHaveBeenCalledTimes(1);
   });
 });

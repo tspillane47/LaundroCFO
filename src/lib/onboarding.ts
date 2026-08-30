@@ -122,8 +122,16 @@ export async function completeOnboarding(
 
 const ONBOARDING_STATUS_INVALIDATED = "laundrocfo:onboarding-status-invalidated";
 
+const onboardingCacheInvalidators: Array<() => void> = [];
+
+/** Let session-cache clear its onboarding records without a circular import. */
+export function registerOnboardingCacheInvalidator(fn: () => void): void {
+  onboardingCacheInvalidators.push(fn);
+}
+
 /** Bust client-side onboarding status reads (e.g. useOnboardingStatus) after completion. */
 export function invalidateOnboardingStatusCache(): void {
+  for (const fn of onboardingCacheInvalidators) fn();
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(ONBOARDING_STATUS_INVALIDATED));
   }

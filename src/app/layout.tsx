@@ -26,6 +26,7 @@ import { isAdminEmail } from "@/lib/admin";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { AlertNotificationProvider } from "@/components/alerts/AlertNotificationProvider";
 import { getOnboardingStatus, ONBOARDING_STATUS_INVALIDATED } from "@/lib/onboarding";
+import { SessionProvider } from "@/lib/session-context";
 
 function getUserInitials(fullName: string | null, email: string | null): string {
   const name = fullName?.trim();
@@ -810,6 +811,16 @@ function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+function SessionTree({ children }: { children: React.ReactNode }) {
+  return (
+    <SessionProvider>
+      <Suspense fallback={<OnboardingGuardFallback />}>
+        <OnboardingGuard>{children}</OnboardingGuard>
+      </Suspense>
+    </SessionProvider>
+  );
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = authPages.includes(pathname);
@@ -822,9 +833,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <body>
           <GoogleAnalytics gaId="G-ZCTEFSVP13" />
           <ToastProvider>
-            <Suspense fallback={<OnboardingGuardFallback />}>
-              <OnboardingGuard>{children}</OnboardingGuard>
-            </Suspense>
+            <SessionTree>{children}</SessionTree>
           </ToastProvider>
         </body>
       </html>
@@ -837,11 +846,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <body>
           <GoogleAnalytics gaId="G-ZCTEFSVP13" />
           <ToastProvider>
-            <Suspense fallback={<OnboardingGuardFallback />}>
-              <OnboardingGuard>
-                <StoreProvider>{children}</StoreProvider>
-              </OnboardingGuard>
-            </Suspense>
+            <SessionTree>
+              <StoreProvider>{children}</StoreProvider>
+            </SessionTree>
           </ToastProvider>
         </body>
       </html>
@@ -853,15 +860,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <GoogleAnalytics gaId="G-ZCTEFSVP13" />
         <ToastProvider>
-          <Suspense fallback={<OnboardingGuardFallback />}>
-            <OnboardingGuard>
-              <StoreProvider>
-                <AlertNotificationProvider>
-                  <AppShell>{children}</AppShell>
-                </AlertNotificationProvider>
-              </StoreProvider>
-            </OnboardingGuard>
-          </Suspense>
+          <SessionTree>
+            <StoreProvider>
+              <AlertNotificationProvider>
+                <AppShell>{children}</AppShell>
+              </AlertNotificationProvider>
+            </StoreProvider>
+          </SessionTree>
         </ToastProvider>
       </body>
     </html>

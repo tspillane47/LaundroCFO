@@ -28,6 +28,7 @@ vi.mock("@/lib/access", async (importOriginal) => {
   };
 });
 
+import { invalidateSessionUser } from "@/lib/session-cache";
 import { invalidateAccessStatusCache, useAccessStatus } from "@/lib/useAccessStatus";
 
 const USER_ID = "user-123";
@@ -153,6 +154,7 @@ function mockAccessByStoreId() {
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   invalidateAccessStatusCache();
+  invalidateSessionUser();
   getUserMock.mockReset();
   getAccessStatusMock.mockReset();
   getUserStoreCountMock.mockReset();
@@ -164,6 +166,7 @@ afterEach(() => {
   unmountMounted();
   vi.restoreAllMocks();
   invalidateAccessStatusCache();
+  invalidateSessionUser();
 });
 
 describe("useAccessStatus", () => {
