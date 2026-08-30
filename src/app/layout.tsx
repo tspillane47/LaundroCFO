@@ -26,7 +26,8 @@ import { isAdminEmail } from "@/lib/admin";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { AlertNotificationProvider } from "@/components/alerts/AlertNotificationProvider";
 import { getOnboardingStatus, ONBOARDING_STATUS_INVALIDATED } from "@/lib/onboarding";
-import { SessionProvider } from "@/lib/session-context";
+import { getCachedSessionUser } from "@/lib/session-cache";
+import { SessionProvider, useSession } from "@/lib/session-context";
 
 function getUserInitials(fullName: string | null, email: string | null): string {
   const name = fullName?.trim();
@@ -218,10 +219,15 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const [navTooltip, setNavTooltip] = useState<{ label: string; top: number; left: number } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [isAdminUser, setIsAdminUser] = useState(false);
+  const session = useSession();
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const awaitingSessionUser = Boolean(session && session.loading && !session.user);
+  const [fallbackEmail, setFallbackEmail] = useState<string | null>(null);
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [userFullName, setUserFullName] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const userEmail = session ? (session.user?.email ?? null) : fallbackEmail;
+  const isAdminUser = isAdminEmail(userEmail);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
   const sidebarStoreRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
@@ -232,16 +238,17 @@ function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (awaitingSessionUser) return;
     let cancelled = false;
 
     async function loadUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const current = sessionRef.current;
+      const user = current ? current.user : await getCachedSessionUser();
       if (cancelled || !user) return;
 
-      setIsAdminUser(isAdminEmail(user.email));
-      setUserEmail(user.email ?? null);
+      if (!current) {
+        setFallbackEmail(user.email ?? null);
+      }
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -251,9 +258,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
       if (cancelled) return;
 
-      setUserFullName(
-        (profile?.full_name as string | null) ?? (user.user_metadata?.full_name as string | undefined) ?? null
-      );
+      setUserFullName((profile?.full_name as string | null) ?? null);
       setUserAvatarUrl((profile?.avatar_url as string | null) ?? null);
     }
 
@@ -262,7 +267,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, [awaitingSessionUser, session?.user?.id, supabase]);
 
   function toggleSidebarCollapsed() {
     setSidebarCollapsed((prev) => {
