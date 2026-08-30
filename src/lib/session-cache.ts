@@ -55,6 +55,7 @@ type OnboardingRecord = {
   userId: string;
   status: OnboardingStatus;
   fetchedAt: number;
+  generation: number;
   promise?: Promise<OnboardingStatus>;
 };
 
@@ -151,7 +152,7 @@ export async function getCachedOnboarding(userId: string): Promise<OnboardingSta
   const now = Date.now();
   const existing = onboardingRecords.get(userId);
 
-  if (existing) {
+  if (existing && existing.generation === onboardingCacheGeneration) {
     if (existing.promise) return existing.promise;
     if (isFresh(existing.fetchedAt, now)) return existing.status;
   }
@@ -162,6 +163,7 @@ export async function getCachedOnboarding(userId: string): Promise<OnboardingSta
     userId,
     status: DEFAULT_ONBOARDING_STATUS,
     fetchedAt: now,
+    generation,
     promise,
   });
 
@@ -174,6 +176,7 @@ export async function getCachedOnboarding(userId: string): Promise<OnboardingSta
       userId,
       status,
       fetchedAt: Date.now(),
+      generation,
     });
     return status;
   } catch (error) {
@@ -187,6 +190,7 @@ export async function getCachedOnboarding(userId: string): Promise<OnboardingSta
 export function peekFreshOnboarding(userId: string): OnboardingRecord | null {
   const record = onboardingRecords.get(userId);
   if (!record || record.promise || !isFresh(record.fetchedAt)) return null;
+  if (record.generation !== onboardingCacheGeneration) return null;
   return record;
 }
 

@@ -35,7 +35,7 @@ export type SessionValue = {
 
 const SessionContext = createContext<SessionValue | null>(null);
 
-function readInitialSession(): SessionValue {
+export function readInitialSession(): SessionValue {
   const user = peekSessionUser();
   if (user === undefined) {
     return {
