@@ -1,6 +1,19 @@
 export const PLAID_QUICKBOOKS_BLOCK_MESSAGE =
   "Disconnect QuickBooks before connecting Plaid for this store.";
 
+export const PLAID_CONNECT_TRUST = {
+  title: "Your bank connection is secure",
+  cardHint: "Secured by Plaid · Read-only access",
+  intro:
+    "This uses Plaid, the same secure technology trusted by Venmo and most banking apps.",
+  points: [
+    "Read-only — LaundroCFO can see transactions, but cannot move money or make any changes.",
+    "Your bank login stays with Plaid. LaundroCFO never sees or stores your credentials.",
+  ],
+  continueLabel: "Continue with Plaid",
+  cancelLabel: "Not now",
+} as const;
+
 export type FinancialDataSourceLike = "manual" | "quickbooks" | "bank_import" | null;
 
 export function isQuickBooksDataSource(source: FinancialDataSourceLike): boolean {

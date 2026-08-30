@@ -51,8 +51,9 @@ function LoginForm() {
         </div>
         <div className="card space-y-4">
           {urlError === "verification_failed" && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[12px] text-red-400">
-              Email verification failed. Please try signing in or request a new verification email.
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-[12px] text-blue-400">
+              This confirmation link didn&apos;t complete — often because your email provider
+              scanned it first. Try signing in; your account may already be confirmed.
             </div>
           )}
           {urlMessage === "check_email" && (

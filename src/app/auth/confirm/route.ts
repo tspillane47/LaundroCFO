@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(
       buildAuthCallbackRedirect(origin, errorPath, {
         error: resolveAuthCallbackErrorCode(type),
-        message: error.message,
+        type,
       })
     )
   }

@@ -7,6 +7,7 @@ import {
   isPlaidUpdateModeEligible,
   isQuickBooksDataSource,
   normalizePlaidTransaction,
+  PLAID_CONNECT_TRUST,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
 } from "@/lib/plaid-shared";
 
@@ -22,6 +23,17 @@ describe("Plaid connection guards", () => {
     expect(PLAID_QUICKBOOKS_BLOCK_MESSAGE).toBe(
       "Disconnect QuickBooks before connecting Plaid for this store."
     );
+  });
+
+  it("explains Plaid trust in a short, read-only reassurance", () => {
+    expect(PLAID_CONNECT_TRUST.title).toMatch(/secure/i);
+    expect(PLAID_CONNECT_TRUST.intro).toMatch(/Plaid/);
+    expect(PLAID_CONNECT_TRUST.intro).toMatch(/Venmo/);
+    expect(PLAID_CONNECT_TRUST.points.join(" ")).toMatch(/read-only/i);
+    expect(PLAID_CONNECT_TRUST.points.join(" ")).toMatch(/cannot move money/i);
+    expect(PLAID_CONNECT_TRUST.points.join(" ")).toMatch(/never sees or stores/i);
+    expect(PLAID_CONNECT_TRUST.continueLabel).toBe("Continue with Plaid");
+    expect(PLAID_CONNECT_TRUST.cardHint).toBe("Secured by Plaid · Read-only access");
   });
 
   it("falls back to a generic bank label when institution name is missing", () => {

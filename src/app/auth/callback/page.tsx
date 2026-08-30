@@ -1,13 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AuthConfirmationError } from "@/components/auth/AuthConfirmationError";
 import { createClient } from "@/lib/supabase";
 import { isOnboardingComplete } from "@/lib/onboarding";
 import { invalidateSessionUser } from "@/lib/session-cache";
 import {
-  isEmailChangeType,
+  logAuthConfirmationError,
+  resolveAuthConfirmationErrorKind,
   resolvePostAuthDestination,
 } from "@/lib/auth-callback";
 
@@ -43,12 +44,8 @@ function AuthCallbackContent() {
       if (cancelled) return;
 
       if (error) {
-        console.error("Auth callback failed:", error.message);
-        setErrorMessage(
-          isEmailChangeType(type)
-            ? `We couldn't confirm your email change: ${error.message}`
-            : `Email confirmation failed: ${error.message}`
-        );
+        logAuthConfirmationError("auth-callback", error.message);
+        setErrorMessage(error.message);
         return;
       }
 
@@ -76,33 +73,12 @@ function AuthCallbackContent() {
   }, [router, searchParams, supabase]);
 
   if (errorMessage) {
-    const isEmailChange = isEmailChangeType(searchParams.get("type"));
-
     return (
-      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center px-4">
-        <div className="w-full max-w-md card space-y-4 text-center">
-          <h1 className="text-[22px] font-bold text-slate-100">
-            {isEmailChange ? "Email change failed" : "Confirmation failed"}
-          </h1>
-          <p className="text-[14px] text-red-400 leading-relaxed">{errorMessage}</p>
-          <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
-            The link may have expired, already been used, or was opened in a different browser
-            than the one where you requested the change. Request a new confirmation email and
-            open the link in the same browser.
-          </p>
-          <div className="flex flex-col gap-2 pt-2">
-            {isEmailChange ? (
-              <Link href="/account" className="btn-primary w-full py-2.5 text-[13px]">
-                Back to Account
-              </Link>
-            ) : (
-              <Link href="/login" className="btn-primary w-full py-2.5 text-[13px]">
-                Back to Sign In
-              </Link>
-            )}
-          </div>
-        </div>
-      </div>
+      <AuthConfirmationError
+        kind={resolveAuthConfirmationErrorKind(searchParams.get("type"))}
+        technicalMessage={errorMessage}
+        logContext="auth-callback-ui"
+      />
     );
   }
 

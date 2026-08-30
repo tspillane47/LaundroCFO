@@ -28,6 +28,7 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { DSCRCard } from "@/components/ui/DSCRCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { CurrentMonthlyAveragesPanel } from "@/components/financials/CurrentMonthlyAveragesPanel";
+import { PlaidConnectTrustPanel } from "@/components/financials/PlaidConnectTrustPanel";
 import { YearRevenueEbitdaChart } from "@/components/financials/YearRevenueEbitdaChart";
 import { buildYearRevenueEbitdaChartData } from "@/lib/yearRevenueEbitdaChart";
 import {
@@ -89,6 +90,7 @@ import {
   formatPlaidConnectionLabel,
   formatPlaidItemErrorMessage,
   isPlaidUpdateModeEligible,
+  PLAID_CONNECT_TRUST,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
   type PlaidSyncResult,
 } from "@/lib/plaid-shared";
@@ -412,6 +414,7 @@ export default function FinancialsPage() {
   const [plaidDisconnectConfirmConnectionId, setPlaidDisconnectConfirmConnectionId] = useState<string | null>(
     null
   );
+  const [showPlaidConnectTrust, setShowPlaidConnectTrust] = useState(false);
   const [disconnectingQb, setDisconnectingQb] = useState(false);
   const [syncingQb, setSyncingQb] = useState(false);
   const [showQbSourceWarning, setShowQbSourceWarning] = useState(false);
@@ -2060,24 +2063,40 @@ export default function FinancialsPage() {
                 <div className="text-[11px] text-amber-200 mt-1">{PLAID_QUICKBOOKS_BLOCK_MESSAGE}</div>
               )}
             </div>
-            <ReadOnlyGuard>
-              <button
-                type="button"
-                className={clsx(
-                  "btn-primary flex-shrink-0",
-                  (!store?.id || plaidBlockedByQuickBooks) && "pointer-events-none opacity-50"
-                )}
-                onClick={() => void initiatePlaidConnect()}
-                disabled={!store?.id || connectingPlaid || plaidBlockedByQuickBooks}
-              >
-                {connectingPlaid && plaidLinkModeRef.current === "connect"
-                  ? "Connecting…"
-                  : hasPlaidConnections
-                    ? "Connect Another Account"
-                    : "Connect Bank Account"}
-              </button>
-            </ReadOnlyGuard>
+            <div className="flex flex-col items-stretch sm:items-end gap-1.5 flex-shrink-0">
+              <ReadOnlyGuard>
+                <button
+                  type="button"
+                  className={clsx(
+                    "btn-primary",
+                    (!store?.id || plaidBlockedByQuickBooks) && "pointer-events-none opacity-50"
+                  )}
+                  onClick={() => setShowPlaidConnectTrust(true)}
+                  disabled={!store?.id || connectingPlaid || plaidBlockedByQuickBooks}
+                >
+                  {connectingPlaid && plaidLinkModeRef.current === "connect"
+                    ? "Connecting…"
+                    : hasPlaidConnections
+                      ? "Connect Another Account"
+                      : "Connect Bank Account"}
+                </button>
+              </ReadOnlyGuard>
+              <p className="text-[10px] text-[var(--text-muted)] text-center sm:text-right leading-tight">
+                {PLAID_CONNECT_TRUST.cardHint}
+              </p>
+            </div>
           </div>
+
+          {showPlaidConnectTrust && (
+            <PlaidConnectTrustPanel
+              busy={connectingPlaid}
+              onCancel={() => setShowPlaidConnectTrust(false)}
+              onContinue={() => {
+                setShowPlaidConnectTrust(false);
+                void initiatePlaidConnect();
+              }}
+            />
+          )}
 
           {plaidConnections.length > 1 && (
             <div className="card flex flex-col sm:flex-row sm:items-center justify-between gap-3">

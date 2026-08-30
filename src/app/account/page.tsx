@@ -214,10 +214,8 @@ export default function AccountPage() {
       setEmailError("");
       router.replace("/account", { scroll: false });
     } else if (searchParams.get("error") === "email_change_failed") {
-      const detail = searchParams.get("message");
       setEmailError(
-        detail ??
-          "We couldn't confirm your email change. The link may have expired — request a new confirmation email and try again."
+        "We couldn't confirm your email change. This can happen if the link expired or was opened by your email provider — request a new confirmation email and try again."
       );
       setEmailSuccess("");
       router.replace("/account", { scroll: false });
