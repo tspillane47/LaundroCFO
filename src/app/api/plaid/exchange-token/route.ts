@@ -5,10 +5,15 @@ import {
 } from "@/lib/quickbooks";
 import {
   exchangePlaidPublicToken,
+  persistPlaidLinkSelectedAccounts,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
   updateStoreFinancialDataSourceOnPlaidConnect,
   upsertPlaidConnection,
 } from "@/lib/plaid";
+import {
+  parsePlaidLinkSelectedAccounts,
+  PlaidLinkAccountsRequiredError,
+} from "@/lib/plaid-shared";
 import { verifyUserCanAccessStore } from "@/lib/store-access";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -22,7 +27,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { storeId?: unknown; public_token?: unknown };
+  let body: { storeId?: unknown; public_token?: unknown; accounts?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -44,6 +49,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Store not found" }, { status: 403 });
   }
 
+  let selectedAccounts;
+  try {
+    selectedAccounts = parsePlaidLinkSelectedAccounts(body.accounts);
+  } catch (error) {
+    if (error instanceof PlaidLinkAccountsRequiredError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
+
   try {
     await reconcileStoreFinancialDataSourceWithQuickBooksConnection(storeId);
     if (await storeHasQuickBooksConnection(storeId)) {
@@ -52,12 +67,18 @@ export async function POST(request: Request) {
 
     const exchangeResult = await exchangePlaidPublicToken(publicToken);
 
-    await upsertPlaidConnection({
+    const connection = await upsertPlaidConnection({
       storeId,
       userId: user.id,
       itemId: exchangeResult.itemId,
       accessToken: exchangeResult.accessToken,
       institutionName: exchangeResult.institutionName,
+    });
+
+    await persistPlaidLinkSelectedAccounts({
+      connectionId: connection.id,
+      storeId,
+      accounts: selectedAccounts,
     });
 
     await updateStoreFinancialDataSourceOnPlaidConnect(storeId);

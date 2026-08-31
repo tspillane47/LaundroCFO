@@ -4,6 +4,8 @@ import { createHash, createPublicKey, timingSafeEqual, verify } from "crypto";
 import {
   Configuration,
   CountryCode,
+  CreditAccountSubtype,
+  DepositoryAccountSubtype,
   PlaidApi,
   PlaidEnvironments,
   Products,
@@ -29,8 +31,11 @@ import {
   planPlaidAddedTransactions,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
   EMPTY_PLAID_BALANCE_SYNC_RESULT,
+  buildPlaidLinkSelectedAccountRows,
+  buildPlaidLinkTokenAccountOptions,
   type ExistingPlaidBankRow,
   type PlaidBalanceSyncResult,
+  type PlaidLinkSelectedAccount,
   type PlaidSyncResult,
 } from "@/lib/plaid-shared";
 import {
@@ -481,6 +486,11 @@ export async function getStoreFinancialDataSource(storeId: string): Promise<Fina
   return (data?.financial_data_source as FinancialDataSource | undefined) ?? null;
 }
 
+export function getPlaidLinkCustomizationName(): string | null {
+  const name = process.env.PLAID_LINK_CUSTOMIZATION_NAME?.trim();
+  return name || null;
+}
+
 async function createPlaidLinkTokenInternal(
   userId: string,
   options?: { accessToken?: string }
@@ -490,6 +500,20 @@ async function createPlaidLinkTokenInternal(
   const webhookUrl = getPlaidWebhookUrl();
   const redirectUri = getPlaidRedirectUri();
   const isUpdateMode = Boolean(options?.accessToken);
+  const accountOptions = buildPlaidLinkTokenAccountOptions({
+    customizationName: getPlaidLinkCustomizationName(),
+    includeAccountFilters: !isUpdateMode,
+  });
+  const accountFilters = accountOptions.account_filters
+    ? {
+        depository: {
+          account_subtypes: [DepositoryAccountSubtype.Checking, DepositoryAccountSubtype.Savings],
+        },
+        credit: {
+          account_subtypes: [CreditAccountSubtype.CreditCard],
+        },
+      }
+    : undefined;
 
   const linkTokenRequest = isUpdateMode
     ? {
@@ -500,6 +524,10 @@ async function createPlaidLinkTokenInternal(
         webhook: webhookUrl,
         redirect_uri: redirectUri,
         access_token: options!.accessToken!,
+        ...(accountFilters ? { account_filters: accountFilters } : {}),
+        ...(accountOptions.link_customization_name
+          ? { link_customization_name: accountOptions.link_customization_name }
+          : {}),
       }
     : {
         user: { client_user_id: userId },
@@ -509,6 +537,10 @@ async function createPlaidLinkTokenInternal(
         language: "en",
         webhook: webhookUrl,
         redirect_uri: redirectUri,
+        ...(accountFilters ? { account_filters: accountFilters } : {}),
+        ...(accountOptions.link_customization_name
+          ? { link_customization_name: accountOptions.link_customization_name }
+          : {}),
       };
 
   console.info(
@@ -756,6 +788,23 @@ export async function upsertPlaidConnection(params: {
   }
 
   return decryptPlaidConnectionRow(data as PlaidConnectionRow);
+}
+
+export async function persistPlaidLinkSelectedAccounts(params: {
+  connectionId: string;
+  storeId: string;
+  accounts: PlaidLinkSelectedAccount[];
+}): Promise<void> {
+  const rows = buildPlaidLinkSelectedAccountRows(params);
+  if (rows.length === 0) {
+    throw new Error("No Plaid Link accounts to persist");
+  }
+
+  const admin = createAdminSupabaseClient();
+  const { error } = await admin.from("plaid_accounts").upsert(rows, { onConflict: "plaid_account_id" });
+  if (error) {
+    throw new Error(`Failed to persist selected Plaid accounts: ${error.message}`);
+  }
 }
 
 export async function updateStoreFinancialDataSourceOnPlaidConnect(storeId: string): Promise<void> {

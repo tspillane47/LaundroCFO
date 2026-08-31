@@ -5,7 +5,7 @@ import { useFormReveal } from "@/lib/useFormReveal";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
-import { usePlaidLink } from "react-plaid-link";
+import { usePlaidLink, type PlaidLinkOnSuccessMetadata } from "react-plaid-link";
 import {
   Area,
   AreaChart,
@@ -90,6 +90,7 @@ import {
   formatPlaidConnectionLabel,
   formatPlaidItemErrorMessage,
   isPlaidUpdateModeEligible,
+  mapPlaidLinkSuccessAccounts,
   PLAID_CONNECT_TRUST,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
   type PlaidSyncResult,
@@ -1077,7 +1078,7 @@ export default function FinancialsPage() {
 
   const { open: openPlaidLink, ready: plaidLinkReady } = usePlaidLink({
     token: plaidLinkToken,
-    onSuccess: async (publicToken) => {
+    onSuccess: async (publicToken, metadata: PlaidLinkOnSuccessMetadata) => {
       if (!store?.id) return;
       setConnectingPlaid(true);
       setError("");
@@ -1085,6 +1086,7 @@ export default function FinancialsPage() {
 
       const isUpdateMode = plaidLinkModeRef.current === "update";
       const connectionId = plaidLinkConnectionIdRef.current;
+      const accounts = mapPlaidLinkSuccessAccounts(metadata);
 
       try {
         if (isUpdateMode) {
@@ -1095,7 +1097,7 @@ export default function FinancialsPage() {
           const response = await fetch("/api/plaid/complete-update-mode", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ storeId: store.id, connectionId }),
+            body: JSON.stringify({ storeId: store.id, connectionId, accounts }),
           });
 
           const payload = (await response.json().catch(() => null)) as
@@ -1120,6 +1122,7 @@ export default function FinancialsPage() {
           body: JSON.stringify({
             storeId: store.id,
             public_token: publicToken,
+            accounts,
           }),
         });
 

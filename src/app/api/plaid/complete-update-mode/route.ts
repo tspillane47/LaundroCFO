@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import {
   clearPlaidConnectionItemErrorById,
   getPlaidConnectionById,
+  persistPlaidLinkSelectedAccounts,
   PlaidNotConnectedError,
   syncPlaidTransactions,
 } from "@/lib/plaid";
+import { parseOptionalPlaidLinkSelectedAccounts } from "@/lib/plaid-shared";
 import { verifyUserCanAccessStore } from "@/lib/store-access";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -18,7 +20,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { storeId?: unknown; connectionId?: unknown };
+  let body: { storeId?: unknown; connectionId?: unknown; accounts?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -47,6 +49,15 @@ export async function POST(request: Request) {
     }
 
     await clearPlaidConnectionItemErrorById(connectionId);
+
+    const selectedAccounts = parseOptionalPlaidLinkSelectedAccounts(body.accounts);
+    if (selectedAccounts) {
+      await persistPlaidLinkSelectedAccounts({
+        connectionId,
+        storeId,
+        accounts: selectedAccounts,
+      });
+    }
 
     let syncResult = null;
     try {

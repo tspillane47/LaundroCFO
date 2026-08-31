@@ -28,6 +28,162 @@ export const DEFAULT_PLAID_WEBHOOK_URL = "https://www.laundrocfo.com/api/webhook
 
 export const DEFAULT_PLAID_REDIRECT_URI = "https://www.laundrocfo.com/financials";
 
+export const PLAID_LINK_ACCOUNTS_REQUIRED_MESSAGE = "No bank accounts were selected";
+
+export const PLAID_LINK_ACCOUNT_FILTERS = {
+  depository: { account_subtypes: ["checking", "savings"] },
+  credit: { account_subtypes: ["credit card"] },
+} as const;
+
+export type PlaidLinkSuccessAccountLike = {
+  id: string;
+  name?: string | null;
+  mask?: string | null;
+  type?: string | null;
+  subtype?: string | null;
+};
+
+export type PlaidLinkSelectedAccount = {
+  plaid_account_id: string;
+  account_name: string;
+  mask: string | null;
+  account_type: string;
+  account_subtype: string | null;
+};
+
+export type PlaidLinkSelectedAccountRow = PlaidLinkSelectedAccount & {
+  plaid_connection_id: string;
+  store_id: string;
+  included: true;
+  selected_via_link: true;
+};
+
+export class PlaidLinkAccountsRequiredError extends Error {
+  constructor(message = PLAID_LINK_ACCOUNTS_REQUIRED_MESSAGE) {
+    super(message);
+    this.name = "PlaidLinkAccountsRequiredError";
+  }
+}
+
+export function buildPlaidLinkTokenAccountOptions(params: {
+  customizationName?: string | null;
+  includeAccountFilters: boolean;
+}): {
+  account_filters?: typeof PLAID_LINK_ACCOUNT_FILTERS;
+  link_customization_name?: string;
+} {
+  const customizationName = params.customizationName?.trim();
+  return {
+    ...(params.includeAccountFilters ? { account_filters: PLAID_LINK_ACCOUNT_FILTERS } : {}),
+    ...(customizationName ? { link_customization_name: customizationName } : {}),
+  };
+}
+
+export function mapPlaidLinkSuccessAccounts(
+  metadata: { accounts?: PlaidLinkSuccessAccountLike[] | null }
+): PlaidLinkSuccessAccountLike[] {
+  return (metadata.accounts ?? []).map((account) => ({
+    id: account.id,
+    name: account.name ?? null,
+    mask: account.mask ?? null,
+    type: account.type ?? null,
+    subtype: account.subtype ?? null,
+  }));
+}
+
+function readLinkAccountId(value: unknown): string | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+  const record = value as { id?: unknown; plaid_account_id?: unknown };
+  const raw = typeof record.id === "string" ? record.id : record.plaid_account_id;
+  const id = typeof raw === "string" ? raw.trim() : "";
+  return id || null;
+}
+
+export function parsePlaidLinkSelectedAccounts(input: unknown): PlaidLinkSelectedAccount[] {
+  if (!Array.isArray(input) || input.length === 0) {
+    throw new PlaidLinkAccountsRequiredError();
+  }
+
+  const accounts: PlaidLinkSelectedAccount[] = [];
+  for (const item of input) {
+    const plaidAccountId = readLinkAccountId(item);
+    if (!plaidAccountId) {
+      throw new PlaidLinkAccountsRequiredError();
+    }
+    if (typeof item !== "object" || item === null) {
+      throw new PlaidLinkAccountsRequiredError();
+    }
+    const record = item as {
+      name?: unknown;
+      account_name?: unknown;
+      mask?: unknown;
+      type?: unknown;
+      account_type?: unknown;
+      subtype?: unknown;
+      account_subtype?: unknown;
+    };
+    const rawName =
+      (typeof record.name === "string" && record.name.trim()) ||
+      (typeof record.account_name === "string" && record.account_name.trim()) ||
+      "";
+    const rawType =
+      (typeof record.type === "string" && record.type.trim()) ||
+      (typeof record.account_type === "string" && record.account_type.trim()) ||
+      "";
+    const rawSubtype =
+      (typeof record.subtype === "string" && record.subtype.trim()) ||
+      (typeof record.account_subtype === "string" && record.account_subtype.trim()) ||
+      "";
+    const rawMask = typeof record.mask === "string" ? record.mask.trim() : "";
+
+    accounts.push({
+      plaid_account_id: plaidAccountId,
+      account_name: rawName || "Bank account",
+      mask: rawMask || null,
+      account_type: rawType || "depository",
+      account_subtype: rawSubtype || null,
+    });
+  }
+
+  return accounts;
+}
+
+export function parseOptionalPlaidLinkSelectedAccounts(
+  input: unknown
+): PlaidLinkSelectedAccount[] | null {
+  if (input === undefined || input === null) {
+    return null;
+  }
+  if (!Array.isArray(input) || input.length === 0) {
+    return null;
+  }
+  try {
+    return parsePlaidLinkSelectedAccounts(input);
+  } catch {
+    return null;
+  }
+}
+
+export function buildPlaidLinkSelectedAccountRows(params: {
+  connectionId: string;
+  storeId: string;
+  accounts: PlaidLinkSelectedAccount[];
+}): PlaidLinkSelectedAccountRow[] {
+  return params.accounts.map((account) => ({
+    plaid_connection_id: params.connectionId,
+    store_id: params.storeId,
+    plaid_account_id: account.plaid_account_id,
+    account_name: account.account_name,
+    mask: account.mask,
+    account_type: account.account_type,
+    account_subtype: account.account_subtype,
+    included: true,
+    selected_via_link: true,
+  }));
+}
+
 /** Item error codes that Plaid resolves via Link update mode (re-auth without a new Item). */
 export function isPlaidUpdateModeEligible(
   errorCode: string | null | undefined

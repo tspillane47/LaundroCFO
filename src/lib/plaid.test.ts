@@ -1,14 +1,22 @@
 import { describe, expect, it } from "vitest";
+import type { PlaidLinkOnSuccessMetadata } from "react-plaid-link";
 import {
+  buildPlaidLinkSelectedAccountRows,
+  buildPlaidLinkTokenAccountOptions,
   formatPlaidConnectionLabel,
   formatPlaidItemErrorMessage,
   isPlaidSyncProtectedStatus,
   isPlaidSyncRemovableStatus,
   isPlaidUpdateModeEligible,
   isQuickBooksDataSource,
+  mapPlaidLinkSuccessAccounts,
   normalizePlaidTransaction,
+  parsePlaidLinkSelectedAccounts,
   PLAID_CONNECT_TRUST,
+  PLAID_LINK_ACCOUNT_FILTERS,
+  PLAID_LINK_ACCOUNTS_REQUIRED_MESSAGE,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
+  PlaidLinkAccountsRequiredError,
 } from "@/lib/plaid-shared";
 
 describe("Plaid connection guards", () => {
@@ -124,5 +132,105 @@ describe("Plaid sync status guards", () => {
     expect(isPlaidSyncRemovableStatus("excluded")).toBe(true);
     expect(isPlaidSyncRemovableStatus("posted")).toBe(false);
     expect(isPlaidSyncRemovableStatus(null)).toBe(true);
+  });
+});
+
+describe("Plaid Link account selection", () => {
+  it("includes checking/savings and credit card filters on new-item tokens", () => {
+    const options = buildPlaidLinkTokenAccountOptions({ includeAccountFilters: true });
+
+    expect(options.account_filters).toEqual({
+      depository: { account_subtypes: ["checking", "savings"] },
+      credit: { account_subtypes: ["credit card"] },
+    });
+    expect(options.account_filters).toEqual(PLAID_LINK_ACCOUNT_FILTERS);
+    expect(options).not.toHaveProperty("link_customization_name");
+  });
+
+  it("adds link_customization_name when set and omits filters in update mode", () => {
+    expect(
+      buildPlaidLinkTokenAccountOptions({
+        includeAccountFilters: true,
+        customizationName: "  laundrocfo_multi_select  ",
+      })
+    ).toEqual({
+      account_filters: PLAID_LINK_ACCOUNT_FILTERS,
+      link_customization_name: "laundrocfo_multi_select",
+    });
+
+    expect(
+      buildPlaidLinkTokenAccountOptions({
+        includeAccountFilters: false,
+        customizationName: "laundrocfo_multi_select",
+      })
+    ).toEqual({
+      link_customization_name: "laundrocfo_multi_select",
+    });
+  });
+
+  it("rejects missing or empty Link account selections", () => {
+    expect(() => parsePlaidLinkSelectedAccounts(undefined)).toThrow(PlaidLinkAccountsRequiredError);
+    expect(() => parsePlaidLinkSelectedAccounts([])).toThrow(PLAID_LINK_ACCOUNTS_REQUIRED_MESSAGE);
+    expect(() => parsePlaidLinkSelectedAccounts([{ name: "Checking" }])).toThrow(
+      PLAID_LINK_ACCOUNTS_REQUIRED_MESSAGE
+    );
+  });
+
+  it("builds upsert rows with selected Link account fields", () => {
+    const accounts = parsePlaidLinkSelectedAccounts([
+      {
+        id: "acc-checking",
+        name: "Business Basic Checking",
+        mask: "6849",
+        type: "depository",
+        subtype: "checking",
+      },
+    ]);
+
+    expect(
+      buildPlaidLinkSelectedAccountRows({
+        connectionId: "conn-1",
+        storeId: "store-1",
+        accounts,
+      })
+    ).toEqual([
+      {
+        plaid_connection_id: "conn-1",
+        store_id: "store-1",
+        plaid_account_id: "acc-checking",
+        account_name: "Business Basic Checking",
+        mask: "6849",
+        account_type: "depository",
+        account_subtype: "checking",
+        included: true,
+        selected_via_link: true,
+      },
+    ]);
+  });
+
+  it("maps onSuccess metadata.accounts for the exchange-token request", () => {
+    const metadata = {
+      institution: { name: "Community Bank N.A.", institution_id: "ins_1" },
+      accounts: [
+        {
+          id: "acc-1",
+          name: "CKCARBUS 0001",
+          mask: "1884",
+          type: "depository",
+          subtype: "checking",
+        },
+      ],
+      link_session_id: "session-1",
+    } as PlaidLinkOnSuccessMetadata;
+
+    expect(mapPlaidLinkSuccessAccounts(metadata)).toEqual([
+      {
+        id: "acc-1",
+        name: "CKCARBUS 0001",
+        mask: "1884",
+        type: "depository",
+        subtype: "checking",
+      },
+    ]);
   });
 });
