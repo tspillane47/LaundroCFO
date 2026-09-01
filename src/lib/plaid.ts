@@ -33,7 +33,10 @@ import {
   EMPTY_PLAID_BALANCE_SYNC_RESULT,
   buildPlaidLinkSelectedAccountRows,
   buildPlaidLinkTokenAccountOptions,
+  filterPlaidAddedTransactionsToIncludedAccounts,
+  planPlaidAccountBalanceWrites,
   type ExistingPlaidBankRow,
+  type PlaidAccountInclusionRow,
   type PlaidBalanceSyncResult,
   type PlaidLinkSelectedAccount,
   type PlaidSyncResult,
@@ -1032,6 +1035,7 @@ async function applyPlaidAddedTransactions(params: {
         .from("bank_transactions")
         .update({
           plaid_transaction_id: normalized.plaid_transaction_id,
+          plaid_account_id: normalized.plaid_account_id,
           transaction_date: normalized.transaction_date,
           description: normalized.description,
           amount: normalized.amount,
@@ -1074,6 +1078,7 @@ async function applyPlaidAddedTransactions(params: {
       transaction_type: normalized.transaction_type,
       original_category: category as BankImportCategory,
       plaid_transaction_id: normalized.plaid_transaction_id,
+      plaid_account_id: normalized.plaid_account_id,
       status: "needs_review" satisfies TransactionStatus,
       is_reviewed: false,
       excluded: false,
@@ -1124,6 +1129,7 @@ async function applyPlaidModifiedTransactions(params: {
           .from("bank_transactions")
           .update({
             description: normalized.description,
+            plaid_account_id: normalized.plaid_account_id,
             modified_at: new Date().toISOString(),
           })
           .eq("id", existing.id);
@@ -1157,6 +1163,7 @@ async function applyPlaidModifiedTransactions(params: {
         amount: normalized.amount,
         transaction_type: normalized.transaction_type,
         category: category as BankImportCategory,
+        plaid_account_id: normalized.plaid_account_id,
         modified_at: new Date().toISOString(),
       })
       .eq("id", existing.id);
@@ -1230,6 +1237,20 @@ async function persistPlaidSyncCursor(connectionId: string, syncCursor: string):
   }
 }
 
+async function loadPlaidAccountInclusionRows(storeId: string): Promise<PlaidAccountInclusionRow[]> {
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("plaid_accounts")
+    .select("plaid_account_id, included")
+    .eq("store_id", storeId);
+
+  if (error) {
+    throw new Error(`Failed to load Plaid account inclusion: ${error.message}`);
+  }
+
+  return (data ?? []) as PlaidAccountInclusionRow[];
+}
+
 export async function syncPlaidAccountBalances(
   connectionId: string,
   connection?: PlaidConnectionRow
@@ -1250,29 +1271,6 @@ export async function syncPlaidAccountBalances(
 
   const admin = createAdminSupabaseClient();
   const syncedAt = new Date().toISOString();
-  const returnedAccountIds = accounts.map((account) => account.account_id);
-
-  if (accounts.length > 0) {
-    const rows = accounts.map((account) => ({
-      plaid_connection_id: connectionId,
-      store_id: resolvedConnection.store_id,
-      plaid_account_id: account.account_id,
-      account_name: account.name,
-      account_type: account.type,
-      account_subtype: account.subtype ?? null,
-      current_balance: account.balances.current ?? 0,
-      available_balance: account.balances.available ?? null,
-      last_synced_at: syncedAt,
-    }));
-
-    const { error: upsertError } = await admin
-      .from("plaid_accounts")
-      .upsert(rows, { onConflict: "plaid_account_id" });
-
-    if (upsertError) {
-      throw new Error(`Failed to upsert Plaid accounts: ${upsertError.message}`);
-    }
-  }
 
   const { data: existingRows, error: existingError } = await admin
     .from("plaid_accounts")
@@ -1283,17 +1281,47 @@ export async function syncPlaidAccountBalances(
     throw new Error(`Failed to load existing Plaid accounts: ${existingError.message}`);
   }
 
-  const staleIds = (existingRows ?? [])
-    .filter((row) => !returnedAccountIds.includes(row.plaid_account_id))
-    .map((row) => row.id);
+  const plan = planPlaidAccountBalanceWrites({
+    connectionId,
+    storeId: resolvedConnection.store_id,
+    syncedAt,
+    accounts,
+    existingRows: existingRows ?? [],
+  });
+
+  for (const row of plan.updates) {
+    const { error: updateError } = await admin
+      .from("plaid_accounts")
+      .update({
+        account_name: row.account_name,
+        account_type: row.account_type,
+        account_subtype: row.account_subtype,
+        mask: row.mask,
+        current_balance: row.current_balance,
+        available_balance: row.available_balance,
+        last_synced_at: row.last_synced_at,
+      })
+      .eq("plaid_account_id", row.plaid_account_id);
+
+    if (updateError) {
+      throw new Error(`Failed to update Plaid account: ${updateError.message}`);
+    }
+  }
+
+  if (plan.inserts.length > 0) {
+    const { error: insertError } = await admin.from("plaid_accounts").insert(plan.inserts);
+    if (insertError) {
+      throw new Error(`Failed to insert Plaid accounts: ${insertError.message}`);
+    }
+  }
 
   let accountsRemoved = 0;
-  if (staleIds.length > 0) {
-    const { error: deleteError } = await admin.from("plaid_accounts").delete().in("id", staleIds);
+  if (plan.staleIds.length > 0) {
+    const { error: deleteError } = await admin.from("plaid_accounts").delete().in("id", plan.staleIds);
     if (deleteError) {
       throw new Error(`Failed to delete stale Plaid accounts: ${deleteError.message}`);
     }
-    accountsRemoved = staleIds.length;
+    accountsRemoved = plan.staleIds.length;
   }
 
   return {
@@ -1345,9 +1373,15 @@ export async function syncPlaidTransactions(connectionId: string): Promise<Plaid
       connection.sync_cursor
     );
 
+    const inclusionRows = await loadPlaidAccountInclusionRows(storeId);
+    const includedAdded = filterPlaidAddedTransactionsToIncludedAccounts(
+      batch.added,
+      inclusionRows
+    );
+
     const allPlaidIds = [
-      ...batch.added.map((txn) => txn.transaction_id),
-      ...batch.added
+      ...includedAdded.map((txn) => txn.transaction_id),
+      ...includedAdded
         .map((txn) => txn.pending_transaction_id)
         .filter((id): id is string => Boolean(id?.trim())),
       ...batch.modified.map((txn) => txn.transaction_id),
@@ -1359,7 +1393,7 @@ export async function syncPlaidTransactions(connectionId: string): Promise<Plaid
     const { inserted, reconciled } = await applyPlaidAddedTransactions({
       storeId,
       userId: connection.user_id,
-      added: batch.added,
+      added: includedAdded,
       removed: batch.removed,
       rules,
       existingByPlaidId,

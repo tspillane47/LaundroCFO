@@ -249,34 +249,74 @@ export type PlaidAccountBalanceRow = {
   account_type: string;
   current_balance: number | string;
   last_synced_at?: string | null;
+  included?: boolean | null;
+  plaid_account_id?: string;
 };
 
 export type PlaidAccountBalanceRowWithStore = PlaidAccountBalanceRow & {
   store_id: string;
 };
 
+export type PlaidAccountInclusionRow = {
+  plaid_account_id: string;
+  included?: boolean | null;
+};
+
+/** Missing `included` is treated as true so older snapshots/tests stay valid. */
+export function isPlaidAccountIncludedForBalances(
+  account: Pick<PlaidAccountBalanceRow, "included">
+): boolean {
+  return account.included !== false;
+}
+
+export function includedPlaidAccountsForBalances(
+  accounts: PlaidAccountBalanceRow[]
+): PlaidAccountBalanceRow[] {
+  return accounts.filter(isPlaidAccountIncludedForBalances);
+}
+
+/** Fail-closed: unknown or omitted account ids are not included. */
+export function isPlaidAccountIncluded(
+  accountId: string | null | undefined,
+  accounts: PlaidAccountInclusionRow[]
+): boolean {
+  const id = accountId?.trim();
+  if (!id) {
+    return false;
+  }
+  return accounts.some((account) => account.plaid_account_id === id && account.included === true);
+}
+
+export function filterPlaidAddedTransactionsToIncludedAccounts<
+  T extends { account_id?: string | null },
+>(added: T[], accounts: PlaidAccountInclusionRow[]): T[] {
+  return added.filter((txn) => isPlaidAccountIncluded(txn.account_id, accounts));
+}
+
 /** Sum depository account balances for a store's synced Plaid accounts. */
 export function sumPlaidCashOnHand(accounts: PlaidAccountBalanceRow[]): number {
-  return accounts
+  return includedPlaidAccountsForBalances(accounts)
     .filter((account) => account.account_type === "depository")
     .reduce((sum, account) => sum + Number(account.current_balance ?? 0), 0);
 }
 
 /** Sum credit account balances for a store's synced Plaid accounts (net debt, not clamped). */
 export function sumPlaidCreditCardDebt(accounts: PlaidAccountBalanceRow[]): number {
-  return accounts
+  return includedPlaidAccountsForBalances(accounts)
     .filter((account) => account.account_type === "credit")
     .reduce((sum, account) => sum + Number(account.current_balance ?? 0), 0);
 }
 
 export function countPlaidAccountsByType(accounts: PlaidAccountBalanceRow[], accountType: string): number {
-  return accounts.filter((account) => account.account_type === accountType).length;
+  return includedPlaidAccountsForBalances(accounts).filter(
+    (account) => account.account_type === accountType
+  ).length;
 }
 
 export function getLatestPlaidAccountSyncAt(accounts: PlaidAccountBalanceRow[]): string | null {
   let latest: string | null = null;
 
-  for (const account of accounts) {
+  for (const account of includedPlaidAccountsForBalances(accounts)) {
     const syncedAt = account.last_synced_at;
     if (!syncedAt) continue;
     if (!latest || syncedAt > latest) {
@@ -339,6 +379,94 @@ export function groupPlaidBalanceSnapshotsByStore(
   return snapshotsByStoreId;
 }
 
+export type PlaidAccountsGetLike = {
+  account_id: string;
+  name: string;
+  type: string;
+  subtype?: string | null;
+  mask?: string | null;
+  balances: {
+    current?: number | null;
+    available?: number | null;
+  };
+};
+
+export type ExistingPlaidAccountBalanceRow = {
+  id: string;
+  plaid_account_id: string;
+};
+
+export type PlaidAccountBalanceWriteRow = {
+  plaid_connection_id: string;
+  store_id: string;
+  plaid_account_id: string;
+  account_name: string;
+  account_type: string;
+  account_subtype: string | null;
+  mask: string | null;
+  current_balance: number;
+  available_balance: number | null;
+  last_synced_at: string;
+};
+
+export type PlaidAccountBalanceInsertRow = PlaidAccountBalanceWriteRow & {
+  included: false;
+  selected_via_link: false;
+};
+
+export function planPlaidAccountBalanceWrites(params: {
+  connectionId: string;
+  storeId: string;
+  syncedAt: string;
+  accounts: PlaidAccountsGetLike[];
+  existingRows: ExistingPlaidAccountBalanceRow[];
+}): {
+  updates: PlaidAccountBalanceWriteRow[];
+  inserts: PlaidAccountBalanceInsertRow[];
+  staleIds: string[];
+} {
+  const existingByPlaidId = new Map(
+    params.existingRows.map((row) => [row.plaid_account_id, row] as const)
+  );
+  const returnedIds = new Set(params.accounts.map((account) => account.account_id));
+
+  const updates: PlaidAccountBalanceWriteRow[] = [];
+  const inserts: PlaidAccountBalanceInsertRow[] = [];
+
+  for (const account of params.accounts) {
+    const row: PlaidAccountBalanceWriteRow = {
+      plaid_connection_id: params.connectionId,
+      store_id: params.storeId,
+      plaid_account_id: account.account_id,
+      account_name: account.name,
+      account_type: account.type,
+      account_subtype: account.subtype ?? null,
+      mask: account.mask ?? null,
+      current_balance: account.balances.current ?? 0,
+      available_balance: account.balances.available ?? null,
+      last_synced_at: params.syncedAt,
+    };
+
+    if (existingByPlaidId.has(account.account_id)) {
+      updates.push(row);
+    } else {
+      inserts.push({
+        ...row,
+        included: false,
+        selected_via_link: false,
+      });
+    }
+  }
+
+  return {
+    updates,
+    inserts,
+    staleIds: params.existingRows
+      .filter((row) => !returnedIds.has(row.plaid_account_id))
+      .map((row) => row.id),
+  };
+}
+
 /** Minimal Plaid transaction fields used for normalization (testable without server imports). */
 export type PlaidTransactionLike = {
   transaction_id: string;
@@ -347,6 +475,7 @@ export type PlaidTransactionLike = {
   merchant_name?: string | null;
   amount: number;
   pending_transaction_id?: string | null;
+  account_id?: string | null;
 };
 
 export type NormalizedPlaidTransaction = {
@@ -356,6 +485,7 @@ export type NormalizedPlaidTransaction = {
   transaction_type: "income" | "expense";
   plaid_transaction_id: string;
   pending_transaction_id: string | null;
+  plaid_account_id: string | null;
 };
 
 /** Max difference allowed when matching same-batch fallback reconciliations by amount. */
@@ -407,6 +537,7 @@ export function normalizePlaidTransaction(txn: PlaidTransactionLike): Normalized
   const amount = Math.abs(txn.amount);
 
   const pendingTransactionId = txn.pending_transaction_id?.trim();
+  const plaidAccountId = txn.account_id?.trim();
 
   return {
     transaction_date: txn.date,
@@ -415,6 +546,7 @@ export function normalizePlaidTransaction(txn: PlaidTransactionLike): Normalized
     transaction_type,
     plaid_transaction_id: txn.transaction_id,
     pending_transaction_id: pendingTransactionId ? pendingTransactionId : null,
+    plaid_account_id: plaidAccountId ? plaidAccountId : null,
   };
 }
 

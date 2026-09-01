@@ -65,6 +65,41 @@ describe("Plaid balance aggregation", () => {
     });
   });
 
+  it("is a no-op for Waterbury-shaped already-included accounts", () => {
+    const waterbury: PlaidAccountBalanceRow[] = [
+      { account_type: "depository", current_balance: 14134.6, included: true },
+      { account_type: "depository", current_balance: 26847.81, included: true },
+      { account_type: "credit", current_balance: 11595.62, included: true },
+    ];
+    const withoutFlag: PlaidAccountBalanceRow[] = waterbury.map(({ included: _included, ...row }) => row);
+
+    expect(sumPlaidCashOnHand(waterbury)).toBeCloseTo(sumPlaidCashOnHand(withoutFlag), 2);
+    expect(sumPlaidCashOnHand(waterbury)).toBeCloseTo(14134.6 + 26847.81, 2);
+    expect(sumPlaidCreditCardDebt(waterbury)).toBeCloseTo(11595.62, 2);
+    expect(buildPlaidBalanceSnapshot(waterbury)).toMatchObject({
+      cashOnHand: 14134.6 + 26847.81,
+      creditCardDebt: 11595.62,
+      depositoryAccountCount: 2,
+      creditAccountCount: 1,
+    });
+  });
+
+  it("excludes included: false accounts from cash and credit totals", () => {
+    const accounts: PlaidAccountBalanceRow[] = [
+      { account_type: "depository", current_balance: 14134.6, included: true },
+      { account_type: "depository", current_balance: 50_000, included: false },
+      { account_type: "credit", current_balance: 11595.62, included: true },
+      { account_type: "credit", current_balance: 9_000, included: false },
+    ];
+
+    expect(sumPlaidCashOnHand(accounts)).toBeCloseTo(14134.6, 2);
+    expect(sumPlaidCreditCardDebt(accounts)).toBeCloseTo(11595.62, 2);
+    expect(buildPlaidBalanceSnapshot(accounts)).toMatchObject({
+      depositoryAccountCount: 1,
+      creditAccountCount: 1,
+    });
+  });
+
   it("returns zero totals when no matching account types exist", () => {
     const accounts: PlaidAccountBalanceRow[] = [
       { account_type: "investment", current_balance: 10_000 },

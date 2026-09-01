@@ -3,8 +3,10 @@ import type { PlaidLinkOnSuccessMetadata } from "react-plaid-link";
 import {
   buildPlaidLinkSelectedAccountRows,
   buildPlaidLinkTokenAccountOptions,
+  filterPlaidAddedTransactionsToIncludedAccounts,
   formatPlaidConnectionLabel,
   formatPlaidItemErrorMessage,
+  isPlaidAccountIncluded,
   isPlaidSyncProtectedStatus,
   isPlaidSyncRemovableStatus,
   isPlaidUpdateModeEligible,
@@ -12,11 +14,15 @@ import {
   mapPlaidLinkSuccessAccounts,
   normalizePlaidTransaction,
   parsePlaidLinkSelectedAccounts,
+  planPlaidAccountBalanceWrites,
+  planPlaidAddedTransactions,
   PLAID_CONNECT_TRUST,
   PLAID_LINK_ACCOUNT_FILTERS,
   PLAID_LINK_ACCOUNTS_REQUIRED_MESSAGE,
   PLAID_QUICKBOOKS_BLOCK_MESSAGE,
   PlaidLinkAccountsRequiredError,
+  sumPlaidCashOnHand,
+  sumPlaidCreditCardDebt,
 } from "@/lib/plaid-shared";
 
 describe("Plaid connection guards", () => {
@@ -83,6 +89,7 @@ describe("Plaid transaction normalization", () => {
       transaction_type: "expense",
       plaid_transaction_id: "txn-1",
       pending_transaction_id: null,
+      plaid_account_id: null,
     });
   });
 
@@ -101,6 +108,7 @@ describe("Plaid transaction normalization", () => {
       transaction_type: "income",
       plaid_transaction_id: "txn-2",
       pending_transaction_id: null,
+      plaid_account_id: null,
     });
   });
 
@@ -114,6 +122,18 @@ describe("Plaid transaction normalization", () => {
     });
 
     expect(result.description).toBe("Main St Laundry");
+  });
+
+  it("stamps plaid_account_id from the Plaid transaction", () => {
+    const result = normalizePlaidTransaction({
+      transaction_id: "txn-4",
+      date: "2026-01-18",
+      name: "CCD Deposit",
+      amount: -484.75,
+      account_id: "community-checking",
+    });
+
+    expect(result.plaid_account_id).toBe("community-checking");
   });
 });
 
@@ -232,5 +252,191 @@ describe("Plaid Link account selection", () => {
         subtype: "checking",
       },
     ]);
+  });
+});
+
+const WATERBURY_ACCOUNTS = [
+  {
+    plaid_account_id: "eastrise-checking",
+    included: true,
+    account_type: "depository",
+    current_balance: 14134.6,
+  },
+  {
+    plaid_account_id: "community-checking",
+    included: true,
+    account_type: "depository",
+    current_balance: 26847.81,
+  },
+  {
+    plaid_account_id: "spark-cash",
+    included: true,
+    account_type: "credit",
+    current_balance: 11595.62,
+  },
+] as const;
+
+describe("Plaid included-account filtering", () => {
+  it("is fail-closed for unknown, omitted, and excluded account ids", () => {
+    expect(isPlaidAccountIncluded("eastrise-checking", WATERBURY_ACCOUNTS)).toBe(true);
+    expect(isPlaidAccountIncluded("personal-checking", WATERBURY_ACCOUNTS)).toBe(false);
+    expect(isPlaidAccountIncluded(null, WATERBURY_ACCOUNTS)).toBe(false);
+    expect(isPlaidAccountIncluded("personal-checking", [
+      { plaid_account_id: "personal-checking", included: false },
+    ])).toBe(false);
+  });
+
+  it("is a no-op for Waterbury's already-included accounts", () => {
+    const added = [
+      { transaction_id: "eastrise-1", account_id: "eastrise-checking" },
+      { transaction_id: "community-1", account_id: "community-checking" },
+      { transaction_id: "spark-1", account_id: "spark-cash" },
+    ];
+
+    expect(filterPlaidAddedTransactionsToIncludedAccounts(added, [...WATERBURY_ACCOUNTS])).toEqual(
+      added
+    );
+    expect(sumPlaidCashOnHand([...WATERBURY_ACCOUNTS])).toBeCloseTo(14134.6 + 26847.81, 2);
+    expect(sumPlaidCreditCardDebt([...WATERBURY_ACCOUNTS])).toBeCloseTo(11595.62, 2);
+
+    const plans = planPlaidAddedTransactions({
+      added: filterPlaidAddedTransactionsToIncludedAccounts(
+        [
+          {
+            transaction_id: "community-1",
+            account_id: "community-checking",
+            date: "2026-08-25",
+            name: "CCD Deposit",
+            amount: -484.75,
+          },
+        ],
+        [...WATERBURY_ACCOUNTS]
+      ),
+      removedTransactionIds: [],
+      existingByPlaidId: new Map(),
+    });
+    expect(plans).toEqual([
+      {
+        action: "insert",
+        txn: expect.objectContaining({
+          transaction_id: "community-1",
+          account_id: "community-checking",
+        }),
+      },
+    ]);
+
+    const balancePlan = planPlaidAccountBalanceWrites({
+      connectionId: "community-conn",
+      storeId: "ec20b2ce-2951-4cf0-9e1c-cf5ee53bb056",
+      syncedAt: "2026-08-31T00:00:00.000Z",
+      existingRows: [{ id: "row-community", plaid_account_id: "community-checking" }],
+      accounts: [
+        {
+          account_id: "community-checking",
+          name: "CKCARBUS 0001",
+          type: "depository",
+          subtype: "checking",
+          mask: "1884",
+          balances: { current: 26847.81, available: 26847.81 },
+        },
+      ],
+    });
+    expect(balancePlan.updates).toHaveLength(1);
+    expect(balancePlan.inserts).toHaveLength(0);
+    expect(balancePlan.updates[0]).not.toHaveProperty("included");
+    expect(balancePlan.staleIds).toEqual([]);
+  });
+
+  it("drops excluded and unknown accounts before insert planning", () => {
+    const added = [
+      {
+        transaction_id: "business-1",
+        account_id: "community-checking",
+        date: "2026-08-25",
+        name: "CCD Deposit",
+        amount: -100,
+      },
+      {
+        transaction_id: "personal-1",
+        account_id: "personal-checking",
+        date: "2026-08-25",
+        name: "GROCERY",
+        amount: 42,
+      },
+      {
+        transaction_id: "unknown-1",
+        account_id: "not-on-item",
+        date: "2026-08-25",
+        name: "UNKNOWN",
+        amount: 10,
+      },
+    ];
+
+    const accounts = [
+      ...WATERBURY_ACCOUNTS,
+      { plaid_account_id: "personal-checking", included: false },
+    ];
+    const included = filterPlaidAddedTransactionsToIncludedAccounts(added, accounts);
+
+    expect(included.map((txn) => txn.transaction_id)).toEqual(["business-1"]);
+    expect(
+      planPlaidAddedTransactions({
+        added: included,
+        removedTransactionIds: [],
+        existingByPlaidId: new Map(),
+      }).map((plan) => plan.action === "insert" && plan.txn.transaction_id)
+    ).toEqual(["business-1"]);
+  });
+
+  it("inserts newly discovered accountsGet rows as included: false", () => {
+    const plan = planPlaidAccountBalanceWrites({
+      connectionId: "eastrise-conn",
+      storeId: "ec20b2ce-2951-4cf0-9e1c-cf5ee53bb056",
+      syncedAt: "2026-08-31T00:00:00.000Z",
+      existingRows: [{ id: "row-business", plaid_account_id: "eastrise-checking" }],
+      accounts: [
+        {
+          account_id: "eastrise-checking",
+          name: "Business Basic Checking",
+          type: "depository",
+          subtype: "checking",
+          mask: "6849",
+          balances: { current: 14134.6, available: 14134.6 },
+        },
+        {
+          account_id: "eastrise-personal",
+          name: "Personal Checking",
+          type: "depository",
+          subtype: "checking",
+          mask: "0001",
+          balances: { current: 800, available: 800 },
+        },
+      ],
+    });
+
+    expect(plan.updates).toHaveLength(1);
+    expect(plan.updates[0].plaid_account_id).toBe("eastrise-checking");
+    expect(plan.updates[0]).not.toHaveProperty("included");
+    expect(plan.inserts).toEqual([
+      expect.objectContaining({
+        plaid_account_id: "eastrise-personal",
+        included: false,
+        selected_via_link: false,
+      }),
+    ]);
+  });
+
+  it("does not add excluded depository balances to cash", () => {
+    expect(
+      sumPlaidCashOnHand([
+        ...WATERBURY_ACCOUNTS,
+        {
+          plaid_account_id: "personal-checking",
+          included: false,
+          account_type: "depository",
+          current_balance: 50_000,
+        },
+      ])
+    ).toBeCloseTo(14134.6 + 26847.81, 2);
   });
 });

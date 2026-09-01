@@ -31,7 +31,7 @@ async function fetchStorePlaidAccountRows(storeId: string): Promise<PlaidAccount
   const supabase = createClient();
   const { data, error } = await supabase
     .from("plaid_accounts")
-    .select("account_type, current_balance, last_synced_at")
+    .select("account_type, current_balance, last_synced_at, included")
     .eq("store_id", storeId);
 
   if (error) {
@@ -83,7 +83,7 @@ export async function loadPortfolioPlaidBalanceData(
       supabase.from("plaid_connections").select("store_id").in("store_id", storeIds),
       supabase
         .from("plaid_accounts")
-        .select("store_id, account_type, current_balance, last_synced_at")
+        .select("store_id, account_type, current_balance, last_synced_at, included")
         .in("store_id", storeIds),
     ]);
 
