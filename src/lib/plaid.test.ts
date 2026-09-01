@@ -3,9 +3,16 @@ import type { PlaidLinkOnSuccessMetadata } from "react-plaid-link";
 import {
   buildPlaidLinkSelectedAccountRows,
   buildPlaidLinkTokenAccountOptions,
+  collectPlaidTransactionIdsToStamp,
+  excludedPlaidAccountOrFilter,
+  fetchExcludedPlaidAccountIds,
+  fetchExcludedPlaidAccountIdsByStore,
   filterPlaidAddedTransactionsToIncludedAccounts,
+  formatPlaidAccountMask,
+  formatPlaidAccountTypeLabel,
   formatPlaidConnectionLabel,
   formatPlaidItemErrorMessage,
+  isBankTransactionVisibleForExcludedPlaidAccounts,
   isPlaidAccountIncluded,
   isPlaidSyncProtectedStatus,
   isPlaidSyncRemovableStatus,
@@ -16,6 +23,8 @@ import {
   parsePlaidLinkSelectedAccounts,
   planPlaidAccountBalanceWrites,
   planPlaidAddedTransactions,
+  plaidAccountStampDateWindow,
+  PLAID_ACCOUNT_STAMP_LOOKBACK_DAYS,
   PLAID_CONNECT_TRUST,
   PLAID_LINK_ACCOUNT_FILTERS,
   PLAID_LINK_ACCOUNTS_REQUIRED_MESSAGE,
@@ -438,5 +447,103 @@ describe("Plaid included-account filtering", () => {
         },
       ])
     ).toBeCloseTo(14134.6 + 26847.81, 2);
+  });
+});
+
+describe("Plaid account-exclude visibility", () => {
+  it("is a Waterbury no-op when nobody has excluded an account", () => {
+    expect(excludedPlaidAccountOrFilter([])).toBeNull();
+    expect(
+      isBankTransactionVisibleForExcludedPlaidAccounts({ plaid_account_id: null }, [])
+    ).toBe(true);
+    expect(
+      isBankTransactionVisibleForExcludedPlaidAccounts(
+        { plaid_account_id: "eastrise-checking" },
+        []
+      )
+    ).toBe(true);
+    expect(
+      isBankTransactionVisibleForExcludedPlaidAccounts(
+        { plaid_account_id: "community-checking" },
+        []
+      )
+    ).toBe(true);
+    expect(
+      isBankTransactionVisibleForExcludedPlaidAccounts({ plaid_account_id: "spark-cash" }, [])
+    ).toBe(true);
+  });
+
+  it("fails open on unstamped or CSV rows when another account is excluded", () => {
+    expect(
+      isBankTransactionVisibleForExcludedPlaidAccounts({ plaid_account_id: null }, [
+        "personal-checking",
+      ])
+    ).toBe(true);
+    expect(
+      isBankTransactionVisibleForExcludedPlaidAccounts({ plaid_account_id: "" }, [
+        "personal-checking",
+      ])
+    ).toBe(true);
+    expect(
+      isBankTransactionVisibleForExcludedPlaidAccounts(
+        { plaid_account_id: "eastrise-checking" },
+        ["personal-checking"]
+      )
+    ).toBe(true);
+  });
+
+  it("hides rows stamped to an excluded account", () => {
+    expect(
+      isBankTransactionVisibleForExcludedPlaidAccounts(
+        { plaid_account_id: "personal-checking" },
+        ["personal-checking"]
+      )
+    ).toBe(false);
+    expect(excludedPlaidAccountOrFilter(["personal-checking"])).toBe(
+      "plaid_account_id.is.null,plaid_account_id.not.in.(personal-checking)"
+    );
+  });
+
+  it("stamps from a date-windowed transactionsGet page, not a cursor change", () => {
+    const window = plaidAccountStampDateWindow(new Date("2026-08-31T12:00:00.000Z"));
+    expect(window.end_date).toBe("2026-08-31");
+    expect(window.start_date).toBe("2023-09-01");
+    expect(PLAID_ACCOUNT_STAMP_LOOKBACK_DAYS).toBe(1095);
+    expect(
+      collectPlaidTransactionIdsToStamp([
+        { transaction_id: "txn-1" },
+        { transaction_id: "txn-1" },
+        { transaction_id: null },
+        { transaction_id: " txn-2 " },
+      ])
+    ).toEqual(["txn-1", "txn-2"]);
+  });
+
+  it("formats account type and mask for Bank Import", () => {
+    expect(formatPlaidAccountTypeLabel("depository", "checking")).toBe("Checking");
+    expect(formatPlaidAccountTypeLabel("credit", "credit card")).toBe("Credit card");
+    expect(formatPlaidAccountMask("6849")).toBe("••••6849");
+    expect(formatPlaidAccountMask(null)).toBe("••••");
+  });
+
+  it("loads no extra excluded ids for Waterbury-style included accounts", async () => {
+    const supabase = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            eq: async () => ({ data: [], error: null }),
+          }),
+          in: () => ({
+            eq: async () => ({ data: [], error: null }),
+          }),
+        }),
+      }),
+    };
+
+    await expect(fetchExcludedPlaidAccountIds(supabase, "waterbury")).resolves.toEqual([]);
+    await expect(
+      fetchExcludedPlaidAccountIdsByStore(supabase, ["waterbury"])
+    ).resolves.toEqual({ waterbury: [] });
+    expect(excludedPlaidAccountOrFilter([])).toBeNull();
   });
 });

@@ -32,6 +32,7 @@ type LinkInsertOutcome = {
 
 type MockPostingOptions = {
   existingLinkIds?: string[];
+  excludedPlaidAccountIds?: string[];
   linkInsertOutcomes?: LinkInsertOutcome[];
   financialUpdateError?: string | null;
   financialInsertError?: string | null;
@@ -51,6 +52,21 @@ function createPostingMockSupabase(options: MockPostingOptions = {}) {
 
   const supabase = {
     from(table: string) {
+      if (table === "plaid_accounts") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: async () => ({
+                data: (options.excludedPlaidAccountIds ?? []).map((plaid_account_id) => ({
+                  plaid_account_id,
+                })),
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+
       if (table === "transaction_pl_links") {
         return {
           select: () => ({
@@ -295,6 +311,24 @@ describe("postTransactionsBatch", () => {
     expect(state.insertedLinkIds).toEqual(["txn-1"]);
     expect(state.deletedLinkIds).toEqual(["txn-1"]);
     expect(state.financialUpdateCount).toBe(1);
+  });
+
+  it("refuses transactions whose Plaid account is excluded", async () => {
+    const { supabase, state } = createPostingMockSupabase({
+      excludedPlaidAccountIds: ["personal-checking"],
+    });
+
+    const result = await postTransactionsBatch(supabase, {
+      storeId: STORE_ID,
+      userId: USER_ID,
+      transactions: [makeTxn({ plaid_account_id: "personal-checking" })],
+      existingRecords: [existingFinancial],
+    });
+
+    expect(result.postedCount).toBe(0);
+    expect(result.error).toBe("These transactions belong to an excluded bank account.");
+    expect(state.insertedLinkIds).toEqual([]);
+    expect(state.financialUpdateCount).toBe(0);
   });
 });
 

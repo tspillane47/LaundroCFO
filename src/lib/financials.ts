@@ -117,6 +117,7 @@ export type BankTransaction = {
   split_parent_id?: string | null;
   modified_at?: string;
   plaid_transaction_id?: string | null;
+  plaid_account_id?: string | null;
 };
 
 export type TransactionPlLink = {
@@ -529,6 +530,12 @@ export function buildPortfolioTtmCashFlow(
 import type { createClient } from "@/lib/supabase";
 import { calcDSCR, calcGlobalDSCR, DSCR_NO_DEBT_LABEL, fmtMultiple } from "@/lib/calculations";
 import { toNum, toNullableText } from "@/lib/formHelpers";
+import {
+  excludedPlaidAccountOrFilter,
+  fetchExcludedPlaidAccountIds,
+  fetchExcludedPlaidAccountIdsByStore,
+  isBankTransactionVisibleForExcludedPlaidAccounts,
+} from "@/lib/plaid-shared";
 import { TEXT_LIMITS, trimToMaxLength, validateMaxLength } from "@/lib/textLimits";
 
 type FinancialsSupabaseClient = ReturnType<typeof createClient>;
@@ -1261,9 +1268,12 @@ export async function fetchUncategorizedReviewCountsByStore(
 ): Promise<Record<string, number>> {
   if (storeIds.length === 0) return {};
 
+  const excludedByStore = await fetchExcludedPlaidAccountIdsByStore(supabase, storeIds);
+  const hasExcludedAccounts = Object.values(excludedByStore).some((ids) => ids.length > 0);
+
   const { data, error } = await supabase
     .from("bank_transactions")
-    .select("store_id")
+    .select("store_id, plaid_account_id")
     .in("store_id", storeIds)
     .eq("excluded", false)
     .not("status", "in", '("posted","excluded","reviewed")')
@@ -1274,6 +1284,15 @@ export async function fetchUncategorizedReviewCountsByStore(
   const counts: Record<string, number> = Object.fromEntries(storeIds.map((id) => [id, 0]));
   for (const row of data ?? []) {
     const storeId = String(row.store_id);
+    if (
+      hasExcludedAccounts &&
+      !isBankTransactionVisibleForExcludedPlaidAccounts(
+        row as { plaid_account_id?: string | null },
+        excludedByStore[storeId] ?? []
+      )
+    ) {
+      continue;
+    }
     counts[storeId] = (counts[storeId] ?? 0) + 1;
   }
   return counts;
@@ -1510,12 +1529,21 @@ export async function fetchUnpostedBankTransactions(
   supabase: FinancialsSupabaseClient,
   storeId: string
 ): Promise<{ transactions: BankTransaction[]; error: string | null }> {
-  const { data, error } = await supabase
+  const excludedAccountIds = await fetchExcludedPlaidAccountIds(supabase, storeId);
+  const visibilityFilter = excludedPlaidAccountOrFilter(excludedAccountIds);
+
+  let query = supabase
     .from("bank_transactions")
     .select("*")
     .eq("store_id", storeId)
     .eq("excluded", false)
     .not("status", "in", '("posted","excluded")');
+
+  if (visibilityFilter) {
+    query = query.or(visibilityFilter);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return { transactions: [], error: error.message };
@@ -2083,6 +2111,7 @@ export type BatchPostTransaction = {
   category: BankImportCategory;
   status?: TransactionStatus | null;
   original_category?: string | null;
+  plaid_account_id?: string | null;
 };
 
 export type PostTransactionsBatchParams = {
@@ -2423,6 +2452,74 @@ export async function reverseTransactionPlLinkPosting(
   });
 }
 
+export async function restoreTransactionPlLinkPosting(
+  supabase: FinancialsSupabaseClient,
+  params: {
+    storeId: string;
+    userId: string;
+    transaction: Pick<
+      BankTransaction,
+      "id" | "transaction_date" | "amount" | "category" | "status" | "excluded"
+    >;
+    store?: StoreFinancialProfile | null;
+  }
+): Promise<{ error: string | null; restored: boolean }> {
+  if (params.transaction.excluded) {
+    return { error: null, restored: false };
+  }
+  if ((params.transaction.status ?? "needs_review") !== "posted") {
+    return { error: null, restored: false };
+  }
+
+  const category = params.transaction.category as BankImportCategory | null;
+  if (!category || !isCategoryReadyToPost(category)) {
+    return { error: null, restored: false };
+  }
+
+  const target = resolvePostingTarget(category);
+  if (!target) {
+    return { error: null, restored: false };
+  }
+
+  const date = new Date(`${params.transaction.transaction_date.split("T")[0]}T12:00:00`);
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const amount = normalizeTransactionAmount(params.transaction.amount);
+
+  const { error: linkError } = await supabase.from("transaction_pl_links").insert({
+    transaction_id: params.transaction.id,
+    store_id: params.storeId,
+    year,
+    month,
+    category: target.column,
+    amount_applied: amount,
+  });
+
+  if (linkError) {
+    if (isPostgresUniqueViolation(linkError)) {
+      return { error: null, restored: false };
+    }
+    return { error: linkError.message, restored: false };
+  }
+
+  const { error: applyError } = await applyPostingDelta(supabase, {
+    storeId: params.storeId,
+    userId: params.userId,
+    year,
+    month,
+    target,
+    amount,
+    store: params.store,
+  });
+
+  if (applyError) {
+    await supabase.from("transaction_pl_links").delete().eq("transaction_id", params.transaction.id);
+    return { error: applyError, restored: false };
+  }
+
+  return { error: null, restored: true };
+}
+
 export async function postTransactionsBatch(
   supabase: FinancialsSupabaseClient,
   params: PostTransactionsBatchParams
@@ -2441,7 +2538,18 @@ export async function postTransactionsBatch(
     return { postedCount: 0, error: null };
   }
 
-  const txnIds = transactions.map((t) => t.id);
+  const excludedAccountIds = await fetchExcludedPlaidAccountIds(supabase, storeId);
+  const visibleTransactions = transactions.filter((txn) =>
+    isBankTransactionVisibleForExcludedPlaidAccounts(txn, excludedAccountIds)
+  );
+  if (visibleTransactions.length === 0) {
+    return {
+      postedCount: 0,
+      error: "These transactions belong to an excluded bank account.",
+    };
+  }
+
+  const txnIds = visibleTransactions.map((t) => t.id);
   const { data: existingLinks, error: linksFetchError } = await supabase
     .from("transaction_pl_links")
     .select("transaction_id")
@@ -2455,7 +2563,7 @@ export async function postTransactionsBatch(
     (existingLinks ?? []).map((l: { transaction_id: string }) => l.transaction_id)
   );
 
-  const postableTransactions = transactions.filter(
+  const postableTransactions = visibleTransactions.filter(
     (txn) => (txn.status ?? "needs_review") !== "posted" && !linkedIds.has(txn.id)
   );
 

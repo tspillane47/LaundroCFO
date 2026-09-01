@@ -7,6 +7,11 @@ import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { fmtDollar } from "@/lib/calculations";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
+import {
+  excludedPlaidAccountOrFilter,
+  fetchExcludedPlaidAccountIds,
+  isBankTransactionVisibleForExcludedPlaidAccounts,
+} from "@/lib/plaid-shared";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 import { FormBanner } from "@/components/ui/FormBanner";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -536,6 +541,17 @@ function TransactionsPageContent() {
       }
       setUserId(user.id);
 
+      const excludedAccountIds = await fetchExcludedPlaidAccountIds(supabase, selectedStore.id);
+      const visibilityFilter = excludedPlaidAccountOrFilter(excludedAccountIds);
+
+      let countQuery = supabase
+        .from("bank_transactions")
+        .select("id, status, excluded")
+        .eq("store_id", selectedStore.id);
+      if (visibilityFilter) {
+        countQuery = countQuery.or(visibilityFilter);
+      }
+
       const [
         { data: storeData, error: storeError },
         { data: countData, error: countError },
@@ -544,10 +560,7 @@ function TransactionsPageContent() {
         { data: rulesData, error: rulesError },
       ] = await Promise.all([
         supabase.from("stores").select("*").eq("id", selectedStore.id).single(),
-        supabase
-          .from("bank_transactions")
-          .select("id, status, excluded")
-          .eq("store_id", selectedStore.id),
+        countQuery,
         supabase
           .from("monthly_financials")
           .select("*")
@@ -594,10 +607,16 @@ function TransactionsPageContent() {
         txnQuery = txnQuery.or("excluded.eq.true,status.eq.excluded");
       }
 
+      if (visibilityFilter && activeTab !== "excluded") {
+        txnQuery = txnQuery.or(visibilityFilter);
+      }
+
       const { data: txnData, error: txnError } = await txnQuery;
       if (txnError) throw new Error(txnError.message);
 
-      const rows = (txnData ?? []) as BankTransaction[];
+      const rows = ((txnData ?? []) as BankTransaction[]).filter((row) =>
+        isBankTransactionVisibleForExcludedPlaidAccounts(row, excludedAccountIds)
+      );
       setTransactions(rows);
 
       const notesMap = new Map<string, string>();

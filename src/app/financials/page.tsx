@@ -29,6 +29,10 @@ import { DSCRCard } from "@/components/ui/DSCRCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { CurrentMonthlyAveragesPanel } from "@/components/financials/CurrentMonthlyAveragesPanel";
 import { PlaidConnectTrustPanel } from "@/components/financials/PlaidConnectTrustPanel";
+import {
+  PlaidConnectedAccountsList,
+  type PlaidConnectedAccount,
+} from "@/components/financials/PlaidConnectedAccountsList";
 import { YearRevenueEbitdaChart } from "@/components/financials/YearRevenueEbitdaChart";
 import { buildYearRevenueEbitdaChartData } from "@/lib/yearRevenueEbitdaChart";
 import {
@@ -403,6 +407,9 @@ export default function FinancialsPage() {
   const [qbMappings, setQbMappings] = useState<QBMappingRow[]>(DEFAULT_QB_MAPPINGS);
   const [qbConnection, setQbConnection] = useState<QBConnection | null>(null);
   const [plaidConnections, setPlaidConnections] = useState<PlaidConnection[]>([]);
+  const [plaidAccounts, setPlaidAccounts] = useState<PlaidConnectedAccount[]>([]);
+  const [togglingPlaidAccountId, setTogglingPlaidAccountId] = useState<string | null>(null);
+  const [plaidAccountConfirmId, setPlaidAccountConfirmId] = useState<string | null>(null);
   const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
   const [shouldOpenPlaidLink, setShouldOpenPlaidLink] = useState(false);
   const plaidLinkModeRef = useRef<"connect" | "update">("connect");
@@ -469,6 +476,7 @@ export default function FinancialsPage() {
       { data: mappingData, error: mappingError },
       { data: connectionData, error: connectionError },
       { data: plaidConnectionsData, error: plaidConnectionsError },
+      { data: plaidAccountsData, error: plaidAccountsError },
       { data: utilitiesData, error: utilitiesError },
       annualDebtByStore,
     ] = await Promise.all([
@@ -495,6 +503,13 @@ export default function FinancialsPage() {
         .eq("store_id", storeId)
         .order("connected_at", { ascending: true }),
       supabase
+        .from("plaid_accounts")
+        .select(
+          "id, plaid_connection_id, account_name, account_type, account_subtype, mask, included, excluded_at"
+        )
+        .eq("store_id", storeId)
+        .order("account_name", { ascending: true }),
+      supabase
         .from("monthly_utilities")
         .select("year, month, water, gas, electric, sewer, trash, internet")
         .eq("store_id", storeId),
@@ -507,6 +522,7 @@ export default function FinancialsPage() {
       mappingError,
       connectionError,
       plaidConnectionsError,
+      plaidAccountsError,
       utilitiesError,
     ]
       .filter(Boolean)
@@ -549,6 +565,7 @@ export default function FinancialsPage() {
 
     setQbConnection((connectionData as QBConnection | null) ?? null);
     setPlaidConnections((plaidConnectionsData as PlaidConnection[] | null) ?? []);
+    setPlaidAccounts((plaidAccountsData as PlaidConnectedAccount[] | null) ?? []);
 
     if (sorted.length > 0 && !showFormRef.current) {
       setSelectedYear(sorted[0].year);
@@ -1074,7 +1091,8 @@ export default function FinancialsPage() {
   const plaidActionBusy =
     connectingPlaid ||
     disconnectingPlaidConnectionId !== null ||
-    syncingPlaidConnectionId !== null;
+    syncingPlaidConnectionId !== null ||
+    togglingPlaidAccountId !== null;
 
   const { open: openPlaidLink, ready: plaidLinkReady } = usePlaidLink({
     token: plaidLinkToken,
@@ -1385,6 +1403,49 @@ export default function FinancialsPage() {
       );
     } finally {
       setDisconnectingPlaidConnectionId(null);
+    }
+  }
+
+  async function togglePlaidAccount(accountId: string, included: boolean) {
+    if (!store?.id) return;
+    setTogglingPlaidAccountId(accountId);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch("/api/plaid/toggle-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId: store.id, accountId, included }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            included?: boolean;
+            stampWarning?: string;
+          }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Failed to update bank account");
+      }
+
+      setPlaidAccountConfirmId(null);
+      if (store.id) invalidateValuationCache(store.id);
+      setSuccess(
+        included
+          ? "Account re-included. Its transactions are back in Bank Import and posted amounts were restored to P&L."
+          : "Account excluded. Its transactions are hidden from Bank Import and removed from P&L."
+      );
+      if (payload?.stampWarning) {
+        setError(payload.stampWarning);
+      }
+      await loadData(store.id);
+    } catch (toggleError) {
+      setError(toggleError instanceof Error ? toggleError.message : "Failed to update bank account");
+    } finally {
+      setTogglingPlaidAccountId(null);
     }
   }
 
@@ -2258,6 +2319,18 @@ export default function FinancialsPage() {
                     </ReadOnlyGuard>
                   </div>
                 </div>
+
+                <PlaidConnectedAccountsList
+                  accounts={plaidAccounts.filter(
+                    (account) => account.plaid_connection_id === connection.id
+                  )}
+                  disabled={plaidActionBusy}
+                  togglingAccountId={togglingPlaidAccountId}
+                  confirmAccountId={plaidAccountConfirmId}
+                  onRequestToggle={(accountId) => setPlaidAccountConfirmId(accountId)}
+                  onCancelToggle={() => setPlaidAccountConfirmId(null)}
+                  onConfirmToggle={(accountId, included) => void togglePlaidAccount(accountId, included)}
+                />
 
                 {syncResult && (
                   <div

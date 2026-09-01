@@ -293,6 +293,153 @@ export function filterPlaidAddedTransactionsToIncludedAccounts<
   return added.filter((txn) => isPlaidAccountIncluded(txn.account_id, accounts));
 }
 
+export const PLAID_ACCOUNT_STAMP_LOOKBACK_DAYS = 1095;
+
+/** Fail-open: unstamped / CSV rows stay visible. Empty excluded list is a no-op. */
+export function isBankTransactionVisibleForExcludedPlaidAccounts(
+  txn: { plaid_account_id?: string | null },
+  excludedAccountIds: readonly string[]
+): boolean {
+  if (excludedAccountIds.length === 0) {
+    return true;
+  }
+  const id = txn.plaid_account_id?.trim();
+  if (!id) {
+    return true;
+  }
+  return !excludedAccountIds.includes(id);
+}
+
+export function excludedPlaidAccountOrFilter(excludedAccountIds: readonly string[]): string | null {
+  const ids = Array.from(
+    new Set(excludedAccountIds.map((id) => id.trim()).filter(Boolean))
+  );
+  if (ids.length === 0) {
+    return null;
+  }
+  return `plaid_account_id.is.null,plaid_account_id.not.in.(${ids.join(",")})`;
+}
+
+type ExcludedPlaidAccountRow = {
+  store_id?: string | null;
+  plaid_account_id?: string | null;
+};
+
+type ExcludedPlaidAccountsQuery = {
+  eq: (column: string, value: string | boolean) => ExcludedPlaidAccountsQuery & Promise<ExcludedPlaidAccountsResult>;
+  in: (column: string, values: readonly string[]) => ExcludedPlaidAccountsQuery;
+};
+
+type ExcludedPlaidAccountsResult = {
+  data: ExcludedPlaidAccountRow[] | null;
+  error: { message: string } | null;
+};
+
+type ExcludedPlaidAccountsClient = {
+  from: (table: string) => {
+    select: (columns: string) => ExcludedPlaidAccountsQuery;
+  };
+};
+
+function asExcludedPlaidAccountsClient(supabase: unknown): ExcludedPlaidAccountsClient {
+  return supabase as ExcludedPlaidAccountsClient;
+}
+
+export async function fetchExcludedPlaidAccountIds(
+  supabase: unknown,
+  storeId: string
+): Promise<string[]> {
+  const { data, error } = await asExcludedPlaidAccountsClient(supabase)
+    .from("plaid_accounts")
+    .select("plaid_account_id")
+    .eq("store_id", storeId)
+    .eq("included", false);
+
+  if (error) {
+    throw new Error(`Failed to load excluded Plaid accounts: ${error.message}`);
+  }
+
+  return (data ?? [])
+    .map((row: ExcludedPlaidAccountRow) => row.plaid_account_id?.trim())
+    .filter((id): id is string => Boolean(id));
+}
+
+export async function fetchExcludedPlaidAccountIdsByStore(
+  supabase: unknown,
+  storeIds: string[]
+): Promise<Record<string, string[]>> {
+  const idsByStore: Record<string, string[]> = Object.fromEntries(storeIds.map((id) => [id, []]));
+  if (storeIds.length === 0) {
+    return idsByStore;
+  }
+
+  const { data, error } = await asExcludedPlaidAccountsClient(supabase)
+    .from("plaid_accounts")
+    .select("store_id, plaid_account_id")
+    .in("store_id", storeIds)
+    .eq("included", false);
+
+  if (error) {
+    throw new Error(`Failed to load excluded Plaid accounts: ${error.message}`);
+  }
+
+  for (const row of (data ?? []) as ExcludedPlaidAccountRow[]) {
+    const storeId = row.store_id?.trim();
+    const accountId = row.plaid_account_id?.trim();
+    if (!storeId || !accountId) continue;
+    if (!idsByStore[storeId]) idsByStore[storeId] = [];
+    idsByStore[storeId].push(accountId);
+  }
+
+  return idsByStore;
+}
+
+export function plaidAccountStampDateWindow(
+  now = new Date(),
+  lookbackDays = PLAID_ACCOUNT_STAMP_LOOKBACK_DAYS
+): { start_date: string; end_date: string } {
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - lookbackDays);
+  return {
+    start_date: start.toISOString().slice(0, 10),
+    end_date: end.toISOString().slice(0, 10),
+  };
+}
+
+export function collectPlaidTransactionIdsToStamp(
+  transactions: Array<{ transaction_id?: string | null }>
+): string[] {
+  return Array.from(
+    new Set(
+      transactions
+        .map((txn) => txn.transaction_id?.trim())
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+}
+
+export function formatPlaidAccountTypeLabel(
+  type: string | null | undefined,
+  subtype?: string | null
+): string {
+  const sub = subtype?.trim().toLowerCase();
+  if (sub === "credit card") return "Credit card";
+  if (sub === "checking") return "Checking";
+  if (sub === "savings") return "Savings";
+  if (sub) {
+    return sub.replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+  if (type === "depository") return "Depository";
+  if (type === "credit") return "Credit";
+  return type?.trim() || "Account";
+}
+
+export function formatPlaidAccountMask(mask?: string | null): string {
+  const digits = mask?.replace(/\D/g, "").slice(-4);
+  return digits ? `••••${digits}` : "••••";
+}
+
 /** Sum depository account balances for a store's synced Plaid accounts. */
 export function sumPlaidCashOnHand(accounts: PlaidAccountBalanceRow[]): number {
   return includedPlaidAccountsForBalances(accounts)
