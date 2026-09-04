@@ -8,6 +8,8 @@ import {
   enrichMonthlyRecords,
   sortRecordsAsc,
   sortRecordsDesc,
+  ttmWindowRecords,
+  isMonthFullyElapsed,
   type CalculatedMonthly,
   type MonthlyFinancialRecord,
   type MonthlyUtilityRecord,
@@ -314,7 +316,7 @@ export function buildBenchmarkRows(args: {
 }
 
 export function buildTtmChartData(records: CalculatedMonthly[]): ReportFinancialContext["ttmChartData"] {
-  const ttm = sortRecordsAsc(records.slice(0, 12));
+  const ttm = sortRecordsAsc(ttmWindowRecords(records));
   return ttm.map((r) => ({
     label: MONTH_SHORT[r.month - 1],
     revenue: r.revenue,
@@ -341,7 +343,7 @@ export function buildUtilityTtmSeries(
   utilitiesLookup: Map<string, MonthlyUtilityRecord>,
   field: UtilityImportField
 ): UtilityTtmPoint[] {
-  const ttm = sortRecordsAsc(ttmRecords.slice(0, 12));
+  const ttm = sortRecordsAsc(ttmWindowRecords(ttmRecords));
   return ttm.map((r) => ({
     month: MONTH_SHORT[r.month - 1],
     value: num(utilitiesLookup.get(monthKey(r.year, r.month))?.[field]),
@@ -417,11 +419,19 @@ export function recordsThroughMonth(
 export function ttmRecordsEndingAt(
   records: CalculatedMonthly[],
   year: number,
-  month: number
+  month: number,
+  asOf: Date = new Date()
 ): CalculatedMonthly[] {
-  const idx = records.findIndex((r) => r.year === year && r.month === month);
-  if (idx === -1) return records.slice(0, 12);
-  return records.slice(idx, idx + 12);
+  let endYear = year;
+  let endMonth = month;
+  if (!isMonthFullyElapsed(year, month, asOf)) {
+    const prior = priorMonth(year, month);
+    endYear = prior.year;
+    endMonth = prior.month;
+  }
+  const idx = records.findIndex((r) => r.year === endYear && r.month === endMonth);
+  if (idx === -1) return ttmWindowRecords(records, asOf);
+  return ttmWindowRecords(records.slice(idx), asOf);
 }
 
 export function priorMonth(year: number, month: number): { year: number; month: number } {
@@ -592,7 +602,7 @@ export async function fetchReportFinancialContext(
           options.endYear,
           options.endMonth
         )
-      : records.slice(0, 12);
+      : ttmWindowRecords(records);
 
   const baseTtm = calcTtmMetrics(ttmRecords);
   const ttm = applyLoanDebtServiceToTtm(baseTtm, annualDebtService);

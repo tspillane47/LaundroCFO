@@ -25,6 +25,7 @@ import {
   sortRecordsDesc,
   enrichMonthlyRecords,
   buildUtilitiesLookup,
+  ttmWindowRecords,
   type MonthlyFinancialRecord,
   type MonthlyUtilityRecord,
   type UtilityImportField,
@@ -241,7 +242,7 @@ export default function UtilitiesPage() {
           sortRecordsDesc(financialsData as MonthlyFinancialRecord[]),
           utilitiesLookup
         );
-        const ttmRecords = records.slice(0, 12);
+        const ttmRecords = ttmWindowRecords(records);
         setTurnsContext({
           selfServiceTtm: ttmRecords.reduce((sum, r) => sum + (r.self_service_revenue ?? 0), 0),
           dryerRevenuePct:
@@ -378,10 +379,9 @@ export default function UtilitiesPage() {
     if (financialRecords.length === 0) return empty;
 
     const utilitiesLookup = buildUtilitiesLookup(records);
-    const ttmRecords = enrichMonthlyRecords(
-      sortRecordsDesc(financialRecords),
-      utilitiesLookup
-    ).slice(0, 12);
+    const ttmRecords = ttmWindowRecords(
+      enrichMonthlyRecords(sortRecordsDesc(financialRecords), utilitiesLookup)
+    );
     const monthsUsed = ttmRecords.length;
     if (monthsUsed === 0) return empty;
 

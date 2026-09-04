@@ -3,7 +3,12 @@ import { benchmarks } from "@/lib/data";
 import { computeStoreDscr } from "@/lib/dscr";
 import { computeEquipmentMetrics, type EquipmentRecord } from "@/lib/equipment";
 import { resolveStoreFinancials } from "@/lib/getStoreValuation";
-import { utilityRecordTotal, annualizeTtmTotal, type MonthlyUtilityRecord } from "@/lib/financials";
+import {
+  annualizeTtmTotal,
+  elapsedMonthlyRecords,
+  utilityRecordTotal,
+  type MonthlyUtilityRecord,
+} from "@/lib/financials";
 
 const NETWORK_BENCHMARK_THRESHOLD = 15;
 
@@ -111,10 +116,22 @@ export function resolveOccupancyRent(
 }
 
 export function buildLaundroCfoFinancialsInput(
-  monthlyFinancials: { revenue?: number | null; utilities?: number | null; ebitda?: number | null }[],
-  ttmMonthsUsedOverride?: number
+  monthlyFinancials: {
+    year?: number;
+    month?: number;
+    revenue?: number | null;
+    utilities?: number | null;
+    ebitda?: number | null;
+  }[],
+  ttmMonthsUsedOverride?: number,
+  asOf: Date = new Date()
 ): LaundroCfoFinancialsInput {
-  const records = monthlyFinancials.slice(0, 12);
+  const dated = monthlyFinancials.filter(
+    (row): row is typeof row & { year: number; month: number } =>
+      row.year != null && row.month != null
+  );
+  const elapsed = dated.length > 0 ? elapsedMonthlyRecords(dated, asOf) : monthlyFinancials;
+  const records = elapsed.slice(0, 12);
   const ttmRevenue = records.reduce((s, r) => s + (Number(r.revenue) || 0), 0);
   const ttmUtilities = records.reduce((s, r) => s + (Number(r.utilities) || 0), 0);
   const ttmEbitda = records.reduce((s, r) => s + (Number(r.ebitda) || 0), 0);

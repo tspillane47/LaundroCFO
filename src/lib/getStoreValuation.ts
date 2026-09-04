@@ -7,6 +7,7 @@ import {
   calcTtmMetrics,
   enrichMonthlyRecords,
   sortRecordsDesc,
+  ttmWindowRecords,
   type MonthlyFinancialRecord,
   type MonthlyUtilityRecord,
 } from "@/lib/financials";
@@ -185,7 +186,7 @@ async function fetchStoreTtmMetrics(
 
   if (ttm.monthsUsed === 0 || ttm.ttmRevenue <= 0) return null;
 
-  const ttmWindow = records.slice(0, ttm.monthsUsed);
+  const ttmWindow = ttmWindowRecords(records);
   const ttmRent = ttmWindow.reduce((sum, r) => sum + (r.rent ?? 0), 0);
 
   return {

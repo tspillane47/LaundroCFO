@@ -17,6 +17,7 @@ import {
   fetchStoreMonthlyFinancials,
   fetchUncategorizedReviewCountsByStore,
   sortRecordsDesc,
+  ttmWindowRecords,
   type CalculatedMonthly,
   type MonthlyUtilityRecord,
 } from "@/lib/financials";
@@ -468,14 +469,17 @@ export default function DashboardPage() {
       equipment: equipment as EquipmentRecord[],
       lease,
       realEstate,
-      monthlyFinancials: monthlyFinancials.map((r) => ({
+      monthlyFinancials: ttmWindowRecords(monthlyFinancials).map((r) => ({
+        year: r.year,
+        month: r.month,
         revenue: r.revenue,
         utilities: r.utilities,
         ebitda: r.ebitda,
       })),
       monthlyUtilities,
+      ttmMonthsUsed: ttm.monthsUsed,
     });
-  }, [store, hasFinancialData, valuation, scheduledDebtService, equipment, lease, realEstate, monthlyFinancials, monthlyUtilities]);
+  }, [store, hasFinancialData, valuation, scheduledDebtService, equipment, lease, realEstate, monthlyFinancials, monthlyUtilities, ttm.monthsUsed]);
 
   const laundrocfoScore = laundroCfoScoreResult?.total ?? 0;
 

@@ -1,6 +1,7 @@
 import {
   annualizeTtmTotal,
   calcTtmMetrics,
+  elapsedMonthlyRecords,
   monthChartLabel,
   sortRecordsAsc,
   type CalculatedMonthly,
@@ -46,8 +47,8 @@ function calendarMonthsAgo(
   return { year: date.getFullYear(), month: date.getMonth() + 1 };
 }
 
-export function hasEnoughChartHistory(records: CalculatedMonthly[]): boolean {
-  return records.length >= MIN_CHART_MONTHS;
+export function hasEnoughChartHistory(records: CalculatedMonthly[], asOf?: Date): boolean {
+  return elapsedMonthlyRecords(records, asOf).length >= MIN_CHART_MONTHS;
 }
 
 export function buildRevenueEbitdaChartData(
@@ -66,9 +67,10 @@ export function buildRevenueEbitdaChartData(
  */
 export function buildValuationHistorySeries(
   ctx: StoreValuationContext,
-  records: CalculatedMonthly[]
+  records: CalculatedMonthly[],
+  asOf: Date = new Date()
 ): ValuationHistoryPoint[] {
-  const sorted = sortRecordsAsc(records);
+  const sorted = sortRecordsAsc(elapsedMonthlyRecords(records, asOf));
   const points: ValuationHistoryPoint[] = [];
 
   for (let i = 0; i < sorted.length; i++) {

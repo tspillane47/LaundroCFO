@@ -10,6 +10,7 @@ import {
   calcTtmMetrics,
   enrichMonthlyRecords,
   sortRecordsDesc,
+  ttmWindowRecords,
   type MonthlyFinancialRecord,
   type MonthlyUtilityRecord,
 } from "../src/lib/financials";
@@ -75,7 +76,7 @@ function buildMockRecords(): {
 
 function main() {
   const { records, utilitiesLookup } = buildMockRecords();
-  const ttmRecords = records.slice(0, 12);
+  const ttmRecords = ttmWindowRecords(records);
   const ttm = calcTtmMetrics(records);
   const monthsUsed = ttm.monthsUsed;
 

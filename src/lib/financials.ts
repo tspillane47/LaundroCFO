@@ -327,8 +327,41 @@ export function sortRecordsAsc(records: CalculatedMonthly[]): CalculatedMonthly[
   });
 }
 
-export function calcTtmMetrics(records: CalculatedMonthly[]): TtmMetrics {
-  const ttm = records.slice(0, 12);
+/**
+ * True when the calendar month (1–12) has fully ended as of `asOf` (local date).
+ * The in-progress current month is not elapsed.
+ */
+export function isMonthFullyElapsed(
+  year: number,
+  month: number,
+  asOf: Date = new Date()
+): boolean {
+  const firstOfFollowingMonth = new Date(year, month, 1);
+  const asOfDate = new Date(asOf.getFullYear(), asOf.getMonth(), asOf.getDate());
+  return asOfDate.getTime() >= firstOfFollowingMonth.getTime();
+}
+
+/** Rows whose calendar month has fully elapsed. Does not hide in-progress P&L rows from callers. */
+export function elapsedMonthlyRecords<T extends { year: number; month: number }>(
+  records: T[],
+  asOf: Date = new Date()
+): T[] {
+  return records.filter((record) => isMonthFullyElapsed(record.year, record.month, asOf));
+}
+
+/**
+ * Trailing window for TTM / valuation / DSCR averages: fully-elapsed months only, max 12.
+ * Callers should pass newest-first (sortRecordsDesc). The current in-progress month is omitted.
+ */
+export function ttmWindowRecords<T extends { year: number; month: number }>(
+  records: T[],
+  asOf: Date = new Date()
+): T[] {
+  return elapsedMonthlyRecords(records, asOf).slice(0, 12);
+}
+
+export function calcTtmMetrics(records: CalculatedMonthly[], asOf: Date = new Date()): TtmMetrics {
+  const ttm = ttmWindowRecords(records, asOf);
   const ttmRevenue = ttm.reduce((sum, r) => sum + r.revenue, 0);
   const ttmEbitda = ttm.reduce((sum, r) => sum + r.ebitda, 0);
   const ttmActualDebtService = ttm.reduce((sum, r) => sum + r.debt_service, 0);
@@ -472,9 +505,10 @@ export const EMPTY_PORTFOLIO_TTM_CASH_FLOW: PortfolioTtmCashFlow = {
 
 function sumTtmRecords(
   records: CalculatedMonthly[],
-  pick: (record: CalculatedMonthly) => number
+  pick: (record: CalculatedMonthly) => number,
+  asOf: Date = new Date()
 ): number {
-  return records.slice(0, 12).reduce((sum, record) => sum + pick(record), 0);
+  return ttmWindowRecords(records, asOf).reduce((sum, record) => sum + pick(record), 0);
 }
 
 /** Portfolio-wide TTM cash flow from monthly_financials — same fields as Financials P&L. */
@@ -661,13 +695,14 @@ function annualizeExpense(
   field: keyof Pick<
     MonthlyFinancialRecord,
     "rent" | "utilities" | "payroll"
-  >
+  >,
+  asOf: Date = new Date()
 ): number {
-  const ttm = records.slice(0, 12);
+  const ttm = ttmWindowRecords(records, asOf);
   if (ttm.length >= 12) {
     return ttm.reduce((sum, r) => sum + num(r[field]), 0);
   }
-  const recent = records[0];
+  const recent = ttm[0];
   if (!recent) return 0;
   return num(recent[field]) * 12;
 }
@@ -831,9 +866,10 @@ export type YoYMetrics = {
   priorMargin: number;
 };
 
-export function calcYoYMetrics(records: CalculatedMonthly[]): YoYMetrics {
-  const current = records.slice(0, 12);
-  const prior = records.slice(12, 24);
+export function calcYoYMetrics(records: CalculatedMonthly[], asOf: Date = new Date()): YoYMetrics {
+  const elapsed = elapsedMonthlyRecords(records, asOf);
+  const current = elapsed.slice(0, 12);
+  const prior = elapsed.slice(12, 24);
 
   const currentRevenue = current.reduce((s, r) => s + r.revenue, 0);
   const priorRevenue = prior.reduce((s, r) => s + r.revenue, 0);

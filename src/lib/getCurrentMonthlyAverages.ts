@@ -11,6 +11,7 @@ import {
   calcTtmMetrics,
   enrichMonthlyRecords,
   sortRecordsDesc,
+  ttmWindowRecords,
   type CalculatedMonthly,
   type MonthlyFinancialRecord,
   type MonthlyUtilityRecord,
@@ -201,7 +202,7 @@ async function fetchTtmFinancialContext(storeId: string): Promise<{
     sortRecordsDesc(financialsData as MonthlyFinancialRecord[]),
     utilitiesLookup
   );
-  const ttmRecords = records.slice(0, 12);
+  const ttmRecords = ttmWindowRecords(records);
 
   return {
     records,

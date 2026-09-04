@@ -39,11 +39,12 @@ export function shouldTriggerLowDscrAlert(
 export function buildStoreTtmWithDscr(
   financialRecords: MonthlyFinancialRecord[],
   scheduledAnnualDebtService: number,
-  utilityRecords: MonthlyUtilityRecord[] = []
+  utilityRecords: MonthlyUtilityRecord[] = [],
+  asOf: Date = new Date()
 ): TtmMetrics {
   const utilitiesLookup = buildUtilitiesLookup(utilityRecords);
   const records = enrichMonthlyRecords(sortRecordsDesc(financialRecords), utilitiesLookup);
-  return applyLoanDebtServiceToTtm(calcTtmMetrics(records), scheduledAnnualDebtService);
+  return applyLoanDebtServiceToTtm(calcTtmMetrics(records, asOf), scheduledAnnualDebtService);
 }
 
 export type DscrDisplayOptions = {

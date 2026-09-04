@@ -9,6 +9,7 @@ import {
   enrichMonthlyRecords,
   fetchAnnualDebtServiceByStore,
   sortRecordsDesc,
+  ttmWindowRecords,
   type MonthlyFinancialRecord,
 } from "@/lib/financials";
 import {
@@ -150,7 +151,7 @@ function ScenariosPageContent() {
         sorted.length > 0
           ? applyLoanDebtServiceToTtm(calcTtmMetrics(sorted), scheduledAnnualDebtService)
           : null;
-      const ttmWindow = sorted.slice(0, ttmMetrics?.monthsUsed ?? 0);
+      const ttmWindow = ttmWindowRecords(sorted);
       const ttmRent = ttmWindow.reduce((sum, r) => sum + (r.rent ?? 0), 0);
       const resolvedFinancials = resolveStoreFinancials(
         storeData,

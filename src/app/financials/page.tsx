@@ -81,6 +81,7 @@ import {
   recordToForm,
   sortRecordsDesc,
   suggestTransactionCategory,
+  ttmWindowRecords,
 } from "@/lib/financials";
 import {
   formatQuickBooksConnectionErrorMessage,
@@ -680,7 +681,7 @@ export default function FinancialsPage() {
   }, [yearRecords]);
 
   const ttmTableTotals = useMemo(() => {
-    const ttmRecords = records.slice(0, ttm.monthsUsed);
+    const ttmRecords = ttmWindowRecords(records);
     return {
       revenue: ttm.ttmRevenue,
       expenses: ttmRecords.reduce((sum, r) => sum + r.totalExpenses, 0),

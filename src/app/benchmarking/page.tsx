@@ -14,6 +14,7 @@ import {
   fetchAnnualDebtServiceByStore,
   fetchStoreMonthlyFinancials,
   sortRecordsDesc,
+  ttmWindowRecords,
   type CalculatedMonthly,
   type MonthlyFinancialRecord,
   type MonthlyUtilityRecord,
@@ -537,7 +538,13 @@ function BenchmarkingPageContent() {
         equipment: equip,
         lease: leaseData as Record<string, unknown> | null,
         realEstate: reData as Record<string, unknown> | null,
-        monthlyFinancials: sorted.map((r) => ({ revenue: r.revenue, utilities: r.utilities, ebitda: r.ebitda })),
+        monthlyFinancials: ttmWindowRecords(sorted).map((r) => ({
+          year: r.year,
+          month: r.month,
+          revenue: r.revenue,
+          utilities: r.utilities,
+          ebitda: r.ebitda,
+        })),
         monthlyUtilities: (utilitiesData ?? []) as MonthlyUtilityRecord[],
         ttmMonthsUsed: ttm.monthsUsed,
       });

@@ -16,6 +16,7 @@ import {
   enrichMonthlyRecords,
   sortRecordsDesc,
   calcTtmMetrics,
+  ttmWindowRecords,
   type MonthlyFinancialRecord,
   type MonthlyUtilityRecord,
   buildUtilitiesLookup,
@@ -105,7 +106,7 @@ async function main() {
     utilitiesLookup
   );
   const ttm = calcTtmMetrics(records);
-  const ttmRecords = records.slice(0, 12);
+  const ttmRecords = ttmWindowRecords(records);
 
   const plTtmDebtService = ttm.ttmDebtService;
   const plMonthlyAvg = ttm.monthsUsed > 0 ? plTtmDebtService / ttm.monthsUsed : 0;
