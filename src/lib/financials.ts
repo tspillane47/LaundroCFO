@@ -1010,7 +1010,7 @@ export const BANK_IMPORT_CATEGORY_LABELS: Record<BankImportCategory, string> = {
   software_subscriptions: "Software & Subscriptions",
   cc_processing_fees: "Credit Card Processing Fees",
   bank_charges: "Bank Charges",
-  debt_service: "Debt Service",
+  debt_service: "Debt Service / Loan Payment",
   bank_fees: "Bank Fees",
   other_expenses: "Other Expenses",
   needs_review: "Needs Category",

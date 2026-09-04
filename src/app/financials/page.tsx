@@ -240,7 +240,7 @@ const CATEGORY_LABELS: Record<PlCategoryField, string> = {
   cc_processing_fees: "CC Processing Fees",
   bank_charges: "Bank Charges",
   other_expenses: "Other Expenses",
-  debt_service: "Debt Service",
+  debt_service: "Debt Service / Loan Payment",
 };
 
 const DEFAULT_QB_MAPPINGS: QBMappingRow[] = [
