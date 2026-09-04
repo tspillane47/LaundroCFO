@@ -1909,6 +1909,7 @@ export function markDuplicateTransactions<T extends DuplicateCheckTransaction>(
   });
 }
 
+/** Single bank CSV parser for Financials, Transactions, and Onboarding. */
 export function parseBankCsv(text: string): ParsedCsvTransaction[] {
   const lines = text.trim().split(/\r?\n/).filter(Boolean);
   if (lines.length < 2) return [];

@@ -50,6 +50,7 @@ import { useWriteGuard } from "@/lib/useWriteGuard";
 import {
   type BankImportCategory,
   type CalculatedMonthly,
+  type CategorizationRule,
   type FinancialDataSource,
   FINANCIAL_DATA_SOURCE_LABELS,
   type MonthlyFinancialRecord,
@@ -73,14 +74,14 @@ import {
   buildUtilitiesLookup,
   emptyMonthlyForm,
   enrichMonthlyRecords,
+  categorizeWithRules,
   getChartRecords,
-  inferTransactionType,
   monthChartLabel,
   monthKey,
+  parseBankCsv,
   ratioStatusColor,
   recordToForm,
   sortRecordsDesc,
-  suggestTransactionCategory,
   ttmWindowRecords,
 } from "@/lib/financials";
 import {
@@ -345,42 +346,6 @@ function RatioCard({ item }: { item: RatioBenchmark }) {
       </div>
     </div>
   );
-}
-
-function parseCSVTransactions(text: string): StagedTransaction[] {
-  const lines = text.trim().split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) return [];
-
-  const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
-  const dateIdx = headers.findIndex((h) => /date|posted/.test(h));
-  const descIdx = headers.findIndex((h) => /desc|memo|name|payee/.test(h));
-  const amountIdx = headers.findIndex((h) => /amount|debit|credit|value/.test(h));
-
-  if (dateIdx === -1 || amountIdx === -1) return [];
-
-  return lines.slice(1).map((line, i) => {
-    const cols = line.match(/(".*?"|[^,]+)/g)?.map((c) => c.trim().replace(/^"|"$/g, "")) ?? line.split(",");
-    const rawDate = cols[dateIdx] ?? "";
-    const description = descIdx >= 0 ? cols[descIdx] ?? null : null;
-    let amount = parseFloat((cols[amountIdx] ?? "0").replace(/[$,]/g, ""));
-    if (Number.isNaN(amount)) amount = 0;
-
-    const parsed = new Date(rawDate);
-    const transaction_date = Number.isNaN(parsed.getTime())
-      ? new Date().toISOString().slice(0, 10)
-      : parsed.toISOString().slice(0, 10);
-
-    const type = inferTransactionType(amount, null);
-    const category = suggestTransactionCategory(description, type);
-    return {
-      tempId: `csv-${i}-${Date.now()}`,
-      transaction_date,
-      description,
-      amount,
-      type,
-      category,
-    };
-  });
 }
 
 export default function FinancialsPage() {
@@ -874,16 +839,43 @@ export default function FinancialsPage() {
 
   function handleCSVUpload(file: File) {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const text = e.target?.result as string;
-      const parsed = parseCSVTransactions(text);
+      const parsed = parseBankCsv(text);
       if (parsed.length === 0) {
-        setError("Could not parse CSV. Include Date and Amount columns.");
+        setError(
+          "Could not parse CSV. Expected columns: Processed Date, Description, Credit or Debit, and Amount."
+        );
         return;
       }
-      setStagedTransactions((prev) => [...parsed, ...prev]);
+
+      let rules: CategorizationRule[] = [];
+      if (userId) {
+        const { data: freshRules } = await supabase
+          .from("categorization_rules")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false });
+        if (freshRules) {
+          rules = freshRules as CategorizationRule[];
+        }
+      }
+
+      const baseId = Date.now();
+      const staged: StagedTransaction[] = parsed.map((row, i) => {
+        const { category } = categorizeWithRules(row.description, row.type, row.amount, rules);
+        return {
+          tempId: `csv-${baseId}-${i}`,
+          transaction_date: row.date,
+          description: row.description,
+          amount: row.amount,
+          type: row.type,
+          category,
+        };
+      });
+      setStagedTransactions((prev) => [...staged, ...prev]);
       setSuccess(
-        `Parsed ${parsed.length} transaction${parsed.length === 1 ? "" : "s"} from CSV. Save to queue, then review on the Transactions page.`
+        `Parsed ${staged.length} transaction${staged.length === 1 ? "" : "s"} from CSV. Save to queue, then review on the Transactions page.`
       );
     };
     reader.readAsText(file);
@@ -2425,7 +2417,8 @@ export default function FinancialsPage() {
             <div>
               <div className="text-[14px] font-semibold text-slate-100">Import Bank Transactions</div>
               <div className="text-[12px] text-[var(--text-muted)] mt-1">
-                Upload a CSV with Date, Description, and Amount columns. After saving, review and categorize on the{" "}
+                Upload a bank CSV (date, description, amount, and debit/credit or signed amounts). After saving, review and
+                categorize on the{" "}
                 <Link href="/transactions?tab=needs_review" className="text-[var(--accent)] hover:underline">
                   Transactions page
                 </Link>
