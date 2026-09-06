@@ -33,15 +33,6 @@ import {
   calcRealEstateLTV,
 } from "@/lib/real-estate-calculations";
 import type { EquipmentRecord } from "@/lib/equipment";
-import {
-  AreaChart,
-  Area,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 import { generateStoreFeed } from "@/lib/intelligence";
 import { IntelligenceFeedMobileShell } from "@/components/ui/IntelligenceFeedMobileShell";
 import { IntelligenceFeedPanel } from "@/components/ui/IntelligenceFeedPanel";
@@ -65,14 +56,20 @@ import {
   LiveFromBankBadge,
 } from "@/components/ui/CashPositionIndicator";
 import { computeStoreCashPosition } from "@/lib/cashPosition";
+import { resolveOccupancyRentDisplay } from "@/lib/storeCanonical";
+import {
+  buildThisMonthChartModel,
+  fetchThisMonthBankTransactions,
+  type ThisMonthTransaction,
+} from "@/lib/thisMonthChart";
 import {
   buildRevenueEbitdaChartData,
   buildValuationHistorySeries,
   computeValuationDeltas,
   hasEnoughChartHistory,
-  INSUFFICIENT_HISTORY_MESSAGE,
 } from "@/lib/valuationHistory";
 import { RevenueEbitdaBarChart } from "@/components/dashboard/RevenueEbitdaBarChart";
+import { ThisMonthChart } from "@/components/dashboard/ThisMonthChart";
 
 function parseDate(value: string | null): Date | null {
   if (!value) return null;
@@ -100,10 +97,16 @@ function formatPlaidAccountCount(count: number, label: string): string {
   return `${count} ${label}${count === 1 ? "" : "s"}`;
 }
 
-function formatAxisValue(value: number): string {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${Math.round(value / 1_000)}k`;
-  return `$${value}`;
+function cashRunwayDays(totalCash: number, monthlyExpenses: number): number | null {
+  if (!(monthlyExpenses > 0)) return null;
+  return Math.round(totalCash / (monthlyExpenses / 30));
+}
+
+function cashRunwayColor(days: number | null, hasFinancialData: boolean): string {
+  if (!hasFinancialData || days == null) return "var(--text-muted)";
+  if (days < 14) return "var(--text-danger)";
+  if (days < 30) return "var(--text-warning)";
+  return "var(--text-success)";
 }
 
 type BenchmarkRow = {
@@ -162,23 +165,6 @@ function HowYouCompareCard({
   );
 }
 
-const ChartTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div
-      className="rounded-lg p-3 text-xs shadow-lg"
-      style={{ background: "var(--bg-card2)", border: "1px solid var(--border)", color: "var(--text-primary)" }}
-    >
-      <div style={{ color: "var(--text-muted)" }} className="mb-1">{label}</div>
-      {payload.map((p: any) => (
-        <div key={p.dataKey} className="font-semibold">
-          {p.name}: {typeof p.value === "number" && p.dataKey !== "month" ? fmtDollar(p.value) : p.value}
-        </div>
-      ))}
-    </div>
-  );
-};
-
 export default function DashboardPage() {
   const router = useRouter();
   const { stores, selectedStore, isAllStores, setSelectedStore, setIsAllStores, loading: storesLoading } = useStores();
@@ -201,6 +187,7 @@ export default function DashboardPage() {
   const [uncategorizedTransactionCount, setUncategorizedTransactionCount] = useState(0);
   const [hasPlaidConnections, setHasPlaidConnections] = useState(false);
   const [plaidBalanceSnapshot, setPlaidBalanceSnapshot] = useState<PlaidBalanceSnapshot | null>(null);
+  const [thisMonthTransactions, setThisMonthTransactions] = useState<ThisMonthTransaction[]>([]);
   const supabase = createClient();
 
   const loadDashboardData = useCallback(async () => {
@@ -214,6 +201,7 @@ export default function DashboardPage() {
       setUncategorizedTransactionCount(0);
       setHasPlaidConnections(false);
       setPlaidBalanceSnapshot(null);
+      setThisMonthTransactions([]);
       setLoadError(false);
       setDetailLoading(false);
       return;
@@ -229,7 +217,7 @@ export default function DashboardPage() {
       const storeValuation = await getStoreValuation(loadedStore.id);
       setValuation(storeValuation);
 
-      const [debt, scheduledAnnual, financialsData, { data: utilitiesData, error: utilitiesError }, uncategorizedCounts, plaidConnected, plaidBalances] =
+      const [debt, scheduledAnnual, financialsData, { data: utilitiesData, error: utilitiesError }, uncategorizedCounts, plaidConnected, plaidBalances, monthTransactions] =
         await Promise.all([
         getStoreDebt(loadedStore.id),
         getStoreScheduledDebtService(loadedStore.id),
@@ -238,12 +226,14 @@ export default function DashboardPage() {
         fetchUncategorizedReviewCountsByStore(supabase, [loadedStore.id]),
         storeHasPlaidConnections(loadedStore.id),
         getStorePlaidBalanceSnapshot(loadedStore.id),
+        fetchThisMonthBankTransactions(supabase, loadedStore.id),
       ]);
       setTotalDebt(debt);
       setScheduledDebtService(scheduledAnnual);
       setUncategorizedTransactionCount(uncategorizedCounts[loadedStore.id] ?? 0);
       setHasPlaidConnections(plaidConnected);
       setPlaidBalanceSnapshot(plaidBalances);
+      setThisMonthTransactions(monthTransactions);
       if (utilitiesError) throw utilitiesError;
       const utilitiesLookup = buildUtilitiesLookup((utilitiesData ?? []) as MonthlyUtilityRecord[]);
       setMonthlyUtilities((utilitiesData ?? []) as MonthlyUtilityRecord[]);
@@ -376,6 +366,16 @@ export default function DashboardPage() {
   const cashPositionComposition = cashPosition.source === "plaid" ? "all_live" : "all_manual";
   const businessValue = estimatedValue;
   const equity = hasFinancialData && canShowValuation ? businessValue + totalCash - totalDebt : 0;
+  const monthlyExpenses = hasFinancialData ? (resolvedFinancials?.monthlyExpenses ?? 0) : 0;
+  const runwayDays = hasFinancialData ? cashRunwayDays(totalCash, monthlyExpenses) : null;
+  const occupancyRent =
+    hasFinancialData && (resolvedFinancials?.monthlyRent ?? 0) > 0
+      ? resolvedFinancials?.monthlyRent ?? null
+      : resolveOccupancyRentDisplay(lease, realEstate, isOwnerOccupied);
+  const occupancyCostPct =
+    hasFinancialData && occupancyRent != null
+      ? calcOccupancyCostRatioFromRent(occupancyRent, revenue)
+      : null;
 
   const leaseMetrics = useMemo(() => {
     if (!lease) return null;
@@ -434,12 +434,9 @@ export default function DashboardPage() {
     return buildValuationHistorySeries(valuation.context, monthlyFinancials);
   }, [canShowValuation, valuation?.context, monthlyFinancials]);
 
-  const valuationTrend = useMemo(
-    () =>
-      valuationHistorySeries
-        .slice(-12)
-        .map(({ label, value }) => ({ month: label, value })),
-    [valuationHistorySeries]
+  const thisMonthChartModel = useMemo(
+    () => buildThisMonthChartModel(thisMonthTransactions),
+    [thisMonthTransactions]
   );
 
   const revenueEbitdaData = useMemo(
@@ -823,21 +820,20 @@ export default function DashboardPage() {
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.2s" }}
-          label="Business Value"
+          label="Cash Runway"
           value={
-            canShowValuation ? (
-              <AnimatedNumber value={businessValue} prefix="$" duration={1000} />
+            hasFinancialData && runwayDays != null ? (
+              <AnimatedNumber value={runwayDays} suffix=" days" duration={1000} />
             ) : (
               "—"
             )
           }
           sub={
-            canShowValuation
-              ? `${fmtMultiple(finalMultiple)} EBITDA multiple`
-              : missingMarketRent
-                ? "Enter an estimated market rent to get an accurate valuation"
-                : "Add monthly financials"
+            hasFinancialData && monthlyExpenses > 0
+              ? `at ${fmtDollar(monthlyExpenses)}/mo expenses`
+              : "Add monthly financials"
           }
+          valueColor={cashRunwayColor(runwayDays, hasFinancialData)}
         />
 
         <KpiCard
@@ -904,62 +900,7 @@ export default function DashboardPage() {
       <div className="grid-3 grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
         {/* Left Column */}
         <div className="xl:col-span-2 space-y-4">
-          {/* Valuation Trend Chart */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <div className="section-title mb-0">12-Month Valuation Trend</div>
-              <div className="text-[20px] font-bold" style={{ color: "var(--accent)" }}>
-                {canShowValuation ? fmtDollar(estimatedValue) : "—"}
-              </div>
-            </div>
-            <div className="h-[220px]">
-              {valuationTrend.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={valuationTrend}>
-                  <defs>
-                    <linearGradient id="valGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tickFormatter={formatAxisValue}
-                    tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={55}
-                  />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Area
-                    type="monotone"
-                    dataKey="value"
-                    name="Valuation"
-                    stroke="var(--accent)"
-                    strokeWidth={2}
-                    fill="url(#valGrad)"
-                    dot={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-[13px] text-center px-4" style={{ color: "var(--text-muted)" }}>
-                  {missingMarketRent ? (
-                    <MissingMarketRentPrompt variant="inline" />
-                  ) : hasFinancialData ? (
-                    INSUFFICIENT_HISTORY_MESSAGE
-                  ) : (
-                    "Add monthly financials to see valuation trend."
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+          <ThisMonthChart model={thisMonthChartModel} />
 
           {/* Revenue vs EBITDA */}
           <RevenueEbitdaBarChart data={revenueEbitdaData} hasFinancialData={hasFinancialData} />
@@ -1090,7 +1031,11 @@ export default function DashboardPage() {
         <div className="section-title mb-4">Valuation Summary</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {[
-            { label: "Est. Value", value: canShowValuation ? fmtDollar(estimatedValue) : "—" },
+            {
+              label: "Occupancy Cost",
+              value:
+                occupancyCostPct != null ? `${occupancyCostPct.toFixed(1)}%` : "—",
+            },
             {
               label: "Multiple",
               value: canShowValuation ? fmtMultiple(finalMultiple) : "—",

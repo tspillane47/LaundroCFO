@@ -19,6 +19,7 @@ import {
   YAxis,
 } from "recharts";
 import { createClient } from "@/lib/supabase";
+import { useToast } from "@/components/ui/ToastProvider";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import { findNegativeFieldError } from "@/lib/formHelpers";
 import { useStores } from "@/lib/store-context";
@@ -79,6 +80,8 @@ import {
   monthChartLabel,
   monthKey,
   parseBankCsv,
+  formatCsvDuplicateSkippedMessage,
+  insertCsvTransactionsSkippingDuplicates,
   ratioStatusColor,
   recordToForm,
   sortRecordsDesc,
@@ -352,6 +355,7 @@ export default function FinancialsPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const toast = useToast();
   const { selectedStore, isAllStores, stores, loading: storesLoading } = useStores();
   const selectedStoreIdRef = useRef<string | undefined>(selectedStore?.id);
   selectedStoreIdRef.current = selectedStore?.id;
@@ -902,14 +906,25 @@ export default function FinancialsPage() {
       is_reviewed: false,
       excluded: false,
     }));
-    const { error: insertError } = await supabase.from("bank_transactions").insert(rows);
-    if (insertError) {
-      setError(insertError.message);
+    const result = await insertCsvTransactionsSkippingDuplicates(supabase, {
+      storeId: store.id,
+      rows,
+    });
+    if (result.error) {
+      setError(result.error);
       setSaving(false);
       return;
     }
     setStagedTransactions([]);
     setSaving(false);
+    if (result.skippedCount > 0) {
+      const skipMsg = formatCsvDuplicateSkippedMessage(result.skippedCount);
+      setSuccess(skipMsg);
+      toast.info(skipMsg);
+    }
+    if (result.insertedCount === 0) {
+      return;
+    }
     if (store?.id) {
       void evaluateAlerts({ storeIds: [store.id] });
     }

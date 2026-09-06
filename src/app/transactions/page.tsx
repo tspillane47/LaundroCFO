@@ -55,6 +55,8 @@ import {
   markDuplicateTransactions,
   normalizeVendorPattern,
   parseBankCsv,
+  formatCsvDuplicateSkippedMessage,
+  insertCsvTransactionsSkippingDuplicates,
   planRuleApplyToExisting,
   postTransactionsBatch,
   reclassifyPostedTransaction,
@@ -1566,18 +1568,28 @@ function TransactionsPageContent() {
       excluded: false,
     }));
 
-    const { error } = await supabase.from("bank_transactions").insert(rows);
+    const result = await insertCsvTransactionsSkippingDuplicates(supabase, {
+      storeId: store.id,
+      rows,
+    });
     setSaving(false);
 
-    if (error) {
+    if (result.error) {
       toast.error("Failed to save — please try again");
       return;
     }
 
     setStagedCsv([]);
-    toast.success(`CSV imported — ${rows.length} transaction${rows.length === 1 ? "" : "s"} added`);
+    if (result.insertedCount > 0) {
+      toast.success(
+        `CSV imported — ${result.insertedCount} transaction${result.insertedCount === 1 ? "" : "s"} added`
+      );
+    }
+    if (result.skippedCount > 0) {
+      toast.info(formatCsvDuplicateSkippedMessage(result.skippedCount));
+    }
     await loadData();
-    if (store?.id) void evaluateAlerts({ storeIds: [store.id] });
+    if (result.insertedCount > 0 && store?.id) void evaluateAlerts({ storeIds: [store.id] });
   }
 
   function openRuleForm(

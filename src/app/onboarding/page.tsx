@@ -13,9 +13,12 @@ import { NavIcon } from "@/components/ui/NavIcons";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import {
   categorizeWithRules,
+  formatCsvDuplicateSkippedMessage,
+  insertCsvTransactionsSkippingDuplicates,
   parseBankCsv,
   type TransactionType,
 } from "@/lib/financials";
+import { useToast } from "@/components/ui/ToastProvider";
 import { getStoreValuation, invalidateValuationCache } from "@/lib/getStoreValuation";
 import { getFinancialDataConfidenceMessage, needsFinancialDataConfidenceNote } from "@/lib/financialDataConfidence";
 import { canAddStore, getAccessStatus, getUserStoreCount, storeCreationBlockedMessage } from "@/lib/access";
@@ -178,6 +181,7 @@ export default function OnboardingPage() {
 function OnboardingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const toast = useToast();
   const isAddingStore = searchParams.get("add") === "true";
   const switchToOwnPath = searchParams.get("switch") === "own";
   const supabase = useMemo(() => createClient(), []);
@@ -639,11 +643,17 @@ function OnboardingContent() {
         excluded: false,
       }));
 
-      const { error } = await supabase.from("bank_transactions").insert(rows);
-      if (error) {
-        console.error("CSV import error:", error);
+      const result = await insertCsvTransactionsSkippingDuplicates(supabase, {
+        storeId: id,
+        rows,
+      });
+      if (result.error) {
+        console.error("CSV import error:", result.error);
         setErrorMessage("We couldn't import your CSV. Please try again.");
         return false;
+      }
+      if (result.skippedCount > 0) {
+        toast.info(formatCsvDuplicateSkippedMessage(result.skippedCount));
       }
     } else if (form.financialMode === "manual") {
       const revenue = toNullableNum(form.monthlyRevenue);

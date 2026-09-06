@@ -1909,6 +1909,111 @@ export function markDuplicateTransactions<T extends DuplicateCheckTransaction>(
   });
 }
 
+/** Exact CSV re-upload key: store already scoped by the caller. */
+export type CsvExactDuplicateKey = {
+  transaction_date: string;
+  amount: number;
+  description: string | null;
+};
+
+export type CsvBankTransactionInsert = CsvExactDuplicateKey & {
+  store_id: string;
+  user_id: string;
+  category: string;
+  transaction_type: string;
+  original_category: string;
+  status: string;
+  is_reviewed: boolean;
+  excluded: boolean;
+};
+
+export type InsertCsvTransactionsResult = {
+  insertedCount: number;
+  skippedCount: number;
+  error: string | null;
+};
+
+const CSV_EXISTING_PAGE_SIZE = 1000;
+
+export function csvExactDuplicateKey(row: CsvExactDuplicateKey): string {
+  const date = String(row.transaction_date).split("T")[0];
+  const amount = Number(row.amount).toFixed(2);
+  const description = row.description ?? "";
+  return `${date}|${amount}|${description}`;
+}
+
+export function formatCsvDuplicateSkippedMessage(skippedCount: number): string {
+  if (skippedCount === 1) {
+    return "1 row was skipped as likely duplicates of transactions already in your account.";
+  }
+  return `${skippedCount} rows were skipped as likely duplicates of transactions already in your account.`;
+}
+
+export function filterCsvRowsAgainstExisting<T extends CsvExactDuplicateKey>(
+  staged: T[],
+  existing: CsvExactDuplicateKey[]
+): { toInsert: T[]; skippedCount: number } {
+  const seen = new Set(existing.map(csvExactDuplicateKey));
+  const toInsert: T[] = [];
+  let skippedCount = 0;
+  for (const row of staged) {
+    const key = csvExactDuplicateKey(row);
+    if (seen.has(key)) {
+      skippedCount += 1;
+      continue;
+    }
+    toInsert.push(row);
+    seen.add(key);
+  }
+  return { toInsert, skippedCount };
+}
+
+async function fetchExistingCsvDuplicateKeys(
+  supabase: FinancialsSupabaseClient,
+  storeId: string
+): Promise<{ keys: CsvExactDuplicateKey[]; error: string | null }> {
+  const keys: CsvExactDuplicateKey[] = [];
+  for (let from = 0; ; from += CSV_EXISTING_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("bank_transactions")
+      .select("transaction_date, amount, description")
+      .eq("store_id", storeId)
+      .order("id", { ascending: true })
+      .range(from, from + CSV_EXISTING_PAGE_SIZE - 1);
+    if (error) return { keys: [], error: error.message };
+    const page = (data ?? []) as CsvExactDuplicateKey[];
+    keys.push(...page);
+    if (page.length < CSV_EXISTING_PAGE_SIZE) break;
+  }
+  return { keys, error: null };
+}
+
+/** Insert CSV rows, skipping exact date+amount+description matches already stored for the store. */
+export async function insertCsvTransactionsSkippingDuplicates(
+  supabase: FinancialsSupabaseClient,
+  params: { storeId: string; rows: CsvBankTransactionInsert[] }
+): Promise<InsertCsvTransactionsResult> {
+  if (params.rows.length === 0) {
+    return { insertedCount: 0, skippedCount: 0, error: null };
+  }
+
+  const existing = await fetchExistingCsvDuplicateKeys(supabase, params.storeId);
+  if (existing.error) {
+    return { insertedCount: 0, skippedCount: 0, error: existing.error };
+  }
+
+  const { toInsert, skippedCount } = filterCsvRowsAgainstExisting(params.rows, existing.keys);
+  if (toInsert.length === 0) {
+    return { insertedCount: 0, skippedCount, error: null };
+  }
+
+  const { error } = await supabase.from("bank_transactions").insert(toInsert);
+  if (error) {
+    return { insertedCount: 0, skippedCount, error: error.message };
+  }
+  return { insertedCount: toInsert.length, skippedCount, error: null };
+}
+
 /** Single bank CSV parser for Financials, Transactions, and Onboarding. */
 export function parseBankCsv(text: string): ParsedCsvTransaction[] {
   const lines = text.trim().split(/\r?\n/).filter(Boolean);
