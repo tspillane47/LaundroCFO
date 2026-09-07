@@ -62,7 +62,6 @@ import {
   computeValuationDeltas,
   hasEnoughChartHistory,
 } from "@/lib/valuationHistory";
-import { CompactEstimatedStoreValue } from "@/components/dashboard/CompactEstimatedStoreValue";
 import { RevenueEbitdaBarChart } from "@/components/dashboard/RevenueEbitdaBarChart";
 import { ThisMonthChart } from "@/components/dashboard/ThisMonthChart";
 
@@ -442,7 +441,7 @@ export default function DashboardPage() {
     [monthlyFinancials]
   );
 
-  const { monthlyChange, yearChangePct } = useMemo(
+  const { monthlyChange } = useMemo(
     () => computeValuationDeltas(valuationHistorySeries),
     [valuationHistorySeries]
   );
@@ -654,15 +653,6 @@ export default function DashboardPage() {
     },
   ];
 
-  const compactValueProps = {
-    canShowValuation,
-    estimatedValue,
-    finalMultiple,
-    ttmMonthsUsed,
-    missingMarketRent,
-    monthlyChange,
-    yearChangePct,
-  };
   const showPlaidCredit = hasPlaidConnections && plaidBalanceSnapshot != null;
   const bankCashSub = !hasFinancialData
     ? "Add monthly financials"
@@ -692,19 +682,11 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      <div className="hidden xl:block">
-        <CompactEstimatedStoreValue {...compactValueProps} />
-      </div>
-
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
         <div className="xl:col-span-2 space-y-5 min-w-0">
           <ThisMonthChart model={thisMonthChartModel} />
 
           <IntelligenceFeedMobileShell items={feedItems} />
-
-          <div className="xl:hidden">
-            <CompactEstimatedStoreValue {...compactValueProps} />
-          </div>
 
           <div className="metric-grid">
             <DSCRCard
@@ -775,7 +757,7 @@ export default function DashboardPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="metric-grid">
             <KpiCard
               className="kpi-fade-in kpi-glow-card"
               style={{ animationDelay: "0.2s" }}
@@ -827,6 +809,26 @@ export default function DashboardPage() {
                     ? "var(--text-success)"
                     : "var(--text-danger)"
                   : "var(--text-muted)"
+              }
+            />
+
+            <KpiCard
+              className="kpi-fade-in kpi-glow-card"
+              style={{ animationDelay: "0.35s" }}
+              label="Estimated Store Value"
+              value={
+                canShowValuation ? (
+                  <AnimatedNumber value={estimatedValue} prefix="$" duration={1000} />
+                ) : (
+                  "—"
+                )
+              }
+              sub={
+                canShowValuation
+                  ? `${fmtMultiple(finalMultiple)} EBITDA multiple`
+                  : missingMarketRent
+                    ? "Enter an estimated market rent to get an accurate valuation"
+                    : "Add monthly financials"
               }
             />
           </div>
