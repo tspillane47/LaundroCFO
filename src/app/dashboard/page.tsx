@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
 import { canShowStoreValuation, getStoreValuation, getStoreDebt, getStoreScheduledDebtService, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
-import { MissingMarketRentPrompt } from "@/components/valuation/MissingMarketRentPrompt";
 import { calcEquipmentScore, calcLeaseScore, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { computeStoreDscr } from "@/lib/dscr";
 import {
@@ -44,17 +43,12 @@ import { JOIN_STORE_SETTINGS_HINT } from "@/lib/onboarding";
 import { useOnboardingStatus } from "@/lib/useOnboardingStatus";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { DSCRCard } from "@/components/ui/DSCRCard";
-import { FinancialDataConfidenceNote } from "@/components/ui/FinancialDataConfidenceNote";
 import { DisclaimerLabel } from "@/components/ui/Disclaimer";
-import { CashCard } from "@/components/ui/CashCard";
 import { PageError } from "@/components/ui/PageError";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
-import { ValueChangeIndicator } from "@/components/ui/ValueChangeIndicator";
-import { BankBalancesPanel } from "@/components/ui/BankBalancesPanel";
-import {
-  formatCashPositionSubtext,
-  LiveFromBankBadge,
-} from "@/components/ui/CashPositionIndicator";
+import { BankBalancesPanel, MANUAL_CASH_SUBTEXT } from "@/components/ui/BankBalancesPanel";
+import { ManualCashEditor } from "@/components/ui/ManualCashEditor";
+import { formatCashPositionSubtext } from "@/components/ui/CashPositionIndicator";
 import { computeStoreCashPosition } from "@/lib/cashPosition";
 import { resolveOccupancyRentDisplay } from "@/lib/storeCanonical";
 import {
@@ -68,6 +62,7 @@ import {
   computeValuationDeltas,
   hasEnoughChartHistory,
 } from "@/lib/valuationHistory";
+import { CompactEstimatedStoreValue } from "@/components/dashboard/CompactEstimatedStoreValue";
 import { RevenueEbitdaBarChart } from "@/components/dashboard/RevenueEbitdaBarChart";
 import { ThisMonthChart } from "@/components/dashboard/ThisMonthChart";
 
@@ -363,7 +358,7 @@ export default function DashboardPage() {
     [storeData, hasPlaidConnections, plaidBalanceSnapshot]
   );
   const totalCash = hasFinancialData ? cashPosition.amount : 0;
-  const cashPositionComposition = cashPosition.source === "plaid" ? "all_live" : "all_manual";
+  const isCashLive = cashPosition.source === "plaid";
   const businessValue = estimatedValue;
   const equity = hasFinancialData && canShowValuation ? businessValue + totalCash - totalDebt : 0;
   const monthlyExpenses = hasFinancialData ? (resolvedFinancials?.monthlyExpenses ?? 0) : 0;
@@ -659,6 +654,25 @@ export default function DashboardPage() {
     },
   ];
 
+  const compactValueProps = {
+    canShowValuation,
+    estimatedValue,
+    finalMultiple,
+    ttmMonthsUsed,
+    missingMarketRent,
+    monthlyChange,
+    yearChangePct,
+  };
+  const showPlaidCredit = hasPlaidConnections && plaidBalanceSnapshot != null;
+  const bankCashSub = !hasFinancialData
+    ? "Add monthly financials"
+    : isCashLive && plaidBalanceSnapshot
+      ? `${formatPlaidAccountCount(plaidBalanceSnapshot.depositoryAccountCount, "depository account")} · Last synced ${formatPlaidLastSynced(plaidBalanceSnapshot.lastSyncedAt)} · Synced from connected bank accounts`
+      : formatCashPositionSubtext("all_manual", 0, 1) ?? MANUAL_CASH_SUBTEXT;
+  const bankCreditSub = showPlaidCredit
+    ? `${formatPlaidAccountCount(plaidBalanceSnapshot.creditAccountCount, "credit account")} · Last synced ${formatPlaidLastSynced(plaidBalanceSnapshot.lastSyncedAt)} · Credit card balances from connected banks`
+    : undefined;
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -678,396 +692,312 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* Section 1: Hero Valuation Banner */}
-      <div className="hero-value-card">
-        <div style={{ fontSize: '12px', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>
-          Estimated Store Value
-        </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
-          {canShowValuation ? (
-            <>
-              <AnimatedNumber value={estimatedValue} prefix="$" className="hero-value-text" duration={1200} />
-              <ValueChangeIndicator value={estimatedValue} />
-            </>
-          ) : (
-            <span className="hero-value-text">—</span>
-          )}
-        </div>
-        {canShowValuation && (monthlyChange != null || yearChangePct != null) && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
-            {monthlyChange != null && (
-              <span
-                style={{
-                  background: monthlyChange >= 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-                  color: monthlyChange >= 0 ? '#4ade80' : '#f87171',
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                }}
-              >
-                {monthlyChange >= 0 ? "+" : ""}{fmtDollar(monthlyChange)} this month
-              </span>
-            )}
-            {yearChangePct != null && (
-              <span
-                style={{
-                  background: yearChangePct >= 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-                  color: yearChangePct >= 0 ? '#4ade80' : '#f87171',
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                }}
-              >
-                {yearChangePct >= 0 ? "+" : ""}{yearChangePct.toFixed(1)}% vs last year
-              </span>
-            )}
-          </div>
-        )}
-        <FinancialDataConfidenceNote monthsUsed={ttmMonthsUsed} variant="hero" className="mt-2" />
-        {missingMarketRent && <MissingMarketRentPrompt variant="hero" className="mt-2" />}
-        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', marginTop: '12px', lineHeight: 1.6 }}>
-          {canShowValuation
-            ? `Based on ${fmtMultiple(finalMultiple)} EBITDA multiple · Equipment grade B · ${leaseMetrics ? `${leaseMetrics.yearsRemaining.toFixed(1)}yr lease` : "—"} · ${sqft.toLocaleString()} SF`
-            : missingMarketRent
-              ? null
-              : "Add monthly financials to estimate store value."}
-        </div>
+      <div className="hidden xl:block">
+        <CompactEstimatedStoreValue {...compactValueProps} />
       </div>
 
-      {hasPlaidConnections && plaidBalanceSnapshot && (
-        <BankBalancesPanel
-          cashOnHand={plaidBalanceSnapshot.cashOnHand}
-          creditCardDebt={plaidBalanceSnapshot.creditCardDebt}
-          cashSub={`${formatPlaidAccountCount(plaidBalanceSnapshot.depositoryAccountCount, "depository account")} · Last synced ${formatPlaidLastSynced(plaidBalanceSnapshot.lastSyncedAt)} · Synced from connected bank accounts`}
-          creditSub={`${formatPlaidAccountCount(plaidBalanceSnapshot.creditAccountCount, "credit account")} · Last synced ${formatPlaidLastSynced(plaidBalanceSnapshot.lastSyncedAt)} · Credit card balances from connected banks`}
-        />
-      )}
-
-      {/* Section 2: KPI Cards */}
-      <div className="metric-grid">
-        <DSCRCard
-          className="kpi-fade-in kpi-glow-card"
-          style={{ animationDelay: "0s" }}
-          dscr={dscrNum}
-          scheduledAnnualDebtService={debtService}
-          hasFinancialData={hasFinancialData}
-          ttmMonthsUsed={ttmMonthsUsed}
-        />
-
-        <KpiCard
-          className="kpi-fade-in kpi-glow-card"
-          style={{ animationDelay: "0.05s" }}
-          label={<DisclaimerLabel>EBITDA Margin</DisclaimerLabel>}
-          value={
-            hasFinancialData ? (
-              <AnimatedNumber value={ebitdaMargin} decimals={1} suffix="%" duration={1000} />
-            ) : (
-              "—"
-            )
-          }
-          sub={hasFinancialData ? `${fmtDollar(ebitda)}/mo EBITDA` : "Add monthly financials"}
-        />
-
-        <KpiCard
-          className="kpi-fade-in kpi-glow-card"
-          style={{ animationDelay: "0.1s" }}
-          label={<DisclaimerLabel>LaundroCFO Score</DisclaimerLabel>}
-          value={
-            hasFinancialData && laundroCfoScoreResult ? (
-              <AnimatedNumber value={laundrocfoScore} duration={1000} />
-            ) : (
-              "—"
-            )
-          }
-          sub={
-            !hasFinancialData
-              ? "Add monthly financials"
-              : laundroCfoScoreResult
-                ? [
-                    `Grade ${laundroCfoScoreResult.grade}`,
-                    laundroCfoScoreResult.metricsIncluded < laundroCfoScoreResult.metricsTotal
-                      ? `${laundroCfoScoreResult.metricsIncluded}/${laundroCfoScoreResult.metricsTotal} metrics`
-                      : null,
-                    laundroCfoScoreResult.potentialScore != null
-                      ? `Could reach ${laundroCfoScoreResult.potentialScore} with complete data`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")
-                : "—"
-          }
-        />
-
-        <KpiCard
-          className="kpi-fade-in kpi-glow-card"
-          style={{ animationDelay: "0.15s" }}
-          label="Monthly Cash Flow"
-          value={
-            hasFinancialData ? (
-              <AnimatedNumber value={monthlyCashFlow} prefix="$" duration={1000} />
-            ) : (
-              "—"
-            )
-          }
-          sub={hasFinancialData ? `${fmtDollar(annualCashFlow)}/yr after debt service` : "Add monthly financials"}
-        />
-      </div>
-
-      {/* Financial Position */}
-      <div className="metric-grid">
-        <KpiCard
-          className="kpi-fade-in kpi-glow-card"
-          style={{ animationDelay: "0.2s" }}
-          label="Cash Runway"
-          value={
-            hasFinancialData && runwayDays != null ? (
-              <AnimatedNumber value={runwayDays} suffix=" days" duration={1000} />
-            ) : (
-              "—"
-            )
-          }
-          sub={
-            hasFinancialData && monthlyExpenses > 0
-              ? `at ${fmtDollar(monthlyExpenses)}/mo expenses`
-              : "Add monthly financials"
-          }
-          valueColor={cashRunwayColor(runwayDays, hasFinancialData)}
-        />
-
-        <KpiCard
-          className="kpi-fade-in kpi-glow-card"
-          style={{ animationDelay: "0.25s" }}
-          label={
-            <span className="inline-flex flex-wrap items-center gap-2">
-              Cash Position
-              {hasFinancialData && cashPositionComposition === "all_live" && <LiveFromBankBadge />}
-            </span>
-          }
-          value={
-            hasFinancialData ? (
-              <AnimatedNumber value={totalCash} prefix="$" duration={1000} />
-            ) : (
-              "—"
-            )
-          }
-          sub={
-            hasFinancialData
-              ? formatCashPositionSubtext(cashPositionComposition, cashPositionComposition === "all_live" ? 1 : 0, 1) ??
-                undefined
-              : "Add monthly financials"
-          }
-        />
-
-        <KpiCard
-          className="kpi-fade-in kpi-glow-card"
-          style={{ animationDelay: "0.3s" }}
-          label="Total Debt"
-          value={<AnimatedNumber value={totalDebt} prefix="$" duration={1000} />}
-          sub="Outstanding loan balance"
-        />
-
-        <KpiCard
-          className="kpi-fade-in kpi-glow-card"
-          style={{ animationDelay: "0.35s" }}
-          label="Net Equity"
-          value={
-            canShowValuation ? (
-              <AnimatedNumber value={equity} prefix="$" duration={1000} />
-            ) : (
-              "—"
-            )
-          }
-          sub={
-            canShowValuation
-              ? "Value + cash − debt"
-              : missingMarketRent
-                ? "Enter an estimated market rent to get an accurate valuation"
-                : "Add monthly financials"
-          }
-          valueColor={
-            canShowValuation
-              ? equity > 0
-                ? "var(--text-success)"
-                : "var(--text-danger)"
-              : "var(--text-muted)"
-          }
-        />
-      </div>
-
-      {/* Section 3: Two Column Layout */}
-      <div className="grid-3 grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-        {/* Left Column */}
-        <div className="xl:col-span-2 space-y-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+        <div className="xl:col-span-2 space-y-5 min-w-0">
           <ThisMonthChart model={thisMonthChartModel} />
 
-          {/* Revenue vs EBITDA */}
+          <IntelligenceFeedMobileShell items={feedItems} />
+
+          <div className="xl:hidden">
+            <CompactEstimatedStoreValue {...compactValueProps} />
+          </div>
+
+          <div className="metric-grid">
+            <DSCRCard
+              className="kpi-fade-in kpi-glow-card"
+              style={{ animationDelay: "0s" }}
+              dscr={dscrNum}
+              scheduledAnnualDebtService={debtService}
+              hasFinancialData={hasFinancialData}
+              ttmMonthsUsed={ttmMonthsUsed}
+            />
+
+            <KpiCard
+              className="kpi-fade-in kpi-glow-card"
+              style={{ animationDelay: "0.05s" }}
+              label={<DisclaimerLabel>EBITDA Margin</DisclaimerLabel>}
+              value={
+                hasFinancialData ? (
+                  <AnimatedNumber value={ebitdaMargin} decimals={1} suffix="%" duration={1000} />
+                ) : (
+                  "—"
+                )
+              }
+              sub={hasFinancialData ? `${fmtDollar(ebitda)}/mo EBITDA` : "Add monthly financials"}
+            />
+
+            <KpiCard
+              className="kpi-fade-in kpi-glow-card"
+              style={{ animationDelay: "0.1s" }}
+              label={<DisclaimerLabel>LaundroCFO Score</DisclaimerLabel>}
+              value={
+                hasFinancialData && laundroCfoScoreResult ? (
+                  <AnimatedNumber value={laundrocfoScore} duration={1000} />
+                ) : (
+                  "—"
+                )
+              }
+              sub={
+                !hasFinancialData
+                  ? "Add monthly financials"
+                  : laundroCfoScoreResult
+                    ? [
+                        `Grade ${laundroCfoScoreResult.grade}`,
+                        laundroCfoScoreResult.metricsIncluded < laundroCfoScoreResult.metricsTotal
+                          ? `${laundroCfoScoreResult.metricsIncluded}/${laundroCfoScoreResult.metricsTotal} metrics`
+                          : null,
+                        laundroCfoScoreResult.potentialScore != null
+                          ? `Could reach ${laundroCfoScoreResult.potentialScore} with complete data`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
+                    : "—"
+              }
+            />
+
+            <KpiCard
+              className="kpi-fade-in kpi-glow-card"
+              style={{ animationDelay: "0.15s" }}
+              label="Monthly Cash Flow"
+              value={
+                hasFinancialData ? (
+                  <AnimatedNumber value={monthlyCashFlow} prefix="$" duration={1000} />
+                ) : (
+                  "—"
+                )
+              }
+              sub={hasFinancialData ? `${fmtDollar(annualCashFlow)}/yr after debt service` : "Add monthly financials"}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <KpiCard
+              className="kpi-fade-in kpi-glow-card"
+              style={{ animationDelay: "0.2s" }}
+              label="Cash Runway"
+              value={
+                hasFinancialData && runwayDays != null ? (
+                  <AnimatedNumber value={runwayDays} suffix=" days" duration={1000} />
+                ) : (
+                  "—"
+                )
+              }
+              sub={
+                hasFinancialData && monthlyExpenses > 0
+                  ? `at ${fmtDollar(monthlyExpenses)}/mo expenses`
+                  : "Add monthly financials"
+              }
+              valueColor={cashRunwayColor(runwayDays, hasFinancialData)}
+            />
+
+            <KpiCard
+              className="kpi-fade-in kpi-glow-card"
+              style={{ animationDelay: "0.25s" }}
+              label="Total Debt"
+              value={<AnimatedNumber value={totalDebt} prefix="$" duration={1000} />}
+              sub="Outstanding loan balance"
+            />
+
+            <KpiCard
+              className="kpi-fade-in kpi-glow-card"
+              style={{ animationDelay: "0.3s" }}
+              label="Net Equity"
+              value={
+                canShowValuation ? (
+                  <AnimatedNumber value={equity} prefix="$" duration={1000} />
+                ) : (
+                  "—"
+                )
+              }
+              sub={
+                canShowValuation
+                  ? "Value + cash − debt"
+                  : missingMarketRent
+                    ? "Enter an estimated market rent to get an accurate valuation"
+                    : "Add monthly financials"
+              }
+              valueColor={
+                canShowValuation
+                  ? equity > 0
+                    ? "var(--text-success)"
+                    : "var(--text-danger)"
+                  : "var(--text-muted)"
+              }
+            />
+          </div>
+
+          <BankBalancesPanel
+            cashOnHand={totalCash}
+            creditCardDebt={showPlaidCredit ? plaidBalanceSnapshot?.creditCardDebt : undefined}
+            cashSub={bankCashSub}
+            creditSub={bankCreditSub}
+            isLiveFromBank={isCashLive}
+            hasFinancialData={hasFinancialData}
+          >
+            <ManualCashEditor
+              store={storeData}
+              hasFinancialData={hasFinancialData}
+              isLiveFromBank={isCashLive}
+              onUpdate={(data) => {
+                setStoreData(data);
+                setStore(data);
+              }}
+            />
+          </BankBalancesPanel>
+
           <RevenueEbitdaBarChart data={revenueEbitdaData} hasFinancialData={hasFinancialData} />
 
           <HowYouCompareCard benchmarks={benchmarks} hasFinancialData={hasFinancialData} />
-        </div>
 
-        <IntelligenceFeedMobileShell items={feedItems} />
-        <IntelligenceFeedPanel items={feedItems} />
-      </div>
-
-      {/* Section 4: Bottom Summary Row */}
-      <div className="grid-3 grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Lease & Occupancy */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-3">
-            <div className="section-title mb-0">
-              {isOwnerOccupied ? "Real Estate" : "Lease & Occupancy"}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="card">
+              <div className="flex items-center justify-between mb-3">
+                <div className="section-title mb-0">
+                  {isOwnerOccupied ? "Real Estate" : "Lease & Occupancy"}
+                </div>
+                <Link href="/lease" className="text-[11px] hover:underline" style={{ color: "var(--accent)" }}>
+                  View →
+                </Link>
+              </div>
+              {isOwnerOccupied ? (
+                realEstateMetrics ? (
+                  <div className="space-y-2 text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                    <div className="flex justify-between">
+                      <span>Property Value</span>
+                      <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {fmtDollar(realEstateMetrics.estimatedValue ?? 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Building Equity</span>
+                      <span className="font-semibold text-green-500">
+                        {fmtDollar(realEstateMetrics.equity ?? 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>LTV</span>
+                      <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {realEstateMetrics.ltv != null ? `${realEstateMetrics.ltv.toFixed(1)}%` : "—"}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>No real estate profile on file.</p>
+                )
+              ) : leaseMetrics ? (
+                <div className="space-y-2 text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                  <div className="flex justify-between">
+                    <span>Lease Score</span>
+                    <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                      {leaseMetrics.score}/100
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Years Remaining</span>
+                    <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                      {leaseMetrics.yearsRemaining.toFixed(1)} yrs
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Expires</span>
+                    <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                      {leaseMetrics.expires}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
+                    {leaseMetrics.yearsRemaining.toFixed(1)}yr base + {leaseMetrics.optionYears}yr options = {leaseMetrics.totalControl.toFixed(1)}yr total control
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
+                  Add lease data to see score and term details.
+                </p>
+              )}
             </div>
-            <Link href="/lease" className="text-[11px] hover:underline" style={{ color: "var(--accent)" }}>
-              View →
-            </Link>
-          </div>
-          {isOwnerOccupied ? (
-            realEstateMetrics ? (
+
+            <div className="card">
+              <div className="flex items-center justify-between mb-3">
+                <div className="section-title mb-0">Equipment</div>
+                <Link href="/equipment" className="text-[11px] hover:underline" style={{ color: "var(--accent)" }}>
+                  View →
+                </Link>
+              </div>
               <div className="space-y-2 text-[13px]" style={{ color: "var(--text-secondary)" }}>
                 <div className="flex justify-between">
-                  <span>Property Value</span>
+                  <span>Equipment Score</span>
                   <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                    {fmtDollar(realEstateMetrics.estimatedValue ?? 0)}
+                    {equipmentScore}/100
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Building Equity</span>
-                  <span className="font-semibold text-green-500">
-                    {fmtDollar(realEstateMetrics.equity ?? 0)}
+                  <span>Avg Age</span>
+                  <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {avgEquipmentAge.toFixed(1)} years
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>LTV</span>
+                  <span>Total Machines</span>
                   <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                    {realEstateMetrics.ltv != null ? `${realEstateMetrics.ltv.toFixed(1)}%` : "—"}
+                    {machines}
                   </span>
                 </div>
-              </div>
-            ) : (
-              <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>No real estate profile on file.</p>
-            )
-          ) : leaseMetrics ? (
-            <div className="space-y-2 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-              <div className="flex justify-between">
-                <span>Lease Score</span>
-                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {leaseMetrics.score}/100
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Years Remaining</span>
-                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {leaseMetrics.yearsRemaining.toFixed(1)} yrs
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Expires</span>
-                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {leaseMetrics.expires}
-                </span>
-              </div>
-              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
-                {leaseMetrics.yearsRemaining.toFixed(1)}yr base + {leaseMetrics.optionYears}yr options = {leaseMetrics.totalControl.toFixed(1)}yr total control
+                <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
+                  Avg {avgEquipmentAge.toFixed(1)}yr · 87% under 10yr · 0% over 15yr
+                </div>
               </div>
             </div>
-          ) : (
-            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-              Add lease data to see score and term details.
-            </p>
-          )}
-        </div>
-
-        {/* Equipment */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-3">
-            <div className="section-title mb-0">Equipment</div>
-            <Link href="/equipment" className="text-[11px] hover:underline" style={{ color: "var(--accent)" }}>
-              View →
-            </Link>
           </div>
-          <div className="space-y-2 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-            <div className="flex justify-between">
-              <span>Equipment Score</span>
-              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                {equipmentScore}/100
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span>Avg Age</span>
-              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                {avgEquipmentAge.toFixed(1)} years
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span>Total Machines</span>
-              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                {machines}
-              </span>
-            </div>
-            <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px" }}>
-              Avg {avgEquipmentAge.toFixed(1)}yr · 87% under 10yr · 0% over 15yr
+
+          <div className="card">
+            <div className="section-title mb-4">Valuation Summary</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+              {[
+                {
+                  label: "Occupancy Cost",
+                  value:
+                    occupancyCostPct != null ? `${occupancyCostPct.toFixed(1)}%` : "—",
+                },
+                {
+                  label: "Multiple",
+                  value: canShowValuation ? fmtMultiple(finalMultiple) : "—",
+                  tooltip: "Applied to annual EBITDA to estimate store value. Higher multiples reflect better lease, equipment, and market factors.",
+                },
+                { label: "Annual EBITDA", value: hasFinancialData ? fmtDollar(annualEbitda) : "—" },
+                { label: "Annual Revenue", value: hasFinancialData ? fmtDollar(revenue * 12) : "—" },
+                {
+                  label: "NOI",
+                  value: hasFinancialData ? fmtDollar(ttmNoi) : "—",
+                },
+                {
+                  label: "DSCR",
+                  value:
+                    hasFinancialData && debtService > 0 && dscrNum != null
+                      ? `${dscrNum.toFixed(2)}x`
+                      : hasFinancialData
+                        ? DSCR_NO_DEBT_LABEL
+                        : "—",
+                },
+                { label: "Cash Flow", value: hasFinancialData ? fmtDollar(annualCashFlow) : "—" },
+              ].map((item) => (
+                <div key={item.label}>
+                  <div className="metric-label">
+                    <DisclaimerLabel>{item.label}</DisclaimerLabel>
+                  </div>
+                  <div className="text-[16px] font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>
+                    {item.value}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Cash Position */}
-        <CashCard
-          store={storeData}
-          hasFinancialData={hasFinancialData}
-          hasPlaidConnection={hasPlaidConnections}
-          plaidSnapshot={plaidBalanceSnapshot}
-          onUpdate={(data) => {
-            setStoreData(data);
-            setStore(data);
-          }}
-        />
-      </div>
-
-      {/* Valuation Summary */}
-      <div className="card">
-        <div className="section-title mb-4">Valuation Summary</div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-          {[
-            {
-              label: "Occupancy Cost",
-              value:
-                occupancyCostPct != null ? `${occupancyCostPct.toFixed(1)}%` : "—",
-            },
-            {
-              label: "Multiple",
-              value: canShowValuation ? fmtMultiple(finalMultiple) : "—",
-              tooltip: "Applied to annual EBITDA to estimate store value. Higher multiples reflect better lease, equipment, and market factors.",
-            },
-            { label: "Annual EBITDA", value: hasFinancialData ? fmtDollar(annualEbitda) : "—" },
-            { label: "Annual Revenue", value: hasFinancialData ? fmtDollar(revenue * 12) : "—" },
-            {
-              label: "NOI",
-              value: hasFinancialData ? fmtDollar(ttmNoi) : "—",
-            },
-            {
-              label: "DSCR",
-              value:
-                hasFinancialData && debtService > 0 && dscrNum != null
-                  ? `${dscrNum.toFixed(2)}x`
-                  : hasFinancialData
-                    ? DSCR_NO_DEBT_LABEL
-                    : "—",
-            },
-            { label: "Cash Flow", value: hasFinancialData ? fmtDollar(annualCashFlow) : "—" },
-          ].map((item) => (
-            <div key={item.label}>
-              <div className="metric-label">
-                <DisclaimerLabel>{item.label}</DisclaimerLabel>
-              </div>
-              <div className="text-[16px] font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>
-                {item.value}
-              </div>
-            </div>
-          ))}
-        </div>
+        <IntelligenceFeedPanel items={feedItems} />
       </div>
 
     </div>

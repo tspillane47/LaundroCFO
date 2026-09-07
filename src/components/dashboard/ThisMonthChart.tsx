@@ -27,7 +27,7 @@ import {
   yearChartValueDomain,
 } from "@/lib/yearRevenueEbitdaChart";
 
-export const THIS_MONTH_CHART_HEIGHT = 240;
+export const THIS_MONTH_CHART_HEIGHT = 320;
 export const THIS_MONTH_CHART_MIN_WIDTH = 320;
 
 function ChartTooltip({
