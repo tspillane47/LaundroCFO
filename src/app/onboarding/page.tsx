@@ -13,7 +13,10 @@ import { NavIcon } from "@/components/ui/NavIcons";
 import { INPUT_CLASS, preventEnterSubmit } from "@/components/occupancy/shared";
 import {
   categorizeWithRules,
+  fetchExistingCsvTransactionsForDuplicateCheck,
+  findCsvPossibleDuplicates,
   formatCsvDuplicateSkippedMessage,
+  formatCsvPossibleDuplicateOnboardingToast,
   insertCsvTransactionsSkippingDuplicates,
   parseBankCsv,
   type TransactionType,
@@ -643,6 +646,11 @@ function OnboardingContent() {
         excluded: false,
       }));
 
+      const existing = await fetchExistingCsvTransactionsForDuplicateCheck(supabase, id);
+      const classified = existing.error
+        ? null
+        : findCsvPossibleDuplicates(rows, existing.rows);
+
       const result = await insertCsvTransactionsSkippingDuplicates(supabase, {
         storeId: id,
         rows,
@@ -654,6 +662,9 @@ function OnboardingContent() {
       }
       if (result.skippedCount > 0) {
         toast.info(formatCsvDuplicateSkippedMessage(result.skippedCount));
+      }
+      if (classified && classified.possible.length > 0) {
+        toast.warning(formatCsvPossibleDuplicateOnboardingToast(classified.possible.length));
       }
     } else if (form.financialMode === "manual") {
       const revenue = toNullableNum(form.monthlyRevenue);

@@ -23,6 +23,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { TransactionReviewCard } from "@/components/transactions/TransactionReviewCard";
 import { TransactionReviewMobileBulkBar } from "@/components/transactions/TransactionReviewMobileBulkBar";
+import { CsvPossibleDuplicateReview } from "@/components/transactions/CsvPossibleDuplicateReview";
 import { useWriteGuard } from "@/lib/useWriteGuard";
 import { TEXT_LIMITS, trimToMaxLength, validateMaxLength } from "@/lib/textLimits";
 import { RuleApplyPrompt } from "@/components/financials/RuleApplyPrompt";
@@ -44,7 +45,10 @@ import {
   categorizeWithRules,
   enrichMonthlyRecords,
   excludeTransaction,
+  fetchExistingCsvTransactionsForDuplicateCheck,
   fetchUnpostedBankTransactions,
+  findCsvPossibleDuplicates,
+  applyCsvPossibleDuplicateDecisions,
   findMatchingAmountRule,
   getImportCategoriesForType,
   getReviewQueueProgress,
@@ -68,6 +72,9 @@ import {
   type BankTransaction,
   type BatchPostTransaction,
   type CategorizationRule,
+  type CsvBankTransactionInsert,
+  type CsvPossibleDuplicateDecision,
+  type CsvPossibleDuplicateResult,
   type MonthlyFinancialRecord,
   type MonthlyUtilityRecord,
   type RuleMatchKind,
@@ -446,6 +453,8 @@ function TransactionsPageContent() {
   const postingRef = useRef(false);
   const csvUploadInputRef = useRef<HTMLInputElement>(null);
   const [duplicateImportCount, setDuplicateImportCount] = useState(0);
+  const [possibleDupReview, setPossibleDupReview] =
+    useState<CsvPossibleDuplicateResult<CsvBankTransactionInsert> | null>(null);
 
   const [expandedHistory, setExpandedHistory] = useState<Set<string>>(new Set());
   const [auditLogsByTxn, setAuditLogsByTxn] = useState<Map<string, TransactionAuditLogEntry[]>>(new Map());
@@ -1548,13 +1557,54 @@ function TransactionsPageContent() {
     reader.readAsText(file);
   }
 
+  async function persistStagedCsvRows(
+    rows: CsvBankTransactionInsert[],
+    extras: { exactSkippedFromReview?: number; possibleSkipped?: number } = {}
+  ) {
+    if (!store?.id) return false;
+    const result =
+      rows.length === 0
+        ? { insertedCount: 0, skippedCount: 0, error: null }
+        : await insertCsvTransactionsSkippingDuplicates(supabase, {
+            storeId: store.id,
+            rows,
+          });
+
+    if (result.error) {
+      toast.error("Failed to save — please try again");
+      return false;
+    }
+
+    setStagedCsv([]);
+    setPossibleDupReview(null);
+    if (result.insertedCount > 0) {
+      toast.success(
+        `CSV imported — ${result.insertedCount} transaction${result.insertedCount === 1 ? "" : "s"} added`
+      );
+    }
+    const exactSkipped = (extras.exactSkippedFromReview ?? 0) + result.skippedCount;
+    if (exactSkipped > 0) {
+      toast.info(formatCsvDuplicateSkippedMessage(exactSkipped));
+    }
+    if ((extras.possibleSkipped ?? 0) > 0) {
+      toast.info(
+        extras.possibleSkipped === 1
+          ? "1 possible duplicate was skipped."
+          : `${extras.possibleSkipped} possible duplicates were skipped.`
+      );
+    }
+    await loadData();
+    if (result.insertedCount > 0 && store?.id) void evaluateAlerts({ storeIds: [store.id] });
+    return true;
+  }
+
   async function saveStagedToQueue() {
     if (!requireWrite()) return;
     if (!store?.id || !userId || stagedCsv.length === 0) return;
     if (saving) return;
     setSaving(true);
 
-    const rows = stagedCsv.map((t) => ({
+    const rows: CsvBankTransactionInsert[] = stagedCsv.map((t) => ({
       store_id: store.id,
       user_id: userId,
       transaction_date: t.transaction_date,
@@ -1568,28 +1618,37 @@ function TransactionsPageContent() {
       excluded: false,
     }));
 
-    const result = await insertCsvTransactionsSkippingDuplicates(supabase, {
-      storeId: store.id,
-      rows,
-    });
-    setSaving(false);
-
-    if (result.error) {
+    const existing = await fetchExistingCsvTransactionsForDuplicateCheck(supabase, store.id);
+    if (existing.error) {
       toast.error("Failed to save — please try again");
+      setSaving(false);
       return;
     }
 
-    setStagedCsv([]);
-    if (result.insertedCount > 0) {
-      toast.success(
-        `CSV imported — ${result.insertedCount} transaction${result.insertedCount === 1 ? "" : "s"} added`
-      );
+    const classified = findCsvPossibleDuplicates(rows, existing.rows);
+    if (classified.possible.length === 0) {
+      await persistStagedCsvRows(rows);
+      setSaving(false);
+      return;
     }
-    if (result.skippedCount > 0) {
-      toast.info(formatCsvDuplicateSkippedMessage(result.skippedCount));
-    }
-    await loadData();
-    if (result.insertedCount > 0 && store?.id) void evaluateAlerts({ storeIds: [store.id] });
+
+    setPossibleDupReview(classified);
+    setSaving(false);
+  }
+
+  async function confirmPossibleDuplicateReview(decisions: Record<number, CsvPossibleDuplicateDecision>) {
+    if (!possibleDupReview) return;
+    if (saving) return;
+    setSaving(true);
+    const { toInsert, possibleSkippedCount } = applyCsvPossibleDuplicateDecisions(
+      possibleDupReview,
+      decisions
+    );
+    await persistStagedCsvRows(toInsert, {
+      exactSkippedFromReview: possibleDupReview.exactSkip.length,
+      possibleSkipped: possibleSkippedCount,
+    });
+    setSaving(false);
   }
 
   function openRuleForm(
@@ -3236,6 +3295,15 @@ function TransactionsPageContent() {
             </div>
           </div>
         </div>
+      )}
+      {possibleDupReview && (
+        <CsvPossibleDuplicateReview
+          open
+          result={possibleDupReview}
+          saving={saving}
+          onCancel={() => setPossibleDupReview(null)}
+          onConfirm={(decisions) => void confirmPossibleDuplicateReview(decisions)}
+        />
       )}
     </div>
   );

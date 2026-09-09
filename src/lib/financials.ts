@@ -1968,6 +1968,155 @@ export function filterCsvRowsAgainstExisting<T extends CsvExactDuplicateKey>(
   return { toInsert, skippedCount };
 }
 
+/** Same-store month+amount key. Store is already scoped by the caller. */
+export type CsvPossibleDuplicateExisting = CsvExactDuplicateKey & {
+  id?: string | null;
+  transaction_type?: string | null;
+  status?: string | null;
+  excluded?: boolean | null;
+};
+
+export type CsvPossibleDuplicateMatch<T extends CsvExactDuplicateKey> = {
+  staged: T;
+  stagedIndex: number;
+  match: CsvPossibleDuplicateExisting;
+};
+
+export type CsvPossibleDuplicateResult<T extends CsvExactDuplicateKey> = {
+  exactSkip: T[];
+  possible: CsvPossibleDuplicateMatch<T>[];
+  unmatched: T[];
+};
+
+export type CsvPossibleDuplicateDecision = "skip" | "insert";
+
+export function csvDateOnly(value: string): string {
+  return String(value).split("T")[0];
+}
+
+export function csvMonthAmountKey(row: Pick<CsvExactDuplicateKey, "transaction_date" | "amount">): string {
+  const month = csvDateOnly(row.transaction_date).slice(0, 7);
+  const amount = Number(row.amount).toFixed(2);
+  return `${month}|${amount}`;
+}
+
+function csvDateUtcMs(value: string): number {
+  const [year, month, day] = csvDateOnly(value).split("-").map(Number);
+  return Date.UTC(year, (month ?? 1) - 1, day ?? 1);
+}
+
+function asPossibleDuplicateExisting(row: CsvExactDuplicateKey): CsvPossibleDuplicateExisting {
+  const extra = row as CsvPossibleDuplicateExisting;
+  return {
+    transaction_date: row.transaction_date,
+    amount: row.amount,
+    description: row.description,
+    id: extra.id,
+    transaction_type: extra.transaction_type,
+    status: extra.status,
+    excluded: extra.excluded,
+  };
+}
+
+/** Closest existing row: smallest calendar-day gap, then stable id order. */
+export function pickClosestCsvDuplicateMatch(
+  staged: Pick<CsvExactDuplicateKey, "transaction_date">,
+  candidates: CsvPossibleDuplicateExisting[]
+): CsvPossibleDuplicateExisting {
+  return [...candidates].sort((a, b) => {
+    const diffA = Math.abs(csvDateUtcMs(staged.transaction_date) - csvDateUtcMs(a.transaction_date));
+    const diffB = Math.abs(csvDateUtcMs(staged.transaction_date) - csvDateUtcMs(b.transaction_date));
+    if (diffA !== diffB) return diffA - diffB;
+    return String(a.id ?? "").localeCompare(String(b.id ?? ""));
+  })[0];
+}
+
+/**
+ * Complementary CSV duplicate check: exact date+amount+description rows auto-skip and
+ * never appear as possible duplicates. Remaining staged rows that share a calendar month
+ * and amount with an existing row (description and type ignored) are flagged for review.
+ */
+export function findCsvPossibleDuplicates<T extends CsvExactDuplicateKey>(
+  staged: T[],
+  existing: CsvPossibleDuplicateExisting[]
+): CsvPossibleDuplicateResult<T> {
+  const exactKeys = new Set(existing.map(csvExactDuplicateKey));
+  const byMonthAmount = new Map<string, CsvPossibleDuplicateExisting[]>();
+  for (const row of existing) {
+    const key = csvMonthAmountKey(row);
+    const list = byMonthAmount.get(key) ?? [];
+    list.push(row);
+    byMonthAmount.set(key, list);
+  }
+
+  const exactSkip: T[] = [];
+  const possible: CsvPossibleDuplicateMatch<T>[] = [];
+  const unmatched: T[] = [];
+  const seenStagedExact = new Set<string>();
+
+  for (let i = 0; i < staged.length; i++) {
+    const row = staged[i];
+    const exactKey = csvExactDuplicateKey(row);
+    if (exactKeys.has(exactKey) || seenStagedExact.has(exactKey)) {
+      exactSkip.push(row);
+      seenStagedExact.add(exactKey);
+      continue;
+    }
+    seenStagedExact.add(exactKey);
+
+    const candidates = byMonthAmount.get(csvMonthAmountKey(row)) ?? [];
+    const nonExact = candidates.filter((candidate) => csvExactDuplicateKey(candidate) !== exactKey);
+    if (nonExact.length > 0) {
+      possible.push({
+        staged: row,
+        stagedIndex: i,
+        match: pickClosestCsvDuplicateMatch(row, nonExact),
+      });
+      continue;
+    }
+
+    unmatched.push(row);
+    const monthKey = csvMonthAmountKey(row);
+    const list = byMonthAmount.get(monthKey) ?? [];
+    list.push(asPossibleDuplicateExisting(row));
+    byMonthAmount.set(monthKey, list);
+  }
+
+  return { exactSkip, possible, unmatched };
+}
+
+export function applyCsvPossibleDuplicateDecisions<T extends CsvExactDuplicateKey>(
+  result: CsvPossibleDuplicateResult<T>,
+  decisions: Record<number, CsvPossibleDuplicateDecision>
+): { toInsert: T[]; possibleSkippedCount: number; insertAnywayCount: number } {
+  const insertFromPossible: T[] = [];
+  let possibleSkippedCount = 0;
+  for (const item of result.possible) {
+    if (decisions[item.stagedIndex] === "insert") {
+      insertFromPossible.push(item.staged);
+    } else {
+      possibleSkippedCount += 1;
+    }
+  }
+  return {
+    toInsert: [...result.unmatched, ...insertFromPossible],
+    possibleSkippedCount,
+    insertAnywayCount: insertFromPossible.length,
+  };
+}
+
+export function formatCsvPossibleDuplicateSaveLabel(insertCount: number, possibleSkipCount: number): string {
+  const dupWord = possibleSkipCount === 1 ? "duplicate" : "duplicates";
+  return `Save ${insertCount} new, skip ${possibleSkipCount} possible ${dupWord}`;
+}
+
+export function formatCsvPossibleDuplicateOnboardingToast(possibleCount: number): string {
+  if (possibleCount === 1) {
+    return "1 imported row matches an existing amount in the same month. Review possible duplicates on the Transactions page.";
+  }
+  return `${possibleCount} imported rows match existing amounts in the same month. Review possible duplicates on the Transactions page.`;
+}
+
 async function fetchExistingCsvDuplicateKeys(
   supabase: FinancialsSupabaseClient,
   storeId: string
@@ -1986,6 +2135,26 @@ async function fetchExistingCsvDuplicateKeys(
     if (page.length < CSV_EXISTING_PAGE_SIZE) break;
   }
   return { keys, error: null };
+}
+
+export async function fetchExistingCsvTransactionsForDuplicateCheck(
+  supabase: FinancialsSupabaseClient,
+  storeId: string
+): Promise<{ rows: CsvPossibleDuplicateExisting[]; error: string | null }> {
+  const rows: CsvPossibleDuplicateExisting[] = [];
+  for (let from = 0; ; from += CSV_EXISTING_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("bank_transactions")
+      .select("id, transaction_date, amount, description, transaction_type, status, excluded")
+      .eq("store_id", storeId)
+      .order("id", { ascending: true })
+      .range(from, from + CSV_EXISTING_PAGE_SIZE - 1);
+    if (error) return { rows: [], error: error.message };
+    const page = (data ?? []) as CsvPossibleDuplicateExisting[];
+    rows.push(...page);
+    if (page.length < CSV_EXISTING_PAGE_SIZE) break;
+  }
+  return { rows, error: null };
 }
 
 /** Insert CSV rows, skipping exact date+amount+description matches already stored for the store. */

@@ -47,6 +47,7 @@ import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ReadOnlyGuard } from "@/components/ui/ReadOnlyGuard";
 import { PostSyncReviewCTA } from "@/components/transactions/PostSyncReviewCTA";
+import { CsvPossibleDuplicateReview } from "@/components/transactions/CsvPossibleDuplicateReview";
 import { useWriteGuard } from "@/lib/useWriteGuard";
 import {
   type BankImportCategory,
@@ -61,6 +62,9 @@ import {
   type StoreFinancialProfile,
   type TransactionStatus,
   type TransactionType,
+  type CsvBankTransactionInsert,
+  type CsvPossibleDuplicateDecision,
+  type CsvPossibleDuplicateResult,
   MONTH_NAMES,
   MONTH_SHORT,
   PL_CATEGORY_FIELDS,
@@ -81,6 +85,9 @@ import {
   monthKey,
   parseBankCsv,
   formatCsvDuplicateSkippedMessage,
+  fetchExistingCsvTransactionsForDuplicateCheck,
+  findCsvPossibleDuplicates,
+  applyCsvPossibleDuplicateDecisions,
   insertCsvTransactionsSkippingDuplicates,
   ratioStatusColor,
   recordToForm,
@@ -374,6 +381,8 @@ export default function FinancialsPage() {
   const [records, setRecords] = useState<CalculatedMonthly[]>([]);
   const [scheduledAnnualDebtService, setScheduledAnnualDebtService] = useState(0);
   const [stagedTransactions, setStagedTransactions] = useState<StagedTransaction[]>([]);
+  const [possibleDupReview, setPossibleDupReview] =
+    useState<CsvPossibleDuplicateResult<CsvBankTransactionInsert> | null>(null);
   const [qbMappings, setQbMappings] = useState<QBMappingRow[]>(DEFAULT_QB_MAPPINGS);
   const [qbConnection, setQbConnection] = useState<QBConnection | null>(null);
   const [plaidConnections, setPlaidConnections] = useState<PlaidConnection[]>([]);
@@ -885,6 +894,51 @@ export default function FinancialsPage() {
     reader.readAsText(file);
   }
 
+  async function persistStagedBankRows(
+    rows: CsvBankTransactionInsert[],
+    extras: { exactSkippedFromReview?: number; possibleSkipped?: number } = {}
+  ) {
+    if (!store?.id) return false;
+    const result =
+      rows.length === 0
+        ? { insertedCount: 0, skippedCount: 0, error: null }
+        : await insertCsvTransactionsSkippingDuplicates(supabase, {
+            storeId: store.id,
+            rows,
+          });
+    if (result.error) {
+      setError(result.error);
+      return false;
+    }
+    setStagedTransactions([]);
+    setPossibleDupReview(null);
+    const exactSkipped = (extras.exactSkippedFromReview ?? 0) + result.skippedCount;
+    const messages: string[] = [];
+    if (exactSkipped > 0) {
+      messages.push(formatCsvDuplicateSkippedMessage(exactSkipped));
+    }
+    if ((extras.possibleSkipped ?? 0) > 0) {
+      messages.push(
+        extras.possibleSkipped === 1
+          ? "1 possible duplicate was skipped."
+          : `${extras.possibleSkipped} possible duplicates were skipped.`
+      );
+    }
+    if (messages.length > 0) {
+      const skipMsg = messages.join(" ");
+      setSuccess(skipMsg);
+      toast.info(skipMsg);
+    }
+    if (result.insertedCount === 0) {
+      return true;
+    }
+    if (store?.id) {
+      void evaluateAlerts({ storeIds: [store.id] });
+    }
+    router.push("/transactions?tab=needs_review");
+    return true;
+  }
+
   async function saveStagedToBank() {
     if (!canWrite) {
       setError(blockedReason ?? "Subscribe to make changes.");
@@ -893,7 +947,7 @@ export default function FinancialsPage() {
     if (!store?.id || !userId || stagedTransactions.length === 0) return;
     if (saving) return;
     setSaving(true);
-    const rows = stagedTransactions.map((t) => ({
+    const rows: CsvBankTransactionInsert[] = stagedTransactions.map((t) => ({
       store_id: store.id,
       user_id: userId,
       transaction_date: t.transaction_date,
@@ -906,29 +960,35 @@ export default function FinancialsPage() {
       is_reviewed: false,
       excluded: false,
     }));
-    const result = await insertCsvTransactionsSkippingDuplicates(supabase, {
-      storeId: store.id,
-      rows,
-    });
-    if (result.error) {
-      setError(result.error);
+    const existing = await fetchExistingCsvTransactionsForDuplicateCheck(supabase, store.id);
+    if (existing.error) {
+      setError(existing.error);
       setSaving(false);
       return;
     }
-    setStagedTransactions([]);
-    setSaving(false);
-    if (result.skippedCount > 0) {
-      const skipMsg = formatCsvDuplicateSkippedMessage(result.skippedCount);
-      setSuccess(skipMsg);
-      toast.info(skipMsg);
-    }
-    if (result.insertedCount === 0) {
+    const classified = findCsvPossibleDuplicates(rows, existing.rows);
+    if (classified.possible.length === 0) {
+      await persistStagedBankRows(rows);
+      setSaving(false);
       return;
     }
-    if (store?.id) {
-      void evaluateAlerts({ storeIds: [store.id] });
-    }
-    router.push("/transactions?tab=needs_review");
+    setPossibleDupReview(classified);
+    setSaving(false);
+  }
+
+  async function confirmPossibleDuplicateReview(decisions: Record<number, CsvPossibleDuplicateDecision>) {
+    if (!possibleDupReview) return;
+    if (saving) return;
+    setSaving(true);
+    const { toInsert, possibleSkippedCount } = applyCsvPossibleDuplicateDecisions(
+      possibleDupReview,
+      decisions
+    );
+    await persistStagedBankRows(toInsert, {
+      exactSkippedFromReview: possibleDupReview.exactSkip.length,
+      possibleSkipped: possibleSkippedCount,
+    });
+    setSaving(false);
   }
 
   async function saveQBMappings() {
@@ -2848,6 +2908,15 @@ export default function FinancialsPage() {
             </div>
           </div>
         </div>
+      )}
+      {possibleDupReview && (
+        <CsvPossibleDuplicateReview
+          open
+          result={possibleDupReview}
+          saving={saving}
+          onCancel={() => setPossibleDupReview(null)}
+          onConfirm={(decisions) => void confirmPossibleDuplicateReview(decisions)}
+        />
       )}
     </div>
   );

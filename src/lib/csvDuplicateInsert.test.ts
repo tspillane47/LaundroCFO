@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyCsvPossibleDuplicateDecisions,
   csvExactDuplicateKey,
+  csvMonthAmountKey,
   filterCsvRowsAgainstExisting,
+  findCsvPossibleDuplicates,
   formatCsvDuplicateSkippedMessage,
+  formatCsvPossibleDuplicateOnboardingToast,
+  formatCsvPossibleDuplicateSaveLabel,
   insertCsvTransactionsSkippingDuplicates,
   parseBankCsv,
+  pickClosestCsvDuplicateMatch,
   type CsvBankTransactionInsert,
   type CsvExactDuplicateKey,
+  type CsvPossibleDuplicateExisting,
 } from "@/lib/financials";
 
 const STORE_ID = "store-cool-road";
@@ -163,5 +170,165 @@ describe("CSV exact duplicate skip", () => {
         description: "DEPOSIT",
       })
     ).toBe("2026-08-03|381.00|DEPOSIT");
+  });
+});
+
+describe("findCsvPossibleDuplicates — real 7 Cool Road pairs", () => {
+  const capitalOneExisting: CsvPossibleDuplicateExisting = {
+    id: "23ff8cfb-6863-4efc-a72a-aa640097262e",
+    transaction_date: "2026-09-08",
+    amount: 10295.66,
+    description: "CRCARDPMT  CAPITAL ONE CCD    CA0A09A3BAF65DB 26/09/08",
+    transaction_type: "expense",
+    status: "excluded",
+    excluded: true,
+  };
+
+  const capitalOneStaged = csvInsertRow({
+    transaction_date: "2026-09-07",
+    amount: 10295.66,
+    description: "CAPITAL ONE AUTOPAY PYMT",
+    transaction_type: "income",
+    category: "self_service_revenue",
+    original_category: "self_service_revenue",
+  });
+
+  const paystriExisting: CsvPossibleDuplicateExisting = {
+    id: "8f2b057e-aef4-4695-b63d-a6ae89cfffc4",
+    transaction_date: "2026-07-01",
+    amount: 9.95,
+    description: "0000000969 PAYSTRI INC CCD    0013246 0620674 26/07/01",
+    transaction_type: "expense",
+    status: "posted",
+    excluded: false,
+  };
+
+  const paystriStaged = csvInsertRow({
+    transaction_date: "2026-07-29",
+    amount: 9.95,
+    description: "0000000975 PAYSTRI INC CCD    0013246 0633821 26/07/29",
+    transaction_type: "expense",
+    category: "cc_processing_fees",
+    original_category: "cc_processing_fees",
+  });
+
+  const depositDescription = "DEPOSIT    MERCHANT BANKCD CCD    496126452887 26/08/17";
+  const depositExisting: CsvPossibleDuplicateExisting = {
+    id: "37f10764-d915-4394-b00d-5b1c632d663c",
+    transaction_date: "2026-08-17",
+    amount: 141.5,
+    description: depositDescription,
+    transaction_type: "income",
+    status: "excluded",
+    excluded: true,
+  };
+  const depositStaged = csvInsertRow({
+    transaction_date: "2026-08-17",
+    amount: 141.5,
+    description: depositDescription,
+    transaction_type: "income",
+  });
+
+  it("flags the Capital One off-by-one / different-text pair as a possible duplicate", () => {
+    const result = findCsvPossibleDuplicates([capitalOneStaged], [capitalOneExisting]);
+    expect(result.exactSkip).toEqual([]);
+    expect(result.unmatched).toEqual([]);
+    expect(result.possible).toHaveLength(1);
+    expect(result.possible[0]?.stagedIndex).toBe(0);
+    expect(result.possible[0]?.staged.description).toBe("CAPITAL ONE AUTOPAY PYMT");
+    expect(result.possible[0]?.match).toEqual(capitalOneExisting);
+    expect(csvMonthAmountKey(capitalOneStaged)).toBe(csvMonthAmountKey(capitalOneExisting));
+    expect(csvExactDuplicateKey(capitalOneStaged)).not.toBe(csvExactDuplicateKey(capitalOneExisting));
+  });
+
+  it("flags the PAYSTRI $9.95 same-month false positive but keeps it insertable", () => {
+    const result = findCsvPossibleDuplicates([paystriStaged], [paystriExisting]);
+    expect(result.exactSkip).toEqual([]);
+    expect(result.possible).toHaveLength(1);
+    expect(result.possible[0]?.staged.description).toBe(
+      "0000000975 PAYSTRI INC CCD    0013246 0633821 26/07/29"
+    );
+    expect(result.possible[0]?.match.description).toBe(
+      "0000000969 PAYSTRI INC CCD    0013246 0620674 26/07/01"
+    );
+
+    const skippedByDefault = applyCsvPossibleDuplicateDecisions(result, {});
+    expect(skippedByDefault).toEqual({
+      toInsert: [],
+      possibleSkippedCount: 1,
+      insertAnywayCount: 0,
+    });
+
+    const insertedAnyway = applyCsvPossibleDuplicateDecisions(result, { 0: "insert" });
+    expect(insertedAnyway).toEqual({
+      toInsert: [paystriStaged],
+      possibleSkippedCount: 0,
+      insertAnywayCount: 1,
+    });
+  });
+
+  it("auto-skips the exact DEPOSIT MERCHANT BANKCD pair and never flags it as possible", () => {
+    const result = findCsvPossibleDuplicates([depositStaged], [depositExisting]);
+    expect(result.exactSkip).toEqual([depositStaged]);
+    expect(result.possible).toEqual([]);
+    expect(result.unmatched).toEqual([]);
+
+    const filtered = filterCsvRowsAgainstExisting([depositStaged], [depositExisting]);
+    expect(filtered).toEqual({ toInsert: [], skippedCount: 1 });
+  });
+
+  it("picks the closest date when several same-month same-amount rows exist", () => {
+    const farther: CsvPossibleDuplicateExisting = {
+      ...capitalOneExisting,
+      id: "farther",
+      transaction_date: "2026-09-01",
+    };
+    const picked = pickClosestCsvDuplicateMatch(capitalOneStaged, [farther, capitalOneExisting]);
+    expect(picked.id).toBe(capitalOneExisting.id);
+  });
+
+  it("does not flag a unique new row", () => {
+    const unique = csvInsertRow({
+      transaction_date: "2026-09-02",
+      amount: 1035.93,
+      description: "IRVING ENERGY",
+      transaction_type: "expense",
+      category: "gas",
+      original_category: "gas",
+    });
+    const result = findCsvPossibleDuplicates([unique], [capitalOneExisting, paystriExisting, depositExisting]);
+    expect(result).toEqual({ exactSkip: [], possible: [], unmatched: [unique] });
+  });
+
+  it("keeps an exact DEPOSIT skip out of possible even when other month+amount pairs are present", () => {
+    const result = findCsvPossibleDuplicates(
+      [depositStaged, capitalOneStaged],
+      [depositExisting, capitalOneExisting]
+    );
+    expect(result.exactSkip).toEqual([depositStaged]);
+    expect(result.possible.map((item) => item.staged.description)).toEqual(["CAPITAL ONE AUTOPAY PYMT"]);
+    expect(result.unmatched).toEqual([]);
+  });
+
+  it("does not let the exact-match insert helper silently drop the Capital One pair", async () => {
+    const existing: CsvExactDuplicateKey[] = [capitalOneExisting];
+    const mock = createCsvInsertMock(existing);
+    const result = await insertCsvTransactionsSkippingDuplicates(mock.supabase as never, {
+      storeId: STORE_ID,
+      rows: [capitalOneStaged],
+    });
+    expect(result).toEqual({ insertedCount: 1, skippedCount: 0, error: null });
+    expect(mock.inserted).toEqual([capitalOneStaged]);
+  });
+
+  it("formats the save label and onboarding toast", () => {
+    expect(formatCsvPossibleDuplicateSaveLabel(4, 1)).toBe("Save 4 new, skip 1 possible duplicate");
+    expect(formatCsvPossibleDuplicateSaveLabel(2, 3)).toBe("Save 2 new, skip 3 possible duplicates");
+    expect(formatCsvPossibleDuplicateOnboardingToast(1)).toBe(
+      "1 imported row matches an existing amount in the same month. Review possible duplicates on the Transactions page."
+    );
+    expect(formatCsvPossibleDuplicateOnboardingToast(2)).toBe(
+      "2 imported rows match existing amounts in the same month. Review possible duplicates on the Transactions page."
+    );
   });
 });
