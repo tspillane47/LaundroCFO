@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   calcAmortizingMonthlyPayment,
+  calcEstimatedBalance,
   calcMultiPhaseLoan,
   calcRemainingMonths,
+  countElapsedPayments,
+  generatePayoffSchedule,
+  nextPaymentDate,
+  paymentDateOn,
+  paymentDueDayFromLoan,
 } from "@/lib/amortization";
 
 /** Reference PMT for cross-checking plain amortizing loans */
@@ -294,5 +300,85 @@ describe("calcRemainingMonths", () => {
     expect(remaining).not.toBeNull();
     expect(Number.isFinite(remaining)).toBe(true);
     expect(remaining!).toBeGreaterThan(0);
+  });
+});
+
+describe("payment due day", () => {
+  const AS_OF_SEP_11 = new Date(2026, 8, 11);
+
+  it("clamps day 31 to February 28 in a non-leap year", () => {
+    expect(paymentDateOn(2026, 1, 31)).toEqual(new Date(2026, 1, 28));
+  });
+
+  it("uses explicit paymentDueDay over the start-date day", () => {
+    expect(
+      paymentDueDayFromLoan({ paymentDueDay: 15, loanStartDate: "2024-12-12" })
+    ).toBe(15);
+  });
+
+  it("falls back to the loan start-date day when paymentDueDay is unset", () => {
+    expect(paymentDueDayFromLoan({ loanStartDate: "2024-12-12" })).toBe(12);
+  });
+
+  it("does not count a payment that has not yet hit this month", () => {
+    expect(countElapsedPayments("2026-08-17", AS_OF_SEP_11, 12)).toBe(0);
+    expect(countElapsedPayments("2026-08-17", AS_OF_SEP_11, 15)).toBe(0);
+  });
+
+  it("counts a payment that landed after lastUpdated and on or before asOf", () => {
+    expect(countElapsedPayments("2026-08-17", AS_OF_SEP_11, 1)).toBe(1);
+    expect(countElapsedPayments("2026-08-17", AS_OF_SEP_11, 31)).toBe(1);
+    expect(countElapsedPayments("2026-08-17", new Date(2026, 8, 12), 12)).toBe(1);
+  });
+
+  it("does not double-count a payment on the last-verified calendar day", () => {
+    expect(countElapsedPayments("2026-08-12", AS_OF_SEP_11, 12)).toBe(0);
+  });
+
+  it("keeps the Waterbury Alliance balance unchanged on Sept 11 when due day is 12", () => {
+    const loan = {
+      currentBalance: 42_399.62,
+      interestRate: 8,
+      monthlyPayment: 852.47,
+      paymentDueDay: 12,
+      loanStartDate: "2024-12-12",
+      lastUpdated: "2026-08-17T14:20:49.565",
+    };
+    expect(calcEstimatedBalance(loan, AS_OF_SEP_11)).toBe(42_399.62);
+  });
+
+  it("would have subtracted September's payment under calendar-month counting", () => {
+    const loan = {
+      currentBalance: 42_399.62,
+      interestRate: 8,
+      monthlyPayment: 852.47,
+      paymentDueDay: 1,
+      lastUpdated: "2026-08-17T14:20:49.565",
+    };
+    const estimated = calcEstimatedBalance(loan, AS_OF_SEP_11);
+    expect(estimated).toBeLessThan(42_399.62);
+  });
+
+  it("plots the next drop on the actual due date, not the month boundary", () => {
+    const schedule = generatePayoffSchedule(
+      {
+        currentBalance: 42_399.62,
+        interestRate: 8,
+        monthlyPayment: 852.47,
+        paymentDueDay: 12,
+        lastUpdated: "2026-08-17T14:20:49.565",
+      },
+      3,
+      AS_OF_SEP_11
+    );
+
+    const label = (d: Date) =>
+      d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+    expect(schedule[0].month).toBe(label(AS_OF_SEP_11));
+    expect(schedule[0].balance).toBe(42_400);
+    expect(schedule[1].month).toBe(label(new Date(2026, 8, 12)));
+    expect(schedule[1].balance).toBeLessThan(schedule[0].balance);
+    expect(schedule[2].month).toBe(label(new Date(2026, 9, 12)));
+    expect(nextPaymentDate(AS_OF_SEP_11, 12)).toEqual(new Date(2026, 8, 12));
   });
 });

@@ -41,6 +41,7 @@ export type StoreLoanRecord = {
   loan_start_date: string | null;
   loan_end_date: string | null;
   amortization_term_months: number | null;
+  payment_due_day?: number | null;
   updated_at: string | null;
 };
 
@@ -195,6 +196,8 @@ export function enrichStoreLoans(loans: StoreLoanRecord[]): EnrichedStoreLoan[] 
       currentBalance: num(loan.current_balance),
       interestRate: num(loan.interest_rate),
       monthlyPayment: num(loan.monthly_payment),
+      paymentDueDay: loan.payment_due_day,
+      loanStartDate: loan.loan_start_date ?? undefined,
       lastUpdated: loan.updated_at ?? undefined,
     });
 
@@ -470,7 +473,7 @@ export async function fetchReportFinancialContext(
     supabase
       .from("store_loans")
       .select(
-        "id, lender_name, original_balance, current_balance, interest_rate, monthly_payment, loan_start_date, loan_end_date, amortization_term_months, updated_at"
+        "id, lender_name, original_balance, current_balance, interest_rate, monthly_payment, loan_start_date, loan_end_date, amortization_term_months, payment_due_day, updated_at"
       )
       .eq("store_id", storeId)
       .eq("is_active", true)

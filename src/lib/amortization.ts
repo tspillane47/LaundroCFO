@@ -3,22 +3,108 @@ export interface LoanInputs {
   interestRate: number; // annual percentage e.g. 7.5
   monthlyPayment: number;
   loanStartDate?: string;
+  /** Day of month the payment actually hits (1–31). Clamped to each month's last day. */
+  paymentDueDay?: number | null;
   lastUpdated?: string; // when current_balance was last manually verified
 }
 
-export function calcEstimatedBalance(loan: LoanInputs): number {
+/** Local calendar date (year/month/day only). ISO `YYYY-MM-DD` is parsed as local, not UTC. */
+export function calendarDate(input: Date | string): Date {
+  if (typeof input === "string") {
+    const isoDate = input.slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) {
+      const [year, month, day] = isoDate.split("-").map(Number);
+      return new Date(year, month - 1, day);
+    }
+    const parsed = new Date(input);
+    if (!Number.isNaN(parsed.getTime())) {
+      return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+    }
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+  return new Date(input.getFullYear(), input.getMonth(), input.getDate());
+}
+
+/** Payment date in a given month; day 31 in February becomes the 28th/29th. */
+export function paymentDateOn(year: number, monthIndex: number, dueDay: number): Date {
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+  const day = Math.min(Math.max(1, Math.floor(dueDay)), lastDay);
+  return new Date(year, monthIndex, day);
+}
+
+/**
+ * Day of month to use for payment timing: explicit paymentDueDay, else start-date day, else 1.
+ */
+export function paymentDueDayFromLoan(loan: {
+  paymentDueDay?: number | null;
+  loanStartDate?: string | null;
+}): number {
+  const explicit = Number(loan.paymentDueDay);
+  if (Number.isInteger(explicit) && explicit >= 1 && explicit <= 31) return explicit;
+  if (loan.loanStartDate) {
+    const day = calendarDate(loan.loanStartDate).getDate();
+    if (day >= 1 && day <= 31) return day;
+  }
+  return 1;
+}
+
+/** Next due date strictly after `asOf` (same calendar day does not count as upcoming). */
+export function nextPaymentDate(asOf: Date | string, dueDay: number): Date {
+  const from = calendarDate(asOf);
+  const thisMonth = paymentDateOn(from.getFullYear(), from.getMonth(), dueDay);
+  if (thisMonth.getTime() > from.getTime()) return thisMonth;
+  const nextMonth = new Date(from.getFullYear(), from.getMonth() + 1, 1);
+  return paymentDateOn(nextMonth.getFullYear(), nextMonth.getMonth(), dueDay);
+}
+
+/**
+ * Count due dates strictly after `lastUpdated` and on or before `asOf`.
+ * A payment on the last-verified calendar day is treated as already in current_balance.
+ */
+export function countElapsedPayments(
+  lastUpdated: Date | string,
+  asOf: Date | string,
+  dueDay: number
+): number {
+  const from = calendarDate(lastUpdated);
+  const to = calendarDate(asOf);
+  if (to.getTime() <= from.getTime()) return 0;
+
+  let count = 0;
+  let year = from.getFullYear();
+  let month = from.getMonth();
+  for (let i = 0; i < 600; i++) {
+    const due = paymentDateOn(year, month, dueDay);
+    if (due.getTime() > to.getTime()) break;
+    if (due.getTime() > from.getTime()) count += 1;
+    month += 1;
+    if (month > 11) {
+      month = 0;
+      year += 1;
+    }
+  }
+  return count;
+}
+
+function applyOnePayment(balance: number, interestRate: number, monthlyPayment: number): number {
+  if (monthlyPayment <= 0) return Math.max(0, balance);
+  const monthlyRate = (interestRate / 100) / 12;
+  const interestPortion = balance * monthlyRate;
+  const principalPortion = monthlyPayment - interestPortion;
+  return Math.max(0, balance - principalPortion);
+}
+
+export function calcEstimatedBalance(loan: LoanInputs, asOf: Date = new Date()): number {
   if (!loan.lastUpdated || loan.monthlyPayment <= 0) return loan.currentBalance;
 
-  const monthsSinceUpdate = monthsBetween(new Date(loan.lastUpdated), new Date());
-  if (monthsSinceUpdate <= 0) return loan.currentBalance;
+  const dueDay = paymentDueDayFromLoan(loan);
+  const paymentsDue = countElapsedPayments(loan.lastUpdated, asOf, dueDay);
+  if (paymentsDue <= 0) return loan.currentBalance;
 
-  const monthlyRate = (loan.interestRate / 100) / 12;
   let balance = loan.currentBalance;
-
-  for (let i = 0; i < monthsSinceUpdate; i++) {
-    const interestPortion = balance * monthlyRate;
-    const principalPortion = loan.monthlyPayment - interestPortion;
-    balance = Math.max(0, balance - principalPortion);
+  for (let i = 0; i < paymentsDue; i++) {
+    balance = applyOnePayment(balance, loan.interestRate, loan.monthlyPayment);
   }
 
   return balance;
@@ -437,24 +523,36 @@ export function calcReverseSolveLoan(inputs: ReverseSolveLoanInputs): ReverseSol
   };
 }
 
-export function generatePayoffSchedule(loan: LoanInputs, months: number = 24): { month: string; balance: number }[] {
-  const monthlyRate = (loan.interestRate / 100) / 12;
-  let balance = calcEstimatedBalance(loan);
-  const schedule: { month: string; balance: number }[] = [];
-  const startDate = new Date();
+function formatPaymentChartLabel(date: Date): string {
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+}
 
-  for (let i = 0; i <= months; i++) {
-    const date = new Date(startDate);
-    date.setMonth(date.getMonth() + i);
+export function generatePayoffSchedule(
+  loan: LoanInputs,
+  months: number = 24,
+  asOf: Date = new Date()
+): { month: string; balance: number }[] {
+  const dueDay = paymentDueDayFromLoan(loan);
+  let balance = calcEstimatedBalance(loan, asOf);
+  const schedule: { month: string; balance: number }[] = [];
+  const startDate = calendarDate(asOf);
+
+  schedule.push({
+    month: formatPaymentChartLabel(startDate),
+    balance: Math.round(balance),
+  });
+
+  let paymentOn = nextPaymentDate(startDate, dueDay);
+  for (let i = 0; i < months; i++) {
+    if (loan.monthlyPayment > 0) {
+      balance = applyOnePayment(balance, loan.interestRate, loan.monthlyPayment);
+    }
     schedule.push({
-      month: date.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+      month: formatPaymentChartLabel(paymentOn),
       balance: Math.round(balance),
     });
-    if (loan.monthlyPayment > 0) {
-      const interestPortion = balance * monthlyRate;
-      const principalPortion = loan.monthlyPayment - interestPortion;
-      balance = Math.max(0, balance - principalPortion);
-    }
+    const nextMonth = new Date(paymentOn.getFullYear(), paymentOn.getMonth() + 1, 1);
+    paymentOn = paymentDateOn(nextMonth.getFullYear(), nextMonth.getMonth(), dueDay);
   }
 
   return schedule;

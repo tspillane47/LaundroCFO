@@ -421,6 +421,8 @@ async function sumActiveLoanBalances(
     interest_rate: number | null;
     monthly_payment: number | null;
     updated_at: string | null;
+    payment_due_day?: number | null;
+    loan_start_date?: string | null;
   }[],
   options: { excludeLoanTypes?: string[]; includeLoanTypes?: string[] } = {}
 ): Promise<number> {
@@ -441,6 +443,8 @@ async function sumActiveLoanBalances(
       currentBalance: loan.current_balance ?? 0,
       interestRate: loan.interest_rate ?? 0,
       monthlyPayment: loan.monthly_payment ?? 0,
+      paymentDueDay: loan.payment_due_day,
+      loanStartDate: loan.loan_start_date ?? undefined,
       lastUpdated: loan.updated_at ?? undefined,
     });
     return sum + estimated;

@@ -63,6 +63,7 @@ type StoreLoan = {
   current_balance: number | null;
   interest_rate: number | null;
   monthly_payment: number | null;
+  payment_due_day: number | null;
   loan_start_date: string | null;
   loan_end_date: string | null;
   amortization_term_months: number | null;
@@ -80,6 +81,7 @@ type LoanForm = {
   current_balance: string;
   interest_rate: string;
   monthly_payment: string;
+  payment_due_day: string;
   loan_start_date: string;
   loan_end_date: string;
   amortization_term_months: string;
@@ -124,6 +126,7 @@ function emptyLoanForm(): LoanForm {
     current_balance: "",
     interest_rate: "",
     monthly_payment: "",
+    payment_due_day: "",
     loan_start_date: "",
     loan_end_date: "",
     amortization_term_months: "",
@@ -142,6 +145,7 @@ function loanToForm(loan: StoreLoan): LoanForm {
     current_balance: loan.current_balance != null ? String(loan.current_balance) : "",
     interest_rate: loan.interest_rate != null ? String(loan.interest_rate) : "",
     monthly_payment: loan.monthly_payment != null ? String(loan.monthly_payment) : "",
+    payment_due_day: loan.payment_due_day != null ? String(loan.payment_due_day) : "",
     loan_start_date: loan.loan_start_date?.split("T")[0] ?? "",
     loan_end_date: loan.loan_end_date?.split("T")[0] ?? "",
     amortization_term_months:
@@ -151,6 +155,12 @@ function loanToForm(loan: StoreLoan): LoanForm {
     balloon_amount: loan.balloon_amount != null ? String(loan.balloon_amount) : "",
     notes: loan.notes ?? "",
   };
+}
+
+function parsePaymentDueDay(value: string): number | null {
+  if (!value.trim()) return null;
+  const n = parseInt(value.replace(/,/g, ""), 10);
+  return Number.isInteger(n) ? n : NaN;
 }
 
 function parseNum(value: string): number | null {
@@ -164,6 +174,7 @@ function enrichLoan(loan: StoreLoan): EnrichedLoan {
     currentBalance: loan.current_balance ?? 0,
     interestRate: loan.interest_rate ?? 0,
     monthlyPayment: loan.monthly_payment ?? 0,
+    paymentDueDay: loan.payment_due_day,
     loanStartDate: loan.loan_start_date ?? undefined,
     lastUpdated: loan.updated_at ?? undefined,
   });
@@ -171,6 +182,7 @@ function enrichLoan(loan: StoreLoan): EnrichedLoan {
     currentBalance: estimatedCurrentBalance,
     interestRate: loan.interest_rate ?? 0,
     monthlyPayment: loan.monthly_payment ?? 0,
+    paymentDueDay: loan.payment_due_day,
     loanStartDate: loan.loan_start_date ?? undefined,
     amortizationTermMonths: loan.amortization_term_months ?? undefined,
   });
@@ -468,6 +480,8 @@ export default function DebtPage() {
         currentBalance: largestLoan.current_balance ?? 0,
         interestRate: largestLoan.interest_rate ?? 0,
         monthlyPayment: largestLoan.monthly_payment ?? 0,
+        paymentDueDay: largestLoan.payment_due_day,
+        loanStartDate: largestLoan.loan_start_date ?? undefined,
         lastUpdated: largestLoan.updated_at ?? undefined,
       },
       24
@@ -524,6 +538,12 @@ export default function DebtPage() {
       return;
     }
 
+    const paymentDueDay = parsePaymentDueDay(form.payment_due_day);
+    if (form.payment_due_day.trim() && (paymentDueDay == null || Number.isNaN(paymentDueDay) || paymentDueDay < 1 || paymentDueDay > 31)) {
+      toast.error("Payment day must be a number from 1 to 31.");
+      return;
+    }
+
     const negativeFieldError = findNegativeFieldError([
       ...(parseNum(form.original_balance) != null
         ? [{ value: parseNum(form.original_balance)!, label: "Original balance" }]
@@ -566,6 +586,7 @@ export default function DebtPage() {
         current_balance: parseNum(form.current_balance),
         interest_rate: parseNum(form.interest_rate),
         monthly_payment: parseNum(form.monthly_payment),
+        payment_due_day: Number.isInteger(paymentDueDay) ? paymentDueDay : null,
         loan_start_date: form.loan_start_date || null,
         loan_end_date: form.loan_end_date || null,
         amortization_term_months: parseNum(form.amortization_term_months),
@@ -1269,6 +1290,21 @@ export default function DebtPage() {
                 placeholder="4500"
               />
             </FormField>
+            <FormField label="Payment Day">
+              <input
+                id="debt-payment-due-day"
+                type="text"
+                inputMode="numeric"
+                value={form.payment_due_day}
+                onChange={(e) => updateForm("payment_due_day", e.target.value)}
+                onKeyDown={preventEnterSubmit}
+                className={INPUT_CLASS}
+                placeholder="15"
+              />
+              <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
+                Day of month the payment hits (1–31). Distinct from start/end date. 31 becomes the last day in shorter months.
+              </p>
+            </FormField>
             <FormField label="Loan Start Date">
               <input
                 id="debt-loan-start-date"
@@ -1369,7 +1405,9 @@ export default function DebtPage() {
         <div className="card">
           <div className="section-title mb-1">Debt Payoff Projection (24 Months)</div>
           <p className="text-[12px] mb-4" style={{ color: "var(--text-muted)" }}>
-            Based on {largestLoan.lender_name ?? "largest loan"} — {fmtDollar(largestLoan.estimatedCurrentBalance)} balance
+            Based on {largestLoan.lender_name ?? "largest loan"} — {fmtDollar(largestLoan.estimatedCurrentBalance)}{" "}
+            balance. Drops plot on the payment day
+            {largestLoan.payment_due_day != null ? ` (the ${largestLoan.payment_due_day})` : ""}, not month boundaries.
           </p>
           <div className="h-[240px]">
             <ResponsiveContainer width="100%" height="100%">

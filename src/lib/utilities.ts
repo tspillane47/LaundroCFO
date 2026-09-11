@@ -1,3 +1,11 @@
+import {
+  buildUtilitiesLookup,
+  monthKey,
+  ttmWindowRecords,
+  type MonthlyUtilityRecord,
+  type UtilityImportField,
+} from "@/lib/financials";
+
 export interface UtilityRecord {
   year: number;
   month: number;
@@ -42,6 +50,18 @@ export function waterCostPerTurn(
   return waterCost / monthlyTurns;
 }
 
+/** Prefer equipment washer quantity; fall back to the store profile count. */
+export function resolveWasherCount(
+  storeWashers: number | null | undefined,
+  equipment: { machine_type: string; quantity: number }[]
+): number {
+  const fromEquipment = equipment
+    .filter((row) => row.machine_type === "Washer")
+    .reduce((sum, row) => sum + (row.quantity ?? 0), 0);
+  if (fromEquipment > 0) return fromEquipment;
+  return storeWashers && storeWashers > 0 ? storeWashers : 0;
+}
+
 export async function getStoreUtilities(storeId: string) {
   const { createClient } = await import("@/lib/supabase");
   const supabase = createClient();
@@ -67,6 +87,120 @@ export function getMostRecentUtility(records: MonthlyUtilityRow[]): MonthlyUtili
     if (a.year !== b.year) return b.year - a.year;
     return b.month - a.month;
   })[0];
+}
+
+function ttmUtilityFieldSum(
+  ttmRecords: { year: number; month: number }[],
+  lookup: Map<string, MonthlyUtilityRecord>,
+  field: UtilityImportField
+): number {
+  return ttmRecords.reduce((sum, record) => {
+    const row = lookup.get(monthKey(record.year, record.month));
+    return sum + (row?.[field] ?? 0);
+  }, 0);
+}
+
+function ttmUtilityFieldHasData(
+  ttmRecords: { year: number; month: number }[],
+  lookup: Map<string, MonthlyUtilityRecord>,
+  field: UtilityImportField
+): boolean {
+  return ttmRecords.some((record) => {
+    const row = lookup.get(monthKey(record.year, record.month));
+    return row != null && (row[field] ?? 0) > 0;
+  });
+}
+
+export type TtmUtilityMetrics = {
+  monthsUsed: number;
+  ttmRevenue: number;
+  avgRevenue: number | null;
+  water: number | null;
+  electric: number | null;
+  gas: number | null;
+  total: number | null;
+  waterPctOfRevenue: number | null;
+  electricPctOfRevenue: number | null;
+  gasPctOfRevenue: number | null;
+  totalPctOfRevenue: number | null;
+  hasUtilityCosts: boolean;
+};
+
+const EMPTY_TTM_UTILITY_METRICS: TtmUtilityMetrics = {
+  monthsUsed: 0,
+  ttmRevenue: 0,
+  avgRevenue: null,
+  water: null,
+  electric: null,
+  gas: null,
+  total: null,
+  waterPctOfRevenue: null,
+  electricPctOfRevenue: null,
+  gasPctOfRevenue: null,
+  totalPctOfRevenue: null,
+  hasUtilityCosts: false,
+};
+
+/**
+ * Trailing monthly utility averages over fully-elapsed months (max 12), keyed off
+ * the same financial TTM window as cost-per-load. Months with no utility row count as 0
+ * so quarterly bills (e.g. water) average correctly instead of showing $0 for the latest month.
+ */
+export function computeTtmUtilityMetrics(
+  financialRecords: { year: number; month: number; revenue?: number }[],
+  utilityRecords: MonthlyUtilityRecord[],
+  asOf: Date = new Date()
+): TtmUtilityMetrics {
+  if (financialRecords.length === 0) return EMPTY_TTM_UTILITY_METRICS;
+
+  const newestFirst = [...financialRecords].sort((a, b) => {
+    if (a.year !== b.year) return b.year - a.year;
+    return b.month - a.month;
+  });
+  const ttmRecords = ttmWindowRecords(newestFirst, asOf);
+  const monthsUsed = ttmRecords.length;
+  if (monthsUsed === 0) return EMPTY_TTM_UTILITY_METRICS;
+
+  const lookup = buildUtilitiesLookup(utilityRecords);
+  const ttmRevenue = ttmRecords.reduce((sum, record) => sum + (record.revenue ?? 0), 0);
+  const avgRevenue = ttmRevenue / monthsUsed;
+
+  const averageIfPresent = (field: UtilityImportField): number | null => {
+    if (!ttmUtilityFieldHasData(ttmRecords, lookup, field)) return null;
+    return ttmUtilityFieldSum(ttmRecords, lookup, field) / monthsUsed;
+  };
+
+  const water = averageIfPresent("water");
+  const electric = averageIfPresent("electric");
+  const gas = averageIfPresent("gas");
+
+  const ttmUtilityTotal = ttmRecords.reduce((sum, record) => {
+    const row = lookup.get(monthKey(record.year, record.month));
+    return sum + (row ? totalUtilities(row) : 0);
+  }, 0);
+  const hasAnyTotal = ttmRecords.some((record) => {
+    const row = lookup.get(monthKey(record.year, record.month));
+    return row != null && totalUtilities(row) > 0;
+  });
+  const total = hasAnyTotal ? ttmUtilityTotal / monthsUsed : null;
+
+  const pct = (amount: number | null) =>
+    amount != null && avgRevenue > 0 ? utilityPctOfRevenue(amount, avgRevenue) : amount != null ? 0 : null;
+
+  return {
+    monthsUsed,
+    ttmRevenue,
+    avgRevenue,
+    water,
+    electric,
+    gas,
+    total,
+    waterPctOfRevenue: pct(water),
+    electricPctOfRevenue: pct(electric),
+    gasPctOfRevenue: pct(gas),
+    totalPctOfRevenue: pct(total),
+    hasUtilityCosts: water != null || electric != null || gas != null,
+  };
 }
 
 export function computeEquipmentMetrics(equipment: { quantity: number; installation_year: number }[]) {

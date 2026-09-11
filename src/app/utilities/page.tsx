@@ -28,7 +28,6 @@ import {
   ttmWindowRecords,
   type MonthlyFinancialRecord,
   type MonthlyUtilityRecord,
-  type UtilityImportField,
 } from "@/lib/financials";
 import {
   computeTurnsPerDay,
@@ -37,7 +36,9 @@ import {
 } from "@/lib/equipment";
 import {
   computeEquipmentMetrics,
+  computeTtmUtilityMetrics,
   getMostRecentUtility,
+  resolveWasherCount,
   totalUtilities,
   utilityPctOfRevenue,
   waterCostPerSF,
@@ -111,28 +112,6 @@ function costPerLoadBenchmark(value: number): { label: string; color: string } {
   if (value < 0.4) return { label: "Good", color: "text-green-400" };
   if (value <= 0.55) return { label: "Watch", color: "text-amber-400" };
   return { label: "High", color: "text-red-400" };
-}
-
-function sumTtmUtilityField(
-  ttmRecords: { year: number; month: number }[],
-  utilitiesLookup: Map<string, MonthlyUtilityRecord>,
-  field: UtilityImportField
-): number {
-  return ttmRecords.reduce((sum, record) => {
-    const utilityRecord = utilitiesLookup.get(monthKey(record.year, record.month));
-    return sum + (utilityRecord?.[field] ?? 0);
-  }, 0);
-}
-
-function ttmUtilityFieldHasData(
-  ttmRecords: { year: number; month: number }[],
-  utilitiesLookup: Map<string, MonthlyUtilityRecord>,
-  field: UtilityImportField
-): boolean {
-  return ttmRecords.some((record) => {
-    const utilityRecord = utilitiesLookup.get(monthKey(record.year, record.month));
-    return utilityRecord != null && (utilityRecord[field] ?? 0) > 0;
-  });
 }
 
 function ChartTooltip({
@@ -317,9 +296,14 @@ export default function UtilitiesPage() {
 
   const latestRevenue = latest ? monthlyRevenueFor(latest.year, latest.month) : store?.monthly_revenue ?? 0;
   const latestTotal = latest ? totalUtilities(latest) : 0;
-  const latestWater = latest?.water ?? 0;
   const sqft = store?.square_footage ?? 0;
-  const washers = store?.washers ?? 0;
+  const washers = resolveWasherCount(store?.washers, equipment);
+
+  const ttmUtility = useMemo(
+    () => computeTtmUtilityMetrics(financialRecords, records),
+    [financialRecords, records]
+  );
+  const displayWater = ttmUtility.water ?? 0;
 
   const realTurnsPerDay = useMemo(() => {
     if (equipment.length === 0 || !turnsContext || turnsContext.selfServiceTtm <= 0) return null;
@@ -374,40 +358,25 @@ export default function UtilitiesPage() {
       waterCostPerLoad: null as number | null,
       electricCostPerLoad: null as number | null,
       gasCostPerLoad: null as number | null,
+      hasTtmWindow: false,
+      hasUtilityCosts: false,
+      washerCount: 0,
+      missingVendPrices: false,
     };
 
-    if (financialRecords.length === 0) return empty;
+    const washerCount = resolveWasherCount(store?.washers, equipment);
+    if (ttmUtility.monthsUsed === 0) {
+      return { ...empty, washerCount, hasUtilityCosts: ttmUtility.hasUtilityCosts };
+    }
 
-    const utilitiesLookup = buildUtilitiesLookup(records);
-    const ttmRecords = ttmWindowRecords(
-      enrichMonthlyRecords(sortRecordsDesc(financialRecords), utilitiesLookup)
-    );
-    const monthsUsed = ttmRecords.length;
-    if (monthsUsed === 0) return empty;
-
-    const washerCount = equipment
-      .filter((e) => e.machine_type === "Washer")
-      .reduce((sum, e) => sum + e.quantity, 0);
-    const washerCountOrNull = washerCount > 0 ? washerCount : null;
     const turnsPerDay = realTurnsPerDay;
+    const missingVendPrices =
+      washerCount > 0 &&
+      equipment.some((e) => e.machine_type === "Washer" && (e.avg_vend_price == null || e.avg_vend_price <= 0));
     const totalLoadsPerMonth =
-      turnsPerDay != null && turnsPerDay > 0 && washerCountOrNull != null
-        ? turnsPerDay * washerCountOrNull * 30
+      turnsPerDay != null && turnsPerDay > 0 && washerCount > 0
+        ? turnsPerDay * washerCount * 30
         : null;
-
-    const toMonthlyAverage = (ttmTotal: number) => ttmTotal / monthsUsed;
-
-    const hasWater = ttmUtilityFieldHasData(ttmRecords, utilitiesLookup, "water");
-    const hasElectric = ttmUtilityFieldHasData(ttmRecords, utilitiesLookup, "electric");
-    const hasGas = ttmUtilityFieldHasData(ttmRecords, utilitiesLookup, "gas");
-
-    const avgWater = hasWater
-      ? toMonthlyAverage(sumTtmUtilityField(ttmRecords, utilitiesLookup, "water"))
-      : null;
-    const avgElectric = hasElectric
-      ? toMonthlyAverage(sumTtmUtilityField(ttmRecords, utilitiesLookup, "electric"))
-      : null;
-    const avgGas = hasGas ? toMonthlyAverage(sumTtmUtilityField(ttmRecords, utilitiesLookup, "gas")) : null;
 
     const costPerLoad = (monthlyCost: number | null) =>
       monthlyCost != null && totalLoadsPerMonth != null && totalLoadsPerMonth > 0
@@ -415,22 +384,26 @@ export default function UtilitiesPage() {
         : null;
 
     const totalAvgUtilities =
-      avgWater != null && avgElectric != null && avgGas != null
-        ? avgWater + avgElectric + avgGas
+      ttmUtility.water != null && ttmUtility.electric != null && ttmUtility.gas != null
+        ? ttmUtility.water + ttmUtility.electric + ttmUtility.gas
         : null;
 
     return {
       totalLoadsPerMonth,
       totalUtilityCostPerLoad: costPerLoad(totalAvgUtilities),
-      waterCostPerLoad: costPerLoad(avgWater),
-      electricCostPerLoad: costPerLoad(avgElectric),
-      gasCostPerLoad: costPerLoad(avgGas),
+      waterCostPerLoad: costPerLoad(ttmUtility.water),
+      electricCostPerLoad: costPerLoad(ttmUtility.electric),
+      gasCostPerLoad: costPerLoad(ttmUtility.gas),
+      hasTtmWindow: true,
+      hasUtilityCosts: ttmUtility.hasUtilityCosts,
+      washerCount,
+      missingVendPrices,
     };
-  }, [financialRecords, records, equipment, realTurnsPerDay]);
+  }, [ttmUtility, equipment, realTurnsPerDay, store?.washers]);
 
   const equipmentInsight = useMemo(() => {
-    if (!latest) return "No significant correlation detected yet - add more historical data.";
-    const waterPct = utilityPctOfRevenue(latest.water, latestRevenue);
+    if (ttmUtility.water == null) return "No significant correlation detected yet - add more historical data.";
+    const waterPct = ttmUtility.waterPctOfRevenue ?? 0;
     if (equipMetrics.avgEquipmentAge > 12 && waterPct > 12) {
       return "Older equipment may be using more water per cycle. Consider retrofitting with high-efficiency washers.";
     }
@@ -438,7 +411,7 @@ export default function UtilitiesPage() {
       return "Efficient equipment is helping keep water costs low.";
     }
     return "No significant correlation detected yet - add more historical data.";
-  }, [latest, equipMetrics.avgEquipmentAge, latestRevenue]);
+  }, [ttmUtility.water, ttmUtility.waterPctOfRevenue, equipMetrics.avgEquipmentAge]);
 
   function openMonthForm(month: number, year?: number) {
     if (!canWrite) return;
@@ -619,23 +592,43 @@ export default function UtilitiesPage() {
           label={
             <MetricTooltip
               label="Total Utilities"
-              explanation="Sum of water, gas, electric, sewer, trash, and internet for the most recent month."
+              explanation="Sum of water, gas, electric, sewer, trash, and internet for the most recent month. Percent of revenue uses the trailing elapsed-month average."
             />
           }
           value={<AnimatedNumber value={latestTotal} prefix="$" duration={1000} />}
-          sub={`${fmtPct(utilityPctOfRevenue(latestTotal, latestRevenue))} of revenue`}
+          sub={
+            ttmUtility.totalPctOfRevenue != null
+              ? `${fmtPct(ttmUtility.totalPctOfRevenue)} of revenue (TTM)`
+              : `${fmtPct(utilityPctOfRevenue(latestTotal, latestRevenue))} of revenue`
+          }
         />
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.05s" }}
-          label="Water"
-          value={<AnimatedNumber value={latestWater} prefix="$" duration={1000} />}
-          sub={
-            <>
-              {fmtDollar(waterCostPerSF(latestWater, sqft))} per SF · {fmtDollar(waterCostPerWasher(latestWater, washers))}{" "}
-              per washer
-            </>
+          label={
+            <MetricTooltip
+              label="Water"
+              explanation="Trailing monthly average over fully elapsed months (max 12). Quarterly bills are averaged across the window instead of showing $0 in months with no water invoice."
+            />
           }
+          value={
+            ttmUtility.water != null ? (
+              <AnimatedNumber value={ttmUtility.water} prefix="$" duration={1000} />
+            ) : (
+              "—"
+            )
+          }
+          sub={
+            ttmUtility.water != null ? (
+              <>
+                {fmtDollar(waterCostPerSF(displayWater, sqft))} per SF ·{" "}
+                {fmtDollar(waterCostPerWasher(displayWater, washers))} per washer · TTM monthly avg
+              </>
+            ) : (
+              "No elapsed water in TTM"
+            )
+          }
+          valueColor={ttmUtility.water == null ? "var(--text-muted)" : undefined}
         />
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
@@ -646,8 +639,21 @@ export default function UtilitiesPage() {
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
           style={{ animationDelay: "0.15s" }}
-          label="Electric"
-          value={<AnimatedNumber value={latest?.electric ?? 0} prefix="$" duration={1000} />}
+          label={
+            <MetricTooltip
+              label="Electric"
+              explanation="Trailing monthly average over fully elapsed months (max 12), so an in-progress month with only a gas bill posted does not zero out electric."
+            />
+          }
+          value={
+            ttmUtility.electric != null ? (
+              <AnimatedNumber value={ttmUtility.electric} prefix="$" duration={1000} />
+            ) : (
+              "—"
+            )
+          }
+          sub={ttmUtility.electric != null ? "TTM monthly avg" : "No elapsed electric in TTM"}
+          valueColor={ttmUtility.electric == null ? "var(--text-muted)" : undefined}
         />
         <KpiCard
           className="kpi-fade-in kpi-glow-card"
@@ -865,20 +871,25 @@ export default function UtilitiesPage() {
       )}
 
       {/* Section 4 — Benchmarks */}
-      {latest && (
+      {(latest || ttmUtility.monthsUsed > 0) && (
         <div className="card">
           <div className="section-title">Utility Benchmarks</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: "Water % of Revenue", value: utilityPctOfRevenue(latest.water, latestRevenue), bench: "Industry typical: 8–12%", low: 8, high: 12 },
-              { label: "Gas % of Revenue", value: utilityPctOfRevenue(latest.gas, latestRevenue), bench: "Industry typical: 3–6%", low: 3, high: 6 },
-              { label: "Electric % of Revenue", value: utilityPctOfRevenue(latest.electric, latestRevenue), bench: "Industry typical: 5–8%", low: 5, high: 8 },
-              { label: "Total Utilities % of Revenue", value: utilityPctOfRevenue(latestTotal, latestRevenue), bench: "Industry typical: 16–26%", low: 16, high: 26 },
+              { label: "Water % of Revenue", value: ttmUtility.waterPctOfRevenue, bench: "Industry typical: 8–12%", low: 8, high: 12 },
+              { label: "Gas % of Revenue", value: ttmUtility.gasPctOfRevenue, bench: "Industry typical: 3–6%", low: 3, high: 6 },
+              { label: "Electric % of Revenue", value: ttmUtility.electricPctOfRevenue, bench: "Industry typical: 5–8%", low: 5, high: 8 },
+              { label: "Total Utilities % of Revenue", value: ttmUtility.totalPctOfRevenue, bench: "Industry typical: 16–26%", low: 16, high: 26 },
             ].map((item) => (
               <div key={item.label} className="card2">
                 <div className="metric-label">{item.label}</div>
-                <div className={clsx("text-[20px] font-bold tabular-nums", benchmarkColor(item.value, item.low, item.high))}>
-                  {fmtPct(item.value)}
+                <div
+                  className={clsx(
+                    "text-[20px] font-bold tabular-nums",
+                    item.value != null ? benchmarkColor(item.value, item.low, item.high) : "text-adaptive-muted"
+                  )}
+                >
+                  {item.value != null ? fmtPct(item.value) : "—"}
                 </div>
                 <div className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
                   {item.bench}
@@ -886,6 +897,12 @@ export default function UtilitiesPage() {
               </div>
             ))}
           </div>
+          {ttmUtility.monthsUsed > 0 && (
+            <p className="text-[12px] mt-3" style={{ color: "var(--text-muted)" }}>
+              Trailing {ttmUtility.monthsUsed} elapsed month{ttmUtility.monthsUsed === 1 ? "" : "s"} — in-progress
+              month excluded.
+            </p>
+          )}
         </div>
       )}
 
@@ -933,23 +950,43 @@ export default function UtilitiesPage() {
           </p>
         ) : (
           <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
-            Add monthly financials, utility costs (water, electric, gas), and equipment with vend prices to
-            calculate cost per load. Industry benchmark: Good under $0.40/load · Watch $0.40–$0.55 · High
-            over $0.55.
+            {records.some((r) => (r.water ?? 0) + (r.electric ?? 0) + (r.gas ?? 0) > 0) &&
+            costPerLoadMetrics.missingVendPrices
+              ? "Add washer vend prices to see cost per load. "
+              : records.some((r) => (r.water ?? 0) + (r.electric ?? 0) + (r.gas ?? 0) > 0) &&
+                  costPerLoadMetrics.washerCount === 0
+                ? "Add washers to equipment to see cost per load. "
+                : "Add monthly financials, utility costs (water, electric, gas), and equipment with vend prices to calculate cost per load. "}
+            Industry benchmark: Good under $0.40/load · Watch $0.40–$0.55 · High over $0.55.
           </p>
         )}
       </div>
 
       {/* Section 6 — Water Analysis */}
-      {latest && (
+      {(latest || ttmUtility.water != null) && (
         <div className="card">
           <div className="section-title">Water Analysis</div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             {[
-              { label: "Water Cost Per Month", value: fmtDollar(latest.water) },
-              { label: "Water Cost Per SF", value: fmtDollar(waterCostPerSF(latest.water, sqft)) },
-              { label: "Water Cost Per Washer", value: fmtDollar(waterCostPerWasher(latest.water, washers)) },
-              { label: "Water Cost Per Turn", value: fmtDollar(waterCostPerTurn(latest.water, washers, 4.5, realTurnsPerDay)) },
+              {
+                label: "Water Cost Per Month",
+                value: ttmUtility.water != null ? fmtDollar(ttmUtility.water) : "—",
+              },
+              {
+                label: "Water Cost Per SF",
+                value: ttmUtility.water != null ? fmtDollar(waterCostPerSF(displayWater, sqft)) : "—",
+              },
+              {
+                label: "Water Cost Per Washer",
+                value: ttmUtility.water != null ? fmtDollar(waterCostPerWasher(displayWater, washers)) : "—",
+              },
+              {
+                label: "Water Cost Per Turn",
+                value:
+                  ttmUtility.water != null
+                    ? fmtDollar(waterCostPerTurn(displayWater, washers, 4.5, realTurnsPerDay))
+                    : "—",
+              },
             ].map((item) => (
               <div key={item.label} className="card2">
                 <div className="metric-label">{item.label}</div>
@@ -985,7 +1022,9 @@ export default function UtilitiesPage() {
             </div>
             <div className="card2 text-center">
               <div className="metric-label">Water Expense</div>
-              <div className="text-[22px] font-bold text-adaptive-info">{fmtDollar(latest.water)}</div>
+              <div className="text-[22px] font-bold text-adaptive-info">
+                {ttmUtility.water != null ? fmtDollar(ttmUtility.water) : "—"}
+              </div>
             </div>
           </div>
           <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>

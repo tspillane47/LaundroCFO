@@ -445,6 +445,7 @@ function TransactionsPageContent() {
   const [filterVendor, setFilterVendor] = useState("");
   const [filterName, setFilterName] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
+  const [filterType, setFilterType] = useState<"" | TransactionType>("");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showManageRules, setShowManageRules] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -680,6 +681,7 @@ function TransactionsPageContent() {
     setFilterVendor("");
     setFilterName("");
     setFilterCategory("");
+    setFilterType("");
   }, [activeTab]);
 
   const reviewRows = useMemo((): ReviewRow[] => {
@@ -755,11 +757,12 @@ function TransactionsPageContent() {
         if (name !== filterName) return false;
       }
       if (filterCategory && row.category !== filterCategory) return false;
+      if (filterType && row.type !== filterType) return false;
       return true;
     });
-  }, [reviewRows, filterVendor, filterName, filterCategory]);
+  }, [reviewRows, filterVendor, filterName, filterCategory, filterType]);
 
-  const hasActiveFilters = Boolean(filterVendor || filterName || filterCategory);
+  const hasActiveFilters = Boolean(filterVendor || filterName || filterCategory || filterType);
 
   const transactionGroups = useMemo((): TransactionGroup[] => {
     const map = new Map<string, TransactionGroup>();
@@ -2477,6 +2480,45 @@ function TransactionsPageContent() {
                 ))}
               </select>
             </div>
+            <div>
+              <div className="metric-label mb-1.5">Type</div>
+              <div
+                className="inline-flex rounded-md border border-[var(--border)] overflow-hidden"
+                role="group"
+                aria-label="Filter by income or expense"
+              >
+                {(
+                  [
+                    { value: "", label: "All" },
+                    { value: "income", label: "Income" },
+                    { value: "expense", label: "Expense" },
+                  ] as const
+                ).map((option) => {
+                  const selected = filterType === option.value;
+                  return (
+                    <button
+                      key={option.label}
+                      type="button"
+                      id={option.value ? `transactions-filtertype-${option.value}` : "transactions-filtertype-all"}
+                      onClick={() => setFilterType(option.value)}
+                      className={clsx(
+                        "px-3 py-1.5 text-[12px] font-medium transition-colors",
+                        selected
+                          ? option.value === "income"
+                            ? "bg-green-600/20 text-green-300"
+                            : option.value === "expense"
+                              ? "bg-red-600/20 text-red-300"
+                              : "bg-blue-600/20 text-adaptive-info"
+                          : "text-adaptive-muted hover:text-adaptive-secondary"
+                      )}
+                      aria-pressed={selected}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <button
               type="button"
               className="btn-outline text-[11px]"
@@ -2484,6 +2526,7 @@ function TransactionsPageContent() {
                 setFilterVendor("");
                 setFilterName("");
                 setFilterCategory("");
+                setFilterType("");
               }}
               disabled={!hasActiveFilters}
             >

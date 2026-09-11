@@ -89,6 +89,8 @@ type StoreLoanRow = {
   interest_rate: number | null;
   monthly_payment: number | null;
   updated_at: string | null;
+  payment_due_day: number | null;
+  loan_start_date: string | null;
 };
 
 function num(value: number | null | undefined): number {
@@ -240,7 +242,7 @@ async function fetchActiveStoreLoans(storeId: string): Promise<StoreLoanRow[]> {
   const supabase = createClient();
   const { data: loans } = await supabase
     .from("store_loans")
-    .select("lender_name, current_balance, interest_rate, monthly_payment, updated_at")
+    .select("lender_name, current_balance, interest_rate, monthly_payment, updated_at, payment_due_day, loan_start_date")
     .eq("store_id", storeId)
     .eq("is_active", true)
     .order("current_balance", { ascending: false });
@@ -274,6 +276,8 @@ function buildCurrentMonthlyAveragesFromContext(
       currentBalance: loan.current_balance ?? 0,
       interestRate: loan.interest_rate ?? 0,
       monthlyPayment: loan.monthly_payment ?? 0,
+      paymentDueDay: loan.payment_due_day,
+      loanStartDate: loan.loan_start_date ?? undefined,
       lastUpdated: loan.updated_at ?? undefined,
     });
 

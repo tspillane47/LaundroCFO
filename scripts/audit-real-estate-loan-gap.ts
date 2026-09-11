@@ -18,7 +18,7 @@ async function main() {
     await Promise.all([
       supabase
         .from("store_loans")
-        .select("id, store_id, lender_name, loan_type, current_balance, interest_rate, monthly_payment, updated_at, is_active")
+        .select("id, store_id, lender_name, loan_type, current_balance, interest_rate, monthly_payment, updated_at, payment_due_day, loan_start_date, is_active")
         .eq("is_active", true)
         .eq("loan_type", REAL_ESTATE_LOAN_TYPE),
       supabase.from("real_estate").select("store_id, current_loan_balance"),
@@ -61,6 +61,8 @@ async function main() {
           currentBalance: loan.current_balance ?? 0,
           interestRate: loan.interest_rate ?? 0,
           monthlyPayment: loan.monthly_payment ?? 0,
+          paymentDueDay: loan.payment_due_day,
+          loanStartDate: loan.loan_start_date ?? undefined,
           lastUpdated: loan.updated_at ?? undefined,
         })
       );
@@ -81,6 +83,8 @@ async function main() {
           currentBalance: l.current_balance ?? 0,
           interestRate: l.interest_rate ?? 0,
           monthlyPayment: l.monthly_payment ?? 0,
+          paymentDueDay: l.payment_due_day,
+          loanStartDate: l.loan_start_date ?? undefined,
           lastUpdated: l.updated_at ?? undefined,
         }),
       })),
