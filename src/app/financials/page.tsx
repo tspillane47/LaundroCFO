@@ -29,6 +29,7 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { DSCRCard } from "@/components/ui/DSCRCard";
 import { MetricTooltip } from "@/components/ui/MetricTooltip";
 import { CurrentMonthlyAveragesPanel } from "@/components/financials/CurrentMonthlyAveragesPanel";
+import { PlManualSourceNote, PlMonthSourcePanel } from "@/components/financials/PlMonthSourcePanel";
 import { PlaidConnectTrustPanel } from "@/components/financials/PlaidConnectTrustPanel";
 import {
   PlaidConnectedAccountsList,
@@ -94,6 +95,14 @@ import {
   sortRecordsDesc,
   ttmWindowRecords,
 } from "@/lib/financials";
+import {
+  calcMonthProvenance,
+  fetchStoreTransactionPlLinks,
+  linksForPeriod,
+  sumPostedByField,
+  type PlLinkAmount,
+} from "@/lib/plProvenance";
+import { analyzeRentScheduledVsActual } from "@/lib/scheduledVsActual";
 import {
   formatQuickBooksConnectionErrorMessage,
   formatQuickBooksSyncStatus,
@@ -422,6 +431,8 @@ export default function FinancialsPage() {
   const [form, setForm] = useState<MonthlyForm>(() => emptyMonthlyForm());
   const [monthlyAverages, setMonthlyAverages] = useState<CurrentMonthlyAverages | null>(null);
   const [monthlyAveragesLoading, setMonthlyAveragesLoading] = useState(false);
+  const [plLinks, setPlLinks] = useState<PlLinkAmount[]>([]);
+  const [leaseMonthlyRent, setLeaseMonthlyRent] = useState(0);
 
   const currentYear = new Date().getFullYear();
   const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
@@ -431,6 +442,8 @@ export default function FinancialsPage() {
     if (!storeId) {
       setStore(null);
       setRecords([]);
+      setPlLinks([]);
+      setLeaseMonthlyRent(0);
       setLoading(false);
       return;
     }
@@ -457,7 +470,9 @@ export default function FinancialsPage() {
       { data: plaidConnectionsData, error: plaidConnectionsError },
       { data: plaidAccountsData, error: plaidAccountsError },
       { data: utilitiesData, error: utilitiesError },
+      { data: leaseData, error: leaseError },
       annualDebtByStore,
+      plLinksData,
     ] = await Promise.all([
       supabase.from("stores").select("*").eq("id", storeId).single(),
       supabase
@@ -492,7 +507,9 @@ export default function FinancialsPage() {
         .from("monthly_utilities")
         .select("year, month, water, gas, electric, sewer, trash, internet")
         .eq("store_id", storeId),
+      supabase.from("leases").select("monthly_rent").eq("store_id", storeId).maybeSingle(),
       fetchAnnualDebtServiceByStore(supabase, [storeId]),
+      fetchStoreTransactionPlLinks(supabase, storeId),
     ]);
 
     const errors = [
@@ -503,6 +520,7 @@ export default function FinancialsPage() {
       plaidConnectionsError,
       plaidAccountsError,
       utilitiesError,
+      leaseError,
     ]
       .filter(Boolean)
       .map((e) => e!.message);
@@ -545,6 +563,8 @@ export default function FinancialsPage() {
     setQbConnection((connectionData as QBConnection | null) ?? null);
     setPlaidConnections((plaidConnectionsData as PlaidConnection[] | null) ?? []);
     setPlaidAccounts((plaidAccountsData as PlaidConnectedAccount[] | null) ?? []);
+    setPlLinks(plLinksData);
+    setLeaseMonthlyRent(Number(leaseData?.monthly_rent ?? 0));
 
     if (sorted.length > 0 && !showFormRef.current) {
       setSelectedYear(sorted[0].year);
@@ -632,6 +652,26 @@ export default function FinancialsPage() {
   const selectedRecord = useMemo(
     () => records.find((r) => r.year === selectedYear && r.month === selectedMonth) ?? null,
     [records, selectedYear, selectedMonth]
+  );
+
+  const selectedMonthLinks = useMemo(
+    () => linksForPeriod(plLinks, selectedYear, selectedMonth),
+    [plLinks, selectedYear, selectedMonth]
+  );
+
+  const selectedProvenance = useMemo(
+    () => (selectedRecord ? calcMonthProvenance(selectedRecord, selectedMonthLinks) : []),
+    [selectedRecord, selectedMonthLinks]
+  );
+
+  const provenanceByField = useMemo(
+    () => new Map(selectedProvenance.map((line) => [line.field, line])),
+    [selectedProvenance]
+  );
+
+  const rentComparison = useMemo(
+    () => analyzeRentScheduledVsActual(leaseMonthlyRent, sumPostedByField(selectedMonthLinks).rent ?? 0),
+    [leaseMonthlyRent, selectedMonthLinks]
   );
 
   const yearRecords = useMemo(() => {
@@ -1745,6 +1785,9 @@ export default function FinancialsPage() {
                       readOnly={!canWrite}
                       disabled={!canWrite}
                     />
+                    <PlManualSourceNote
+                      line={provenanceByField.get(key as (typeof selectedProvenance)[number]["field"])}
+                    />
                   </div>
                 ))}
               </div>
@@ -1786,6 +1829,15 @@ export default function FinancialsPage() {
                 </ReadOnlyGuard>
               </div>
             </div>
+          )}
+
+          {(selectedRecord || rentComparison.shouldWarn) && (
+            <PlMonthSourcePanel
+              year={selectedYear}
+              month={selectedMonth}
+              lines={selectedProvenance}
+              rentComparison={rentComparison}
+            />
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-[4fr_1fr] gap-4 items-start">

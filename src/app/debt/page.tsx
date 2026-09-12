@@ -24,6 +24,11 @@ import {
   generatePayoffSchedule,
 } from "@/lib/amortization";
 import { calcDSCR, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
+import {
+  DEBT_SERVICE_VARIANCE_WARN_PCT,
+  exceedsVarianceThreshold,
+  variancePct,
+} from "@/lib/scheduledVsActual";
 import { computeStoreDscr } from "@/lib/dscr";
 import {
   annualizeTtmTotal,
@@ -201,13 +206,10 @@ function enrichLoan(loan: StoreLoan): EnrichedLoan {
   };
 }
 
-function variancePct(variance: number, scheduled: number): number {
-  if (scheduled === 0) return variance === 0 ? 0 : 100;
-  return Math.abs(variance / scheduled) * 100;
-}
-
 function varianceColorClass(variance: number, scheduled: number): string {
-  return variancePct(variance, scheduled) > 5 ? "text-red-400" : "text-green-400";
+  return exceedsVarianceThreshold(variance, scheduled, DEBT_SERVICE_VARIANCE_WARN_PCT)
+    ? "text-red-400"
+    : "text-green-400";
 }
 
 function dscrColorClass(dscr: number): string {
