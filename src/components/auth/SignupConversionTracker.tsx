@@ -7,6 +7,7 @@ import { SIGNUP_COMPLETE_PARAM } from "@/lib/auth-callback";
 
 /**
  * Fires `sign_up` after the server confirm route redirects with `signup_complete=1`.
+ * That param is set from the user-object signup signal, not from URL `type=signup`.
  * Reads the real URL so this cannot suspend on useSearchParams.
  */
 export function SignupConversionTracker() {

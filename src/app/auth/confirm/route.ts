@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import { isOnboardingComplete } from '@/lib/onboarding'
 import {
   buildAuthCallbackRedirect,
+  isNewSignupConfirmation,
   isSupportedOtpType,
   resolveAuthCallbackErrorCode,
   resolveAuthCallbackErrorPath,
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
     }
   )
 
-  const { error } = await supabase.auth.verifyOtp({
+  const { data, error } = await supabase.auth.verifyOtp({
     token_hash: tokenHash,
     type,
   })
@@ -81,18 +82,17 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  const user = data.user
+  const onboardingComplete = Boolean(user && (await isOnboardingComplete(supabase, user.id)))
+  const isNewSignup = isNewSignupConfirmation({ user, type, onboardingComplete })
+
   const destination = await resolvePostAuthDestination({
     nextParam,
     type,
-    isOnboardingComplete: async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      return Boolean(user && (await isOnboardingComplete(supabase, user.id)))
-    },
+    isOnboardingComplete: async () => onboardingComplete,
   })
 
   return NextResponse.redirect(
-    buildAuthCallbackRedirect(origin, withSignupCompleteParam(destination, type))
+    buildAuthCallbackRedirect(origin, withSignupCompleteParam(destination, isNewSignup))
   )
 }

@@ -8,7 +8,7 @@ import { isOnboardingComplete } from "@/lib/onboarding";
 import { invalidateSessionUser } from "@/lib/session-cache";
 import { trackSignUpEvent } from "@/lib/analytics";
 import {
-  isSignupConfirmationType,
+  isNewSignupConfirmation,
   logAuthConfirmationError,
   resolveAuthConfirmationErrorKind,
   resolvePostAuthDestination,
@@ -41,7 +41,7 @@ function AuthCallbackContent() {
         return;
       }
 
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
       if (cancelled) return;
 
@@ -53,19 +53,19 @@ function AuthCallbackContent() {
 
       invalidateSessionUser();
 
-      if (isSignupConfirmationType(type)) {
+      const user = data.user;
+      const onboardingComplete = Boolean(
+        user && (await isOnboardingComplete(supabase, user.id))
+      );
+
+      if (isNewSignupConfirmation({ user, type, onboardingComplete })) {
         trackSignUpEvent();
       }
 
       const destination = await resolvePostAuthDestination({
         nextParam,
         type,
-        isOnboardingComplete: async () => {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          return Boolean(user && (await isOnboardingComplete(supabase, user.id)));
-        },
+        isOnboardingComplete: async () => onboardingComplete,
       });
 
       router.replace(destination);

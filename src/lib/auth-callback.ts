@@ -25,8 +25,45 @@ export function isSupportedOtpType(type: string): type is EmailOtpType {
 
 export const SIGNUP_COMPLETE_PARAM = 'signup_complete'
 
+/** GoTrue writes both timestamps in the same verify/exchange for first confirmation. */
+export const SIGNUP_CONFIRMATION_SKEW_MS = 15_000
+
+export type SignupConfirmationUser = {
+  email_confirmed_at?: string | null
+  last_sign_in_at?: string | null
+}
+
 export function isSignupConfirmationType(type: string | null | undefined): boolean {
   return type === 'signup'
+}
+
+/**
+ * True for a first email-confirmation session.
+ *
+ * exchangeCodeForSession / verifyOtp do not expose a signup-vs-login grant.
+ * URL `type=signup` is also dropped when ConfirmationURL falls back to Site URL.
+ *
+ * Reliable fields on the returned user:
+ * - email_confirmed_at is set when the email is confirmed (first confirm or email change)
+ * - last_sign_in_at is set on this session and moves on later logins
+ * First confirmation writes both in the same request; later sessions only bump last_sign_in_at.
+ */
+export function isNewSignupConfirmation(options: {
+  user: SignupConfirmationUser | null | undefined
+  type?: string | null
+  onboardingComplete?: boolean
+}): boolean {
+  const { user, type, onboardingComplete } = options
+
+  if (!user) return false
+  if (onboardingComplete) return false
+  if (isEmailChangeType(type) || type === 'recovery') return false
+
+  const confirmedAt = Date.parse(user.email_confirmed_at ?? '')
+  const lastSignInAt = Date.parse(user.last_sign_in_at ?? '')
+  if (Number.isNaN(confirmedAt) || Number.isNaN(lastSignInAt)) return false
+
+  return Math.abs(lastSignInAt - confirmedAt) <= SIGNUP_CONFIRMATION_SKEW_MS
 }
 
 export function buildAuthCallbackRedirect(
@@ -47,12 +84,9 @@ export function buildSignupEmailRedirectTo(origin: string): string {
   return buildAuthCallbackRedirect(origin, '/auth/callback', { type: 'signup' })
 }
 
-/** Append `signup_complete=1` only for signup confirmations so the client can fire GA once. */
-export function withSignupCompleteParam(
-  destination: string,
-  type: string | null | undefined
-): string {
-  if (!isSignupConfirmationType(type)) return destination
+/** Append `signup_complete=1` so the client can fire GA after a server verify. */
+export function withSignupCompleteParam(destination: string, isNewSignup: boolean): string {
+  if (!isNewSignup) return destination
   const url = new URL(destination, 'https://placeholder.invalid')
   url.searchParams.set(SIGNUP_COMPLETE_PARAM, '1')
   return `${url.pathname}${url.search}${url.hash}`

@@ -4,6 +4,7 @@ import {
   buildAuthCallbackRedirect,
   buildSignupEmailRedirectTo,
   isEmailChangeType,
+  isNewSignupConfirmation,
   isSignupConfirmationType,
   isSupportedOtpType,
   resolveAuthCallbackErrorCode,
@@ -46,20 +47,54 @@ describe('auth callback helpers', () => {
     expect(isSignupConfirmationType(null)).toBe(false)
   })
 
-  it('appends signup_complete=1 only for signup confirmations', () => {
-    expect(withSignupCompleteParam('/onboarding', 'signup')).toBe(
+  it('appends signup_complete=1 only when the user-object signal says new signup', () => {
+    expect(withSignupCompleteParam('/onboarding', true)).toBe(
       '/onboarding?signup_complete=1'
     )
-    expect(withSignupCompleteParam('/portfolio', 'signup')).toBe(
+    expect(withSignupCompleteParam('/portfolio', true)).toBe(
       '/portfolio?signup_complete=1'
     )
-    expect(withSignupCompleteParam('/reset-password', 'recovery')).toBe(
-      '/reset-password'
-    )
-    expect(withSignupCompleteParam('/account?email_updated=1', 'email_change')).toBe(
+    expect(withSignupCompleteParam('/reset-password', false)).toBe('/reset-password')
+    expect(withSignupCompleteParam('/account?email_updated=1', false)).toBe(
       '/account?email_updated=1'
     )
-    expect(withSignupCompleteParam('/onboarding', null)).toBe('/onboarding')
+    expect(withSignupCompleteParam('/onboarding', false)).toBe('/onboarding')
+  })
+
+  it('treats matching confirmation and first-sign-in timestamps as a new signup', () => {
+    const now = '2026-09-13T17:00:00.000Z'
+    expect(
+      isNewSignupConfirmation({
+        user: { email_confirmed_at: now, last_sign_in_at: now },
+      })
+    ).toBe(true)
+    expect(
+      isNewSignupConfirmation({
+        user: { email_confirmed_at: now, last_sign_in_at: now },
+        type: 'email',
+      })
+    ).toBe(true)
+  })
+
+  it('does not treat later logins, recovery, email change, or onboarded users as signup', () => {
+    const confirmed = '2026-09-13T17:00:00.000Z'
+    const laterLogin = '2026-09-13T17:00:30.000Z'
+    const matching = { email_confirmed_at: confirmed, last_sign_in_at: confirmed }
+
+    expect(
+      isNewSignupConfirmation({
+        user: { email_confirmed_at: confirmed, last_sign_in_at: laterLogin },
+      })
+    ).toBe(false)
+    expect(isNewSignupConfirmation({ user: matching, type: 'recovery' })).toBe(false)
+    expect(isNewSignupConfirmation({ user: matching, type: 'email_change' })).toBe(false)
+    expect(isNewSignupConfirmation({ user: matching, onboardingComplete: true })).toBe(false)
+    expect(isNewSignupConfirmation({ user: null })).toBe(false)
+    expect(
+      isNewSignupConfirmation({
+        user: { email_confirmed_at: null, last_sign_in_at: confirmed },
+      })
+    ).toBe(false)
   })
 
   it('routes email change confirmations to account', async () => {
