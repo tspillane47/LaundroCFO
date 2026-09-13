@@ -20,54 +20,17 @@ export function pushGAEvent(...args: unknown[]): boolean {
  * No-ops on the server and on repeat calls (sessionStorage guard after a successful queue).
  */
 export function trackSignUpEvent(): boolean {
-  // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis.
-  console.log("[TEMP-DEBUG] trackSignUpEvent() called");
-
-  if (typeof window === "undefined") {
-    // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis.
-    console.log("[TEMP-DEBUG] trackSignUpEvent skipped — no window (server)");
-    return false;
-  }
+  if (typeof window === "undefined") return false;
 
   try {
-    const existingGuard = window.sessionStorage.getItem(SIGN_UP_STORAGE_KEY);
-    const alreadySent = existingGuard === "1";
-    // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis.
-    console.log("[TEMP-DEBUG] sessionStorage check", {
-      key: SIGN_UP_STORAGE_KEY,
-      value: existingGuard,
-      alreadySent,
-      passes: !alreadySent,
-    });
-    if (alreadySent) {
-      // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis.
-      console.log("[TEMP-DEBUG] trackSignUpEvent skipped — sessionStorage guard already set");
+    if (window.sessionStorage.getItem(SIGN_UP_STORAGE_KEY) === "1") {
       return false;
     }
-  } catch (err) {
+  } catch {
     // Private mode / blocked storage — still send this call.
-    // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis.
-    console.log("[TEMP-DEBUG] sessionStorage check threw — proceeding anyway", err);
   }
 
-  const target = window as DataLayerWindow;
-  const dataLayerBefore = target.dataLayer;
-  const pushArgs: unknown[] = ["event", "sign_up", { method: "email" }];
-  // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis.
-  console.log("[TEMP-DEBUG] window.dataLayer at moment of push", {
-    exists: dataLayerBefore !== undefined,
-    isArray: Array.isArray(dataLayerBefore),
-    length: Array.isArray(dataLayerBefore) ? dataLayerBefore.length : null,
-    state: dataLayerBefore,
-  });
-  console.log("[TEMP-DEBUG] executing dataLayer.push with", pushArgs);
-
   const queued = pushGAEvent("event", "sign_up", { method: "email" });
-  // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis.
-  console.log("[TEMP-DEBUG] dataLayer.push completed", {
-    queued,
-    dataLayerAfter: (window as DataLayerWindow).dataLayer,
-  });
   if (!queued) return false;
 
   try {

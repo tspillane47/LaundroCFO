@@ -17,18 +17,8 @@ export function SignupConversionTracker() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const signupComplete = params.get(SIGNUP_COMPLETE_PARAM) === "1";
-    // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis. Only log on confirmation-related landings.
-    if (signupComplete || pathname === "/onboarding" || pathname.startsWith("/auth/")) {
-      console.log("[TEMP-DEBUG] SignupConversionTracker", {
-        pathname,
-        search: window.location.search,
-        signupComplete,
-      });
-    }
     if (!signupComplete) return;
 
-    // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis.
-    console.log("[TEMP-DEBUG] calling trackSignUpEvent() from SignupConversionTracker (signup_complete=1)");
     trackSignUpEvent();
 
     params.delete(SIGNUP_COMPLETE_PARAM);
