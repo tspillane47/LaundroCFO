@@ -227,19 +227,24 @@ export default function AccountPage() {
     setSavingProfile(true);
     setError("");
 
-    const { error: updateError } = await supabase
+    const { data, error: updateError } = await supabase
       .from("profiles")
-      .update({
-        full_name: fullName.trim() || null,
-        phone: phone.trim() || null,
-        company_name: companyName.trim() || null,
-        role,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId);
+      .upsert(
+        {
+          id: userId,
+          full_name: fullName.trim() || null,
+          phone: phone.trim() || null,
+          company_name: companyName.trim() || null,
+          role,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      )
+      .select("id")
+      .single();
 
-    if (updateError) {
-      setError(updateError.message);
+    if (updateError || !data?.id) {
+      setError(updateError?.message || "Failed to persist profile");
       toast.error("Failed to save profile — please try again");
     } else {
       toast.success("Profile saved");
@@ -313,15 +318,20 @@ export default function AccountPage() {
     const previous = notifications[key];
     setNotifications((n) => ({ ...n, [key]: checked }));
 
-    const { error: updateError } = await supabase
+    const { data, error: updateError } = await supabase
       .from("profiles")
-      .update({
-        [key]: checked,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId);
+      .upsert(
+        {
+          id: userId,
+          [key]: checked,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      )
+      .select("id")
+      .single();
 
-    if (updateError) {
+    if (updateError || !data?.id) {
       setNotifications((n) => ({ ...n, [key]: previous }));
       toast.error("Failed to update notification preferences");
     } else {
