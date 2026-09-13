@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import { trackSignUpEvent } from "@/lib/analytics";
+import { buildSignupEmailRedirectTo } from "@/lib/auth-callback";
 import { createClient } from "@/lib/supabase";
 import { invalidateSessionUser } from "@/lib/session-cache";
 import Link from "next/link";
@@ -26,7 +28,7 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: buildSignupEmailRedirectTo(window.location.origin),
         data: { terms_accepted_at: termsAcceptedAt },
       },
     });
@@ -35,6 +37,7 @@ export default function SignupPage() {
     } else {
       if (data.session) {
         invalidateSessionUser();
+        trackSignUpEvent();
       }
       if (data.user?.id) {
         await supabase.from("profiles").upsert({
@@ -55,7 +58,7 @@ export default function SignupPage() {
       type: "signup",
       email: pendingEmail,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: buildSignupEmailRedirectTo(window.location.origin),
       },
     });
     if (error) setResendMessage(error.message);

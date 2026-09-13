@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest'
 import {
   AUTH_CONFIRMATION_ERROR_COPY,
   buildAuthCallbackRedirect,
+  buildSignupEmailRedirectTo,
   isEmailChangeType,
+  isSignupConfirmationType,
   isSupportedOtpType,
   resolveAuthCallbackErrorCode,
   resolveAuthCallbackErrorPath,
   resolveAuthConfirmationErrorCopy,
   resolveAuthConfirmationErrorKind,
   resolvePostAuthDestination,
+  withSignupCompleteParam,
 } from '@/lib/auth-callback'
 
 describe('auth callback helpers', () => {
@@ -32,6 +35,31 @@ describe('auth callback helpers', () => {
         email_updated: '1',
       })
     ).toBe('https://app.example.com/account?email_updated=1')
+  })
+
+  it('tags signup confirmation emails with type=signup', () => {
+    expect(buildSignupEmailRedirectTo('https://app.example.com')).toBe(
+      'https://app.example.com/auth/callback?type=signup'
+    )
+    expect(isSignupConfirmationType('signup')).toBe(true)
+    expect(isSignupConfirmationType('recovery')).toBe(false)
+    expect(isSignupConfirmationType(null)).toBe(false)
+  })
+
+  it('appends signup_complete=1 only for signup confirmations', () => {
+    expect(withSignupCompleteParam('/onboarding', 'signup')).toBe(
+      '/onboarding?signup_complete=1'
+    )
+    expect(withSignupCompleteParam('/portfolio', 'signup')).toBe(
+      '/portfolio?signup_complete=1'
+    )
+    expect(withSignupCompleteParam('/reset-password', 'recovery')).toBe(
+      '/reset-password'
+    )
+    expect(withSignupCompleteParam('/account?email_updated=1', 'email_change')).toBe(
+      '/account?email_updated=1'
+    )
+    expect(withSignupCompleteParam('/onboarding', null)).toBe('/onboarding')
   })
 
   it('routes email change confirmations to account', async () => {

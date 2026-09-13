@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { INPUT_CLASS } from "@/components/occupancy/shared";
 import {
+  buildSignupEmailRedirectTo,
   logAuthConfirmationError,
   resolveAuthConfirmationErrorCopy,
   type AuthConfirmationErrorKind,
@@ -51,7 +52,7 @@ export function AuthConfirmationError({
       type: "signup",
       email: trimmed,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: buildSignupEmailRedirectTo(window.location.origin),
       },
     });
 

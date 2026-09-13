@@ -9,6 +9,7 @@ import {
   resolveAuthCallbackErrorCode,
   resolveAuthCallbackErrorPath,
   resolvePostAuthDestination,
+  withSignupCompleteParam,
 } from '@/lib/auth-callback'
 
 /**
@@ -91,5 +92,7 @@ export async function GET(request: NextRequest) {
     },
   })
 
-  return NextResponse.redirect(buildAuthCallbackRedirect(origin, destination))
+  return NextResponse.redirect(
+    buildAuthCallbackRedirect(origin, withSignupCompleteParam(destination, type))
+  )
 }

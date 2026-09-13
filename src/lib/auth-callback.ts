@@ -23,6 +23,12 @@ export function isSupportedOtpType(type: string): type is EmailOtpType {
   )
 }
 
+export const SIGNUP_COMPLETE_PARAM = 'signup_complete'
+
+export function isSignupConfirmationType(type: string | null | undefined): boolean {
+  return type === 'signup'
+}
+
 export function buildAuthCallbackRedirect(
   origin: string,
   path: string,
@@ -35,6 +41,21 @@ export function buildAuthCallbackRedirect(
     }
   }
   return url.toString()
+}
+
+export function buildSignupEmailRedirectTo(origin: string): string {
+  return buildAuthCallbackRedirect(origin, '/auth/callback', { type: 'signup' })
+}
+
+/** Append `signup_complete=1` only for signup confirmations so the client can fire GA once. */
+export function withSignupCompleteParam(
+  destination: string,
+  type: string | null | undefined
+): string {
+  if (!isSignupConfirmationType(type)) return destination
+  const url = new URL(destination, 'https://placeholder.invalid')
+  url.searchParams.set(SIGNUP_COMPLETE_PARAM, '1')
+  return `${url.pathname}${url.search}${url.hash}`
 }
 
 export async function resolvePostAuthDestination(options: {

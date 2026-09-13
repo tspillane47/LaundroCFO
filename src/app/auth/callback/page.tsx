@@ -6,7 +6,9 @@ import { AuthConfirmationError } from "@/components/auth/AuthConfirmationError";
 import { createClient } from "@/lib/supabase";
 import { isOnboardingComplete } from "@/lib/onboarding";
 import { invalidateSessionUser } from "@/lib/session-cache";
+import { trackSignUpEvent } from "@/lib/analytics";
 import {
+  isSignupConfirmationType,
   logAuthConfirmationError,
   resolveAuthConfirmationErrorKind,
   resolvePostAuthDestination,
@@ -50,6 +52,10 @@ function AuthCallbackContent() {
       }
 
       invalidateSessionUser();
+
+      if (isSignupConfirmationType(type)) {
+        trackSignUpEvent();
+      }
 
       const destination = await resolvePostAuthDestination({
         nextParam,
