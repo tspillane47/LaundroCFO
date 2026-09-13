@@ -38,9 +38,9 @@ describe('auth callback helpers', () => {
     ).toBe('https://app.example.com/account?email_updated=1')
   })
 
-  it('tags signup confirmation emails with type=signup', () => {
+  it('points signup confirmation emails at /auth/confirm (token_hash next, not PKCE callback)', () => {
     expect(buildSignupEmailRedirectTo('https://app.example.com')).toBe(
-      'https://app.example.com/auth/callback?type=signup'
+      'https://app.example.com/auth/confirm'
     )
     expect(isSignupConfirmationType('signup')).toBe(true)
     expect(isSignupConfirmationType('recovery')).toBe(false)

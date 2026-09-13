@@ -77,32 +77,54 @@ function AuthCallbackContent() {
         return;
       }
 
-      if (!code) {
-        // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis.
-        console.log("[TEMP-DEBUG] /auth/callback abort — missing code");
-        if (!cancelled) {
-          setErrorMessage("This confirmation link is invalid or incomplete.");
-        }
-        return;
-      }
+      // createBrowserClient auto-exchanges ?code= during initialize() and then
+      // deletes the PKCE cookie. A second exchangeCodeForSession always fails
+      // with "PKCE code verifier not found in storage". Prefer the session
+      // initialize() already created.
+      const { data: existingSessionData } = await supabase.auth.getSession();
+      let user = existingSessionData.session?.user ?? null;
+      // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis.
+      console.log("[TEMP-DEBUG] /auth/callback getSession()", {
+        hasExistingSession: Boolean(user),
+        hasCode: Boolean(code),
+      });
 
-      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      if (!user) {
+        if (!code) {
+          // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis.
+          console.log("[TEMP-DEBUG] /auth/callback abort — missing code and session");
+          if (!cancelled) {
+            setErrorMessage("This confirmation link is invalid or incomplete.");
+          }
+          return;
+        }
+
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+        if (cancelled) return;
+
+        if (error) {
+          // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis.
+          console.log("[TEMP-DEBUG] exchangeCodeForSession failed", error.message);
+          logAuthConfirmationError("auth-callback", error.message);
+          setErrorMessage(error.message);
+          return;
+        }
+
+        user = data.user;
+      }
 
       if (cancelled) return;
 
-      if (error) {
-        // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis.
-        console.log("[TEMP-DEBUG] exchangeCodeForSession failed", error.message);
-        logAuthConfirmationError("auth-callback", error.message);
-        setErrorMessage(error.message);
+      if (!user) {
+        setErrorMessage("This confirmation link is invalid or incomplete.");
         return;
       }
 
-      const user = data.user;
       // [TEMP-DEBUG] Remove after GA4 sign_up diagnosis.
-      console.log("[TEMP-DEBUG] exchangeCodeForSession succeeded — user timestamps", {
-        email_confirmed_at: user?.email_confirmed_at ?? null,
-        last_sign_in_at: user?.last_sign_in_at ?? null,
+      console.log("[TEMP-DEBUG] /auth/callback session ready — user timestamps", {
+        email_confirmed_at: user.email_confirmed_at ?? null,
+        last_sign_in_at: user.last_sign_in_at ?? null,
         type,
       });
 

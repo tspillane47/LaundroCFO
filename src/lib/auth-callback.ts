@@ -80,8 +80,9 @@ export function buildAuthCallbackRedirect(
   return url.toString()
 }
 
+/** Passed to email templates as `{{ .RedirectTo }}` / `next` — not a PKCE callback. */
 export function buildSignupEmailRedirectTo(origin: string): string {
-  return buildAuthCallbackRedirect(origin, '/auth/callback', { type: 'signup' })
+  return buildAuthCallbackRedirect(origin, '/auth/confirm')
 }
 
 /** Append `signup_complete=1` so the client can fire GA after a server verify. */
