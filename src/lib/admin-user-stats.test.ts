@@ -82,6 +82,18 @@ describe("countConfirmedSignupsSince", () => {
       total: 2,
     });
   });
+
+  it("excludes a late confirmation when the signup itself is older than 30 days", () => {
+    const users: AuthUserForStats[] = [
+      { created_at: isoDaysAgo(NOW, 10), email_confirmed_at: isoDaysAgo(NOW, 10) },
+      { created_at: isoDaysAgo(NOW, 40), email_confirmed_at: isoDaysAgo(NOW, 2) },
+    ];
+
+    expect(countConfirmedSignupsSince(users, isoDaysAgo(NOW, 30))).toEqual({
+      confirmed: 1,
+      total: 1,
+    });
+  });
 });
 
 describe("fetchAdminUserStats", () => {
