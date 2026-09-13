@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { isAdminEmail } from "@/lib/admin";
+import {
+  formatConfirmationRate,
+  type AdminUserStats,
+} from "@/lib/admin-user-stats";
 import { TRIAL_LENGTH_DAYS } from "@/lib/beta";
 import { invalidateBetaModeCache, useBetaMode } from "@/lib/useBetaMode";
 import { CardSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -22,6 +26,9 @@ export default function AdminPage() {
   const [confirmEndBetaOpen, setConfirmEndBetaOpen] = useState(false);
   const [confirmEnableBetaOpen, setConfirmEnableBetaOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [userStats, setUserStats] = useState<AdminUserStats | null>(null);
+  const [userStatsLoading, setUserStatsLoading] = useState(true);
+  const [userStatsError, setUserStatsError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +55,30 @@ export default function AdminPage() {
       cancelled = true;
     };
   }, [router, supabase]);
+
+  const loadUserStats = useCallback(async () => {
+    setUserStatsLoading(true);
+    setUserStatsError(false);
+
+    try {
+      const response = await fetch("/api/admin/user-stats");
+      if (!response.ok) {
+        throw new Error("Failed to load user stats");
+      }
+      const payload = (await response.json()) as AdminUserStats;
+      setUserStats(payload);
+    } catch {
+      setUserStatsError(true);
+      setUserStats(null);
+    } finally {
+      setUserStatsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authorized) return;
+    void loadUserStats();
+  }, [authorized, loadUserStats]);
 
   const handleEndBeta = useCallback(async () => {
     setSubmitting(true);
@@ -120,6 +151,48 @@ export default function AdminPage() {
         <p className="text-[12px] mt-1" style={{ color: "var(--text-muted)" }}>
           Platform settings and internal tools.
         </p>
+      </div>
+
+      <div className="card space-y-4">
+        <div>
+          <div className="section-title mb-1">Users</div>
+          <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+            All-time profiles and recent signup health, including email confirmation over the last 30 days.
+          </p>
+        </div>
+
+        {userStatsLoading ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+        ) : userStatsError || !userStats ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+              Unable to load user stats.
+            </p>
+            <button type="button" className="btn-outline text-[12px] px-3 py-1.5" onClick={() => void loadUserStats()}>
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <UserStatCard label="Total users" value={userStats.totalProfiles} hint="All-time profiles" />
+            <UserStatCard label="New (7 days)" value={userStats.signups7d} hint="Signups" />
+            <UserStatCard label="New (30 days)" value={userStats.signups30d} hint="Signups" />
+            <UserStatCard
+              label="Confirmed (30 days)"
+              value={formatConfirmationRate(userStats.confirmationRate30d)}
+              hint={
+                userStats.confirmationCohort30d === 0
+                  ? "No signups in this window"
+                  : `${userStats.confirmed30d} of ${userStats.confirmationCohort30d} signups`
+              }
+            />
+          </div>
+        )}
       </div>
 
       <div className="card space-y-4">
@@ -217,6 +290,31 @@ export default function AdminPage() {
           onConfirm={() => void handleEnableBeta()}
         />
       )}
+    </div>
+  );
+}
+
+function UserStatCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: number | string;
+  hint: string;
+}) {
+  return (
+    <div
+      className="rounded-lg px-4 py-3 border"
+      style={{ borderColor: "var(--border)", background: "var(--bg-card2)" }}
+    >
+      <div className="metric-label mb-1">{label}</div>
+      <div className="text-[24px] font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>
+        {value}
+      </div>
+      <div className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+        {hint}
+      </div>
     </div>
   );
 }
