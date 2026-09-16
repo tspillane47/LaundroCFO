@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { useSession } from "@/lib/session-context";
 import { useStores } from "@/lib/store-context";
+import { ownedBySubtitle } from "@/lib/store-access";
 import { DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { shouldTriggerLowDscrAlert } from "@/lib/dscr";
 import {
@@ -63,6 +65,8 @@ type Store = {
   id: string;
   name: string | null;
   address: string | null;
+  user_id?: string | null;
+  ownerLabel?: string | null;
   monthly_revenue: number | null;
   monthly_expenses: number | null;
   annual_debt_service: number | null;
@@ -140,6 +144,8 @@ function formatPortfolioPlaidCreditSubtext(snapshot: PortfolioPlaidBalanceSnapsh
 export default function PortfolioPage() {
   const supabase = createClient();
   const router = useRouter();
+  const session = useSession();
+  const currentUserId = session?.user?.id;
   const {
     stores,
     loading: storesLoading,
@@ -932,8 +938,10 @@ export default function PortfolioPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {storeMetrics.map((m) => (
-            <div key={m.store.id} className="card relative">
+          {storeMetrics.map((m) => {
+            const ownerLine = ownedBySubtitle(m.store, currentUserId);
+            return (
+              <div key={m.store.id} className="card relative">
               {m.hasDscrWarning && (
                 <span className="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-red-500" />
               )}
@@ -944,11 +952,21 @@ export default function PortfolioPage() {
               >
                 {m.store.name ?? "Unnamed Store"}
               </div>
-              <div
-                className="text-[12px] mb-4 truncate"
-                style={{ color: "var(--text-muted)", maxWidth: "100%" }}
-              >
-                {m.store.address ?? "No address"}
+              <div className="mb-4" style={{ maxWidth: "100%" }}>
+                <div
+                  className="text-[12px] truncate"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {m.store.address ?? "No address"}
+                </div>
+                {ownerLine ? (
+                  <div
+                    className="text-[11px] mt-0.5 truncate"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {ownerLine}
+                  </div>
+                ) : null}
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
@@ -1042,8 +1060,9 @@ export default function PortfolioPage() {
                   </button>
                 </ReadOnlyGuard>
               </div>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       </div>
 

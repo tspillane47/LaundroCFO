@@ -71,7 +71,23 @@ describe("buildUserDataExport", () => {
       }
     });
 
-    const payload = await buildUserDataExport({ from } as never, "user-1", "alex@example.com");
+    const rpc = vi.fn(async () => {
+      throw new Error("store_owner_labels should not run for owned-only stores");
+    });
+
+    const payload = await buildUserDataExport(
+      {
+        from,
+        auth: {
+          getUser: async () => ({ data: { user: { id: "user-1" } }, error: null }),
+        },
+        rpc,
+      } as never,
+      "user-1",
+      "alex@example.com"
+    );
+
+    expect(rpc).not.toHaveBeenCalled();
 
     expect(payload.email).toBe("alex@example.com");
     expect(payload.stores).toHaveLength(1);
