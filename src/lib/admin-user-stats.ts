@@ -1,4 +1,5 @@
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const STORE_ID_PAGE = 1000;
 
 export type AdminUserStats = {
   totalProfiles: number;
@@ -7,6 +8,7 @@ export type AdminUserStats = {
   confirmed30d: number;
   confirmationCohort30d: number;
   confirmationRate30d: number | null;
+  weeklyActiveStores: number;
 };
 
 export type AuthUserForStats = {
@@ -14,21 +16,30 @@ export type AuthUserForStats = {
   email_confirmed_at?: string | null;
 };
 
+type QueryError = { message: string };
+
 type CountResult = {
+  data?: { store_id: string }[] | null;
   count: number | null;
-  error: { message: string } | null;
+  error: QueryError | null;
 };
 
-type ProfilesCountQuery = PromiseLike<CountResult> & {
-  gte: (column: string, value: string) => PromiseLike<CountResult>;
+type StoreIdPageResult = {
+  data: { store_id: string }[] | null;
+  error: QueryError | null;
+};
+
+export type AdminStatsFilterQuery = PromiseLike<CountResult> & {
+  gte: (column: string, value: string) => AdminStatsFilterQuery;
+  range: (from: number, to: number) => PromiseLike<StoreIdPageResult>;
 };
 
 export type AdminUserStatsClient = {
   from: (table: string) => {
     select: (
       columns: string,
-      options: { count: "exact"; head: boolean }
-    ) => ProfilesCountQuery;
+      options?: { count: "exact"; head: boolean }
+    ) => AdminStatsFilterQuery;
   };
   auth: {
     admin: {
@@ -101,6 +112,51 @@ async function listAllAuthUsers(admin: AdminUserStatsClient): Promise<AuthUserFo
   return users;
 }
 
+async function storeIdsSince(
+  admin: AdminUserStatsClient,
+  table: string,
+  column: string,
+  sinceIso: string
+): Promise<Set<string>> {
+  const ids = new Set<string>();
+
+  for (let from = 0; ; from += STORE_ID_PAGE) {
+    const { data, error } = await admin
+      .from(table)
+      .select("store_id")
+      .gte(column, sinceIso)
+      .range(from, from + STORE_ID_PAGE - 1);
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const page = data ?? [];
+    for (const row of page) {
+      if (row.store_id) ids.add(row.store_id);
+    }
+    if (page.length < STORE_ID_PAGE) break;
+  }
+
+  return ids;
+}
+
+async function countWeeklyActiveStores(
+  admin: AdminUserStatsClient,
+  sinceIso: string
+): Promise<number> {
+  const [bankIds, linkIds, manualIds] = await Promise.all([
+    storeIdsSince(admin, "bank_transactions", "created_at", sinceIso),
+    storeIdsSince(admin, "transaction_pl_links", "applied_at", sinceIso),
+    storeIdsSince(admin, "monthly_financials", "manually_overridden_at", sinceIso),
+  ]);
+
+  const ids = new Set<string>();
+  bankIds.forEach((id) => ids.add(id));
+  linkIds.forEach((id) => ids.add(id));
+  manualIds.forEach((id) => ids.add(id));
+  return ids.size;
+}
+
 export async function fetchAdminUserStats(
   admin: AdminUserStatsClient,
   now: Date = new Date()
@@ -108,11 +164,12 @@ export async function fetchAdminUserStats(
   const since7d = isoDaysAgo(now, 7);
   const since30d = isoDaysAgo(now, 30);
 
-  const [totalProfiles, signups7d, signups30d, authUsers] = await Promise.all([
+  const [totalProfiles, signups7d, signups30d, authUsers, weeklyActiveStores] = await Promise.all([
     countProfiles(admin),
     countProfiles(admin, since7d),
     countProfiles(admin, since30d),
     listAllAuthUsers(admin),
+    countWeeklyActiveStores(admin, since7d),
   ]);
 
   const { confirmed, total } = countConfirmedSignupsSince(authUsers, since30d);
@@ -124,5 +181,6 @@ export async function fetchAdminUserStats(
     confirmed30d: confirmed,
     confirmationCohort30d: total,
     confirmationRate30d: computeConfirmationRate(confirmed, total),
+    weeklyActiveStores,
   };
 }

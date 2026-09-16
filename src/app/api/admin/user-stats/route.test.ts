@@ -61,6 +61,7 @@ describe("GET /api/admin/user-stats", () => {
       confirmed30d: 4,
       confirmationCohort30d: 5,
       confirmationRate30d: 0.8,
+      weeklyActiveStores: 4,
     });
 
     const response = await GET();
@@ -74,6 +75,7 @@ describe("GET /api/admin/user-stats", () => {
       confirmed30d: 4,
       confirmationCohort30d: 5,
       confirmationRate30d: 0.8,
+      weeklyActiveStores: 4,
     });
     expect(createAdminSupabaseClientMock).toHaveBeenCalled();
     expect(fetchAdminUserStatsMock).toHaveBeenCalledWith({ mocked: true });

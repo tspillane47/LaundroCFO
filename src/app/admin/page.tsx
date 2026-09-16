@@ -157,12 +157,13 @@ export default function AdminPage() {
         <div>
           <div className="section-title mb-1">Users</div>
           <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-            All-time profiles and recent signup health, including email confirmation over the last 30 days.
+            All-time profiles, weekly active stores, and recent signup health, including email confirmation over the last 30 days.
           </p>
         </div>
 
         {userStatsLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <CardSkeleton />
             <CardSkeleton />
             <CardSkeleton />
             <CardSkeleton />
@@ -178,7 +179,7 @@ export default function AdminPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
             <UserStatCard label="Total users" value={userStats.totalProfiles} hint="All-time profiles" />
             <UserStatCard label="New (7 days)" value={userStats.signups7d} hint="Signups" />
             <UserStatCard label="New (30 days)" value={userStats.signups30d} hint="Signups" />
@@ -190,6 +191,11 @@ export default function AdminPage() {
                   ? "No signups in this window"
                   : `${userStats.confirmed30d} of ${userStats.confirmationCohort30d} signups`
               }
+            />
+            <UserStatCard
+              label="Weekly active stores"
+              value={userStats.weeklyActiveStores}
+              hint="Financial activity in last 7 days"
             />
           </div>
         )}
