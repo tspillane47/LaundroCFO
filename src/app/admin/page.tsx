@@ -7,7 +7,10 @@ import clsx from "clsx";
 import { createClient } from "@/lib/supabase";
 import { isAdminEmail } from "@/lib/admin";
 import {
+  ACTIVATION_FUNNEL_STEP_META,
   formatConfirmationRate,
+  formatFunnelStepLabel,
+  type ActivationFunnelStep,
   type AdminUserStats,
 } from "@/lib/admin-user-stats";
 import { TRIAL_LENGTH_DAYS } from "@/lib/beta";
@@ -29,6 +32,7 @@ export default function AdminPage() {
   const [userStats, setUserStats] = useState<AdminUserStats | null>(null);
   const [userStatsLoading, setUserStatsLoading] = useState(true);
   const [userStatsError, setUserStatsError] = useState(false);
+  const [openFunnelStep, setOpenFunnelStep] = useState<ActivationFunnelStep | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -157,13 +161,12 @@ export default function AdminPage() {
         <div>
           <div className="section-title mb-1">Users</div>
           <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-            All-time profiles, weekly active stores, and recent signup health, including email confirmation over the last 30 days.
+            All-time profiles and recent signup health, including email confirmation over the last 30 days.
           </p>
         </div>
 
         {userStatsLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-            <CardSkeleton />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <CardSkeleton />
             <CardSkeleton />
             <CardSkeleton />
@@ -179,7 +182,7 @@ export default function AdminPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <UserStatCard label="Total users" value={userStats.totalProfiles} hint="All-time profiles" />
             <UserStatCard label="New (7 days)" value={userStats.signups7d} hint="Signups" />
             <UserStatCard label="New (30 days)" value={userStats.signups30d} hint="Signups" />
@@ -192,12 +195,58 @@ export default function AdminPage() {
                   : `${userStats.confirmed30d} of ${userStats.confirmationCohort30d} signups`
               }
             />
-            <UserStatCard
-              label="Weekly active stores"
-              value={userStats.weeklyActiveStores}
-              hint="Financial activity in last 7 days"
-            />
           </div>
+        )}
+      </div>
+
+      <div className="card space-y-4">
+        <div>
+          <div className="section-title mb-1">Activation</div>
+          <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+            Independent last-7-day counts — not a nested signup cohort. Click a number to see who is in that bucket.
+          </p>
+        </div>
+
+        {userStatsLoading ? (
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+        ) : userStatsError || !userStats ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+              Unable to load activation stats.
+            </p>
+            <button type="button" className="btn-outline text-[12px] px-3 py-1.5" onClick={() => void loadUserStats()}>
+              Retry
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+              {userStats.funnel.steps.map((step, index) => (
+                <FunnelStepCard
+                  key={step.id}
+                  step={step}
+                  stepNumber={index + 1}
+                  onOpen={() => setOpenFunnelStep(step)}
+                />
+              ))}
+            </div>
+            <UserStatCard
+              label="Stores with financial data"
+              value={userStats.storesWithFinancialData}
+              hint={
+                userStats.storesWithFinancialData === 0
+                  ? "All-time stores with at least one financial row"
+                  : `${userStats.weeklyActiveStores} of ${userStats.storesWithFinancialData} weekly active`
+              }
+            />
+          </>
         )}
       </div>
 
@@ -296,6 +345,145 @@ export default function AdminPage() {
           onConfirm={() => void handleEnableBeta()}
         />
       )}
+
+      {openFunnelStep && (
+        <FunnelDrilldownDialog step={openFunnelStep} onClose={() => setOpenFunnelStep(null)} />
+      )}
+    </div>
+  );
+}
+
+function formatSignupDate(value: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function FunnelStepCard({
+  step,
+  stepNumber,
+  onOpen,
+}: {
+  step: ActivationFunnelStep;
+  stepNumber: number;
+  onOpen: () => void;
+}) {
+  const meta = ACTIVATION_FUNNEL_STEP_META[step.id];
+  return (
+    <div
+      className="rounded-lg px-4 py-3 border"
+      style={{ borderColor: "var(--border)", background: "var(--bg-card2)" }}
+    >
+      <div className="metric-label mb-1">
+        {stepNumber}. {meta.label}
+      </div>
+      <button
+        type="button"
+        className="text-[24px] font-bold tabular-nums hover:underline underline-offset-4"
+        style={{ color: "var(--accent)" }}
+        onClick={onOpen}
+        aria-label={`View ${step.count} ${meta.label.toLowerCase()}`}
+      >
+        {step.count}
+      </button>
+      <div className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+        {meta.hint}
+      </div>
+    </div>
+  );
+}
+
+function FunnelDrilldownDialog({
+  step,
+  onClose,
+}: {
+  step: ActivationFunnelStep;
+  onClose: () => void;
+}) {
+  const meta = ACTIVATION_FUNNEL_STEP_META[step.id];
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/40"
+        aria-label="Close dialog"
+        onClick={onClose}
+      />
+      <div
+        className="relative w-full max-w-2xl max-h-[80vh] overflow-hidden rounded-xl shadow-xl border flex flex-col"
+        style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-funnel-title"
+      >
+        <div className="px-5 pt-5 pb-3">
+          <h2
+            id="admin-funnel-title"
+            className="text-[15px] font-semibold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            {meta.label}
+          </h2>
+          <p className="text-[12px] mt-1" style={{ color: "var(--text-muted)" }}>
+            {step.count} {step.count === 1 ? "record" : "records"} · last 7 days
+          </p>
+        </div>
+        <div className="px-5 pb-5 overflow-auto">
+          {step.members.length === 0 ? (
+            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
+              No records in this bucket.
+            </p>
+          ) : (
+            <table className="w-full text-left text-[12px]">
+              <thead>
+                <tr style={{ color: "var(--text-muted)" }}>
+                  <th className="font-medium pb-2 pr-3">Email</th>
+                  <th className="font-medium pb-2 pr-3">Store</th>
+                  <th className="font-medium pb-2 pr-3">Signed up</th>
+                  <th className="font-medium pb-2">Stuck on</th>
+                </tr>
+              </thead>
+              <tbody>
+                {step.members.map((member, index) => (
+                  <tr key={`${member.email ?? "none"}-${member.storeName ?? "none"}-${index}`}>
+                    <td className="py-1.5 pr-3" style={{ color: "var(--text-primary)" }}>
+                      {member.email ?? "—"}
+                    </td>
+                    <td className="py-1.5 pr-3" style={{ color: "var(--text-primary)" }}>
+                      {member.storeName ?? "—"}
+                    </td>
+                    <td className="py-1.5 pr-3" style={{ color: "var(--text-secondary)" }}>
+                      {formatSignupDate(member.signupDate)}
+                    </td>
+                    <td className="py-1.5" style={{ color: "var(--text-secondary)" }}>
+                      {formatFunnelStepLabel(member.stuckOn)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="px-5 pb-5 flex justify-end">
+          <button type="button" className="btn-outline text-[12px]" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
