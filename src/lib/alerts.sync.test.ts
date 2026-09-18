@@ -7,13 +7,14 @@ import {
   planToastShownUpdates,
   type StoreAlertRow,
 } from "@/lib/alerts";
-import { compareMonthlyRevenue } from "@/lib/alertEvaluation";
+import { compareMonthlyRevenue, resolvedFinancialsFromPortfolioTtm } from "@/lib/alertEvaluation";
 import {
   buildRevenuePeriodKey,
   generateStoreFeed,
   parseDscrFromAlertText,
 } from "@/lib/intelligence";
 import { computeStoreValuation } from "@/lib/getStoreValuation";
+import { EMPTY_TTM_METRICS } from "@/lib/financials";
 
 const STORE_ID = "store-123";
 
@@ -394,5 +395,63 @@ describe("generateStoreFeed unified evaluator", () => {
     });
 
     expect(items.some((item) => item.id === `tx-review-${STORE_ID}`)).toBe(false);
+  });
+
+  it("does not emit a critical DSCR alert when debt exists but TTM financials are missing", () => {
+    const items = generateStoreFeed(makeStore(), undefined, [], [], {
+      scheduledAnnualDebtService: 18137.52,
+      resolvedFinancials: {
+        monthlyRevenue: 0,
+        monthlyExpenses: 0,
+        annualEbitda: 0,
+        ttmMonthsUsed: 0,
+        source: "none",
+      },
+    });
+
+    const dscr = items.find((item) => item.id === `dscr-${STORE_ID}`);
+    expect(dscr).toBeUndefined();
+
+    const persistable = feedItemsToPersistableAlerts(items);
+    expect(persistable.some((alert) => alert.alert_key === `dscr-${STORE_ID}`)).toBe(false);
+    expect(persistable.some((alert) => alert.title === "DSCR Below Threshold")).toBe(false);
+  });
+
+  it("does not emit a DSCR alert when resolvedFinancials is omitted and only debt service is present", () => {
+    const items = generateStoreFeed(makeStore(), undefined, [], [], {
+      scheduledAnnualDebtService: 18137.52,
+    });
+
+    expect(items.find((item) => item.id === `dscr-${STORE_ID}`)).toBeUndefined();
+  });
+
+  it("maps admin-fetched portfolio TTM into DSCR financials instead of empty valuation data", () => {
+    const store = makeStore();
+    const emptyValuationFinancials = resolvedFinancialsFromPortfolioTtm(store, EMPTY_TTM_METRICS);
+    expect(emptyValuationFinancials.source).toBe("none");
+    expect(emptyValuationFinancials.annualEbitda).toBe(0);
+
+    const fromTtm = resolvedFinancialsFromPortfolioTtm(store, {
+      ...EMPTY_TTM_METRICS,
+      ttmRevenue: 54172.24,
+      ttmEbitda: 23574.98,
+      monthsUsed: 4,
+      ttmDebtService: 18137.52,
+      dscr: 3.8993721302581603,
+    });
+    expect(fromTtm.source).toBe("ttm");
+    expect(fromTtm.annualEbitda).toBeCloseTo(70724.94, 2);
+
+    const items = generateStoreFeed(store, undefined, [], [], {
+      scheduledAnnualDebtService: 18137.52,
+      resolvedFinancials: fromTtm,
+    });
+    const dscr = items.find((item) => item.id === `dscr-${STORE_ID}`);
+    expect(dscr?.severity).toBe("success");
+    expect(dscr?.headline).toBe("DSCR: 3.90x");
+    expect(dscr?.description).toContain("Strong debt coverage");
+    expect(feedItemsToPersistableAlerts(items).some((alert) => alert.alert_key === `dscr-${STORE_ID}`)).toBe(
+      false
+    );
   });
 });

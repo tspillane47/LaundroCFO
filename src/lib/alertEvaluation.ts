@@ -16,8 +16,9 @@ import {
   fetchUncategorizedReviewCountsByStore,
   sortRecordsDesc,
   type MonthlyFinancialRecord,
+  type TtmMetrics,
 } from "@/lib/financials";
-import { getStoreValuation } from "@/lib/getStoreValuation";
+import { getStoreValuation, resolveStoreFinancials } from "@/lib/getStoreValuation";
 import {
   buildRevenuePeriodKey,
   generateStoreFeed,
@@ -182,6 +183,21 @@ async function buildPositiveEventsForStore(
   return positiveEvents;
 }
 
+/** DSCR/EBITDA for alerts come from admin-fetched TTM, not getStoreValuation(). */
+export function resolvedFinancialsFromPortfolioTtm(
+  store: Record<string, unknown>,
+  ttm: TtmMetrics | undefined
+) {
+  if (!ttm || ttm.monthsUsed <= 0) {
+    return resolveStoreFinancials(store);
+  }
+  return resolveStoreFinancials(store, {
+    ttmRevenue: ttm.ttmRevenue,
+    ttmEbitda: ttm.ttmEbitda,
+    monthsUsed: ttm.monthsUsed,
+  });
+}
+
 export async function buildPortfolioFeedItems(
   supabase: SupabaseClient,
   stores: Record<string, unknown>[],
@@ -255,6 +271,8 @@ export async function buildPortfolioFeedItems(
     utilitiesData
   );
 
+  // Valuation multiples still come from getStoreValuation (equipment/lease/real estate).
+  // DSCR/EBITDA must NOT — that path uses an unauthenticated browser client in cron.
   const valuations = await Promise.all(
     targetStores.map((store) => getStoreValuation(String(store.id)))
   );
@@ -266,10 +284,11 @@ export async function buildPortfolioFeedItems(
     const storeId = String(store.id);
     const valuation = valuations[index];
     const storeTtm = portfolioTtmSummary.byStoreId[storeId];
+    const resolvedFinancials = resolvedFinancialsFromPortfolioTtm(store, storeTtm);
 
     const feedOptions: StoreFeedOptions = {
       scheduledAnnualDebtService: scheduledDebtServiceByStore[storeId] ?? 0,
-      resolvedFinancials: valuation?.resolvedFinancials,
+      resolvedFinancials,
       ttmRevenue: storeTtm?.ttmRevenue,
       ttmUtilities: storeTtm?.ttmUtilities,
       isOwnerOccupied: store.occupancy_type === "owner_occupied",
@@ -281,7 +300,7 @@ export async function buildPortfolioFeedItems(
         : null,
       positiveEvents: await buildPositiveEventsForStore(supabase, store, {
         scheduledAnnualDebtService: scheduledDebtServiceByStore[storeId] ?? 0,
-        resolvedFinancials: valuation?.resolvedFinancials,
+        resolvedFinancials,
       }),
       uncategorizedTransactionCount: uncategorizedCounts[storeId] ?? 0,
     };

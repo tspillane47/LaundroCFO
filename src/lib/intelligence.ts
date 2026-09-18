@@ -260,7 +260,7 @@ export function generateStoreFeed(
   }
 
   const scheduledAnnualDebtService = options?.scheduledAnnualDebtService ?? 0;
-  if (hasScheduledDebtService(scheduledAnnualDebtService)) {
+  if (hasFinancialData && hasScheduledDebtService(scheduledAnnualDebtService)) {
     const dscr = computeStoreDscr(annualEbitda, scheduledAnnualDebtService);
     if (dscr != null) {
       const isLow = shouldTriggerLowDscrAlert(dscr, scheduledAnnualDebtService);
