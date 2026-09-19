@@ -237,15 +237,26 @@ export default function AdminPage() {
                 />
               ))}
             </div>
-            <UserStatCard
-              label="Stores with financial data"
-              value={userStats.storesWithFinancialData}
-              hint={
-                userStats.storesWithFinancialData === 0
-                  ? "All-time stores with at least one financial row"
-                  : `${userStats.weeklyActiveStores} of ${userStats.storesWithFinancialData} weekly active`
-              }
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <UserStatCard
+                label="Stores with financial data"
+                value={userStats.storesWithFinancialData}
+                hint={
+                  userStats.storesWithFinancialData === 0
+                    ? "All-time stores with at least one financial row"
+                    : `${userStats.weeklyActiveStores} of ${userStats.storesWithFinancialData} weekly active`
+                }
+              />
+              <UserStatCard
+                label="Connected Banks"
+                value={userStats.storesWithPlaidConnection}
+                hint={
+                  userStats.totalStores === 0
+                    ? "All-time stores with an active Plaid connection"
+                    : `${userStats.storesWithPlaidConnection} of ${userStats.totalStores} stores`
+                }
+              />
+            </div>
           </>
         )}
       </div>

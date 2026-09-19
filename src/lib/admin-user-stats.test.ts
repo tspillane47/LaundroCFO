@@ -219,7 +219,7 @@ describe("formatFunnelStepLabel", () => {
   });
 
   it("renders the step label", () => {
-    expect(formatFunnelStepLabel("connected_bank")).toBe("Connected Bank");
+    expect(formatFunnelStepLabel("connected_bank")).toBe("New Bank Connections (7 days)");
   });
 });
 
@@ -334,6 +334,8 @@ describe("fetchAdminUserStats", () => {
     expect(stats.confirmationRate30d).toBe(0.5);
     expect(stats.weeklyActiveStores).toBe(0);
     expect(stats.storesWithFinancialData).toBe(0);
+    expect(stats.storesWithPlaidConnection).toBe(0);
+    expect(stats.totalStores).toBe(0);
     expect(stats.funnel.windowDays).toBe(7);
     expect(funnelCount(stats, "signed_up")).toBe(2);
     expect(funnelCount(stats, "weekly_active")).toBe(0);
@@ -508,6 +510,39 @@ describe("fetchAdminUserStats", () => {
     expect(funnelCount(stats, "connected_bank")).toBe(1);
     expect(funnelCount(stats, "added_financial_data")).toBe(0);
     expect(stats.storesWithFinancialData).toBe(0);
+    expect(stats.storesWithPlaidConnection).toBe(1);
+  });
+
+  it("counts all-time Plaid connections separately from the 7-day Connected Bank step", async () => {
+    const admin = createMockAdmin({
+      total: 1,
+      last7: 0,
+      last30: 0,
+      users: [],
+      stores: [
+        {
+          id: STORE_A,
+          name: "Old Laundry",
+          user_id: null,
+          created_at: isoDaysAgo(NOW, 40),
+        },
+        {
+          id: STORE_C,
+          name: "Never Active",
+          user_id: null,
+          created_at: isoDaysAgo(NOW, 20),
+        },
+      ],
+      plaid: [
+        { store_id: STORE_A, connected_at: isoDaysAgo(NOW, 20) },
+        { store_id: STORE_C, connected_at: isoDaysAgo(NOW, 1) },
+      ],
+    });
+
+    const stats = await fetchAdminUserStats(admin, NOW);
+    expect(funnelCount(stats, "connected_bank")).toBe(1);
+    expect(stats.storesWithPlaidConnection).toBe(2);
+    expect(stats.totalStores).toBe(2);
   });
 
   it("builds drill-down members and does not mark a CSV-only active store as stuck on Connected Bank", async () => {

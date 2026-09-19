@@ -31,6 +31,8 @@ export type AdminUserStats = {
   confirmationRate30d: number | null;
   weeklyActiveStores: number;
   storesWithFinancialData: number;
+  storesWithPlaidConnection: number;
+  totalStores: number;
   funnel: {
     windowDays: 7;
     steps: ActivationFunnelStep[];
@@ -56,7 +58,10 @@ export const ACTIVATION_FUNNEL_STEP_META: Record<
     label: "Added Financial Data",
     hint: "Financial rows written in last 7 days",
   },
-  connected_bank: { label: "Connected Bank", hint: "Plaid connections in last 7 days" },
+  connected_bank: {
+    label: "New Bank Connections (7 days)",
+    hint: "Plaid connections created in last 7 days",
+  },
   weekly_active: { label: "Weekly Active Stores", hint: "Qualifying activity in last 7 days" },
   returning: { label: "Returning Stores", hint: "Active in both this week and last week" },
 };
@@ -531,6 +536,8 @@ export async function fetchAdminUserStats(
     confirmationRate30d: computeConfirmationRate(confirmed, total),
     weeklyActiveStores: weeklyActiveIds.size,
     storesWithFinancialData: financialStoreIds.size,
+    storesWithPlaidConnection: plaidStoreIds.size,
+    totalStores: stores.length,
     funnel,
   };
 }
