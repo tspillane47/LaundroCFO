@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { trackSignUpEvent } from "@/lib/analytics";
+import { trackSignUpEvent, trackSignupStarted } from "@/lib/analytics";
 import { buildSignupEmailRedirectTo } from "@/lib/auth-callback";
 import { createClient } from "@/lib/supabase";
 import { invalidateSessionUser } from "@/lib/session-cache";
@@ -129,6 +129,7 @@ export default function SignupPage() {
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
+              onFocus={() => trackSignupStarted()}
               className={INPUT_CLASS}
               placeholder="you@example.com"
             />
