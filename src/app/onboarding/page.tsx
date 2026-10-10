@@ -225,6 +225,7 @@ function OnboardingContent() {
   const [form, setForm] = useState<OnboardingForm>(DEFAULT_FORM);
   const [storeId, setStoreId] = useState<string | null>(null);
   const [plaidResult, setPlaidResult] = useState<OnboardingPlaidResult | null>(null);
+  const [showOtherOptions, setShowOtherOptions] = useState(false);
   const [storeNameError, setStoreNameError] = useState("");
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -1382,10 +1383,18 @@ function OnboardingContent() {
 
                       {!plaidResult && (
                       <>
-                      <p className="text-[12px] text-[var(--text-muted)] text-center mb-3">
-                        No bank connection yet? You can still get started another way:
-                      </p>
+                      <div className="text-center mb-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowOtherOptions((open) => !open)}
+                          className="text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline underline-offset-2"
+                        >
+                          {showOtherOptions ? "Hide other options" : "Can't connect a bank right now?"}
+                        </button>
+                      </div>
 
+                      {showOtherOptions && (
+                      <>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
                         {(
                           [
@@ -1462,6 +1471,8 @@ function OnboardingContent() {
                             />
                           </Field>
                         </div>
+                      )}
+                      </>
                       )}
                       </>
                       )}

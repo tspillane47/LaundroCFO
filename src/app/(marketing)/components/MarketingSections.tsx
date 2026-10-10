@@ -39,7 +39,6 @@ const integrations = [
   { name: "QuickBooks", abbr: "QB", color: "#2CA01C", active: true },
   { name: "FasCard", abbr: "FC", color: "#2563eb", active: true },
   { name: "Bank Accounts", abbr: "🏦", color: "#60a5fa", active: true, isEmoji: true },
-  { name: "CSV Import", abbr: "CSV", color: '#374151', active: true },
 ];
 
 const comingSoon = ["Laundry POS", "Coin Laundry Pro", "CSC Pay"];

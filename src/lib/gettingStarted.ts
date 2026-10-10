@@ -95,9 +95,9 @@ export function buildFinancialDataOptions(input: {
     },
     {
       id: "csv",
-      label: "Import Bank Statement (CSV)",
+      label: "Import a bank file (last resort)",
       connectedLabel: "Bank transactions imported",
-      description: "Upload a CSV export from your bank if you prefer not to connect accounts.",
+      description: "Only if you can't connect your bank. Connecting keeps everything up to date for you.",
       href: "/transactions",
       connected: input.hasTransactions,
     },
