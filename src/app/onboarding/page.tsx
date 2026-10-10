@@ -37,6 +37,10 @@ import {
   type OnboardingPath,
 } from "@/lib/onboarding";
 import { CopyableEmail } from "@/components/onboarding/CopyableEmail";
+import {
+  OnboardingPlaidConnect,
+  type OnboardingPlaidResult,
+} from "@/components/onboarding/OnboardingPlaidConnect";
 import { replaceFullDocument } from "@/lib/navigate-after-auth-change";
 
 const TOTAL_STEPS = 4;
@@ -220,6 +224,7 @@ function OnboardingContent() {
   const [slideKey, setSlideKey] = useState(0);
   const [form, setForm] = useState<OnboardingForm>(DEFAULT_FORM);
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [plaidResult, setPlaidResult] = useState<OnboardingPlaidResult | null>(null);
   const [storeNameError, setStoreNameError] = useState("");
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -795,7 +800,8 @@ function OnboardingContent() {
     let nextEstimate = estimatedValue;
     let nextValuationDataMonths = valuationDataMonths;
 
-    if (!skip && form.financialMode) {
+    // A connected bank is the source of truth; never layer CSV or manual numbers on top of it.
+    if (!skip && form.financialMode && !plaidResult) {
       const ok = await saveFinancials(storeId);
       if (!ok) {
         setBusy(false);
@@ -1064,7 +1070,9 @@ function OnboardingContent() {
                             ? ` ${getFinancialDataConfidenceMessage(valuationDataMonths)}`
                             : ""
                         }`
-                      : isAddingStore
+                      : plaidResult
+                        ? "Your bank is connected. Next, sort your transactions into categories and your real numbers will show up on your dashboard."
+                        : isAddingStore
                         ? "Your new store is in your portfolio — add more data anytime to unlock its full valuation."
                         : "Great start — we'll walk you through a few optional steps to unlock your full dashboard."}
                   </p>
@@ -1356,10 +1364,26 @@ function OnboardingContent() {
                   {step === 4 && (
                     <div>
                       <h2 className="text-[24px] font-bold text-[var(--text-primary)] mb-1">
-                        Add your financial data
+                        Connect your bank
                       </h2>
                       <p className="text-[13px] text-[var(--text-muted)] mb-6">
-                        Upload transactions or enter estimates for the current month.
+                        The fastest way to see your real numbers. It takes about a minute.
+                      </p>
+
+                      {storeId && (
+                        <div className="mb-6">
+                          <OnboardingPlaidConnect
+                            storeId={storeId}
+                            result={plaidResult}
+                            onConnected={setPlaidResult}
+                          />
+                        </div>
+                      )}
+
+                      {!plaidResult && (
+                      <>
+                      <p className="text-[12px] text-[var(--text-muted)] text-center mb-3">
+                        No bank connection yet? You can still get started another way:
                       </p>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
@@ -1439,6 +1463,8 @@ function OnboardingContent() {
                           </Field>
                         </div>
                       )}
+                      </>
+                      )}
                     </div>
                   )}
 
@@ -1466,7 +1492,7 @@ function OnboardingContent() {
                       </button>
 
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 order-1 sm:order-2">
-                        {step >= 3 && (
+                        {step >= 3 && !(step === 4 && plaidResult) && (
                           <button
                             type="button"
                             disabled={busy}
@@ -1476,9 +1502,7 @@ function OnboardingContent() {
                             }}
                             className="text-[13px] text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-40 px-2 py-2"
                           >
-                            {step === 4
-                              ? "I'll add this later — start with estimates"
-                              : "I'll add this later"}
+                            {step === 4 ? "Skip for now" : "I'll add this later"}
                           </button>
                         )}
 
