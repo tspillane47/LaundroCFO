@@ -29,6 +29,7 @@ import { getCachedSessionUser, invalidateSessionUser } from "@/lib/session-cache
 import { SessionProvider, useSession } from "@/lib/session-context";
 import { replaceFullDocument } from "@/lib/navigate-after-auth-change";
 import { SignupConversionTracker } from "@/components/auth/SignupConversionTracker";
+import { InternalTrafficGuard } from "@/components/analytics/InternalTrafficGuard";
 
 function getUserInitials(fullName: string | null, email: string | null): string {
   const name = fullName?.trim();
@@ -803,6 +804,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
 function SessionTree({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
+      <InternalTrafficGuard />
       <SignupConversionTracker />
       <Suspense fallback={<OnboardingGuardFallback />}>
         <OnboardingGuard>{children}</OnboardingGuard>

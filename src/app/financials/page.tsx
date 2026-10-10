@@ -2542,9 +2542,9 @@ export default function FinancialsPage() {
 
           <div className="card flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="text-[14px] font-semibold text-slate-100">Import Bank Transactions</div>
+              <div className="text-[14px] font-semibold text-slate-100">Can&apos;t connect a bank? Import a file instead</div>
               <div className="text-[12px] text-[var(--text-muted)] mt-1">
-                Upload a bank CSV (date, description, amount, and debit/credit or signed amounts). After saving, review and
+                Last resort. Connecting your bank above keeps everything up to date automatically. If you can&apos;t, upload a bank CSV (date, description, amount, and debit/credit or signed amounts). After saving, review and
                 categorize on the{" "}
                 <Link href="/transactions?tab=needs_review" className="text-[var(--accent)] hover:underline">
                   Transactions page
@@ -2559,8 +2559,8 @@ export default function FinancialsPage() {
             </div>
             <div className="flex gap-2">
               <ReadOnlyGuard>
-                <label className="btn-outline cursor-pointer">
-                  Upload CSV
+                <label className="text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline underline-offset-2 cursor-pointer">
+                  Upload a file
                   <input
                     id="financials-input"
                     type="file"

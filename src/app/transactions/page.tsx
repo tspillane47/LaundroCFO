@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
@@ -2238,15 +2239,25 @@ function TransactionsPageContent() {
 
       <div className="card flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="text-[14px] font-semibold text-adaptive-primary">Import Bank Transactions</div>
+          <div className="text-[14px] font-semibold text-adaptive-primary">Bank Transactions</div>
           <div className="text-[12px] text-adaptive-muted mt-1">
-            Upload a CSV, then save to the review queue before posting.
+            Connected banks import on their own. Review and categorize them here before posting.
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <ReadOnlyGuard>
-            <label className={clsx("btn-outline", canWrite ? "cursor-pointer" : "cursor-not-allowed opacity-60")}>
-              Upload CSV
+            <Link href="/financials?tab=bank" className="btn-outline">
+              Bank connections →
+            </Link>
+          </ReadOnlyGuard>
+          <ReadOnlyGuard>
+            <label
+              className={clsx(
+                "text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline underline-offset-2",
+                canWrite ? "cursor-pointer" : "cursor-not-allowed opacity-60"
+              )}
+            >
+              Import a file instead
               <input
                 ref={csvUploadInputRef}
                 id="transactions-input-2"
@@ -2281,13 +2292,24 @@ function TransactionsPageContent() {
         <EmptyState
           icon="Receipt"
           title="No transactions yet"
-          description="Import your bank CSV to get started"
+          description="Connect your bank and your transactions will show up here on their own."
           cta={
-            <ReadOnlyGuard align="stretch">
-              <button type="button" onClick={openCsvImport} className="btn-primary inline-flex text-[13px]">
-                Import CSV →
-              </button>
-            </ReadOnlyGuard>
+            <div className="flex flex-col items-center gap-3">
+              <ReadOnlyGuard align="stretch">
+                <Link href="/financials?tab=bank" className="btn-primary inline-flex text-[13px]">
+                  Connect your bank →
+                </Link>
+              </ReadOnlyGuard>
+              <ReadOnlyGuard align="stretch">
+                <button
+                  type="button"
+                  onClick={openCsvImport}
+                  className="text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline underline-offset-2"
+                >
+                  No bank connection? Import a CSV instead
+                </button>
+              </ReadOnlyGuard>
+            </div>
           }
         />
       ) : (
@@ -2642,7 +2664,7 @@ function TransactionsPageContent() {
         {reviewRows.length === 0 ? (
           <p className="text-[13px] text-adaptive-muted py-6 text-center">
             {activeTab === "needs_review"
-              ? "No transactions to review. Upload a CSV to get started."
+              ? "No transactions to review right now."
               : "No transactions in this view."}
           </p>
         ) : filteredReviewRows.length === 0 ? (
