@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
@@ -2177,13 +2178,24 @@ function TransactionsPageContent() {
         <EmptyState
           icon="Receipt"
           title="No transactions yet"
-          description="Import your bank CSV to get started"
+          description="Connect your bank and your transactions will show up here on their own."
           cta={
-            <ReadOnlyGuard align="stretch">
-              <button type="button" onClick={openCsvImport} className="btn-primary inline-flex text-[13px]">
-                Import CSV →
-              </button>
-            </ReadOnlyGuard>
+            <div className="flex flex-col items-center gap-3">
+              <ReadOnlyGuard align="stretch">
+                <Link href="/financials?tab=bank" className="btn-primary inline-flex text-[13px]">
+                  Connect your bank →
+                </Link>
+              </ReadOnlyGuard>
+              <ReadOnlyGuard align="stretch">
+                <button
+                  type="button"
+                  onClick={openCsvImport}
+                  className="text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline underline-offset-2"
+                >
+                  No bank connection? Import a CSV instead
+                </button>
+              </ReadOnlyGuard>
+            </div>
           }
         />
       ) : (
@@ -2538,7 +2550,7 @@ function TransactionsPageContent() {
         {reviewRows.length === 0 ? (
           <p className="text-[13px] text-adaptive-muted py-6 text-center">
             {activeTab === "needs_review"
-              ? "No transactions to review. Upload a CSV to get started."
+              ? "No transactions to review right now."
               : "No transactions in this view."}
           </p>
         ) : filteredReviewRows.length === 0 ? (
