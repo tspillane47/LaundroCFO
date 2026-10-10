@@ -187,5 +187,26 @@ describe("normalizePlaidTransaction pending_transaction_id", () => {
     });
 
     expect(result.pending_transaction_id).toBeNull();
+    expect(result.pending).toBe(false);
+  });
+
+  it("stores Plaid's pending flag", () => {
+    const pending = normalizePlaidTransaction({
+      transaction_id: "txn-pending",
+      date: "2026-08-17",
+      name: "Mobile deposit",
+      amount: -40,
+      pending: true,
+    });
+    const settled = normalizePlaidTransaction({
+      transaction_id: "txn-settled",
+      date: "2026-08-18",
+      name: "Mobile deposit",
+      amount: -40,
+      pending: false,
+    });
+
+    expect(pending.pending).toBe(true);
+    expect(settled.pending).toBe(false);
   });
 });

@@ -97,7 +97,7 @@ export type TransactionStatus =
   | "system_classified"
   | "user_classified";
 
-export type TransactionChangeSource = "user" | "rule" | "import" | "system";
+export type TransactionChangeSource = "user" | "rule" | "import" | "system" | "auto";
 
 export type BankTransaction = {
   id: string;
@@ -118,6 +118,7 @@ export type BankTransaction = {
   modified_at?: string;
   plaid_transaction_id?: string | null;
   plaid_account_id?: string | null;
+  pending?: boolean;
 };
 
 export type TransactionPlLink = {
@@ -569,10 +570,11 @@ import {
   fetchExcludedPlaidAccountIds,
   fetchExcludedPlaidAccountIdsByStore,
   isBankTransactionVisibleForExcludedPlaidAccounts,
+  plaidAmountsMatch,
 } from "@/lib/plaid-shared";
 import { TEXT_LIMITS, trimToMaxLength, validateMaxLength } from "@/lib/textLimits";
 
-type FinancialsSupabaseClient = ReturnType<typeof createClient>;
+export type FinancialsSupabaseClient = ReturnType<typeof createClient>;
 
 export async function fetchStoreTtmMetrics(
   supabase: FinancialsSupabaseClient,
@@ -1505,6 +1507,79 @@ export function categorizeWithRules(
 
   const suggested = suggestTransactionCategory(description, type);
   return { category: suggested, suggested, ruleApplied: false };
+}
+
+export const AUTO_POST_REVENUE_CATEGORIES = [
+  "self_service_revenue",
+  "wdf_revenue",
+  "commercial_revenue",
+  "vending_revenue",
+  "other_revenue",
+] as const satisfies readonly RevenueBreakdownField[];
+
+export type IncomeAutoPostDecision =
+  | { post: false; reason: "not_income" | "needs_review" | "fallback" | "not_revenue" }
+  | { post: true; category: RevenueBreakdownField; source: "rule" | "keyword" };
+
+function descriptionBlocksAutoPost(description: string | null): boolean {
+  const text = (description ?? "").toLowerCase();
+  const trimmed = (description ?? "").trim();
+  if (!trimmed || /^check\s*#?\d*$/i.test(trimmed) || trimmed.toLowerCase() === "check") {
+    return true;
+  }
+  for (const keyword of NEEDS_REVIEW_KEYWORDS) {
+    if (text.includes(keyword)) return true;
+  }
+  return false;
+}
+
+/** Income category from an explicit keyword. Null when suggestTransactionCategory would use the default fallback. */
+export function matchExplicitIncomeKeyword(description: string | null): RevenueBreakdownField | null {
+  const text = (description ?? "").toLowerCase();
+  if (!text.trim() || descriptionBlocksAutoPost(description)) return null;
+
+  for (const keyword of WDF_REVENUE_KEYWORDS) {
+    if (text.includes(keyword)) return "wdf_revenue";
+  }
+  for (const keyword of VENDING_REVENUE_KEYWORDS) {
+    if (text.includes(keyword)) return "vending_revenue";
+  }
+  for (const keyword of OTHER_REVENUE_KEYWORDS) {
+    if (text.includes(keyword)) return "other_revenue";
+  }
+  for (const keyword of SELF_SERVICE_REVENUE_KEYWORDS) {
+    if (text.includes(keyword.toLowerCase())) return "self_service_revenue";
+  }
+  return null;
+}
+
+/**
+ * Revenue is auto-posted only from a saved rule or a real keyword match.
+ * The default self-service fallback, transfers, Zelle, and Venmo stay in Needs Review.
+ */
+export function resolveIncomeAutoPostCategory(
+  description: string | null,
+  type: TransactionType,
+  amount: number,
+  rules: CategorizationRule[]
+): IncomeAutoPostDecision {
+  if (type !== "income") return { post: false, reason: "not_income" };
+  if (descriptionBlocksAutoPost(description)) return { post: false, reason: "needs_review" };
+
+  const { category, ruleApplied } = categorizeWithRules(description, type, amount, rules);
+  if (ruleApplied) {
+    if ((AUTO_POST_REVENUE_CATEGORIES as readonly string[]).includes(category)) {
+      return { post: true, category: category as RevenueBreakdownField, source: "rule" };
+    }
+    return { post: false, reason: "not_revenue" };
+  }
+
+  const keywordCategory = matchExplicitIncomeKeyword(description);
+  if (keywordCategory) {
+    return { post: true, category: keywordCategory, source: "keyword" };
+  }
+
+  return { post: false, reason: "fallback" };
 }
 
 export type RuleApplyPlan = {
@@ -2441,6 +2516,7 @@ export type PostTransactionsBatchResult = {
   /** When true, the client should reload transaction/P&L state (e.g. after a cross-tab race). */
   refreshRecommended?: boolean;
   alreadyPostedCount?: number;
+  postedTransactionIds?: string[];
 };
 
 export function isPostgresUniqueViolation(
@@ -2562,7 +2638,7 @@ function postingTargetFromStoredCategory(category: string): PostingTarget {
   return { table: "monthly_financials", column: category };
 }
 
-async function writeTransactionAuditLog(
+export async function writeTransactionAuditLog(
   supabase: FinancialsSupabaseClient,
   entry: {
     transactionId: string;
@@ -2582,6 +2658,7 @@ async function writeTransactionAuditLog(
     old_value: entry.oldValue,
     new_value: entry.newValue,
     change_source: entry.changeSource,
+    changed_at: new Date().toISOString(),
   });
 
   return { error: error?.message ?? null };
@@ -2839,8 +2916,6 @@ export async function postTransactionsBatch(
     storeId,
     userId,
     transactions,
-    existingRecords = [],
-    existingUtilityRecords = [],
     store = null,
     changeSource = "user",
   } = params;
@@ -2965,9 +3040,28 @@ export async function postTransactionsBatch(
 
     accumulatePostingDeltas(linkedItems, utilityDeltaMap, revenueDeltaMap, financialDeltaMap);
 
+    let dbUtilityRecords: MonthlyUtilityRecord[] = [];
+    if (utilityDeltaMap.size > 0) {
+      const { data: utilityRows, error: utilityFetchError } = await supabase
+        .from("monthly_utilities")
+        .select("*")
+        .eq("store_id", storeId);
+
+      if (utilityFetchError) {
+        const rollback = await deleteTransactionPlLinks(
+          supabase,
+          linkedItems.map((linked) => linked.txn.id)
+        );
+        if (rollback.error) return { postedCount: 0, error: rollback.error, postedTransactionIds: [] };
+        return { postedCount: 0, error: utilityFetchError.message, postedTransactionIds: [] };
+      }
+
+      dbUtilityRecords = (utilityRows ?? []) as MonthlyUtilityRecord[];
+    }
+
     if (utilityDeltaMap.size > 0) {
       const utilityRowsByPeriod = new Map(
-        existingUtilityRecords.map((row) => [monthKey(row.year, row.month), row])
+        dbUtilityRecords.map((row) => [monthKey(row.year, row.month), row])
       );
 
       for (const [periodKey, deltas] of Array.from(utilityDeltaMap.entries())) {
@@ -3008,9 +3102,28 @@ export async function postTransactionsBatch(
       ...Array.from(financialDeltaMap.keys()),
     ]);
 
+    let dbFinancialRecords: MonthlyFinancialRecord[] = [];
+    if (financialPeriodKeys.size > 0) {
+      const { data: financialRows, error: financialFetchError } = await supabase
+        .from("monthly_financials")
+        .select("*")
+        .eq("store_id", storeId);
+
+      if (financialFetchError) {
+        const rollback = await deleteTransactionPlLinks(
+          supabase,
+          linkedItems.map((linked) => linked.txn.id)
+        );
+        if (rollback.error) return { postedCount: 0, error: rollback.error, postedTransactionIds: [] };
+        return { postedCount: 0, error: financialFetchError.message, postedTransactionIds: [] };
+      }
+
+      dbFinancialRecords = (financialRows ?? []) as MonthlyFinancialRecord[];
+    }
+
     for (const periodKey of Array.from(financialPeriodKeys)) {
       const { year, month } = parseMonthPeriodKey(periodKey);
-      const existing = existingRecords.find((r) => r.year === year && r.month === month) ?? null;
+      const existing = dbFinancialRecords.find((r) => r.year === year && r.month === month) ?? null;
       const base = existing
         ? recordToForm(calcMonthly(existing))
         : { ...emptyMonthlyForm(store), year, month };
@@ -3098,6 +3211,7 @@ export async function postTransactionsBatch(
       const updatePayload: Record<string, unknown> = {
         is_reviewed: true,
         status: "posted",
+        category: importCategory,
         modified_at: now,
       };
 
@@ -3144,6 +3258,7 @@ export async function postTransactionsBatch(
       error: null,
       refreshRecommended: alreadyPostedCount > 0,
       alreadyPostedCount,
+      postedTransactionIds: linkedItems.map((item) => item.txn.id),
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to post transactions.";
@@ -3324,7 +3439,7 @@ export async function reclassifyPostedTransaction(
     .from("bank_transactions")
     .update({
       category: newCategory,
-      status: "user_classified",
+      status: "posted",
       modified_at: now,
     })
     .eq("id", transactionId);
@@ -3342,4 +3457,187 @@ export async function reclassifyPostedTransaction(
   });
 
   return { error: auditError };
+}
+
+function calendarParts(transactionDate: string): { year: number; month: number } {
+  const date = new Date(`${transactionDate.split("T")[0]}T12:00:00`);
+  return { year: date.getFullYear(), month: date.getMonth() + 1 };
+}
+
+export function postedReconcileNeedsFinancialAdjustment(
+  previous: {
+    status?: string | null;
+    amount?: number | null;
+    transaction_date?: string | null;
+    transaction_type?: string | null;
+  },
+  next: {
+    amount: number;
+    transaction_date: string;
+    transaction_type: string;
+  }
+): boolean {
+  if (previous.status !== "posted") return false;
+  const previousAmount = previous.amount;
+  if (previousAmount == null || !plaidAmountsMatch(Number(previousAmount), next.amount)) return true;
+  const previousDate = (previous.transaction_date ?? "").split("T")[0];
+  if (previousDate !== next.transaction_date.split("T")[0]) return true;
+  if (previous.transaction_type && previous.transaction_type !== next.transaction_type) return true;
+  return false;
+}
+
+/**
+ * After a pending row settles onto a posted bank row, keep transaction_pl_links
+ * and the P&L delta aligned with the new amount, date, or type.
+ */
+export async function syncPostedLinkAfterBankChange(
+  supabase: FinancialsSupabaseClient,
+  params: {
+    storeId: string;
+    userId: string;
+    transactionId: string;
+    previous: {
+      status?: string | null;
+      amount?: number | null;
+      transaction_date?: string | null;
+      transaction_type?: string | null;
+    };
+    next: {
+      transaction_date: string;
+      amount: number;
+      transaction_type: "income" | "expense";
+      description: string;
+    };
+    rules?: CategorizationRule[];
+    store?: StoreFinancialProfile | null;
+  }
+): Promise<{ adjusted: boolean; error: string | null }> {
+  const { data: plLink, error: plLinkError } = await supabase
+    .from("transaction_pl_links")
+    .select("*")
+    .eq("transaction_id", params.transactionId)
+    .maybeSingle();
+
+  if (plLinkError) return { adjusted: false, error: plLinkError.message };
+  if (!plLink) return { adjusted: false, error: null };
+
+  const link = plLink as TransactionPlLink;
+  const { year, month } = calendarParts(params.next.transaction_date);
+  const amount = normalizeTransactionAmount(params.next.amount);
+  const typeChanged = Boolean(
+    params.previous.transaction_type && params.previous.transaction_type !== params.next.transaction_type
+  );
+  const linkAlreadyMatches =
+    !typeChanged &&
+    link.year === year &&
+    link.month === month &&
+    plaidAmountsMatch(toNum(link.amount_applied), amount);
+
+  if (linkAlreadyMatches) {
+    return { adjusted: false, error: null };
+  }
+
+  if (params.previous.status !== "posted") {
+    return { adjusted: false, error: null };
+  }
+
+  const oldAmount = toNum(link.amount_applied);
+  const oldTarget = postingTargetFromStoredCategory(link.category);
+
+  const { error: reverseError } = await reverseTransactionPlLinkPosting(supabase, {
+    storeId: params.storeId,
+    userId: params.userId,
+    link,
+    store: params.store,
+  });
+  if (reverseError) return { adjusted: false, error: reverseError };
+
+  let nextCategory = link.category as BankImportCategory;
+  if (typeChanged) {
+    const { category } = categorizeWithRules(
+      params.next.description,
+      params.next.transaction_type,
+      params.next.amount,
+      params.rules ?? []
+    );
+    nextCategory = category;
+  }
+
+  const nextTarget = isCategoryReadyToPost(nextCategory) ? resolvePostingTarget(nextCategory) : null;
+  if (!nextTarget) {
+    const { error: deleteError } = await supabase
+      .from("transaction_pl_links")
+      .delete()
+      .eq("id", link.id);
+    if (deleteError) return { adjusted: false, error: deleteError.message };
+
+    const { error: statusError } = await supabase
+      .from("bank_transactions")
+      .update({
+        category: nextCategory,
+        status: "needs_review",
+        is_reviewed: false,
+        modified_at: new Date().toISOString(),
+      })
+      .eq("id", params.transactionId);
+    if (statusError) return { adjusted: false, error: statusError.message };
+
+    return { adjusted: true, error: null };
+  }
+
+  const { error: linkUpdateError } = await supabase
+    .from("transaction_pl_links")
+    .update({
+      year,
+      month,
+      category: nextTarget.column,
+      amount_applied: amount,
+    })
+    .eq("id", link.id);
+  if (linkUpdateError) return { adjusted: false, error: linkUpdateError.message };
+
+  const { error: applyError } = await applyPostingDelta(supabase, {
+    storeId: params.storeId,
+    userId: params.userId,
+    year,
+    month,
+    target: nextTarget,
+    amount,
+    store: params.store,
+  });
+
+  if (applyError) {
+    await applyPostingDelta(supabase, {
+      storeId: params.storeId,
+      userId: params.userId,
+      year: link.year,
+      month: link.month,
+      target: oldTarget,
+      amount: oldAmount,
+      store: params.store,
+    });
+    await supabase
+      .from("transaction_pl_links")
+      .update({
+        year: link.year,
+        month: link.month,
+        category: link.category,
+        amount_applied: oldAmount,
+      })
+      .eq("id", link.id);
+    return { adjusted: false, error: applyError };
+  }
+
+  if (typeChanged) {
+    const { error: categoryError } = await supabase
+      .from("bank_transactions")
+      .update({
+        category: nextCategory,
+        modified_at: new Date().toISOString(),
+      })
+      .eq("id", params.transactionId);
+    if (categoryError) return { adjusted: true, error: categoryError.message };
+  }
+
+  return { adjusted: true, error: null };
 }

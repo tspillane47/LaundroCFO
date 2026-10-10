@@ -621,6 +621,7 @@ export type PlaidTransactionLike = {
   name: string;
   merchant_name?: string | null;
   amount: number;
+  pending?: boolean | null;
   pending_transaction_id?: string | null;
   account_id?: string | null;
 };
@@ -631,6 +632,7 @@ export type NormalizedPlaidTransaction = {
   amount: number;
   transaction_type: "income" | "expense";
   plaid_transaction_id: string;
+  pending: boolean;
   pending_transaction_id: string | null;
   plaid_account_id: string | null;
 };
@@ -645,6 +647,10 @@ export type ExistingPlaidBankRow = {
   description: string | null;
   transaction_date?: string | null;
   amount?: number | null;
+  transaction_type?: string | null;
+  category?: string | null;
+  pending?: boolean | null;
+  user_id?: string | null;
 };
 
 export type PlaidAddedReconciliationPath = "pending_transaction_id" | "same_batch_fallback";
@@ -692,6 +698,7 @@ export function normalizePlaidTransaction(txn: PlaidTransactionLike): Normalized
     amount,
     transaction_type,
     plaid_transaction_id: txn.transaction_id,
+    pending: txn.pending === true,
     pending_transaction_id: pendingTransactionId ? pendingTransactionId : null,
     plaid_account_id: plaidAccountId ? plaidAccountId : null,
   };

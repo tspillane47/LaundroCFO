@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useStores } from "@/lib/store-context";
-import { canShowStoreValuation, getStoreValuation, getStoreDebt, getStoreScheduledDebtService, hasMonthlyFinancialRecords, type StoreValuationResult } from "@/lib/getStoreValuation";
+import { canShowStoreValuation, getStoreValuation, getStoreDebt, getStoreScheduledDebtService, hasMonthlyFinancialRecords, invalidateValuationCache, type StoreValuationResult } from "@/lib/getStoreValuation";
 import { calcEquipmentScore, calcLeaseScore, DSCR_NO_DEBT_LABEL, fmtDollar, fmtMultiple } from "@/lib/calculations";
 import { computeStoreDscr } from "@/lib/dscr";
 import {
@@ -15,6 +15,7 @@ import {
   enrichMonthlyRecords,
   fetchStoreMonthlyFinancials,
   fetchUncategorizedReviewCountsByStore,
+  MONTH_NAMES,
   sortRecordsDesc,
   ttmWindowRecords,
   type CalculatedMonthly,
@@ -64,6 +65,7 @@ import {
 } from "@/lib/valuationHistory";
 import { RevenueEbitdaBarChart } from "@/components/dashboard/RevenueEbitdaBarChart";
 import { ThisMonthChart } from "@/components/dashboard/ThisMonthChart";
+import { saveAutoPostNotice } from "@/lib/autoPostNotice";
 
 function parseDate(value: string | null): Date | null {
   if (!value) return null;
@@ -182,9 +184,12 @@ export default function DashboardPage() {
   const [hasPlaidConnections, setHasPlaidConnections] = useState(false);
   const [plaidBalanceSnapshot, setPlaidBalanceSnapshot] = useState<PlaidBalanceSnapshot | null>(null);
   const [thisMonthTransactions, setThisMonthTransactions] = useState<ThisMonthTransaction[]>([]);
+  const [bankRefreshing, setBankRefreshing] = useState(false);
   const supabase = createClient();
+  const loadDashboardDataRef = useRef<(options?: { quiet?: boolean }) => Promise<void>>(async () => {});
+  const loadGeneration = useRef(0);
 
-  const loadDashboardData = useCallback(async () => {
+  const loadDashboardData = useCallback(async (options?: { quiet?: boolean }) => {
     if (!selectedStore) {
       setStore(null);
       setValuation(null);
@@ -202,13 +207,16 @@ export default function DashboardPage() {
     }
 
     const loadedStore = selectedStore;
+    const generation = ++loadGeneration.current;
+    const isCurrent = () => generation === loadGeneration.current;
     setStore(loadedStore);
     setStoreData(loadedStore);
-    setDetailLoading(true);
+    if (!options?.quiet) setDetailLoading(true);
     setLoadError(false);
 
     try {
       const storeValuation = await getStoreValuation(loadedStore.id);
+      if (!isCurrent()) return;
       setValuation(storeValuation);
 
       const [debt, scheduledAnnual, financialsData, { data: utilitiesData, error: utilitiesError }, uncategorizedCounts, plaidConnected, plaidBalances, monthTransactions] =
@@ -222,6 +230,7 @@ export default function DashboardPage() {
         getStorePlaidBalanceSnapshot(loadedStore.id),
         fetchThisMonthBankTransactions(supabase, loadedStore.id),
       ]);
+      if (!isCurrent()) return;
       setTotalDebt(debt);
       setScheduledDebtService(scheduledAnnual);
       setUncategorizedTransactionCount(uncategorizedCounts[loadedStore.id] ?? 0);
@@ -246,6 +255,7 @@ export default function DashboardPage() {
             .eq("store_id", loadedStore.id),
         ]);
 
+      if (!isCurrent()) return;
       if (policiesError) throw policiesError;
       if (equipmentError) throw equipmentError;
 
@@ -260,6 +270,7 @@ export default function DashboardPage() {
           .eq("store_id", loadedStore.id)
           .limit(1)
           .maybeSingle();
+        if (!isCurrent()) return;
         if (reError) throw reError;
         setRealEstate(reData);
         setLease(null);
@@ -272,6 +283,7 @@ export default function DashboardPage() {
           .eq("store_id", loadedStore.id)
           .limit(1)
           .maybeSingle();
+        if (!isCurrent()) return;
         if (leaseError) throw leaseError;
 
         if (leaseData) {
@@ -281,6 +293,7 @@ export default function DashboardPage() {
             .select("*")
             .eq("lease_id", leaseData.id)
             .order("option_number", { ascending: true });
+          if (!isCurrent()) return;
           if (optionsError) throw optionsError;
           setLeaseOptions(optionsData ?? []);
         } else {
@@ -289,15 +302,62 @@ export default function DashboardPage() {
         }
       }
     } catch {
-      setLoadError(true);
+      if (isCurrent()) setLoadError(true);
     } finally {
-      setDetailLoading(false);
+      if (isCurrent()) setDetailLoading(false);
     }
   }, [selectedStore, supabase]);
+
+  loadDashboardDataRef.current = loadDashboardData;
 
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
+
+  useEffect(() => {
+    const storeId = selectedStore?.id;
+    if (!storeId || isAllStores) return;
+
+    let cancelled = false;
+    setBankRefreshing(true);
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/plaid/refresh-store", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ storeId }),
+        });
+        const body = (await response.json().catch(() => null)) as {
+          throttled?: boolean;
+          postedCount?: number;
+          postedAmount?: number;
+          transactionIds?: string[];
+        } | null;
+        if (cancelled || !response.ok || !body || body.throttled) return;
+
+        if ((body.postedCount ?? 0) > 0) {
+          saveAutoPostNotice({
+            storeId,
+            postedCount: body.postedCount ?? 0,
+            postedAmount: body.postedAmount ?? 0,
+            transactionIds: body.transactionIds ?? [],
+          });
+        }
+
+        invalidateValuationCache(storeId);
+        await loadDashboardDataRef.current({ quiet: true });
+      } catch {
+        // The dashboard already rendered from the last saved books.
+      } finally {
+        if (!cancelled) setBankRefreshing(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStore?.id, isAllStores]);
 
   function openStore(s: (typeof stores)[0]) {
     setSelectedStore(s);
@@ -316,6 +376,10 @@ export default function DashboardPage() {
   const missingMarketRent = isOwnerOccupied && hasFinancialData && !canShowValuation;
 
   const revenue = hasFinancialData ? (resolvedFinancials?.monthlyRevenue ?? 0) : 0;
+  const now = new Date();
+  const revenueThisMonth =
+    monthlyFinancials.find((record) => record.year === now.getFullYear() && record.month === now.getMonth() + 1)
+      ?.revenue ?? 0;
   const expenses = hasFinancialData ? (resolvedFinancials?.monthlyExpenses ?? 0) : 0;
   const ebitda = hasFinancialData ? revenue - expenses : 0;
   const annualEbitda = hasFinancialData ? (resolvedFinancials?.annualEbitda ?? 0) : 0;
@@ -676,6 +740,11 @@ export default function DashboardPage() {
           >
             {store.address ?? "No address set"}
           </p>
+          {bankRefreshing && (
+            <p className="text-[12px] mt-1" style={{ color: "var(--text-muted)" }}>
+              Updating from your bank...
+            </p>
+          )}
         </div>
         <Link href="/settings" className="btn-outline text-[14px] md:text-[12px] w-full sm:w-auto text-center">
           Edit Store
@@ -689,6 +758,16 @@ export default function DashboardPage() {
           <IntelligenceFeedMobileShell items={feedItems} />
 
           <div className="metric-grid">
+            <KpiCard
+              className="kpi-fade-in kpi-glow-card"
+              label="Revenue this month"
+              value={<AnimatedNumber value={revenueThisMonth} prefix="$" duration={1000} />}
+              sub={
+                revenueThisMonth > 0
+                  ? `${MONTH_NAMES[now.getMonth()]} posted revenue`
+                  : `No posted revenue yet in ${MONTH_NAMES[now.getMonth()]}`
+              }
+            />
             <DSCRCard
               className="kpi-fade-in kpi-glow-card"
               style={{ animationDelay: "0s" }}

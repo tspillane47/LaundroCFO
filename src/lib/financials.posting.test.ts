@@ -34,6 +34,7 @@ type MockPostingOptions = {
   existingLinkIds?: string[];
   excludedPlaidAccountIds?: string[];
   linkInsertOutcomes?: LinkInsertOutcome[];
+  financialRows?: MonthlyFinancialRecord[];
   financialUpdateError?: string | null;
   financialInsertError?: string | null;
   txnUpdateError?: string | null;
@@ -44,6 +45,7 @@ type MockPostingOptions = {
 function createPostingMockSupabase(options: MockPostingOptions = {}) {
   const insertedLinkIds: string[] = [];
   const deletedLinkIds: string[] = [];
+  const txnUpdates: Record<string, unknown>[] = [];
   let financialUpdateCount = 0;
   let financialInsertCount = 0;
   let financialUpdateRent: number | null = null;
@@ -99,6 +101,12 @@ function createPostingMockSupabase(options: MockPostingOptions = {}) {
 
       if (table === "monthly_financials") {
         return {
+          select: () => ({
+            eq: async () => ({
+              data: options.financialRows ?? [existingFinancial],
+              error: null,
+            }),
+          }),
           update: (payload: { rent?: number }) => ({
             eq: async () => {
               financialUpdateCount += 1;
@@ -121,10 +129,13 @@ function createPostingMockSupabase(options: MockPostingOptions = {}) {
 
       if (table === "bank_transactions") {
         return {
-          update: () => ({
-            eq: async () => ({
-              error: options.txnUpdateError ? { message: options.txnUpdateError } : null,
-            }),
+          update: (payload: Record<string, unknown>) => ({
+            eq: async () => {
+              txnUpdates.push(payload);
+              return {
+                error: options.txnUpdateError ? { message: options.txnUpdateError } : null,
+              };
+            },
           }),
         };
       }
@@ -158,6 +169,9 @@ function createPostingMockSupabase(options: MockPostingOptions = {}) {
       },
       get financialUpdateRent() {
         return financialUpdateRent;
+      },
+      get txnUpdates() {
+        return txnUpdates;
       },
     },
   };
@@ -223,11 +237,30 @@ describe("postTransactionsBatch", () => {
       error: null,
       refreshRecommended: false,
       alreadyPostedCount: 0,
+      postedTransactionIds: ["txn-1"],
     });
     expect(state.insertedLinkIds).toEqual(["txn-1"]);
     expect(state.financialUpdateCount).toBe(1);
     expect(state.financialUpdateRent).toBe(1500);
     expect(state.deletedLinkIds).toEqual([]);
+    expect(state.txnUpdates[0]).toMatchObject({ status: "posted", category: "rent" });
+  });
+
+  it("re-reads monthly_financials from the database instead of stale in-memory rows", async () => {
+    const { supabase, state } = createPostingMockSupabase({
+      financialRows: [{ ...existingFinancial, rent: 2000 }],
+    });
+
+    const result = await postTransactionsBatch(supabase, {
+      storeId: STORE_ID,
+      userId: USER_ID,
+      transactions: [makeTxn()],
+      existingRecords: [{ ...existingFinancial, rent: 9000 }],
+    });
+
+    expect(result.postedCount).toBe(1);
+    expect(result.error).toBeNull();
+    expect(state.financialUpdateRent).toBe(2500);
   });
 
   it("does not apply P&L when a duplicate link race is detected", async () => {

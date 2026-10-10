@@ -17,6 +17,9 @@ import { createAdminSupabaseClient } from "@/lib/supabase-admin";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
+/** Leave the last 30s of the 300s function budget so the current store can finish. */
+const CRON_BUDGET_MS = 270_000;
+
 type IntegrationKind = "quickbooks" | "plaid";
 
 type ConnectionSyncResult = {
@@ -35,6 +38,11 @@ type DuplicateReconcileCronResult = {
   error?: string;
 };
 
+type SkippedStore = {
+  storeId: string;
+  integration: IntegrationKind;
+};
+
 function summarizeResults(results: ConnectionSyncResult[], integration: IntegrationKind) {
   const scoped = results.filter((entry) => entry.integration === integration);
   return {
@@ -51,9 +59,13 @@ export async function GET(request: Request) {
   }
 
   const startedAt = new Date().toISOString();
+  const startedMs = Date.now();
   const results: ConnectionSyncResult[] = [];
   const duplicateReconcile: DuplicateReconcileCronResult[] = [];
+  const skippedStores: SkippedStore[] = [];
   const admin = createAdminSupabaseClient();
+
+  const pastBudget = () => Date.now() - startedMs >= CRON_BUDGET_MS;
 
   const [{ data: quickbooksConnections, error: quickbooksError }, { data: plaidConnections, error: plaidError }] =
     await Promise.all([
@@ -71,7 +83,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Failed to load Plaid connections" }, { status: 500 });
   }
 
-  for (const connection of quickbooksConnections ?? []) {
+  const quickbooksList = quickbooksConnections ?? [];
+  for (let index = 0; index < quickbooksList.length; index += 1) {
+    if (pastBudget()) {
+      const remaining = quickbooksList.slice(index).map((connection) => connection.store_id);
+      console.warn("[cron/sync-integrations] stopping near time limit; skipped QuickBooks stores", {
+        skippedStores: remaining,
+      });
+      skippedStores.push(...remaining.map((storeId) => ({ storeId, integration: "quickbooks" as const })));
+      break;
+    }
+
+    const connection = quickbooksList[index];
     const storeId = connection.store_id;
     try {
       await syncQuickBooksFinancials(storeId);
@@ -99,7 +122,18 @@ export async function GET(request: Request) {
     }
   }
 
-  for (const { storeId, connectionIds } of groupPlaidConnectionsByStore(plaidConnections ?? [])) {
+  const plaidGroups = groupPlaidConnectionsByStore(plaidConnections ?? []);
+  for (let index = 0; index < plaidGroups.length; index += 1) {
+    if (pastBudget()) {
+      const remaining = plaidGroups.slice(index).map((group) => group.storeId);
+      console.warn("[cron/sync-integrations] stopping near time limit; skipped Plaid stores", {
+        skippedStores: remaining,
+      });
+      skippedStores.push(...remaining.map((storeId) => ({ storeId, integration: "plaid" as const })));
+      break;
+    }
+
+    const { storeId, connectionIds } = plaidGroups[index];
     let anyPlaidSyncOk = false;
 
     for (const connectionId of connectionIds) {
@@ -153,6 +187,7 @@ export async function GET(request: Request) {
     finishedAt: new Date().toISOString(),
     quickbooks: summarizeResults(results, "quickbooks"),
     plaid: summarizeResults(results, "plaid"),
+    skippedStores,
     duplicateReconcile: {
       storesAttempted: duplicateReconcile.length,
       storesSucceeded: duplicateReconcile.filter((entry) => entry.ok).length,

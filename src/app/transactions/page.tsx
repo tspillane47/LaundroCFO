@@ -8,6 +8,13 @@ import { useStores } from "@/lib/store-context";
 import { fmtDollar } from "@/lib/calculations";
 import { invalidateValuationCache } from "@/lib/getStoreValuation";
 import {
+  clearAutoPostNotice,
+  formatAutoPostBanner,
+  readAutoPostNotice,
+  saveAutoPostNotice,
+  type AutoPostNotice,
+} from "@/lib/autoPostNotice";
+import {
   excludedPlaidAccountOrFilter,
   fetchExcludedPlaidAccountIds,
   isBankTransactionVisibleForExcludedPlaidAccounts,
@@ -432,6 +439,8 @@ function TransactionsPageContent() {
   const [financialRecords, setFinancialRecords] = useState<MonthlyFinancialRecord[]>([]);
   const [utilityRecords, setUtilityRecords] = useState<MonthlyUtilityRecord[]>([]);
   const [plLinksByTxn, setPlLinksByTxn] = useState<Map<string, TransactionPlLink>>(new Map());
+  const [autoPostedIds, setAutoPostedIds] = useState<Set<string>>(new Set());
+  const [autoPostNotice, setAutoPostNotice] = useState<AutoPostNotice | null>(null);
   const [categorizationRules, setCategorizationRules] = useState<CategorizationRule[]>([]);
   const [stagedCsv, setStagedCsv] = useState<StagedCsvRow[]>([]);
   const [categoryOverrides, setCategoryOverrides] = useState<Map<string, BankImportCategory>>(new Map());
@@ -654,8 +663,31 @@ function TransactionsPageContent() {
         } else {
           setPlLinksByTxn(new Map());
         }
+
+        const autoIds = new Set<string>();
+        if (postedIds.length > 0) {
+          const { data: auditRows } = await supabase
+            .from("transaction_audit_log")
+            .select("transaction_id, change_source, new_value, changed_at")
+            .eq("store_id", selectedStore.id)
+            .eq("field_changed", "status")
+            .in("transaction_id", postedIds)
+            .order("changed_at", { ascending: false });
+
+          const seen = new Set<string>();
+          for (const entry of auditRows ?? []) {
+            const transactionId = entry.transaction_id as string;
+            if (seen.has(transactionId)) continue;
+            seen.add(transactionId);
+            if (entry.change_source === "auto" && entry.new_value === "posted") {
+              autoIds.add(transactionId);
+            }
+          }
+        }
+        setAutoPostedIds(autoIds);
       } else {
         setPlLinksByTxn(new Map());
+        setAutoPostedIds(new Set());
       }
     } catch {
       setLoadError(true);
@@ -669,6 +701,65 @@ function TransactionsPageContent() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!selectedStore?.id) {
+      setAutoPostNotice(null);
+      return;
+    }
+    setAutoPostNotice(readAutoPostNotice(selectedStore.id));
+  }, [selectedStore?.id]);
+
+  async function undoAutoPostedTransaction(transactionId: string) {
+    if (!requireWrite()) return;
+    const response = await fetch("/api/transactions/undo-auto-post", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transactionId }),
+    });
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    if (!response.ok) {
+      setMessage({ type: "error", text: body?.error ?? "Could not undo the automatic post." });
+      return;
+    }
+
+    setAutoPostNotice((current) => {
+      if (!current) return current;
+      const transactionIds = current.transactionIds.filter((id) => id !== transactionId);
+      if (transactionIds.length === 0) {
+        clearAutoPostNotice();
+        return null;
+      }
+      const next = {
+        ...current,
+        transactionIds,
+        postedCount: transactionIds.length,
+      };
+      saveAutoPostNotice(next);
+      return next;
+    });
+    await loadData();
+  }
+
+  async function undoAutoPostNotice() {
+    if (!autoPostNotice || !requireWrite()) return;
+    for (const transactionId of autoPostNotice.transactionIds) {
+      const response = await fetch("/api/transactions/undo-auto-post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactionId }),
+      });
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        setMessage({ type: "error", text: body?.error ?? "Could not undo the automatic post." });
+        await loadData();
+        return;
+      }
+    }
+    clearAutoPostNotice();
+    setAutoPostNotice(null);
+    await loadData();
+  }
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -2132,6 +2223,19 @@ function TransactionsPageContent() {
 
       <FormBanner message={message} />
 
+      {autoPostNotice && autoPostNotice.postedCount > 0 && (
+        <div className="rounded-lg px-3 py-2 text-[12px] bg-green-500/10 border border-green-500/20 text-green-400 flex flex-wrap items-center gap-2">
+          <span>{formatAutoPostBanner(autoPostNotice.postedCount, autoPostNotice.postedAmount)}</span>
+          {autoPostNotice.transactionIds.length > 0 && (
+            <ReadOnlyGuard>
+              <button type="button" className="btn-outline text-[11px]" onClick={() => void undoAutoPostNotice()}>
+                Undo
+              </button>
+            </ReadOnlyGuard>
+          )}
+        </div>
+      )}
+
       <div className="card flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="text-[14px] font-semibold text-adaptive-primary">Import Bank Transactions</div>
@@ -2856,7 +2960,12 @@ function TransactionsPageContent() {
                         </td>
                         <td className="py-3 pr-3 text-right font-semibold tabular-nums text-[var(--text-primary)]">{fmtDollar(row.amount)}</td>
                         <td className="py-3 pr-3">
-                          <StatusBadge status={row.status} excluded={row.excluded} />
+                          <span className="inline-flex items-center gap-1.5">
+                            <StatusBadge status={row.status} excluded={row.excluded} />
+                            {autoPostedIds.has(row.id) && (
+                              <span className="badge badge-blue text-[10px]">Auto</span>
+                            )}
+                          </span>
                         </td>
                         <td className="py-3 pr-3">
                           {excluded ? (
@@ -2943,6 +3052,18 @@ function TransactionsPageContent() {
                           )}
                           {(activeTab === "posted" || (activeTab === "all" && posted)) && (
                             <>
+                              {autoPostedIds.has(row.id) && (
+                                <ReadOnlyGuard>
+                                  <button
+                                    type="button"
+                                    className="btn-outline text-[11px] mr-1.5"
+                                    onClick={() => void undoAutoPostedTransaction(row.id)}
+                                    disabled={saving || posting}
+                                  >
+                                    Undo
+                                  </button>
+                                </ReadOnlyGuard>
+                              )}
                               <ReadOnlyGuard>
                                 <button
                                   type="button"

@@ -18,7 +18,12 @@ import type {
   FinancialDataSource,
   TransactionStatus,
 } from "@/lib/financials";
-import { categorizeWithRules, reverseTransactionPlLinkPosting } from "@/lib/financials";
+import {
+  categorizeWithRules,
+  reverseTransactionPlLinkPosting,
+  syncPostedLinkAfterBankChange,
+  type FinancialsSupabaseClient,
+} from "@/lib/financials";
 import { createAdminSupabaseClient } from "@/lib/supabase-admin";
 import { decryptTokenIfEncrypted, encryptToken } from "@/lib/tokenEncryption";
 import {
@@ -414,6 +419,21 @@ export async function flagPlaidConnectionNewTransactions(itemId: string): Promis
   }
 }
 
+async function loadPlaidConnectionIdByItemId(itemId: string): Promise<string | null> {
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("plaid_connections")
+    .select("id")
+    .eq("plaid_item_id", itemId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load Plaid connection for item ${itemId}: ${error.message}`);
+  }
+
+  return (data?.id as string | undefined) ?? null;
+}
+
 export async function setPlaidConnectionItemError(
   itemId: string,
   errorCode: string,
@@ -454,6 +474,10 @@ export async function handlePlaidWebhookPayload(payload: PlaidWebhookPayload): P
 
   if (webhookType === "TRANSACTIONS" && webhookCode === "SYNC_UPDATES_AVAILABLE") {
     await flagPlaidConnectionNewTransactions(itemId);
+    const connectionId = await loadPlaidConnectionIdByItemId(itemId);
+    if (connectionId) {
+      await syncPlaidTransactions(connectionId);
+    }
     return;
   }
 
@@ -989,7 +1013,9 @@ async function loadExistingPlaidTransactions(
   const admin = createAdminSupabaseClient();
   const { data, error } = await admin
     .from("bank_transactions")
-    .select("id, plaid_transaction_id, status, description, transaction_date, amount")
+    .select(
+      "id, plaid_transaction_id, status, description, transaction_date, amount, transaction_type, category, pending, user_id"
+    )
     .eq("store_id", storeId)
     .in("plaid_transaction_id", plaidTransactionIds);
 
@@ -1026,6 +1052,28 @@ async function applyPlaidAddedTransactions(params: {
   let inserted = 0;
   let reconciled = 0;
 
+  for (const txn of added) {
+    const alreadySettled = existingByPlaidId.get(txn.transaction_id);
+    if (!alreadySettled || alreadySettled.status !== "posted") continue;
+    const normalized = normalizePlaidTransaction(txn);
+    const { error: adjustError } = await syncPostedLinkAfterBankChange(admin as unknown as FinancialsSupabaseClient, {
+      storeId,
+      userId,
+      transactionId: alreadySettled.id,
+      previous: alreadySettled,
+      next: {
+        transaction_date: normalized.transaction_date,
+        amount: normalized.amount,
+        transaction_type: normalized.transaction_type,
+        description: normalized.description,
+      },
+      rules,
+    });
+    if (adjustError) {
+      throw new Error(`Failed to update posted P&L after Plaid reconcile: ${adjustError}`);
+    }
+  }
+
   const insertRows = [];
 
   for (const plan of plans) {
@@ -1040,12 +1088,33 @@ async function applyPlaidAddedTransactions(params: {
           description: normalized.description,
           amount: normalized.amount,
           transaction_type: normalized.transaction_type,
+          pending: false,
           modified_at: new Date().toISOString(),
         })
         .eq("id", plan.existingRowId);
 
       if (error) {
         throw new Error(`Failed to reconcile Plaid transaction: ${error.message}`);
+      }
+
+      const existing = existingByPlaidId.get(plan.previousPlaidTransactionId);
+      if (existing) {
+        const { error: adjustError } = await syncPostedLinkAfterBankChange(admin as unknown as FinancialsSupabaseClient, {
+          storeId,
+          userId,
+          transactionId: plan.existingRowId,
+          previous: existing,
+          next: {
+            transaction_date: normalized.transaction_date,
+            amount: normalized.amount,
+            transaction_type: normalized.transaction_type,
+            description: normalized.description,
+          },
+          rules,
+        });
+        if (adjustError) {
+          throw new Error(`Failed to update posted P&L after Plaid reconcile: ${adjustError}`);
+        }
       }
 
       console.info("[plaid/sync] reconciled added transaction to existing row", {
@@ -1079,6 +1148,7 @@ async function applyPlaidAddedTransactions(params: {
       original_category: category as BankImportCategory,
       plaid_transaction_id: normalized.plaid_transaction_id,
       plaid_account_id: normalized.plaid_account_id,
+      pending: normalized.pending,
       status: "needs_review" satisfies TransactionStatus,
       is_reviewed: false,
       excluded: false,
@@ -1124,12 +1194,15 @@ async function applyPlaidModifiedTransactions(params: {
     const status = existing.status ?? "needs_review";
 
     if (isPlaidSyncProtectedStatus(status)) {
-      if (normalized.description !== (existing.description ?? "")) {
+      const descriptionChanged = normalized.description !== (existing.description ?? "");
+      const pendingChanged = Boolean(existing.pending) !== normalized.pending;
+      if (descriptionChanged || pendingChanged) {
         const { error } = await admin
           .from("bank_transactions")
           .update({
             description: normalized.description,
             plaid_account_id: normalized.plaid_account_id,
+            pending: normalized.pending,
             modified_at: new Date().toISOString(),
           })
           .eq("id", existing.id);
@@ -1164,6 +1237,7 @@ async function applyPlaidModifiedTransactions(params: {
         transaction_type: normalized.transaction_type,
         category: category as BankImportCategory,
         plaid_account_id: normalized.plaid_account_id,
+        pending: normalized.pending,
         modified_at: new Date().toISOString(),
       })
       .eq("id", existing.id);
