@@ -46,7 +46,7 @@ import { replaceFullDocument } from "@/lib/navigate-after-auth-change";
 const TOTAL_STEPS = 4;
 const ONBOARDING_NAV_TIMEOUT_MS = 5000;
 
-const STEP_LABELS = ["Welcome", "Your Store", "Occupancy", "Financials"];
+const STEP_LABELS = ["Welcome", "Your Store", "Financials", "Occupancy"];
 
 type OnboardingPhase = "choice" | "wizard" | "join";
 
@@ -248,6 +248,8 @@ function OnboardingContent() {
   const [onboardingRecheckTick, setOnboardingRecheckTick] = useState(0);
   const completingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
+  /** Set only after CSV or manual numbers are saved on the bank step. */
+  const savedFinancialModeRef = useRef<FinancialMode>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -781,14 +783,17 @@ function OnboardingContent() {
     setBusy(true);
     setErrorMessage("");
 
-    if (!skip && form.occupancy) {
-      const ok = await saveOccupancy(storeId);
-      setBusy(false);
-      if (!ok) return;
-    } else {
-      setBusy(false);
+    // A connected bank is the source of truth; never layer CSV or manual numbers on top of it.
+    if (!skip && form.financialMode && !plaidResult) {
+      const ok = await saveFinancials(storeId);
+      if (!ok) {
+        setBusy(false);
+        return;
+      }
+      savedFinancialModeRef.current = form.financialMode;
     }
 
+    setBusy(false);
     goToStep(4, "left");
   }
 
@@ -797,19 +802,21 @@ function OnboardingContent() {
     setBusy(true);
     setErrorMessage("");
 
-    let nextHasEstimate = hasValuationEstimate;
-    let nextEstimate = estimatedValue;
-    let nextValuationDataMonths = valuationDataMonths;
-
-    // A connected bank is the source of truth; never layer CSV or manual numbers on top of it.
-    if (!skip && form.financialMode && !plaidResult) {
-      const ok = await saveFinancials(storeId);
+    if (!skip && form.occupancy) {
+      const ok = await saveOccupancy(storeId);
       if (!ok) {
         setBusy(false);
         return;
       }
+    }
 
-      if (form.financialMode === "manual") {
+    let nextHasEstimate = hasValuationEstimate;
+    let nextEstimate = estimatedValue;
+    let nextValuationDataMonths = valuationDataMonths;
+
+    const savedFinancialMode = savedFinancialModeRef.current;
+    if (savedFinancialMode && !plaidResult) {
+      if (savedFinancialMode === "manual") {
         const revenue = toNullableNum(form.monthlyRevenue) ?? 0;
         if (revenue > 0) {
           const valuation = await getStoreValuation(storeId);
@@ -1248,123 +1255,6 @@ function OnboardingContent() {
                   {step === 3 && (
                     <div>
                       <h2 className="text-[24px] font-bold text-[var(--text-primary)] mb-1">
-                        Do you own or lease your location?
-                      </h2>
-                      <p className="text-[13px] text-[var(--text-muted)] mb-6">
-                        Occupancy details affect your valuation and lending profile.
-                      </p>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                        {(
-                          [
-                            { value: "lease" as const, label: "I Lease" },
-                            { value: "own" as const, label: "I Own My Building" },
-                          ] as const
-                        ).map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => setField("occupancy", option.value)}
-                            className={clsx(
-                              "rounded-xl border-2 px-4 py-5 text-[15px] font-semibold transition-colors min-h-[72px]",
-                              form.occupancy === option.value
-                                ? "border-blue-500 bg-blue-500/10 text-[var(--accent-blue)]"
-                                : "border-[var(--border)] text-[var(--text-secondary)] hover:border-blue-400/50"
-                            )}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      {form.occupancy === "lease" && (
-                        <div className="space-y-4 border-t border-[var(--border)] pt-5">
-                          <Field label="Monthly Rent">
-                            <input
-                              id="onboarding-monthlyrent"
-                              type="number"
-                              value={form.monthlyRent}
-                              onChange={(e) => setField("monthlyRent", e.target.value)}
-                              onKeyDown={preventEnterSubmit}
-                              className={INPUT_CLASS}
-                              placeholder="6200"
-                            />
-                          </Field>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <Field label="Lease End Date">
-                              <input
-                                id="onboarding-leaseenddate"
-                                type="date"
-                                value={form.leaseEndDate}
-                                onChange={(e) => setField("leaseEndDate", e.target.value)}
-                                onKeyDown={preventEnterSubmit}
-                                className={INPUT_CLASS}
-                              />
-                            </Field>
-                            <Field label="Annual Escalation %">
-                              <input
-                                id="onboarding-annualescalation"
-                                type="number"
-                                value={form.annualEscalation}
-                                onChange={(e) => setField("annualEscalation", e.target.value)}
-                                onKeyDown={preventEnterSubmit}
-                                className={INPUT_CLASS}
-                                placeholder="3"
-                              />
-                            </Field>
-                          </div>
-                        </div>
-                      )}
-
-                      {form.occupancy === "own" && (
-                        <div className="space-y-4 border-t border-[var(--border)] pt-5">
-                          <Field label="Monthly Mortgage Payment">
-                            <input
-                              id="onboarding-monthlymortgage"
-                              type="number"
-                              value={form.monthlyMortgage}
-                              onChange={(e) => setField("monthlyMortgage", e.target.value)}
-                              onKeyDown={preventEnterSubmit}
-                              className={INPUT_CLASS}
-                              placeholder="4500"
-                            />
-                          </Field>
-                          <Field label="Estimated Building Value">
-                            <input
-                              id="onboarding-buildingvalue"
-                              type="number"
-                              value={form.buildingValue}
-                              onChange={(e) => setField("buildingValue", e.target.value)}
-                              onKeyDown={preventEnterSubmit}
-                              className={INPUT_CLASS}
-                              placeholder="850000"
-                            />
-                          </Field>
-                          <Field label="Estimated Market Rent ($/month)">
-                            <input
-                              id="onboarding-marketrent"
-                              type="number"
-                              min="1"
-                              required
-                              value={form.marketRentEstimate}
-                              onChange={(e) => setField("marketRentEstimate", e.target.value)}
-                              onKeyDown={preventEnterSubmit}
-                              className={INPUT_CLASS}
-                              placeholder="1500"
-                            />
-                            <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
-                              What a tenant would pay for this space. Required for an accurate
-                              owner-occupied valuation — not written to your books.
-                            </p>
-                          </Field>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {step === 4 && (
-                    <div>
-                      <h2 className="text-[24px] font-bold text-[var(--text-primary)] mb-1">
                         Connect your bank
                       </h2>
                       <p className="text-[13px] text-[var(--text-muted)] mb-6">
@@ -1479,6 +1369,123 @@ function OnboardingContent() {
                     </div>
                   )}
 
+                  {step === 4 && (
+                    <div>
+                      <h2 className="text-[24px] font-bold text-[var(--text-primary)] mb-1">
+                        Do you own or lease your location?
+                      </h2>
+                      <p className="text-[13px] text-[var(--text-muted)] mb-6">
+                        Occupancy details affect your valuation and lending profile.
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                        {(
+                          [
+                            { value: "lease" as const, label: "I Lease" },
+                            { value: "own" as const, label: "I Own My Building" },
+                          ] as const
+                        ).map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setField("occupancy", option.value)}
+                            className={clsx(
+                              "rounded-xl border-2 px-4 py-5 text-[15px] font-semibold transition-colors min-h-[72px]",
+                              form.occupancy === option.value
+                                ? "border-blue-500 bg-blue-500/10 text-[var(--accent-blue)]"
+                                : "border-[var(--border)] text-[var(--text-secondary)] hover:border-blue-400/50"
+                            )}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {form.occupancy === "lease" && (
+                        <div className="space-y-4 border-t border-[var(--border)] pt-5">
+                          <Field label="Monthly Rent">
+                            <input
+                              id="onboarding-monthlyrent"
+                              type="number"
+                              value={form.monthlyRent}
+                              onChange={(e) => setField("monthlyRent", e.target.value)}
+                              onKeyDown={preventEnterSubmit}
+                              className={INPUT_CLASS}
+                              placeholder="6200"
+                            />
+                          </Field>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <Field label="Lease End Date">
+                              <input
+                                id="onboarding-leaseenddate"
+                                type="date"
+                                value={form.leaseEndDate}
+                                onChange={(e) => setField("leaseEndDate", e.target.value)}
+                                onKeyDown={preventEnterSubmit}
+                                className={INPUT_CLASS}
+                              />
+                            </Field>
+                            <Field label="Annual Escalation %">
+                              <input
+                                id="onboarding-annualescalation"
+                                type="number"
+                                value={form.annualEscalation}
+                                onChange={(e) => setField("annualEscalation", e.target.value)}
+                                onKeyDown={preventEnterSubmit}
+                                className={INPUT_CLASS}
+                                placeholder="3"
+                              />
+                            </Field>
+                          </div>
+                        </div>
+                      )}
+
+                      {form.occupancy === "own" && (
+                        <div className="space-y-4 border-t border-[var(--border)] pt-5">
+                          <Field label="Monthly Mortgage Payment">
+                            <input
+                              id="onboarding-monthlymortgage"
+                              type="number"
+                              value={form.monthlyMortgage}
+                              onChange={(e) => setField("monthlyMortgage", e.target.value)}
+                              onKeyDown={preventEnterSubmit}
+                              className={INPUT_CLASS}
+                              placeholder="4500"
+                            />
+                          </Field>
+                          <Field label="Estimated Building Value">
+                            <input
+                              id="onboarding-buildingvalue"
+                              type="number"
+                              value={form.buildingValue}
+                              onChange={(e) => setField("buildingValue", e.target.value)}
+                              onKeyDown={preventEnterSubmit}
+                              className={INPUT_CLASS}
+                              placeholder="850000"
+                            />
+                          </Field>
+                          <Field label="Estimated Market Rent ($/month)">
+                            <input
+                              id="onboarding-marketrent"
+                              type="number"
+                              min="1"
+                              required
+                              value={form.marketRentEstimate}
+                              onChange={(e) => setField("marketRentEstimate", e.target.value)}
+                              onKeyDown={preventEnterSubmit}
+                              className={INPUT_CLASS}
+                              placeholder="1500"
+                            />
+                            <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+                              What a tenant would pay for this space. Required for an accurate
+                              owner-occupied valuation — not written to your books.
+                            </p>
+                          </Field>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {!showCompletion && phase === "wizard" && step > 1 && (
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-8 pt-6 border-t border-[var(--border)]">
                       <button
@@ -1503,7 +1510,7 @@ function OnboardingContent() {
                       </button>
 
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 order-1 sm:order-2">
-                        {step >= 3 && !(step === 4 && plaidResult) && (
+                        {step >= 3 && !(step === 3 && plaidResult) && (
                           <button
                             type="button"
                             disabled={busy}
@@ -1513,7 +1520,7 @@ function OnboardingContent() {
                             }}
                             className="text-[13px] text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-40 px-2 py-2"
                           >
-                            {step === 4 ? "Skip for now" : "I'll add this later"}
+                            {step === 3 ? "Skip for now" : "I'll add this later"}
                           </button>
                         )}
 
