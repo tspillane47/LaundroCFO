@@ -60,7 +60,13 @@ function trackOncePerSession(
  * No-ops on the server and on repeat calls (sessionStorage guard after a successful queue).
  */
 export function trackSignUpEvent(): boolean {
-  return trackOncePerSession(SIGN_UP_STORAGE_KEY, "sign_up", { method: "email" });
+  const sent = trackOncePerSession(SIGN_UP_STORAGE_KEY, "sign_up", { method: "email" });
+  if (sent && typeof window !== "undefined") {
+    // Tells Meta ads a signup happened so campaigns can optimize for it.
+    const fbq = (window as unknown as { fbq?: (...args: unknown[]) => void }).fbq;
+    if (typeof fbq === "function") fbq("track", "CompleteRegistration");
+  }
+  return sent;
 }
 
 /**

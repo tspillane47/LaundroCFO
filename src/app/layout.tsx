@@ -30,6 +30,7 @@ import { SessionProvider, useSession } from "@/lib/session-context";
 import { replaceFullDocument } from "@/lib/navigate-after-auth-change";
 import { SignupConversionTracker } from "@/components/auth/SignupConversionTracker";
 import { InternalTrafficGuard } from "@/components/analytics/InternalTrafficGuard";
+import { MetaPixel } from "@/components/analytics/MetaPixel";
 
 function getUserInitials(fullName: string | null, email: string | null): string {
   const name = fullName?.trim();
@@ -824,6 +825,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <html lang="en">
         <body>
           <GoogleAnalytics gaId="G-ZCTEFSVP13" />
+          <MetaPixel />
           <ToastProvider>
             <SessionTree>{children}</SessionTree>
           </ToastProvider>
@@ -837,6 +839,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <html lang="en">
         <body>
           <GoogleAnalytics gaId="G-ZCTEFSVP13" />
+          <MetaPixel />
           <ToastProvider>
             <SessionTree>
               <StoreProvider>{children}</StoreProvider>
@@ -851,6 +854,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <GoogleAnalytics gaId="G-ZCTEFSVP13" />
+          <MetaPixel />
         <ToastProvider>
           <SessionTree>
             <StoreProvider>
